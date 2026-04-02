@@ -1,0 +1,166 @@
+module;
+#include <algorithm>
+#include <cstdint>
+#include <memory>
+#include <utility>
+#include <vector>
+
+export module Nandina.Layout;
+
+import Nandina.Core;
+
+export namespace Nandina {
+
+    enum class Align : std::uint8_t {
+        start,
+        center,
+        end,
+        stretch,
+        space_between,
+        space_around,
+    };
+
+    // ── LayoutContainer ───────────────────────────────────────────────────────
+    class LayoutContainer : public Component {
+    public:
+        auto gap(float value) -> LayoutContainer& {
+            gap_ = value; mark_dirty(); return *this;
+        }
+
+        auto padding(float value) -> LayoutContainer& {
+            padding_top_ = padding_right_ = padding_bottom_ = padding_left_ = value;
+            mark_dirty(); return *this;
+        }
+
+        auto padding(float h, float v) -> LayoutContainer& {
+            padding_top_ = padding_bottom_ = v;
+            padding_left_ = padding_right_ = h;
+            mark_dirty(); return *this;
+        }
+
+        auto align_items(Align value) -> LayoutContainer& {
+            align_items_ = value; mark_dirty(); return *this;
+        }
+
+        auto justify_content(Align value) -> LayoutContainer& {
+            justify_content_ = value; mark_dirty(); return *this;
+        }
+
+        auto add(std::unique_ptr<Widget> child) -> LayoutContainer& {
+            add_child(std::move(child));
+            return *this;
+        }
+
+        virtual auto layout() -> void = 0;
+
+    protected:
+        float gap_            = 0.0f;
+        float padding_top_    = 0.0f;
+        float padding_right_  = 0.0f;
+        float padding_bottom_ = 0.0f;
+        float padding_left_   = 0.0f;
+        Align align_items_     = Align::start;
+        Align justify_content_ = Align::start;
+    };
+
+    // ── Column ────────────────────────────────────────────────────────────────
+    class Column final : public LayoutContainer {
+    public:
+        static auto Create() -> std::unique_ptr<Column> {
+            return std::make_unique<Column>();
+        }
+
+        auto gap(float value) -> Column& {
+            LayoutContainer::gap(value); return *this;
+        }
+
+        auto padding(float value) -> Column& {
+            LayoutContainer::padding(value); return *this;
+        }
+
+        auto padding(float h, float v) -> Column& {
+            LayoutContainer::padding(h, v); return *this;
+        }
+
+        auto align_items(Align value) -> Column& {
+            LayoutContainer::align_items(value); return *this;
+        }
+
+        auto justify_content(Align value) -> Column& {
+            LayoutContainer::justify_content(value); return *this;
+        }
+
+        auto layout() -> void override {
+            float cursor_y = y() + padding_top_;
+            bool first = true;
+            for_each_child([&](Widget& child) {
+                if (!first) { cursor_y += gap_; }
+                first = false;
+                child.set_bounds(x() + padding_left_, cursor_y,
+                                 width() - padding_left_ - padding_right_,
+                                 child.height());
+                cursor_y += child.height();
+            });
+        }
+    };
+
+    // ── Row ───────────────────────────────────────────────────────────────────
+    class Row final : public LayoutContainer {
+    public:
+        static auto Create() -> std::unique_ptr<Row> {
+            return std::make_unique<Row>();
+        }
+
+        auto gap(float value) -> Row& {
+            LayoutContainer::gap(value); return *this;
+        }
+
+        auto padding(float value) -> Row& {
+            LayoutContainer::padding(value); return *this;
+        }
+
+        auto padding(float h, float v) -> Row& {
+            LayoutContainer::padding(h, v); return *this;
+        }
+
+        auto align_items(Align value) -> Row& {
+            LayoutContainer::align_items(value); return *this;
+        }
+
+        auto justify_content(Align value) -> Row& {
+            LayoutContainer::justify_content(value); return *this;
+        }
+
+        auto layout() -> void override {
+            float cursor_x = x() + padding_left_;
+            bool first = true;
+            for_each_child([&](Widget& child) {
+                if (!first) { cursor_x += gap_; }
+                first = false;
+                child.set_bounds(cursor_x, y() + padding_top_,
+                                 child.width(),
+                                 height() - padding_top_ - padding_bottom_);
+                cursor_x += child.width();
+            });
+        }
+    };
+
+    // ── Stack ─────────────────────────────────────────────────────────────────
+    class Stack final : public LayoutContainer {
+    public:
+        static auto Create() -> std::unique_ptr<Stack> {
+            return std::make_unique<Stack>();
+        }
+
+        auto layout() -> void override {
+            const float cx = x() + padding_left_;
+            const float cy = y() + padding_top_;
+            const float cw = width()  - padding_left_ - padding_right_;
+            const float ch = height() - padding_top_  - padding_bottom_;
+            for_each_child([&](Widget& child) {
+                child.set_bounds(cx, cy, cw, ch);
+            });
+        }
+    };
+
+} // export namespace Nandina

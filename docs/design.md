@@ -1,13 +1,14 @@
-# NovaUI 设计文档（当前实现对齐版）
+# Nandina 设计文档
 
 ## 1. 项目目标
 
-NovaUI 目标是在 C++ 桌面端提供接近前端框架的开发体验：
+Nandina 目标是在现代 C++ 桌面端提供接近前端框架的开发体验：
 
-1. 组件可组合，页面可拆分。
-2. API 语义化，支持链式调用与回调事件。
-3. 架构清晰，避免宏系统与重型反射依赖。
-4. 保留现代 UI 系统的扩展能力（主题、布局、动画、复合组件）。
+1. **零宏**：完全不依赖宏魔法，所有 API 均为纯 C++ 表达式。
+2. **现代 C++26**：使用 Modules、概念、范围等最新语言特性。
+3. **组合优于继承**：复杂组件由 Action 单元组合而成，不形成继承链臃肿体。
+4. **响应式状态**：`State<T>` / `Computed<F>` / `Effect` 驱动 UI 自动更新，无需手动 `setState`。
+5. **跨平台渲染**：WebGPU(Vulkan/Metal/DX12) > OpenGL > 软件光栅化，后端透明于组件代码。
 
 ---
 
@@ -15,159 +16,257 @@ NovaUI 目标是在 C++ 桌面端提供接近前端框架的开发体验：
 
 | 层 | 选型 | 说明 |
 | :-- | :-- | :-- |
-| Shell | SDL3 | 窗口、事件、纹理呈现，跨平台稳定 |
-| Render | ThorVG | 矢量绘制与软件后端，适合逐步演进 |
-| Layout | Yoga（规划） | 后续接入 Flex 布局，当前先保留接口 |
-| Build | CMake + Ninja | 使用 C++ modules 依赖扫描，规避 Meson 顺序问题 |
+| 语言 | C++26 + Modules | 零头文件，概念约束，最新标准 |
+| 窗口/事件 | SDL3 | 跨平台窗口与事件，轻量稳定 |
+| 矢量渲染 | ThorVG | 软件 / OpenGL / WebGPU 后端，路径+SVG 能力 |
+| 文字 | FreeType + HarfBuzz | Unicode 字形光栅化 + 文本整形 |
+| 布局 | Row/Column/Stack → Yoga（后期） | 先自实现 Flex 容器，后期接入 Yoga |
+| 构建 | CMake + Ninja | C++26 Modules 依赖扫描，CMakePresets |
+| 包管理 | vcpkg manifest 模式 | 声明式依赖，CI 可复现 |
 
-说明：当前仓库主线已切换 CMake，模块构建由 CMake 扫描管理。
+### 渲染后端优先级策略
 
----
+```
+WebGPU (Vulkan / Metal / DX12)
+        ↓ 探测失败
+    OpenGL
+        ↓ 探测失败
+  SwCanvas（软件光栅化）
+```
 
-## 3. 架构概览
-
-采用保留模式组件树（Retained Mode）：
-
-1. Page 层：用户自定义页面与窗口子类。
-2. WindowController 层：生命周期与主循环控制。
-3. Component/Widget 层：树结构、事件、状态。
-4. Renderer 层：将组件树转为 ThorVG paint 并提交。
-
-### 3.1 数据流
-
-1. SDL 事件进入窗口。
-2. 事件转换为内部 Event。
-3. 组件树命中测试并分发。
-4. 组件状态变化触发重绘。
-5. 渲染器将当前组件树绘制到窗口。
-
-### 3.2 组件组合思想
-
-核心原则：复杂组件由基础组件组合而成，而不是单体巨类。
-
-例如 Button：
-
-1. FocusComponent：焦点/高亮层。
-2. RectangleComponent：几何背景层。
-3. Button 自身：输入事件与组合行为控制。
+后端选择对组件代码完全透明，ThorVG 统一抽象渲染面。
 
 ---
 
-## 4. 当前模块说明
+## 3. 架构总览
 
-### 4.1 Core 模块
+### 3.1 分层架构图
 
-文件：[src/core/Core.ixx](src/core/Core.ixx)
+```
+Application → Window → Layout → Core ← Reactive → Style → Text → Types
+```
 
-包含：
+| 模块 | 职责 |
+| :-- | :-- |
+| `Nandina.Types` | Color、Position、Size、Rect 等基础值类型 |
+| `Nandina.Core` | Widget 树 / 几何 / dirty 标记 / 事件分发 / Component / Button |
+| `Nandina.Reactive` | State / ReadState / Computed / Effect / EffectScope |
+| `Nandina.Style` | ThemeTokens、Design Token、Variant Recipe |
+| `Nandina.Text` | UTF-8 整形 → GlyphRun → Glyph Atlas → ThorVG |
+| `Nandina.Layout` | Row / Column / Stack，后期接入 Yoga |
+| `Nandina.Components.*` | Label / Button / Input 等高层组件 |
+| `Nandina.Window` | NanWindow（SDL3 + ThorVG）、WindowController |
+| `Nandina.Application` | 应用入口，初始化 SDL3 / ThorVG |
 
-1. Event / MouseButton
-2. Signal / Connection
-3. Widget（基础树与事件能力）
-4. Component（可继承业务基类）
-5. RectangleComponent / FocusComponent / Button（组合示例）
+### 3.2 数据流
 
-### 4.2 Window 模块
-
-文件：[src/core/Window.ixx](src/core/Window.ixx)
-
-包含：
-
-1. NanWindow：底层窗口与渲染执行器。
-2. WindowController：可继承窗口控制器（类似 Qt 风格）。
-
-WindowController 对外约定：
-
-1. `title()`：窗口标题。
-2. `initial_size()`：初始大小。
-3. `build_root()`：构建页面根组件。
-4. `on_start()/on_frame()/on_shutdown()`：生命周期扩展点。
-
-### 4.3 几何类型模块
-
-文件：
-
-1. [src/types/Position.ixx](src/types/Position.ixx)
-2. [src/types/Size.ixx](src/types/Size.ixx)
-3. [src/types/Rect.ixx](src/types/Rect.ixx)
-
-说明：这些类型作为后续布局、命中测试和样式系统的公共基石。
-
----
-
-## 5. 设计原则
-
-1. 用户代码不直接操作底层窗口细节。
-2. 组件优先组合而非继承链膨胀。
-3. 事件系统保持类型安全与低心智负担。
-4. 先打通最小闭环，再逐步提升样式与布局能力。
-
----
-
-## 6. 页面开发建议范式
-
-建议使用“页面子类 + build_root”方式组织业务 UI：
-
-1. 每个 Page 自己管理组件树。
-2. WindowController 管理执行循环。
-3. 回调逻辑写在页面或组件内。
-
-示例（抽象）：
-
-```cpp
-class SettingsWindow : public Nandina::WindowController {
-protected:
-    auto build_root() -> std::unique_ptr<Nandina::Widget> override {
-        auto page = std::make_unique<Nandina::Component>();
-        auto save = Nandina::Button::Create();
-        save->set_bounds(560, 500, 220, 56);
-        page->add_child(std::move(save));
-        return page;
-    }
-};
+```
+SDL 事件
+  ↓
+NanWindow::process_events()
+  ↓
+translate_and_dispatch() → Nandina::Event
+  ↓
+Widget 树命中测试 (dispatch_event)
+  ↓
+handle_event() → 修改 State<T>
+  ↓
+Effect 触发 → mark_dirty() 向上冒泡
+  ↓
+render_widget() 剪枝（!dirty && !has_dirty_child 则跳过）
+  ↓
+ThorVG canvas submit → SDL 纹理更新
 ```
 
 ---
 
-## 7. 后续演进方向
+## 4. Nandina.Reactive 模块设计
 
-### 7.1 布局系统
+### 4.1 核心类型
 
-1. 先实现轻量容器（HStack/VStack/FlexContainer）占位。
-2. 保持 API 稳定后接入 Yoga。
+| 类型 | 说明 |
+| :-- | :-- |
+| `State<T>` | 可读写响应式值，`operator()()` 读值并自动注册依赖，`set()` 写值并通知观察者 |
+| `ReadState<T>` | 只读视图，由 `State<T>::as_read_only()` 创建，传给子组件 Props |
+| `Computed<F>` | 惰性派生状态，自动追踪 State 依赖，访问时按需重算 |
+| `Effect` | 副作用函数，每次依赖 State 发生变化时重新执行 |
+| `EffectScope` | RAII 生命周期容器，scope 析构时所有 Effect 自动断开 |
 
-### 7.2 样式系统
+### 4.2 依赖追踪内部机制
 
-1. Theme Tokens（颜色、间距、圆角、字体）。
-2. Variant Recipe（Primary/Ghost/Destructive）。
-3. 状态样式（hover/pressed/focused/disabled）。
+```cpp
+// thread_local 当前 invalidator 指针
+inline thread_local std::function<void()>* current_invalidator = nullptr;
 
-### 7.3 文本系统
+// State::operator()() 调用时
+void track_access() const {
+    if (current_invalidator) {
+        observers_.push_back({ next_id_++, true, *current_invalidator });
+    }
+}
 
-1. Button 文本可视化。
-2. 后续接入字体加载与排版。
+// Effect::run() 执行时
+void run() {
+    self_invalidator_ = [this]{ run(); };     // 重新执行的闭包
+    auto* prev = current_invalidator;
+    current_invalidator = &self_invalidator_;
+    fn_();                                     // 执行副作用，期间读取的 State 会注册 self_invalidator_
+    current_invalidator = prev;
+}
+```
 
-### 7.4 组件库扩展
+### 4.3 作用域层级
 
-1. Input、Checkbox、Switch。
-2. Dialog、Dropdown、Toast。
+| 层级 | 所有者 | 说明 |
+| :-- | :-- | :-- |
+| 组件局部 | Component::scope_ | 随组件析构自动清理 |
+| 父→子传递 | Props::ReadState<T> | 父组件持有 State，子组件仅读，Widget 树保证子不长于父 |
+| 全局应用 | AppStore | 跨组件共享状态，手动管理生命周期 |
 
 ---
 
-## 8. 已知约束
+## 5. dirty 标记设计
 
-1. 当前 Button 组合已具备交互反馈，但文本绘制尚未实现。
-2. 当前布局主要依赖绝对坐标，Flex 仍在后续阶段。
-3. 主题系统尚未启用全局 Token 解析流程。
+Widget 持有两个标志位：
+
+- `dirty_`：本节点需要重绘。
+- `has_dirty_child_`：子树中存在 dirty 节点。
+
+### 5.1 mark_dirty() 向上冒泡
+
+```
+widget.mark_dirty()
+  → dirty_ = true
+  → parent_->bubble_dirty_child()
+       → parent_->has_dirty_child_ = true
+       → parent_->parent_->bubble_dirty_child() ...
+```
+
+### 5.2 render_widget() 剪枝
+
+```
+render_widget(widget)
+  if (!widget.is_dirty() && !widget.has_dirty_child())
+      return;   // 跳过整棵子树
+  if (widget.is_dirty())
+      // 重绘本节点
+  for_each_child → render_widget(child)
+```
 
 ---
 
-## 9. 里程碑判定标准
+## 6. 组件模型
 
-MVP 阶段达成标准：
+### 6.1 继承关系
 
-1. 可继承窗口模型稳定运行。
-2. 组件树可构建、可响应点击。
-3. 组合组件（Button）具备可见状态变化。
-4. CMake 构建稳定可复现。
+```
+Widget  (树 / 几何 / dirty / 事件)
+  └── Component  (业务基类 + EffectScope scope_)
+        └── Label / Button / Input ...
+```
 
+### 6.2 Action 组合模型
+
+行为单元（Action）以组合而非继承方式附加到组件：
+
+| Action | 职责 |
+| :-- | :-- |
+| `HoverAction` | 悬停状态追踪 |
+| `PressAction` | 按压状态追踪 |
+| `FocusAction` | 焦点状态追踪 |
+
+---
+
+## 7. 布局系统
+
+| 容器 | 排布方式 |
+| :-- | :-- |
+| `Row` | 子组件横向排列，支持 gap / padding / align_items / justify_content |
+| `Column` | 子组件纵向排列 |
+| `Stack` | 子组件叠放于同一位置 |
+
+后期将 Row/Column 内部计算替换为 Yoga，对外 API 不变。
+
+### 布局属性
+
+```
+gap           // 子间距
+padding       // 内边距（统一 或 水平/垂直 分开设置）
+align_items   // 交叉轴对齐
+justify_content // 主轴对齐
+```
+
+---
+
+## 8. 文字渲染流程
+
+```
+UTF-8 字符串
+  ↓ HarfBuzz 整形
+GlyphRun（字形序列 + 位置）
+  ↓ FreeType 光栅化
+Glyph Atlas 缓存（纹理）
+  ↓ ThorVG 纹理贴图
+屏幕输出
+```
+
+---
+
+## 9. Style / Theme
+
+### ThemeTokens 结构
+
+| 分类 | Token |
+| :-- | :-- |
+| 颜色 | background, foreground, primary, primary_foreground, secondary, destructive, muted, border, ring |
+| 圆角 | radius_sm, radius_md, radius_lg |
+| 间距 | spacing_1 ~ spacing_4 |
+| 字体 | font_size_sm, font_size_base, font_size_lg |
+
+---
+
+## 10. 组件定义范式
+
+Props 结构体 + 链式 API 双轨并行：
+
+```cpp
+// 链式调用风格
+auto label = Label::Create()
+    .text("Hello")
+    .font_size(16);
+
+// Props 结构体风格（适合响应式绑定）
+State<std::string> name{"Nandina"};
+auto label = Label::Create({ .text_signal = &name });
+```
+
+---
+
+## 11. 构建系统
+
+### CMakePresets
+
+| Preset | 说明 |
+| :-- | :-- |
+| debug | Debug + ASan/UBSan |
+| release | Release -O3 |
+| debug-vcpkg | Debug + vcpkg manifest |
+| release-vcpkg | Release + vcpkg manifest |
+| ci | CI 构建（继承 release-vcpkg） |
+
+### vcpkg manifest 依赖
+
+sdl3 / thorvg / freetype / harfbuzz / yoga
+
+---
+
+## 12. 里程碑
+
+| 里程碑 | 内容 | 状态 |
+| :-- | :-- | :-- |
+| M0 | 窗口 + Button 组合 + 事件分发 + ThorVG SwCanvas | ✅ 完成 |
+| M1 | Reactive 模块（State/Computed/Effect/EffectScope）+ Label + dirty 剪枝 | 🚧 进行中 |
+| M2 | Row / Column / Stack 布局容器 | ⬜ 待开始 |
+| M3 | ThemeTokens + Design Token + Variant Recipe | ⬜ 待开始 |
+| M4 | FreeType + HarfBuzz 文字渲染 + Glyph Atlas | ⬜ 待开始 |
+| M5 | 组件库扩展（Input/Checkbox/Switch 等）+ Yoga 接入 | ⬜ 待开始 |

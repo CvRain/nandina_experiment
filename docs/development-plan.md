@@ -1,156 +1,118 @@
-# NovaUI 开发计划（总任务-子任务-子任务）
+# Nandina 开发计划（M1 – M5）
 
-## 1. 基础架构稳固
+## M1：响应式核心 + Label + dirty 剪枝
 
-### 1.1 构建与工程稳定性
+### 1.1 Nandina.Reactive 模块
 
-#### 1.1.1 CMake 主线收敛
-- 固化 CMake + Ninja 为唯一构建主线。
-- 清理无效模块源配置，保证模块列表与源码一致。
-- 输出统一构建命令与调试命令。
+- [x] 创建 `src/reactive/Reactive.ixx`，导出 `Nandina.Reactive` 模块
+- [x] 实现 `State<T>`：`operator()()` 读值并自动注册依赖，`set()` 写值并通知观察者
+- [x] 实现 `ReadState<T>`：只读视图，由 `State<T>::as_read_only()` 创建
+- [x] 实现 `Computed<F>`：惰性派生状态，自动追踪 State 依赖
+- [x] 实现 `Effect`：副作用函数，依赖变化时自动重新执行
+- [x] 实现 `EffectScope`：RAII 生命周期容器，析构时断开所有 Effect
+- [x] `detail::current_invalidator` thread_local 依赖追踪机制
 
-#### 1.1.2 模块组织规范
-- 定义 `Core / Window / Types / Style` 分层边界。
-- 明确哪些模块允许相互 import，避免循环依赖。
-- 约定对外 export 的 API 面。
+### 1.2 Widget dirty 剪枝增强
 
-### 1.2 运行时闭环
+- [x] `Widget` 添加 `parent_` 非拥有指针（弱引用）
+- [x] `Widget` 添加 `has_dirty_child_` 标志位
+- [x] `add_child()` 设置 `child->parent_ = this`
+- [x] `mark_dirty()` 向上冒泡 `bubble_dirty_child()`
+- [x] `render_widget()` 剪枝：`!dirty && !has_dirty_child` 时跳过子树
+- [x] `clear_dirty()` 同时清除 `dirty_` 和 `has_dirty_child_`
+- [x] `for_each_child()` 改为 public
 
-#### 1.2.1 窗口生命周期
-- 维持 `WindowController::exec()` 作为统一入口。
-- 规范 `on_start / on_frame / on_shutdown` 行为。
+### 1.3 Component EffectScope
 
-#### 1.2.2 渲染链路
-- 规范 `process_events -> present_frame` 顺序。
-- 确认空场景与有根组件场景均可稳定绘制。
+- [x] `Component` 基类添加 `EffectScope scope_` 成员
+- [x] Core.ixx 引入 `import Nandina.Reactive`
 
----
+### 1.4 Label 组件
 
-## 2. 组件系统增强
-
-### 2.1 基类能力完善
-
-#### 2.1.1 Widget 与 Component 职责拆分
-- Widget 负责树、几何、基础事件。
-- Component 负责业务语义扩展。
-
-#### 2.1.2 事件机制增强
-- 完善按下、抬起、点击、移动的分发语义。
-- 引入事件消费规则文档。
-
-### 2.2 组合组件体系
-
-#### 2.2.1 Button 组合模型迭代
-- 继续采用 `Focus + Rectangle + Button` 组合结构。
-- 增加可配置状态（normal/hover/pressed/focused/disabled）。
-
-#### 2.2.2 基础原语补齐
-- 新增 `Box`、`Spacer` 原语。
-- 预留 `Text` 组件接口（先接口，后渲染实现）。
+- [x] 创建 `src/components/Label.ixx`，导出 `Nandina.Components.Label`
+- [x] `LabelProps` 结构体：`text_signal` 可选响应式绑定
+- [x] `Label::Create()` 无参工厂
+- [x] `Label::Create(LabelProps)` Props 工厂，支持响应式文本绑定
+- [x] 链式 API：`text()`, `font_size()`, `text_color()`
+- [x] 私有成员：`State<std::string> text_`，`float font_size_`，`text_r/g/b/a_`
+- [x] 私有构造器添加 Effect：读取 `text_()` → 调用 `mark_dirty()`
 
 ---
 
-## 3. 页面开发体验提升
+## M2：布局系统
 
-### 3.1 Page 范式标准化
+### 2.1 LayoutContainer 基类
 
-#### 3.1.1 页面模板
-- 建立 `PageWindow` 示例模板。
-- 约定 `build_root()` 的页面结构组织方式。
+- [x] 创建 `src/layout/Layout.ixx`，导出 `Nandina.Layout`
+- [x] `Align` 枚举：start / center / end / stretch / space_between / space_around
+- [x] `LayoutContainer` 抽象类（继承 Component）
+- [x] 链式 API：`gap()`, `padding()`, `align_items()`, `justify_content()`
+- [x] `add(std::unique_ptr<Widget>)` 返回 `LayoutContainer&`
+- [x] 纯虚 `layout()` 方法
 
-#### 3.1.2 页面级事件组织
-- 支持页面层统一绑定组件回调。
-- 规范连接对象生命周期管理。
+### 2.2 具体布局容器
 
-### 3.2 组合式 API 演进
+- [x] `Column::Create()`，`layout()` 纵向排列子组件
+- [x] `Row::Create()`，`layout()` 横向排列子组件
+- [x] `Stack::Create()`，`layout()` 叠放子组件
 
-#### 3.2.1 Builder/链式接口
-- 为 Button、Box 提供一致的链式 setter 风格。
-- 保证返回引用类型一致，便于连续调用。
+### 2.3 集成测试
 
-#### 3.2.2 可读性与可维护性
-- 约定组件命名与目录结构。
-- 页面示例保持接近前端组件开发体验。
-
----
-
-## 4. 布局系统（样式前置）
-
-### 4.1 轻量布局容器
-
-#### 4.1.1 本地容器实现
-- 实现 `HStack / VStack / FlexContainer` 的最小排布。
-- 支持 `gap / padding / align` 基础属性。
-
-#### 4.1.2 布局调试能力
-- 提供可视化边界辅助（开发模式）。
-- 输出布局结果日志，便于定位排版问题。
-
-### 4.2 Yoga 接入准备
-
-#### 4.2.1 属性映射
-- 设计内部布局属性到 Yoga 的映射表。
-- 对齐 FlexDirection/Justify/Align 语义。
-
-#### 4.2.2 逐步替换策略
-- 先保留本地布局行为。
-- 按容器类型逐步切换 Yoga 计算。
+- [ ] 使用 Row/Column 替换 main.cpp 中的绝对坐标布局
+- [ ] 验证 gap/padding 属性生效
 
 ---
 
-## 5. 样式系统（后置）
+## M3：样式系统
 
-### 5.1 Theme Tokens
+### 3.1 ThemeTokens
 
-#### 5.1.1 Token 结构设计
-- 颜色、圆角、间距、字体 Token 定义。
-- 默认主题与可扩展主题入口。
+- [ ] 设计 `ThemeTokens` 结构体（颜色、圆角、间距、字体 Token）
+- [ ] 实现默认 Light/Dark 主题
+- [ ] 组件可读取全局主题 Token
 
-#### 5.1.2 读取路径
-- 组件可读取全局主题。
-- 支持页面级覆盖（局部主题）。
+### 3.2 Variant Recipe
 
-### 5.2 Variant 与状态样式
-
-#### 5.2.1 Variant Recipe
-- Button 支持 Primary/Ghost/Destructive。
-- 不同状态自动解析对应绘制参数。
-
-#### 5.2.2 渲染参数解耦
-- 组件逻辑与样式解析分离。
-- 样式最终产出统一 Paint 参数对象。
+- [ ] Button 支持 Primary / Ghost / Destructive Variant
+- [ ] 各 Variant 自动解析对应绘制参数
+- [ ] 状态样式（hover / pressed / focused / disabled）
 
 ---
 
-## 6. 验证与质量
+## M4：文字渲染
 
-### 6.1 功能验证
+### 4.1 文字整形与光栅化
 
-#### 6.1.1 交互验证
-- 点击、按压、焦点反馈行为正确。
-- 组件树事件分发顺序符合预期。
+- [ ] 集成 HarfBuzz 进行 UTF-8 文本整形，输出 GlyphRun
+- [ ] 集成 FreeType 进行字形光栅化
+- [ ] 实现 Glyph Atlas 缓存（纹理图集）
 
-#### 6.1.2 页面验证
-- 至少提供 2 个页面示例（设置页、表单页）。
-- 页面级组件组合方式可复用。
+### 4.2 ThorVG 集成
 
-### 6.2 工程验证
-
-#### 6.2.1 构建验证
-- Debug/Release 构建通过。
-- 模块依赖无循环、无顺序问题。
-
-#### 6.2.2 运行验证
-- 运行稳定，无明显内存泄漏。
-- 关闭窗口流程完整，无崩溃。
+- [ ] 将 Glyph Atlas 以 ThorVG 纹理形式输出到画布
+- [ ] Label 组件实现实际文字渲染（当前为骨架代码）
 
 ---
 
-## 7. 当前执行顺序建议
+## M5：组件库 + Yoga
 
-1. 先完成第 2 章（组件系统增强）。
-2. 再完成第 3 章（页面开发体验）。
-3. 然后推进第 4 章（轻量布局）。
-4. 最后再进入第 5 章（主题样式）。
+### 5.1 组件库扩展
 
-这条顺序与当前项目现状一致：先把交互与组合能力做强，再做样式体系。
+- [ ] `Input` 组件（文本输入框）
+- [ ] `Checkbox` 组件
+- [ ] `Switch` 组件
+- [ ] `Dialog` 组件
+- [ ] `Dropdown` 组件
+- [ ] `Toast` 通知组件
+
+### 5.2 Yoga 接入
+
+- [ ] 集成 Yoga 布局引擎
+- [ ] Row/Column/Stack 内部计算替换为 Yoga
+- [ ] 对外 API 保持不变
+
+---
+
+## 当前执行建议
+
+M1 → M2 → M3 → M4 → M5 顺序推进，每个里程碑完成后在 `docs/design.md` 里程碑表中更新状态。
