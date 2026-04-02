@@ -11,6 +11,8 @@ module;
 
 export module Nandina.Core;
 
+export import Nandina.Reactive;
+
 export namespace Nandina {
     enum class EventType : std::uint8_t {
         none,
@@ -83,8 +85,9 @@ export namespace Nandina {
         std::function<bool()> connected_fn_;
     };
 
+    // Event-based signal (different from reactive State<T> in Nandina.Reactive)
     template<typename... Args>
-    class Signal {
+    class EventSignal {
     public:
         using Slot = std::function<void(Args...)>;
 
@@ -151,6 +154,9 @@ export namespace Nandina {
         std::vector<SlotEntry> slots_;
     };
 
+    // ── Widget ────────────────────────────────────────────────────────────────
+    using WidgetPtr = std::unique_ptr<class Widget>;
+
     class Widget {
     public:
         using Child = std::unique_ptr<Widget>;
@@ -158,6 +164,7 @@ export namespace Nandina {
         virtual ~Widget() = default;
 
         auto add_child(Child child) -> Widget& {
+            child->parent_ = this;
             children_.push_back(std::move(child));
             mark_dirty();
             return *this;
@@ -194,16 +201,19 @@ export namespace Nandina {
             return clicked_.connect(std::move(handler));
         }
 
-        [[nodiscard]] auto is_dirty() const noexcept -> bool {
-            return dirty_;
-        }
+        [[nodiscard]] auto is_dirty()        const noexcept -> bool { return dirty_; }
+        [[nodiscard]] auto has_dirty_child() const noexcept -> bool { return has_dirty_child_; }
 
         auto mark_dirty() noexcept -> void {
             dirty_ = true;
+            if (parent_ && !parent_->has_dirty_child_) {
+                parent_->bubble_dirty_child();
+            }
         }
 
         auto clear_dirty() noexcept -> void {
-            dirty_ = false;
+            dirty_           = false;
+            has_dirty_child_ = false;
         }
 
         [[nodiscard]] auto x()      const noexcept -> float { return x_; }
@@ -247,23 +257,37 @@ export namespace Nandina {
         }
 
     private:
+        auto bubble_dirty_child() -> void {
+            has_dirty_child_ = true;
+            if (parent_ && !parent_->has_dirty_child_) {
+                parent_->bubble_dirty_child();
+            }
+        }
+
         float x_ = 0.0f;
         float y_ = 0.0f;
         float width_ = 0.0f;
         float height_ = 0.0f;
-        bool dirty_ = true;
+        bool dirty_           = true;
+        bool has_dirty_child_ = false;
+        Widget* parent_       = nullptr;
         std::vector<Child> children_;
-        Signal<> clicked_;
+        EventSignal<> clicked_;
         Color bg_color_{255, 255, 255, 255};
         float border_radius_ = 0.0f;
     };
 
+    // ── Component ─────────────────────────────────────────────────────────────
     class Component : public Widget {
     public:
         using Ptr = std::unique_ptr<Component>;
         virtual ~Component() = default;
+
+    protected:
+        EffectScope scope_;
     };
 
+    // ── RectangleComponent ────────────────────────────────────────────────────
     class RectangleComponent final : public Component {
     public:
         static auto Create() -> std::unique_ptr<RectangleComponent> {
@@ -281,6 +305,7 @@ export namespace Nandina {
         }
     };
 
+    // ── FocusComponent ────────────────────────────────────────────────────────
     class FocusComponent final : public Component {
     public:
         static auto Create() -> std::unique_ptr<FocusComponent> {
@@ -301,6 +326,7 @@ export namespace Nandina {
         bool focused_ = false;
     };
 
+    // ── Button ────────────────────────────────────────────────────────────────
     class Button final : public Component {
     public:
         static auto Create() -> std::unique_ptr<Button> {

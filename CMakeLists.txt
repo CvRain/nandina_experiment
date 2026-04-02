@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(NandinaExperiment
-        VERSION 1.0.0
+        VERSION 0.2.0
         LANGUAGES CXX
 )
 
@@ -23,11 +23,17 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
 # ── Module interface sources ──────────────────────────────────────────────────
 set(MODULE_SOURCES
+        src/reactive/Reactive.ixx
+
         src/core/Core.ixx
         src/core/Event.ixx
         src/core/Signal.ixx
         src/core/Widget.ixx
         src/core/Window.ixx
+
+        src/components/Label.ixx
+
+        src/layout/Layout.ixx
 
         src/style/Theme.ixx
 
@@ -53,6 +59,23 @@ target_sources(NandinaExperiment
 target_compile_options(NandinaExperiment PRIVATE
         -Wall -Wextra -Wpedantic
 )
+
+# ── Optional: FreeType + HarfBuzz text engine ─────────────────────────────────
+find_package(Freetype QUIET)
+find_package(harfbuzz QUIET)
+
+if(Freetype_FOUND AND harfbuzz_FOUND)
+    message(STATUS "Text engine: FreeType ${FREETYPE_VERSION_STRING} + HarfBuzz found — enabling NANDINA_TEXT_ENGINE")
+    target_link_libraries(NandinaExperiment PRIVATE Freetype::Freetype harfbuzz::harfbuzz)
+    target_compile_definitions(NandinaExperiment PRIVATE NANDINA_TEXT_ENGINE=1)
+else()
+    if(NOT Freetype_FOUND)
+        message(STATUS "Text engine: FreeType not found — text rendering disabled")
+    endif()
+    if(NOT harfbuzz_FOUND)
+        message(STATUS "Text engine: HarfBuzz not found — text rendering disabled")
+    endif()
+endif()
 
 
 target_compile_features(${PROJECT_NAME} PRIVATE cxx_std_26)
