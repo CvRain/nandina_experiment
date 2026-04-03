@@ -8,7 +8,10 @@
       "generator": "Ninja",
       "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
+        "CMAKE_CXX_STANDARD": "26",
+        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
+        "CMAKE_MAKE_PROGRAM": "ninja"
       }
     },
     {
@@ -17,7 +20,7 @@
       "inherits": "base",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fsanitize=address,undefined"
+        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0"
       }
     },
     {
@@ -27,6 +30,26 @@
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
         "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG"
+      }
+    },
+    {
+      "name": "debug-clang",
+      "displayName": "Debug + ASan (Clang)",
+      "inherits": "base",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++",
+        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fsanitize=address,undefined"
+      }
+    },
+    {
+      "name": "debug-clang-vcpkg",
+      "displayName": "Debug + ASan + vcpkg (Clang)",
+      "inherits": "debug-clang",
+      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "cacheVariables": {
+        "VCPKG_MANIFEST_MODE": "ON"
       }
     },
     {
@@ -56,6 +79,8 @@
   "buildPresets": [
     { "name": "debug",         "configurePreset": "debug" },
     { "name": "release",       "configurePreset": "release" },
+    { "name": "debug-clang",         "configurePreset": "debug-clang" },
+    { "name": "debug-clang-vcpkg",   "configurePreset": "debug-clang-vcpkg" },
     { "name": "debug-vcpkg",   "configurePreset": "debug-vcpkg" },
     { "name": "release-vcpkg", "configurePreset": "release-vcpkg" },
     { "name": "ci",            "configurePreset": "ci" }

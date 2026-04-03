@@ -1,13 +1,27 @@
 {
-  "$schema": "https://raw.githubusercontent.com/microsoft/vcpkg/master/scripts/vcpkg.schema.json",
   "name": "nandina-experiment",
   "version": "0.2.0",
   "description": "Nandina GUI framework experiment — C++26 component library",
   "dependencies": [
-    { "name": "sdl3",      "version>=": "3.0.0"  },
-    { "name": "thorvg",    "version>=": "0.14.0" },
-    { "name": "freetype",  "version>=": "2.13.0" },
-    { "name": "harfbuzz",  "version>=": "8.0.0"  },
-    { "name": "yoga",      "version>=": "3.0.0"  }
+    {
+      "name": "sdl3",
+      "features": ["dbus", "ibus", "x11", "wayland"]
+    },
+    {
+      "name": "dbus",
+      "default-features": false
+    },
+    {
+      "name": "thorvg"
+    },
+    {
+      "name": "freetype"
+    },
+    {
+      "name": "harfbuzz"
+    },
+    {
+      "name": "yoga"
+    }
   ]
 }

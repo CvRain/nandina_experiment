@@ -25,11 +25,17 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 set(MODULE_SOURCES
         src/reactive/Reactive.ixx
 
-        src/core/Core.ixx
+        # Nandina.Core sub-modules (dependency order: leaves first)
+        src/core/Color.ixx
         src/core/Event.ixx
         src/core/Signal.ixx
         src/core/Widget.ixx
+        src/core/Component.ixx
+        src/core/Button.ixx
+        src/core/Core.ixx         # umbrella re-export
+
         src/core/Window.ixx
+        src/core/NanApplication.ixx
 
         src/components/Label.ixx
 
@@ -41,7 +47,7 @@ set(MODULE_SOURCES
         src/types/Rect.ixx
         src/types/Size.ixx
 
-        src/NanApplication.ixx
+        src/application_window.ixx
 )
 
 # ── Executable ────────────────────────────────────────────────────────────────

@@ -1,17 +1,10 @@
 module;
 
-#include <cstdint>
-
 export module Nandina.Style.Theme;
 
-export namespace Nandina {
-    struct Color {
-        std::uint8_t r = 0;
-        std::uint8_t g = 0;
-        std::uint8_t b = 0;
-        std::uint8_t a = 255;
-    };
+import Nandina.Core.Color;
 
+export namespace Nandina {
     struct Theme {
         struct Colors {
             Color primary{37, 99, 235, 255};

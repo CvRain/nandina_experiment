@@ -23,28 +23,46 @@ export namespace Nandina {
         struct WindowDeleter {
             void operator()(SDL_Window *w) const noexcept { if (w) SDL_DestroyWindow(w); }
         };
+
         struct RendererDeleter {
             void operator()(SDL_Renderer *r) const noexcept { if (r) SDL_DestroyRenderer(r); }
         };
+
         struct TextureDeleter {
             void operator()(SDL_Texture *t) const noexcept { if (t) SDL_DestroyTexture(t); }
         };
 
         class Builder {
         public:
-            auto set_title(std::string_view title) -> Builder& { title_ = title; return *this; }
-            auto set_width(int w)  -> Builder& { width_  = w; return *this; }
-            auto set_height(int h) -> Builder& { height_ = h; return *this; }
+            auto set_title(std::string_view title) -> Builder& {
+                title_ = title;
+                return *this;
+            }
+
+            auto set_width(int w) -> Builder& {
+                width_ = w;
+                return *this;
+            }
+
+            auto set_height(int h) -> Builder& {
+                height_ = h;
+                return *this;
+            }
+
             [[nodiscard]] auto build() const -> NanWindow { return NanWindow{title_, width_, height_}; }
+
         private:
             std::string title_ = "Nandina Window";
-            int width_  = 800;
+            int width_ = 800;
             int height_ = 600;
         };
 
         NanWindow(const NanWindow &) = delete;
+
         auto operator=(const NanWindow &) -> NanWindow& = delete;
+
         NanWindow(NanWindow &&) noexcept = default;
+
         auto operator=(NanWindow &&) noexcept -> NanWindow& = default;
 
         auto set_root(std::unique_ptr<Widget> root) -> void {
@@ -66,18 +84,20 @@ export namespace Nandina {
         }
 
         auto present_frame() -> void {
-            canvas_->remove(nullptr);  // clear all paints from previous frame
+            canvas_->remove(nullptr); // clear all paints from previous frame
 
             if (root_) {
                 render_widget(*root_);
-            } else {
+            }
+            else {
                 auto *bg = tvg::Shape::gen();
                 bg->appendRect(0, 0, static_cast<float>(width_), static_cast<float>(height_), 0, 0);
                 bg->fill(255, 255, 255, 255);
                 canvas_->add(bg);
             }
 
-            if (canvas_->draw(true) == tvg::Result::Success) {  // true = clear buffer before draw
+            if (canvas_->draw(true) == tvg::Result::Success) {
+                // true = clear buffer before draw
                 canvas_->sync();
             }
 
@@ -100,10 +120,10 @@ export namespace Nandina {
 
         static auto translate_button(std::uint8_t sdl_btn) noexcept -> MouseButton {
             switch (sdl_btn) {
-                case SDL_BUTTON_LEFT:   return MouseButton::left;
+                case SDL_BUTTON_LEFT: return MouseButton::left;
                 case SDL_BUTTON_MIDDLE: return MouseButton::middle;
-                case SDL_BUTTON_RIGHT:  return MouseButton::right;
-                default:                return MouseButton::none;
+                case SDL_BUTTON_RIGHT: return MouseButton::right;
+                default: return MouseButton::none;
             }
         }
 
@@ -112,35 +132,43 @@ export namespace Nandina {
                 press_x_ = sdl_event.button.x;
                 press_y_ = sdl_event.button.y;
                 pressed_ = true;
-                Event ev{EventType::mouse_button_press,
-                         translate_button(sdl_event.button.button),
-                         press_x_, press_y_};
+                Event ev{
+                    EventType::mouse_button_press,
+                    translate_button(sdl_event.button.button),
+                    press_x_, press_y_
+                };
                 root_->dispatch_event(ev);
-
-            } else if (sdl_event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            }
+            else if (sdl_event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
                 const float rx = sdl_event.button.x;
                 const float ry = sdl_event.button.y;
 
-                Event ev_up{EventType::mouse_button_release,
-                            translate_button(sdl_event.button.button),
-                            rx, ry};
+                Event ev_up{
+                    EventType::mouse_button_release,
+                    translate_button(sdl_event.button.button),
+                    rx, ry
+                };
                 root_->dispatch_event(ev_up);
 
                 // Synthesize click: released within 16 px of press point
                 if (pressed_) {
                     const float dx = rx - press_x_, dy = ry - press_y_;
                     if (dx * dx + dy * dy < 256.0f) {
-                        Event ev_click{EventType::click,
-                                       translate_button(sdl_event.button.button),
-                                       rx, ry};
+                        Event ev_click{
+                            EventType::click,
+                            translate_button(sdl_event.button.button),
+                            rx, ry
+                        };
                         root_->dispatch_event(ev_click);
                     }
                     pressed_ = false;
                 }
-
-            } else if (sdl_event.type == SDL_EVENT_MOUSE_MOTION) {
-                Event ev{EventType::mouse_move, MouseButton::none,
-                         sdl_event.motion.x, sdl_event.motion.y};
+            }
+            else if (sdl_event.type == SDL_EVENT_MOUSE_MOTION) {
+                Event ev{
+                    EventType::mouse_move, MouseButton::none,
+                    sdl_event.motion.x, sdl_event.motion.y
+                };
                 root_->dispatch_event(ev);
             }
         }
@@ -159,23 +187,23 @@ export namespace Nandina {
             });
         }
 
-        int width_  = 0;
+        int width_ = 0;
         int height_ = 0;
-        bool pressed_  = false;
+        bool pressed_ = false;
         float press_x_ = 0.0f;
         float press_y_ = 0.0f;
 
         std::unique_ptr<Widget> root_;
-        std::unique_ptr<SDL_Window,   WindowDeleter>   window_;
+        std::unique_ptr<SDL_Window, WindowDeleter> window_;
         std::unique_ptr<SDL_Renderer, RendererDeleter> renderer_;
-        std::unique_ptr<SDL_Texture,  TextureDeleter>  texture_;
+        std::unique_ptr<SDL_Texture, TextureDeleter> texture_;
         std::vector<std::uint32_t> pixel_buffer_;
         std::unique_ptr<tvg::SwCanvas> canvas_;
     };
 
     NanWindow::NanWindow(std::string_view title, const int width, const int height)
         : width_(width), height_(height) {
-        SDL_Window   *raw_window   = nullptr;
+        SDL_Window *raw_window = nullptr;
         SDL_Renderer *raw_renderer = nullptr;
 
         if (!SDL_CreateWindowAndRenderer(title.data(), width, height, 0, &raw_window, &raw_renderer)) {
@@ -196,7 +224,7 @@ export namespace Nandina {
         pixel_buffer_.resize(static_cast<std::size_t>(width * height));
         canvas_.reset(tvg::SwCanvas::gen());
         if (canvas_->target(pixel_buffer_.data(), width, width, height,
-                             tvg::ColorSpace::ARGB8888) != tvg::Result::Success) {
+                            tvg::ColorSpace::ARGB8888) != tvg::Result::Success) {
             throw std::runtime_error("ThorVG canvas binding failed!");
         }
         std::println("[NanWindow] '{}' ({}x{}) initialized.", title, width, height);
@@ -210,10 +238,10 @@ export namespace Nandina {
         auto exec() -> int {
             auto [w, h] = initial_size();
             auto window = NanWindow::Builder{}
-                .set_title(title())
-                .set_width(w)
-                .set_height(h)
-                .build();
+                    .set_title(title())
+                    .set_width(w)
+                    .set_height(h)
+                    .build();
 
             auto root = build_root();
             window.set_root(std::move(root));

@@ -1,5 +1,6 @@
 module;
 
+#include <cstdint>
 #include <functional>
 #include <memory>
 #include <utility>
@@ -7,6 +8,7 @@ module;
 
 export module Nandina.Core.Widget;
 
+import Nandina.Core.Color;
 import Nandina.Core.Event;
 import Nandina.Core.Signal;
 
@@ -27,34 +29,40 @@ export namespace Nandina {
             return *this;
         }
 
-        auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& {
+        virtual auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& {
             x_ = x; y_ = y; width_ = width; height_ = height;
             mark_dirty();
             return *this;
         }
 
-        [[nodiscard]] auto contains(float px, float py) const noexcept -> bool {
-            return px >= x_ && px < x_ + width_ && py >= y_ && py < y_ + height_;
+        auto set_background(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+                            std::uint8_t a = 255) noexcept -> Widget& {
+            bg_color_ = {r, g, b, a};
+            mark_dirty();
+            return *this;
         }
 
-        auto dispatch_event(Event& event) -> bool {
-            for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
-                if ((*it)->dispatch_event(event)) { return true; }
-            }
-            if (event.handled || !contains(event.x, event.y)) { return false; }
-            return handle_event(event);
+        auto set_border_radius(float r) noexcept -> Widget& {
+            border_radius_ = r;
+            mark_dirty();
+            return *this;
         }
 
         auto on_click(std::function<void()> handler) -> Connection {
             return clicked_.connect(std::move(handler));
         }
 
-        [[nodiscard]] auto is_dirty()         const noexcept -> bool { return dirty_; }
-        [[nodiscard]] auto has_dirty_child()  const noexcept -> bool { return has_dirty_child_; }
-        [[nodiscard]] auto x()      const noexcept -> float { return x_; }
-        [[nodiscard]] auto y()      const noexcept -> float { return y_; }
-        [[nodiscard]] auto width()  const noexcept -> float { return width_; }
-        [[nodiscard]] auto height() const noexcept -> float { return height_; }
+        auto dispatch_event(Event& ev) -> bool {
+            for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
+                if ((*it)->dispatch_event(ev)) { return true; }
+            }
+            if (ev.handled || !contains(ev.x, ev.y)) { return false; }
+            return handle_event(ev);
+        }
+
+        [[nodiscard]] auto contains(float px, float py) const noexcept -> bool {
+            return px >= x_ && px < x_ + width_ && py >= y_ && py < y_ + height_;
+        }
 
         auto mark_dirty() noexcept -> void {
             dirty_ = true;
@@ -69,14 +77,23 @@ export namespace Nandina {
         }
 
         auto for_each_child(std::function<void(Widget&)> fn) const -> void {
-            for (const auto& child : children_) { fn(*child); }
+            for (const auto& c : children_) { fn(*c); }
         }
 
+        [[nodiscard]] auto is_dirty()        const noexcept -> bool  { return dirty_; }
+        [[nodiscard]] auto has_dirty_child() const noexcept -> bool  { return has_dirty_child_; }
+        [[nodiscard]] auto x()               const noexcept -> float { return x_; }
+        [[nodiscard]] auto y()               const noexcept -> float { return y_; }
+        [[nodiscard]] auto width()           const noexcept -> float { return width_; }
+        [[nodiscard]] auto height()          const noexcept -> float { return height_; }
+        [[nodiscard]] auto background()      const noexcept -> Color { return bg_color_; }
+        [[nodiscard]] auto border_radius()   const noexcept -> float { return border_radius_; }
+
     protected:
-        virtual auto handle_event(Event& event) -> bool {
-            if (event.type == EventType::click) {
+        virtual auto handle_event(Event& ev) -> bool {
+            if (ev.type == EventType::click) {
                 clicked_.emit();
-                event.mark_handled();
+                ev.mark_handled();
                 return true;
             }
             return false;
@@ -94,18 +111,18 @@ export namespace Nandina {
             }
         }
 
-        float x_ = 0.0f, y_ = 0.0f, width_ = 0.0f, height_ = 0.0f;
-        bool dirty_           = true;
-        bool has_dirty_child_ = false;
-        Widget* parent_       = nullptr;
-        std::vector<Child> children_;
-        Signal<> clicked_;
-    };
+        float  x_             = 0.0f;
+        float  y_             = 0.0f;
+        float  width_         = 0.0f;
+        float  height_        = 0.0f;
+        float  border_radius_ = 0.0f;
+        bool   dirty_           = true;
+        bool   has_dirty_child_ = false;
+        Widget* parent_         = nullptr;
 
-    class Component : public Widget {
-    public:
-        using Ptr = std::unique_ptr<Component>;
-        virtual ~Component() = default;
+        Color  bg_color_{255, 255, 255, 255};
+        EventSignal<> clicked_;
+        std::vector<Child> children_;
     };
 
 } // export namespace Nandina
