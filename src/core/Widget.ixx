@@ -11,6 +11,9 @@ export module Nandina.Core.Widget;
 import Nandina.Core.Color;
 import Nandina.Core.Event;
 import Nandina.Core.Signal;
+import Nandina.Types.Position;
+import Nandina.Types.Size;
+import Nandina.Types.Rect;
 
 export namespace Nandina {
 
@@ -29,10 +32,47 @@ export namespace Nandina {
             return *this;
         }
 
+        // Non-owning child reference. The caller is responsible for the child's
+        // lifetime (e.g. Router owns its Pages while RouterView just references them).
+        auto add_child_ref(Widget* child) -> Widget& {
+            if (child) {
+                child->parent_ = this;
+                children_ref_.push_back(child);
+                mark_dirty();
+            }
+            return *this;
+        }
+
+        // Clears all non-owning child references without destroying the widgets.
+        auto clear_children_ref() -> void {
+            for (auto* c : children_ref_) {
+                if (c) { c->parent_ = nullptr; }
+            }
+            children_ref_.clear();
+            mark_dirty();
+        }
+
         virtual auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& {
             x_ = x; y_ = y; width_ = width; height_ = height;
             mark_dirty();
             return *this;
+        }
+
+        // ── Geometric-type overloads ──────────────────────────────────────────
+        auto set_bounds(const Rect& r) noexcept -> Widget& {
+            return set_bounds(r.x(), r.y(), r.width(), r.height());
+        }
+
+        auto set_bounds(const Position& pos, const Size& size) noexcept -> Widget& {
+            return set_bounds(pos.x(), pos.y(), size.width(), size.height());
+        }
+
+        auto set_position(const Position& pos) noexcept -> Widget& {
+            return set_bounds(pos.x(), pos.y(), width_, height_);
+        }
+
+        auto set_size(const Size& size) noexcept -> Widget& {
+            return set_bounds(x_, y_, size.width(), size.height());
         }
 
         auto set_background(std::uint8_t r, std::uint8_t g, std::uint8_t b,
@@ -53,6 +93,9 @@ export namespace Nandina {
         }
 
         auto dispatch_event(Event& ev) -> bool {
+            for (auto it = children_ref_.rbegin(); it != children_ref_.rend(); ++it) {
+                if (*it && (*it)->dispatch_event(ev)) { return true; }
+            }
             for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
                 if ((*it)->dispatch_event(ev)) { return true; }
             }
@@ -78,16 +121,22 @@ export namespace Nandina {
 
         auto for_each_child(std::function<void(Widget&)> fn) const -> void {
             for (const auto& c : children_) { fn(*c); }
+            for (auto* c : children_ref_) { if (c) { fn(*c); } }
         }
 
-        [[nodiscard]] auto is_dirty()        const noexcept -> bool  { return dirty_; }
-        [[nodiscard]] auto has_dirty_child() const noexcept -> bool  { return has_dirty_child_; }
-        [[nodiscard]] auto x()               const noexcept -> float { return x_; }
-        [[nodiscard]] auto y()               const noexcept -> float { return y_; }
-        [[nodiscard]] auto width()           const noexcept -> float { return width_; }
-        [[nodiscard]] auto height()          const noexcept -> float { return height_; }
-        [[nodiscard]] auto background()      const noexcept -> Color { return bg_color_; }
-        [[nodiscard]] auto border_radius()   const noexcept -> float { return border_radius_; }
+        [[nodiscard]] auto is_dirty()        const noexcept -> bool     { return dirty_; }
+        [[nodiscard]] auto has_dirty_child() const noexcept -> bool     { return has_dirty_child_; }
+        [[nodiscard]] auto x()               const noexcept -> float    { return x_; }
+        [[nodiscard]] auto y()               const noexcept -> float    { return y_; }
+        [[nodiscard]] auto width()           const noexcept -> float    { return width_; }
+        [[nodiscard]] auto height()          const noexcept -> float    { return height_; }
+        [[nodiscard]] auto background()      const noexcept -> Color    { return bg_color_; }
+        [[nodiscard]] auto border_radius()   const noexcept -> float    { return border_radius_; }
+
+        // ── Geometric readers ─────────────────────────────────────────────────
+        [[nodiscard]] auto rect()     const noexcept -> Rect     { return {x_, y_, width_, height_}; }
+        [[nodiscard]] auto position() const noexcept -> Position { return {x_, y_}; }
+        [[nodiscard]] auto size()     const noexcept -> Size     { return {width_, height_}; }
 
     protected:
         virtual auto handle_event(Event& ev) -> bool {
@@ -122,7 +171,8 @@ export namespace Nandina {
 
         Color  bg_color_{255, 255, 255, 255};
         EventSignal<> clicked_;
-        std::vector<Child> children_;
+        std::vector<Child>   children_;
+        std::vector<Widget*> children_ref_;  // Non-owning references (e.g. for RouterView)
     };
 
 } // export namespace Nandina

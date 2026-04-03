@@ -1,6 +1,8 @@
 module;
 
+#include <format>
 #include <memory>
+#include <string>
 #include <string_view>
 #include <utility>
 
@@ -10,48 +12,87 @@ import Nandina.Core;
 import Nandina.Window;
 import Nandina.Layout;
 import Nandina.Components.Label;
+import Nandina.Types;
 
-// ApplicationWindow — 继承 WindowController，填充 exec() 所需的三个虚函数。
-// 等同于 Qt 的 QMainWindow 子类，作为编写 UI 测试代码的入口。
-export class ApplicationWindow final : public Nandina::WindowController {
-protected:
-    auto build_root() -> std::unique_ptr<Nandina::Widget> override;
+// ── CounterPage ───────────────────────────────────────────────────────────────
+// Demonstrates State + Effect reactive binding inside a Page.
+// Pressing "+1" / "-1" updates a count_, which the Effect propagates to the label.
+// ─────────────────────────────────────────────────────────────────────────────
+class CounterPage : public Nandina::Page {
+public:
+    static auto Create() -> std::unique_ptr<CounterPage> {
+        auto self = std::unique_ptr<CounterPage>(new CounterPage());
+        self->initialize();
+        return self;
+    }
 
-    [[nodiscard]] auto initial_size() const -> std::pair<int, int> override;
+    auto build() -> Nandina::WidgetPtr override {
+        auto col = Nandina::Column::Create();
+        col->set_bounds(0.0f, 0.0f, 640.0f, 480.0f);
+        col->set_background(30, 30, 30);
+        col->gap(16.0f).padding(40.0f);
 
-    [[nodiscard]] auto title() const -> std::string_view override;
+        // Label — displays the current count via a reactive Effect
+        auto label = Nandina::Label::Create();
+        label->set_size(Nandina::Size::fixed(400.0f, 48.0f));
+        label->font_size(32.0f).text_color(255, 255, 255);
+
+        effect([this, lbl = label.get()] {
+            lbl->text(std::format("Count: {}", count_.get()));
+        });
+
+        // Button row
+        auto row = Nandina::Row::Create();
+        row->set_size(Nandina::Size::fixed(300.0f, 48.0f));
+        row->gap(12.0f);
+
+        auto dec = Nandina::Button::Create();
+        dec->set_size(Nandina::Size::fixed(120.0f, 48.0f));
+        dec->text("-1");
+        dec->on_click([this] { count_.set(count_.get() - 1); });
+
+        auto inc = Nandina::Button::Create();
+        inc->set_size(Nandina::Size::fixed(120.0f, 48.0f));
+        inc->text("+1");
+        inc->on_click([this] { count_.set(count_.get() + 1); });
+
+        row->add(std::move(dec)).add(std::move(inc));
+        row->layout();
+
+        col->add(std::move(label)).add(std::move(row));
+        col->layout();
+
+        return col;
+    }
+
+private:
+    Nandina::State<int> count_{ 0 };
 };
 
-// ── build_root ────────────────────────────────────────────────────────────────
-// 使用 Column 布局（M2 集成测试：Row/Column 替换绝对坐标）
-auto ApplicationWindow::build_root() -> std::unique_ptr<Nandina::Widget> {
-    auto root = Nandina::Column::Create();
-    root->set_bounds(0, 0, 640, 480)
-         .set_background(30, 30, 30);
-    root->gap(12.0f).padding(24.0f);
 
-    // Label
-    auto label = Nandina::Label::Create();
-    label->set_bounds(0, 0, 0, 30); // width 由 Column::layout() 计算，height 预设
-    label->text("Hello, Nandina!").font_size(20.0f).text_color(0, 0, 0);
-    root->add(std::move(label));
+// ── ApplicationWindow ─────────────────────────────────────────────────────────
+// Initialises the Router, pushes CounterPage as the first screen, and places a
+// RouterView that fills the entire window.
+// ─────────────────────────────────────────────────────────────────────────────
+export class ApplicationWindow final : public Nandina::WindowController {
+protected:
+    auto build_root() -> std::unique_ptr<Nandina::Widget> override {
+        router_.push<CounterPage>();
 
-    // Button
-    auto btn = Nandina::Button::Create();
-    btn->set_bounds(0, 0, 0, 40);
-    btn->text("Click Me");
-    root->add(std::move(btn));
+        auto view = Nandina::RouterView::Create(router_);
+        view->set_bounds(0.0f, 0.0f, 640.0f, 480.0f);
+        return view;
+    }
 
-    root->layout(); // Column 根据 gap/padding 计算子组件位置
-    return root;
-}
+    [[nodiscard]] auto initial_size() const -> std::pair<int, int> override {
+        return {640, 480};
+    }
 
-// ── initial_size ──────────────────────────────────────────────────────────────
-auto ApplicationWindow::initial_size() const -> std::pair<int, int> {
-    return {640, 480};
-}
+    [[nodiscard]] auto title() const -> std::string_view override {
+        return "Nandina — Counter";
+    }
 
-// ── title ─────────────────────────────────────────────────────────────────────
-auto ApplicationWindow::title() const -> std::string_view {
-    return "Nandina — Composed UI";
-}
+private:
+    Nandina::Router router_;
+};
+
