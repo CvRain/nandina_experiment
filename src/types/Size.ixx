@@ -37,9 +37,9 @@ export namespace Nandina {
         // Returns a square Size with equal width and height.
         [[nodiscard]] static auto square(float s) noexcept -> Size { return {s, s}; }
 
-        // Returns true if this Size represents a "fill parent" marker.
+        // Returns true if this Size represents a "fill parent" marker (both axes < 0).
         [[nodiscard]] auto is_fill() const noexcept -> bool {
-            return width_ < 0.0f || height_ < 0.0f;
+            return width_ < 0.0f && height_ < 0.0f;
         }
 
     private:

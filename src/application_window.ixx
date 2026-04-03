@@ -65,8 +65,6 @@ public:
         return col;
     }
 
-    auto on_enter() -> void override {}
-
 private:
     Nandina::State<int> count_{ 0 };
 };
