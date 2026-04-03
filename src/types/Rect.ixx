@@ -2,6 +2,9 @@ module;
 
 export module Nandina.Types.Rect;
 
+import Nandina.Types.Position;
+import Nandina.Types.Size;
+
 export namespace Nandina {
     class Rect {
     public:
@@ -50,6 +53,18 @@ export namespace Nandina {
         [[nodiscard]] auto intersects(const Rect &other) const noexcept -> bool;
 
         [[nodiscard]] auto intersection(const Rect &other) const noexcept -> Rect;
+
+        // ── Factory & decomposition ───────────────────────────────────────────
+        // Constructs a Rect from a Position and a Size.
+        [[nodiscard]] static auto from(Position pos, Size size) noexcept -> Rect {
+            return {pos.x(), pos.y(), size.width(), size.height()};
+        }
+
+        // Returns the top-left corner as a Position.
+        [[nodiscard]] auto position() const noexcept -> Position { return {x_, y_}; }
+
+        // Returns the dimensions as a Size.
+        [[nodiscard]] auto size() const noexcept -> Size { return {width_, height_}; }
 
     private:
         float x_ = 0.0f;

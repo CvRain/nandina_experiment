@@ -25,12 +25,20 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 set(MODULE_SOURCES
         src/reactive/Reactive.ixx
 
+        # Geometry types (must precede Widget which imports them)
+        src/types/Position.ixx
+        src/types/Size.ixx
+        src/types/Rect.ixx
+        src/types/Types.ixx       # umbrella re-export
+
         # Nandina.Core sub-modules (dependency order: leaves first)
         src/core/Color.ixx
         src/core/Event.ixx
         src/core/Signal.ixx
         src/core/Widget.ixx
         src/core/Component.ixx
+        src/core/CompositeComponent.ixx
+        src/core/Router.ixx
         src/core/Button.ixx
         src/core/Core.ixx         # umbrella re-export
 
@@ -42,10 +50,6 @@ set(MODULE_SOURCES
         src/layout/Layout.ixx
 
         src/style/Theme.ixx
-
-        src/types/Position.ixx
-        src/types/Rect.ixx
-        src/types/Size.ixx
 
         src/application_window.ixx
 )

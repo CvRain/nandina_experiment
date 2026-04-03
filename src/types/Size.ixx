@@ -27,6 +27,21 @@ export namespace Nandina {
 
         [[nodiscard]] auto expanded_to(const Size &other) const noexcept -> Size;
 
+        // ── Semantic factory methods ──────────────────────────────────────────
+        // Returns a Size that signals "fill the parent container" (both axes -1).
+        [[nodiscard]] static auto fill() noexcept -> Size { return {-1.0f, -1.0f}; }
+
+        // Returns a Size with explicit width and height.
+        [[nodiscard]] static auto fixed(float w, float h) noexcept -> Size { return {w, h}; }
+
+        // Returns a square Size with equal width and height.
+        [[nodiscard]] static auto square(float s) noexcept -> Size { return {s, s}; }
+
+        // Returns true if this Size represents a "fill parent" marker.
+        [[nodiscard]] auto is_fill() const noexcept -> bool {
+            return width_ < 0.0f || height_ < 0.0f;
+        }
+
     private:
         float width_ = 0.0f;
         float height_ = 0.0f;
