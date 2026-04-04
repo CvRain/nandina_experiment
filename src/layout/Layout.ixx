@@ -113,6 +113,7 @@ export namespace Nandina {
             const float gap_total = (child_count > 1)
                 ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
             const float remaining = avail_h - fixed_total - gap_total;
+            const float flex_inv  = (flex_total > 0) ? 1.0f / static_cast<float>(flex_total) : 0.0f;
 
             // ── Pass 2: place children ────────────────────────────────────────
             float cursor_y = y() + padding_top_;
@@ -124,7 +125,7 @@ export namespace Nandina {
 
                 const int f = child.flex_factor();
                 if (f > 0 && flex_total > 0) {
-                    const float alloc_h = remaining * (static_cast<float>(f) / static_cast<float>(flex_total));
+                    const float alloc_h = remaining * (static_cast<float>(f) * flex_inv);
                     child.set_bounds(x() + padding_left_, cursor_y,
                                      width() - padding_left_ - padding_right_,
                                      alloc_h);
@@ -187,6 +188,7 @@ export namespace Nandina {
             const float gap_total = (child_count > 1)
                 ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
             const float remaining = avail_w - fixed_total - gap_total;
+            const float flex_inv  = (flex_total > 0) ? 1.0f / static_cast<float>(flex_total) : 0.0f;
 
             // ── Pass 2: place children ────────────────────────────────────────
             float cursor_x = x() + padding_left_;
@@ -198,7 +200,7 @@ export namespace Nandina {
 
                 const int f = child.flex_factor();
                 if (f > 0 && flex_total > 0) {
-                    const float alloc_w = remaining * (static_cast<float>(f) / static_cast<float>(flex_total));
+                    const float alloc_w = remaining * (static_cast<float>(f) * flex_inv);
                     child.set_bounds(cursor_x, y() + padding_top_,
                                      alloc_w,
                                      height() - padding_top_ - padding_bottom_);
