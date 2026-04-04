@@ -14,6 +14,8 @@ export import Nandina.Core.Color;
 export import Nandina.Core.Event;
 export import Nandina.Core.Signal;
 export import Nandina.Core.Widget;
+export import Nandina.Core.FreeWidget;
+export import Nandina.Core.RenderLayer;
 export import Nandina.Core.Component;
 export import Nandina.Core.CompositeComponent;
 export import Nandina.Core.Router;
