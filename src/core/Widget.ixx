@@ -138,7 +138,18 @@ export namespace Nandina {
         [[nodiscard]] auto position() const noexcept -> Position { return {x_, y_}; }
         [[nodiscard]] auto size()     const noexcept -> Size     { return {width_, height_}; }
 
+        // ── Flex layout support ───────────────────────────────────────────────
+        // Returns 0 for fixed-size widgets; Expanded / Spacer return their flex value.
+        [[nodiscard]] virtual auto flex_factor() const noexcept -> int { return 0; }
+
     protected:
+        // Geometric fields are protected so that FreeWidget (and other subclasses)
+        // can directly update position/size without going through set_bounds().
+        float x_      = 0.0f;
+        float y_      = 0.0f;
+        float width_  = 0.0f;
+        float height_ = 0.0f;
+
         virtual auto handle_event(Event& ev) -> bool {
             if (ev.type == EventType::click) {
                 clicked_.emit();
@@ -160,10 +171,6 @@ export namespace Nandina {
             }
         }
 
-        float  x_             = 0.0f;
-        float  y_             = 0.0f;
-        float  width_         = 0.0f;
-        float  height_        = 0.0f;
         float  border_radius_ = 0.0f;
         bool   dirty_           = true;
         bool   has_dirty_child_ = false;

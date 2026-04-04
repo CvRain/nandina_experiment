@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.28)
 
 project(NandinaExperiment
-        VERSION 0.2.0
+        VERSION 0.3.0
         LANGUAGES CXX
 )
 
@@ -36,6 +36,8 @@ set(MODULE_SOURCES
         src/core/Event.ixx
         src/core/Signal.ixx
         src/core/Widget.ixx
+        src/core/FreeWidget.ixx        # depends on Widget
+        src/core/RenderLayer.ixx       # depends on Widget + Event
         src/core/Component.ixx
         src/core/CompositeComponent.ixx
         src/core/Router.ixx
@@ -47,7 +49,8 @@ set(MODULE_SOURCES
 
         src/components/Label.ixx
 
-        src/layout/Layout.ixx
+        src/layout/FlexLayout.ixx      # depends on Component + Types
+        src/layout/Layout.ixx          # depends on Core + FlexLayout
 
         src/style/Theme.ixx
 

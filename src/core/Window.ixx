@@ -1,6 +1,7 @@
 module;
 
 #include <SDL3/SDL.h>
+#include <array>
 #include <cstddef>
 #include <cstdint>
 #include <format>
@@ -65,8 +66,8 @@ export namespace Nandina {
 
         auto operator=(NanWindow &&) noexcept -> NanWindow& = default;
 
-        auto set_root(std::unique_ptr<Widget> root) -> void {
-            root_ = std::move(root);
+        auto set_layers(std::array<RenderLayer, 16>& layers) -> void {
+            layers_ = &layers;
         }
 
         // Returns true when the application should quit
@@ -76,7 +77,7 @@ export namespace Nandina {
                 if (sdl_event.type == SDL_EVENT_QUIT) {
                     return true;
                 }
-                if (root_) {
+                if (layers_) {
                     translate_and_dispatch(sdl_event);
                 }
             }
@@ -86,10 +87,14 @@ export namespace Nandina {
         auto present_frame() -> void {
             canvas_->remove(nullptr); // clear all paints from previous frame
 
-            if (root_) {
-                render_widget(*root_);
-            }
-            else {
+            if (layers_) {
+                // Render layers in order 0 → 15 (higher index renders on top)
+                for (auto& layer : *layers_) {
+                    if (layer.visible && layer.has_content()) {
+                        render_widget(*layer.root);
+                    }
+                }
+            } else {
                 auto *bg = tvg::Shape::gen();
                 bg->appendRect(0, 0, static_cast<float>(width_), static_cast<float>(height_), 0, 0);
                 bg->fill(255, 255, 255, 255);
@@ -127,49 +132,78 @@ export namespace Nandina {
             }
         }
 
-        auto translate_and_dispatch(const SDL_Event &sdl_event) -> void {
+        // Translate an SDL_Event to a Nandina Event.
+        // Returns an Event with type==none for unhandled SDL event types.
+        auto translate_event(const SDL_Event& sdl_event) -> Event {
             if (sdl_event.type == SDL_EVENT_MOUSE_BUTTON_DOWN) {
                 press_x_ = sdl_event.button.x;
                 press_y_ = sdl_event.button.y;
                 pressed_ = true;
-                Event ev{
+                return Event{
                     EventType::mouse_button_press,
                     translate_button(sdl_event.button.button),
                     press_x_, press_y_
                 };
-                root_->dispatch_event(ev);
             }
-            else if (sdl_event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
+            if (sdl_event.type == SDL_EVENT_MOUSE_BUTTON_UP) {
                 const float rx = sdl_event.button.x;
                 const float ry = sdl_event.button.y;
-
-                Event ev_up{
+                // We need to dispatch both release and click; handle that in
+                // translate_and_dispatch by synthesizing the click separately.
+                pending_click_x_ = rx;
+                pending_click_y_ = ry;
+                pending_click_btn_ = sdl_event.button.button;
+                pending_click_ = pressed_;
+                pressed_ = false;
+                return Event{
                     EventType::mouse_button_release,
                     translate_button(sdl_event.button.button),
                     rx, ry
                 };
-                root_->dispatch_event(ev_up);
-
-                // Synthesize click: released within 16 px of press point
-                if (pressed_) {
-                    const float dx = rx - press_x_, dy = ry - press_y_;
-                    if (dx * dx + dy * dy < 256.0f) {
-                        Event ev_click{
-                            EventType::click,
-                            translate_button(sdl_event.button.button),
-                            rx, ry
-                        };
-                        root_->dispatch_event(ev_click);
-                    }
-                    pressed_ = false;
-                }
             }
-            else if (sdl_event.type == SDL_EVENT_MOUSE_MOTION) {
-                Event ev{
+            if (sdl_event.type == SDL_EVENT_MOUSE_MOTION) {
+                return Event{
                     EventType::mouse_move, MouseButton::none,
                     sdl_event.motion.x, sdl_event.motion.y
                 };
-                root_->dispatch_event(ev);
+            }
+            return Event{ EventType::none, MouseButton::none, 0.0f, 0.0f };
+        }
+
+        auto translate_and_dispatch(const SDL_Event &sdl_event) -> void {
+            Event ev = translate_event(sdl_event);
+            if (ev.type == EventType::none) { return; }
+
+            // Dispatch from highest layer to lowest; stop at modal or handled.
+            for (int i = static_cast<int>(layers_->size()) - 1; i >= 0; --i) {
+                auto& layer = (*layers_)[i];
+                if (!layer.visible || !layer.has_content()) { continue; }
+
+                layer.root->dispatch_event(ev);
+
+                if (ev.handled) { break; }
+                if (layer.modal) { break; }
+            }
+
+            // Synthesize click after a mouse-up if released close to press point.
+            if (ev.type == EventType::mouse_button_release && pending_click_) {
+                pending_click_ = false;
+                const float dx = pending_click_x_ - press_x_;
+                const float dy = pending_click_y_ - press_y_;
+                if (dx * dx + dy * dy < 256.0f) {
+                    Event ev_click{
+                        EventType::click,
+                        translate_button(pending_click_btn_),
+                        pending_click_x_, pending_click_y_
+                    };
+                    for (int i = static_cast<int>(layers_->size()) - 1; i >= 0; --i) {
+                        auto& layer = (*layers_)[i];
+                        if (!layer.visible || !layer.has_content()) { continue; }
+                        layer.root->dispatch_event(ev_click);
+                        if (ev_click.handled) { break; }
+                        if (layer.modal) { break; }
+                    }
+                }
             }
         }
 
@@ -192,8 +226,12 @@ export namespace Nandina {
         bool pressed_ = false;
         float press_x_ = 0.0f;
         float press_y_ = 0.0f;
+        bool pending_click_ = false;
+        float pending_click_x_ = 0.0f;
+        float pending_click_y_ = 0.0f;
+        std::uint8_t pending_click_btn_ = 0;
 
-        std::unique_ptr<Widget> root_;
+        std::array<RenderLayer, 16>* layers_ = nullptr;
         std::unique_ptr<SDL_Window, WindowDeleter> window_;
         std::unique_ptr<SDL_Renderer, RendererDeleter> renderer_;
         std::unique_ptr<SDL_Texture, TextureDeleter> texture_;
@@ -243,8 +281,8 @@ export namespace Nandina {
                     .set_height(h)
                     .build();
 
-            auto root = build_root();
-            window.set_root(std::move(root));
+            setup_layers(layers_);
+            window.set_layers(layers_);
             on_start();
 
             while (!window.process_events()) {
@@ -257,6 +295,26 @@ export namespace Nandina {
         }
 
     protected:
+        // ── Semantic layer accessors (mirrors Godot's conventional layer numbers)
+        auto world_layer()   -> RenderLayer& { return layers_[0]; }  // FreeWidget / world canvas
+        auto ui_layer()      -> RenderLayer& { return layers_[1]; }  // main UI, RouterView
+        auto overlay_layer() -> RenderLayer& { return layers_[2]; }  // Popover/Toast/Dock
+        auto modal_layer()   -> RenderLayer& { return layers_[3]; }  // Dialog (modal)
+        auto layer(int i)    -> RenderLayer& { return layers_[i]; }  // arbitrary layer
+
+        // Override this to configure all render layers.
+        // Default: calls the legacy build_root() and places the result in ui_layer().
+        virtual auto setup_layers(std::array<RenderLayer, 16>& layers) -> void {
+            auto root = build_root();
+            if (root) {
+                layers[1].root = std::move(root);
+            }
+        }
+
+        // Legacy entry-point kept for backward compatibility.
+        // Override build_root() if you do not need multi-layer support.
+        virtual auto build_root() -> std::unique_ptr<Widget> { return nullptr; }
+
         [[nodiscard]] virtual auto title() const -> std::string_view {
             return "Nandina Window";
         }
@@ -265,15 +323,10 @@ export namespace Nandina {
             return {800, 600};
         }
 
-        virtual auto build_root() -> std::unique_ptr<Widget> = 0;
+        virtual auto on_start()    -> void {}
+        virtual auto on_frame()    -> void {}
+        virtual auto on_shutdown() -> void {}
 
-        virtual auto on_start() -> void {
-        }
-
-        virtual auto on_frame() -> void {
-        }
-
-        virtual auto on_shutdown() -> void {
-        }
+        std::array<RenderLayer, 16> layers_;
     };
 }

@@ -9,6 +9,8 @@ export module Nandina.Layout;
 
 import Nandina.Core;
 
+export import Nandina.Layout.Flex;
+
 export namespace Nandina {
 
     enum class Align : std::uint8_t {
@@ -91,15 +93,48 @@ export namespace Nandina {
         }
 
         auto layout() -> void override {
+            const float avail_h = height() - padding_top_ - padding_bottom_;
+
+            // ── Pass 1: sum fixed heights and total flex ──────────────────────
+            float fixed_total = 0.0f;
+            int   flex_total  = 0;
+            int   child_count = 0;
+
+            for_each_child([&](Widget& child) {
+                const int f = child.flex_factor();
+                if (f > 0) {
+                    flex_total += f;
+                } else {
+                    fixed_total += child.height();
+                }
+                ++child_count;
+            });
+
+            const float gap_total = (child_count > 1)
+                ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
+            const float remaining = avail_h - fixed_total - gap_total;
+
+            // ── Pass 2: place children ────────────────────────────────────────
             float cursor_y = y() + padding_top_;
-            bool first = true;
+            bool  first    = true;
+
             for_each_child([&](Widget& child) {
                 if (!first) { cursor_y += gap_; }
                 first = false;
-                child.set_bounds(x() + padding_left_, cursor_y,
-                                 width() - padding_left_ - padding_right_,
-                                 child.height());
-                cursor_y += child.height();
+
+                const int f = child.flex_factor();
+                if (f > 0 && flex_total > 0) {
+                    const float alloc_h = remaining * (static_cast<float>(f) / static_cast<float>(flex_total));
+                    child.set_bounds(x() + padding_left_, cursor_y,
+                                     width() - padding_left_ - padding_right_,
+                                     alloc_h);
+                    cursor_y += alloc_h;
+                } else {
+                    child.set_bounds(x() + padding_left_, cursor_y,
+                                     width() - padding_left_ - padding_right_,
+                                     child.height());
+                    cursor_y += child.height();
+                }
             });
         }
     };
@@ -132,15 +167,48 @@ export namespace Nandina {
         }
 
         auto layout() -> void override {
+            const float avail_w = width() - padding_left_ - padding_right_;
+
+            // ── Pass 1: sum fixed widths and total flex ───────────────────────
+            float fixed_total = 0.0f;
+            int   flex_total  = 0;
+            int   child_count = 0;
+
+            for_each_child([&](Widget& child) {
+                const int f = child.flex_factor();
+                if (f > 0) {
+                    flex_total += f;
+                } else {
+                    fixed_total += child.width();
+                }
+                ++child_count;
+            });
+
+            const float gap_total = (child_count > 1)
+                ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
+            const float remaining = avail_w - fixed_total - gap_total;
+
+            // ── Pass 2: place children ────────────────────────────────────────
             float cursor_x = x() + padding_left_;
-            bool first = true;
+            bool  first    = true;
+
             for_each_child([&](Widget& child) {
                 if (!first) { cursor_x += gap_; }
                 first = false;
-                child.set_bounds(cursor_x, y() + padding_top_,
-                                 child.width(),
-                                 height() - padding_top_ - padding_bottom_);
-                cursor_x += child.width();
+
+                const int f = child.flex_factor();
+                if (f > 0 && flex_total > 0) {
+                    const float alloc_w = remaining * (static_cast<float>(f) / static_cast<float>(flex_total));
+                    child.set_bounds(cursor_x, y() + padding_top_,
+                                     alloc_w,
+                                     height() - padding_top_ - padding_bottom_);
+                    cursor_x += alloc_w;
+                } else {
+                    child.set_bounds(cursor_x, y() + padding_top_,
+                                     child.width(),
+                                     height() - padding_top_ - padding_bottom_);
+                    cursor_x += child.width();
+                }
             });
         }
     };
