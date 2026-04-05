@@ -18,11 +18,14 @@ export namespace Nandina {
     class Label final : public Component {
     public:
         static auto Create() -> std::unique_ptr<Label> {
-            return std::unique_ptr<Label>(new Label());
+            auto label = std::unique_ptr<Label>(new Label());
+            label->set_hit_test_visible(false);
+            return label;
         }
 
         static auto Create(LabelProps props) -> std::unique_ptr<Label> {
             auto label = std::unique_ptr<Label>(new Label());
+            label->set_hit_test_visible(false);
             if (props.text_signal) {
                 const auto* sig = props.text_signal;
                 label->scope_.add([lbl = label.get(), sig]{

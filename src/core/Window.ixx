@@ -17,6 +17,7 @@ module;
 export module Nandina.Window;
 
 import Nandina.Core;
+import Nandina.Components.Label;
 
 export namespace Nandina {
     class NanWindow {
@@ -110,6 +111,13 @@ export namespace Nandina {
                               width_ * static_cast<int>(sizeof(std::uint32_t)));
             SDL_RenderClear(renderer_.get());
             SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr);
+            if (layers_) {
+                for (auto& layer : *layers_) {
+                    if (layer.visible && layer.has_content()) {
+                        render_text_overlay(*layer.root);
+                    }
+                }
+            }
             SDL_RenderPresent(renderer_.get());
         }
 
@@ -221,6 +229,32 @@ export namespace Nandina {
             });
         }
 
+        auto render_text_overlay(Widget& widget) -> void {
+            if (auto* label = dynamic_cast<Label*>(&widget)) {
+                draw_debug_text(widget.x(), widget.y(),
+                                label->get_text(),
+                                label->text_r(), label->text_g(), label->text_b(), label->text_a());
+            } else if (auto* button = dynamic_cast<Button*>(&widget)) {
+                draw_debug_text(widget.x() + 12.0f,
+                                widget.y() + (widget.height() * 0.5f) - 4.0f,
+                                button->get_text(),
+                                255, 255, 255, 255);
+            }
+
+            widget.for_each_child([this](Widget& child) {
+                render_text_overlay(child);
+            });
+        }
+
+        auto draw_debug_text(float x, float y, const std::string& text,
+                             std::uint8_t r, std::uint8_t g, std::uint8_t b, std::uint8_t a) -> void {
+            if (text.empty()) {
+                return;
+            }
+            SDL_SetRenderDrawColor(renderer_.get(), r, g, b, a);
+            SDL_RenderDebugText(renderer_.get(), x, y, text.c_str());
+        }
+
         int width_ = 0;
         int height_ = 0;
         bool pressed_ = false;
@@ -275,13 +309,16 @@ export namespace Nandina {
 
         auto exec() -> int {
             auto [w, h] = initial_size();
+            window_width_ = w;
+            window_height_ = h;
             auto window = NanWindow::Builder{}
                     .set_title(title())
                     .set_width(w)
                     .set_height(h)
                     .build();
 
-            setup_layers(layers_);
+            reset_layers();
+            setup();
             window.set_layers(layers_);
             on_start();
 
@@ -295,6 +332,10 @@ export namespace Nandina {
         }
 
     protected:
+        virtual auto setup() -> void {
+            setup_layers(layers_);
+        }
+
         // ── Semantic layer accessors (mirrors Godot's conventional layer numbers)
         auto world_layer()   -> RenderLayer& { return layers_[0]; }  // FreeWidget / world canvas
         auto ui_layer()      -> RenderLayer& { return layers_[1]; }  // main UI, RouterView
@@ -302,12 +343,54 @@ export namespace Nandina {
         auto modal_layer()   -> RenderLayer& { return layers_[3]; }  // Dialog (modal)
         auto layer(int i)    -> RenderLayer& { return layers_[i]; }  // arbitrary layer
 
+        [[nodiscard]] auto window_width() const noexcept -> int { return window_width_; }
+        [[nodiscard]] auto window_height() const noexcept -> int { return window_height_; }
+
+        auto set_background(std::unique_ptr<Widget> widget) -> Widget& {
+            return set_layer_root(0, std::move(widget));
+        }
+
+        auto set_content(std::unique_ptr<Widget> widget) -> Widget& {
+            return set_layer_root(1, std::move(widget));
+        }
+
+        auto set_overlay(std::unique_ptr<Widget> widget) -> Widget& {
+            return set_layer_root(2, std::move(widget));
+        }
+
+        auto add_child(std::unique_ptr<Widget> widget) -> Widget& {
+            const int target_layer = normalize_layer_index(widget ? widget->layer() : 1);
+            return add_to_layer(target_layer, std::move(widget));
+        }
+
+        auto add_to_layer(int index, std::unique_ptr<Widget> widget) -> Widget& {
+            auto* mounted = layers_[normalize_layer_index(index)].add(std::move(widget));
+            return *mounted;
+        }
+
+        auto set_background_color(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+                                  std::uint8_t a = 255) -> Widget& {
+            auto bg = std::make_unique<FreeWidget>();
+            bg->move_to(0.0f, 0.0f)
+              .resize(static_cast<float>(window_width_), static_cast<float>(window_height_))
+              .set_background(r, g, b, a);
+            return set_background(std::move(bg));
+        }
+
+        auto set_layer_visible(int index, bool visible) -> void {
+            layers_[normalize_layer_index(index)].visible = visible;
+        }
+
+        auto set_layer_modal(int index, bool modal) -> void {
+            layers_[normalize_layer_index(index)].modal = modal;
+        }
+
         // Override this to configure all render layers.
         // Default: calls the legacy build_root() and places the result in ui_layer().
-        virtual auto setup_layers(std::array<RenderLayer, 16>& layers) -> void {
+        virtual auto setup_layers(std::array<RenderLayer, 16>&) -> void {
             auto root = build_root();
             if (root) {
-                layers[1].root = std::move(root);
+                set_content(std::move(root));
             }
         }
 
@@ -328,5 +411,33 @@ export namespace Nandina {
         virtual auto on_shutdown() -> void {}
 
         std::array<RenderLayer, 16> layers_;
+
+    private:
+        static constexpr int default_content_layer_ = 1;
+
+        auto reset_layers() -> void {
+            for (std::size_t i = 0; i < layers_.size(); ++i) {
+                layers_[i].index = static_cast<int>(i);
+                layers_[i].modal = false;
+                layers_[i].visible = true;
+                layers_[i].root.reset();
+            }
+        }
+
+        [[nodiscard]] static auto normalize_layer_index(int index) noexcept -> int {
+            if (index < 0 || index >= 16) {
+                return default_content_layer_;
+            }
+            return index;
+        }
+
+        auto set_layer_root(int index, std::unique_ptr<Widget> widget) -> Widget& {
+            auto& target = layers_[normalize_layer_index(index)];
+            target.root = std::move(widget);
+            return *target.root;
+        }
+
+        int window_width_ = 800;
+        int window_height_ = 600;
     };
 }

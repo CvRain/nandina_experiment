@@ -19,8 +19,17 @@ export namespace Nandina {
             return std::unique_ptr<Button>(new Button());
         }
 
+        auto set_background(std::uint8_t r, std::uint8_t g, std::uint8_t b,
+                            std::uint8_t a = 255) noexcept -> Button& {
+            if (rect_layer_) {
+                rect_layer_->color(r, g, b, a);
+            }
+            return *this;
+        }
+
         auto text(std::string value) -> Button& {
             text_ = std::move(value);
+            mark_dirty();
             return *this;
         }
 

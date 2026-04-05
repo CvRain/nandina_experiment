@@ -28,7 +28,9 @@ export namespace Nandina {
     class RectangleComponent final : public Component {
     public:
         static auto Create() -> std::unique_ptr<RectangleComponent> {
-            return std::make_unique<RectangleComponent>();
+            auto component = std::make_unique<RectangleComponent>();
+            component->set_hit_test_visible(false);
+            return component;
         }
 
         auto color(std::uint8_t r, std::uint8_t g, std::uint8_t b,
@@ -48,7 +50,9 @@ export namespace Nandina {
     class FocusComponent final : public Component {
     public:
         static auto Create() -> std::unique_ptr<FocusComponent> {
-            return std::make_unique<FocusComponent>();
+            auto component = std::make_unique<FocusComponent>();
+            component->set_hit_test_visible(false);
+            return component;
         }
 
         auto focused(bool value) -> FocusComponent& {

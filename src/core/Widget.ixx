@@ -25,6 +25,24 @@ export namespace Nandina {
 
         virtual ~Widget() = default;
 
+        auto set_hit_test_visible(bool value) noexcept -> Widget& {
+            hit_test_visible_ = value;
+            return *this;
+        }
+
+        [[nodiscard]] auto hit_test_visible() const noexcept -> bool {
+            return hit_test_visible_;
+        }
+
+        auto layer(int index) noexcept -> Widget& {
+            layer_ = index;
+            return *this;
+        }
+
+        [[nodiscard]] auto layer() const noexcept -> int {
+            return layer_;
+        }
+
         auto add_child(Child child) -> Widget& {
             child->parent_ = this;
             children_.push_back(std::move(child));
@@ -99,7 +117,7 @@ export namespace Nandina {
             for (auto it = children_.rbegin(); it != children_.rend(); ++it) {
                 if ((*it)->dispatch_event(ev)) { return true; }
             }
-            if (ev.handled || !contains(ev.x, ev.y)) { return false; }
+            if (ev.handled || !hit_test_visible_ || !contains(ev.x, ev.y)) { return false; }
             return handle_event(ev);
         }
 
@@ -174,9 +192,11 @@ export namespace Nandina {
         float  border_radius_ = 0.0f;
         bool   dirty_           = true;
         bool   has_dirty_child_ = false;
+        bool   hit_test_visible_ = true;
         Widget* parent_         = nullptr;
 
         Color  bg_color_{255, 255, 255, 255};
+        int    layer_ = -1;
         EventSignal<> clicked_;
         std::vector<Child>   children_;
         std::vector<Widget*> children_ref_;  // Non-owning references (e.g. for RouterView)
