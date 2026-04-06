@@ -2,6 +2,7 @@ module;
 
 #include <format>
 #include <memory>
+#include <print>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -41,36 +42,41 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     col->set_background(0, 0, 0, 0); // transparent — Layer 0 background shows through
     col->gap(16.0f).padding(40.0f);
 
-    //── Fixed-height title ─────────────────────────────────────────────
+    // ── Fixed-height title ─────────────────────────────────────────────
     auto title_box = Nandina::SizedBox::Create();
-    title_box->height(48.0f);
-    title_box->set_background(0, 0, 0, 0);
+    title_box->height(48.0f).set_background(0, 0, 0, 0);
+
     auto title_label = Nandina::Label::Create();
     title_label->set_size(Nandina::Size::fixed(560.0f, 48.0f));
     title_label->font_size(24.0f).text_color(200, 200, 255);
     title_label->text("Nandina Counter");
     title_box->child(std::move(title_label));
 
-    //── Expanded center area (3 flex shares) ───────────────────────────
+    // ── Expanded center area (3 flex shares) ───────────────────────────
     auto center_exp = Nandina::Expanded::Create(3);
+
     auto count_center = Nandina::Center::Create();
     count_center->set_background(0, 0, 0, 0);
+
     auto count_label = Nandina::Label::Create();
     count_label->set_size(Nandina::Size::fixed(400.0f, 64.0f));
     count_label->font_size(48.0f).text_color(255, 255, 255);
+
     effect([this, lbl = count_label.get()] {
         lbl->text(std::format("Count: {}", count_.get()));
+        std::printf("Count: %d\n", count_.get());
     });
+
     count_center->child(std::move(count_label));
     center_exp->child(std::move(count_center));
 
-    //── Elastic spacer (1 flex share) ──────────────────────────────────
+    // ── Elastic spacer (1 flex share) ──────────────────────────────────
     auto spacer = Nandina::Spacer::Create(1);
 
-    //── Button row (fixed height) ──────────────────────────────────────
+    // ── Button row (fixed height) ──────────────────────────────────────
     auto btn_row = Nandina::Row::Create();
     btn_row->set_size(Nandina::Size::fixed(560.0f, 52.0f));
-    btn_row->gap(12.0f).padding(0.0f);
+    btn_row->gap(12.0f).padding(15.0f);
     btn_row->set_background(0, 0, 0, 0);
 
     auto left_spacer = Nandina::Spacer::Create(1);
@@ -79,13 +85,20 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     dec->set_size(Nandina::Size::fixed(120.0f, 60.0f));
     dec->text("-1");
     dec->set_background(234, 153, 156);
-    dec->on_click([this] { count_.set(count_.get() - 1); });
+    auto *dec_button = dec.get();
+    dec->on_click([this, dec_button] {
+        count_.set(count_.get() - 1);
+        std::println("decrease button clicked!");
+    });
 
     auto inc = Nandina::Button::Create();
     inc->set_size(Nandina::Size::fixed(120.0f, 60.0f));
     inc->text("+1");
     inc->set_background(234, 153, 156);
-    inc->on_click([this] { count_.set(count_.get() + 1); });
+    inc->on_click([this] {
+        count_.set(count_.get() + 1);
+        std::println("increase button clicked!");
+    });
 
     auto right_spacer = Nandina::Spacer::Create(1);
 
@@ -114,7 +127,6 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
 
     return col;
 }
-
 
 // ── ApplicationWindow ─────────────────────────────────────────────────────────
 // Uses the multi-layer RenderLayer architecture:

@@ -21,7 +21,7 @@ export namespace Nandina {
         Connection(Connection &&) noexcept = default;
         auto operator=(Connection &&) noexcept -> Connection& = default;
 
-        ~Connection() { disconnect(); }
+        ~Connection() {}
 
         auto disconnect() -> void {
             if (disconnect_fn_) {

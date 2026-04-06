@@ -11,7 +11,6 @@ import Nandina.Core.Event;
 import Nandina.Core.Widget;
 
 export namespace Nandina {
-
     // ── Button ────────────────────────────────────────────────────────────────
     // A clickable button composed of a FocusComponent ring layer and a
     // RectangleComponent fill layer, following the Action composition model.
@@ -39,7 +38,10 @@ export namespace Nandina {
         [[nodiscard]] auto text_content() const noexcept -> std::string_view override { return text_; }
         [[nodiscard]] auto text_color() const noexcept -> Nandina::Color override { return {255, 255, 255, 255}; }
         [[nodiscard]] auto text_font_size() const noexcept -> float override { return 18.0f; }
-        [[nodiscard]] auto text_align() const noexcept -> Nandina::TextAlign override { return Nandina::TextAlign::center; }
+
+        [[nodiscard]] auto text_align() const noexcept -> Nandina::TextAlign override {
+            return Nandina::TextAlign::center;
+        }
 
         // Override set_bounds to keep child layers in sync
         auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& override {
@@ -54,7 +56,7 @@ export namespace Nandina {
         }
 
     protected:
-        auto handle_event(Event& ev) -> bool override {
+        auto handle_event(Event &ev) -> bool override {
             if (ev.type == EventType::mouse_button_press && contains(ev.x, ev.y)) {
                 pressed_ = true;
                 if (rect_layer_) { rect_layer_->color(29, 78, 216); }
@@ -92,10 +94,9 @@ export namespace Nandina {
             add_child(std::move(rect));
         }
 
-        std::string         text_;
-        bool                pressed_      = false;
-        FocusComponent*     focus_layer_  = nullptr;
-        RectangleComponent* rect_layer_   = nullptr;
+        std::string text_;
+        bool pressed_ = false;
+        FocusComponent *focus_layer_ = nullptr;
+        RectangleComponent *rect_layer_ = nullptr;
     };
-
 } // export namespace Nandina

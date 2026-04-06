@@ -1,5 +1,6 @@
 module;
 #include <cassert>
+#include <atomic>
 #include <cstddef>
 #include <functional>
 #include <memory>
@@ -17,7 +18,16 @@ export namespace Nandina {
 
     // ── Internal detail ───────────────────────────────────────────────────────
     namespace detail {
-        inline thread_local std::function<void()>* current_invalidator = nullptr;
+        struct TrackingContext {
+            std::size_t id = 0;
+            std::function<void()>* invalidate = nullptr;
+        };
+
+        inline thread_local TrackingContext* current_tracking_context = nullptr;
+        inline auto next_tracking_id() -> std::size_t {
+            static std::atomic_size_t next_id{1};
+            return next_id.fetch_add(1, std::memory_order_relaxed);
+        }
 
         struct ObserverEntry {
             std::size_t id       = 0;
@@ -62,11 +72,17 @@ export namespace Nandina {
 
     private:
         auto track_access() const -> void {
-            if (detail::current_invalidator) {
+            if (detail::current_tracking_context && detail::current_tracking_context->invalidate) {
+                for (const auto& observer : observers_) {
+                    if (observer.active && observer.id == detail::current_tracking_context->id) {
+                        return;
+                    }
+                }
+
                 observers_.push_back({
-                    next_id_++,
+                    detail::current_tracking_context->id,
                     true,
-                    *detail::current_invalidator
+                    *detail::current_tracking_context->invalidate
                 });
             }
         }
@@ -84,7 +100,6 @@ export namespace Nandina {
 
         T value_;
         mutable std::vector<detail::ObserverEntry> observers_;
-        mutable std::size_t next_id_ = 1;
     };
 
     // ── ReadState<T> ──────────────────────────────────────────────────────────
@@ -127,7 +142,7 @@ export namespace Nandina {
         using ValueType = std::invoke_result_t<F>;
 
         explicit Computed(F compute_fn)
-            : compute_fn_(std::move(compute_fn)), stale_(true) {}
+            : compute_fn_(std::move(compute_fn)), stale_(true), observer_id_(detail::next_tracking_id()) {}
 
         Computed(const Computed&)          = delete;
         auto operator=(const Computed&)    = delete;
@@ -145,15 +160,17 @@ export namespace Nandina {
         auto recompute() const -> void {
             stale_ = false;
             auto invalidator = std::function<void()>{ [this]{ stale_ = true; } };
-            auto* prev = detail::current_invalidator;
-            detail::current_invalidator = &invalidator;
+            detail::TrackingContext context{observer_id_, &invalidator};
+            auto* prev = detail::current_tracking_context;
+            detail::current_tracking_context = &context;
             cached_ = compute_fn_();
-            detail::current_invalidator = prev;
+            detail::current_tracking_context = prev;
         }
 
         F                  compute_fn_;
         mutable ValueType  cached_{};
         mutable bool       stale_;
+        std::size_t        observer_id_;
     };
 
     template<typename F>
@@ -165,7 +182,7 @@ export namespace Nandina {
         template<typename F>
             requires std::invocable<F>
         explicit Effect(F&& fn)
-            : fn_(std::forward<F>(fn)) {
+            : fn_(std::forward<F>(fn)), observer_id_(detail::next_tracking_id()) {
             run();
         }
 
@@ -197,15 +214,17 @@ export namespace Nandina {
         auto run() -> void {
             if (!active_) { return; }
             self_invalidator_ = [this]{ run(); };
-            auto* prev = detail::current_invalidator;
-            detail::current_invalidator = &self_invalidator_;
+            detail::TrackingContext context{observer_id_, &self_invalidator_};
+            auto* prev = detail::current_tracking_context;
+            detail::current_tracking_context = &context;
             fn_();
-            detail::current_invalidator = prev;
+            detail::current_tracking_context = prev;
         }
 
         std::function<void()> fn_;
         bool                  active_ = true;
         std::function<void()> self_invalidator_;
+        std::size_t           observer_id_ = 0;
     };
 
     // ── EffectScope ───────────────────────────────────────────────────────────
