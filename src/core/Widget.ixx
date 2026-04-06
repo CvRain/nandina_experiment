@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <string_view>
 #include <utility>
 #include <vector>
 
@@ -16,6 +17,11 @@ import Nandina.Types.Size;
 import Nandina.Types.Rect;
 
 export namespace Nandina {
+
+    enum class TextAlign : std::uint8_t {
+        start,
+        center,
+    };
 
     using WidgetPtr = std::unique_ptr<class Widget>;
 
@@ -155,6 +161,12 @@ export namespace Nandina {
         [[nodiscard]] auto rect()     const noexcept -> Rect     { return {x_, y_, width_, height_}; }
         [[nodiscard]] auto position() const noexcept -> Position { return {x_, y_}; }
         [[nodiscard]] auto size()     const noexcept -> Size     { return {width_, height_}; }
+
+        [[nodiscard]] virtual auto text_content() const noexcept -> std::string_view { return {}; }
+        [[nodiscard]] virtual auto text_color() const noexcept -> Color { return {0, 0, 0, 255}; }
+        [[nodiscard]] virtual auto text_font_size() const noexcept -> float { return 0.0f; }
+        [[nodiscard]] virtual auto text_bounds() const noexcept -> Rect { return rect(); }
+        [[nodiscard]] virtual auto text_align() const noexcept -> TextAlign { return TextAlign::start; }
 
         // ── Flex layout support ───────────────────────────────────────────────
         // Returns 0 for fixed-size widgets; Expanded / Spacer return their flex value.

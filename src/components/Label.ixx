@@ -58,6 +58,9 @@ export namespace Nandina {
         [[nodiscard]] auto text_g()        const -> std::uint8_t       { return text_g_; }
         [[nodiscard]] auto text_b()        const -> std::uint8_t       { return text_b_; }
         [[nodiscard]] auto text_a()        const -> std::uint8_t       { return text_a_; }
+        [[nodiscard]] auto text_content() const noexcept -> std::string_view override { return text_.get(); }
+        [[nodiscard]] auto text_color() const noexcept -> Color override { return {text_r_, text_g_, text_b_, text_a_}; }
+        [[nodiscard]] auto text_font_size() const noexcept -> float override { return font_size_; }
 
     private:
         Label() {

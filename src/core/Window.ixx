@@ -1,9 +1,18 @@
 module;
 
+#ifdef NANDINA_TEXT_ENGINE
+#include <ft2build.h>
+#include FT_FREETYPE_H
+#include <hb-ft.h>
+#include <hb.h>
+#endif
+
 #include <SDL3/SDL.h>
 #include <array>
 #include <cstddef>
 #include <cstdint>
+#include <cmath>
+#include <filesystem>
 #include <format>
 #include <memory>
 #include <print>
@@ -17,7 +26,6 @@ module;
 export module Nandina.Window;
 
 import Nandina.Core;
-import Nandina.Components.Label;
 
 export namespace Nandina {
     class NanWindow {
@@ -67,6 +75,12 @@ export namespace Nandina {
 
         auto operator=(NanWindow &&) noexcept -> NanWindow& = default;
 
+        ~NanWindow() {
+    #ifdef NANDINA_TEXT_ENGINE
+            shutdown_text_engine();
+    #endif
+        }
+
         auto set_layers(std::array<RenderLayer, 16>& layers) -> void {
             layers_ = &layers;
         }
@@ -107,17 +121,29 @@ export namespace Nandina {
                 canvas_->sync();
             }
 
+#ifdef NANDINA_TEXT_ENGINE
+            if (layers_) {
+                for (auto& layer : *layers_) {
+                    if (layer.visible && layer.has_content()) {
+                        render_text(layer.root.get());
+                    }
+                }
+            }
+#endif
+
             SDL_UpdateTexture(texture_.get(), nullptr, pixel_buffer_.data(),
                               width_ * static_cast<int>(sizeof(std::uint32_t)));
             SDL_RenderClear(renderer_.get());
             SDL_RenderTexture(renderer_.get(), texture_.get(), nullptr, nullptr);
+#ifndef NANDINA_TEXT_ENGINE
             if (layers_) {
                 for (auto& layer : *layers_) {
                     if (layer.visible && layer.has_content()) {
-                        render_text_overlay(*layer.root);
+                        render_debug_text_overlay(layer.root.get());
                     }
                 }
             }
+#endif
             SDL_RenderPresent(renderer_.get());
         }
 
@@ -130,6 +156,172 @@ export namespace Nandina {
 
     private:
         NanWindow(std::string_view title, int width, int height);
+
+#ifdef NANDINA_TEXT_ENGINE
+        static auto find_default_font() -> std::string {
+            constexpr std::array<std::string_view, 5> candidates{
+                "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/dejavu/DejaVuSans.ttf",
+                "/usr/share/fonts/TTF/DejaVuSans.ttf",
+                "/usr/share/fonts/truetype/liberation2/LiberationSans-Regular.ttf",
+                "/usr/share/fonts/liberation/LiberationSans-Regular.ttf",
+            };
+
+            for (const auto candidate : candidates) {
+                if (std::filesystem::exists(candidate)) {
+                    return std::string(candidate);
+                }
+            }
+
+            return {};
+        }
+
+        auto initialize_text_engine() -> void {
+            if (FT_Init_FreeType(&ft_library_) != 0) {
+                throw std::runtime_error("FreeType initialization failed");
+            }
+
+            font_path_ = find_default_font();
+            if (font_path_.empty()) {
+                throw std::runtime_error("No default font found for NANDINA_TEXT_ENGINE");
+            }
+
+            if (FT_New_Face(ft_library_, font_path_.c_str(), 0, &ft_face_) != 0) {
+                throw std::runtime_error(std::format("Unable to load font: {}", font_path_));
+            }
+
+            hb_font_ = hb_ft_font_create_referenced(ft_face_);
+        }
+
+        auto shutdown_text_engine() noexcept -> void {
+            if (hb_font_) {
+                hb_font_destroy(hb_font_);
+                hb_font_ = nullptr;
+            }
+            if (ft_face_) {
+                FT_Done_Face(ft_face_);
+                ft_face_ = nullptr;
+            }
+            if (ft_library_) {
+                FT_Done_FreeType(ft_library_);
+                ft_library_ = nullptr;
+            }
+        }
+
+        auto set_font_size(float font_size) -> void {
+            const auto pixel_size = static_cast<unsigned int>(font_size < 1.0f ? 1.0f : font_size);
+            if (current_font_size_ == pixel_size) {
+                return;
+            }
+
+            FT_Set_Pixel_Sizes(ft_face_, 0, pixel_size);
+            hb_ft_font_changed(hb_font_);
+            current_font_size_ = pixel_size;
+        }
+
+        [[nodiscard]] auto blend_channel(std::uint8_t src, std::uint8_t dst, std::uint8_t src_alpha) const noexcept -> std::uint8_t {
+            const auto value = (static_cast<unsigned int>(src) * src_alpha)
+                             + (static_cast<unsigned int>(dst) * (255 - src_alpha));
+            return static_cast<std::uint8_t>(value / 255);
+        }
+
+        auto blend_pixel(int x, int y, const Color& color, std::uint8_t coverage) -> void {
+            if (x < 0 || y < 0 || x >= width_ || y >= height_ || coverage == 0) {
+                return;
+            }
+
+            const auto src_alpha = static_cast<std::uint8_t>((static_cast<unsigned int>(color.a) * coverage) / 255);
+            if (src_alpha == 0) {
+                return;
+            }
+
+            auto& pixel = pixel_buffer_[static_cast<std::size_t>(y) * static_cast<std::size_t>(width_) + static_cast<std::size_t>(x)];
+            const auto dst_a = static_cast<std::uint8_t>((pixel >> 24) & 0xFFu);
+            const auto dst_r = static_cast<std::uint8_t>((pixel >> 16) & 0xFFu);
+            const auto dst_g = static_cast<std::uint8_t>((pixel >> 8) & 0xFFu);
+            const auto dst_b = static_cast<std::uint8_t>(pixel & 0xFFu);
+
+            const auto out_a = static_cast<std::uint8_t>(src_alpha + ((static_cast<unsigned int>(dst_a) * (255 - src_alpha)) / 255));
+            const auto out_r = blend_channel(color.r, dst_r, src_alpha);
+            const auto out_g = blend_channel(color.g, dst_g, src_alpha);
+            const auto out_b = blend_channel(color.b, dst_b, src_alpha);
+
+            pixel = (static_cast<std::uint32_t>(out_a) << 24)
+                  | (static_cast<std::uint32_t>(out_r) << 16)
+                  | (static_cast<std::uint32_t>(out_g) << 8)
+                  | static_cast<std::uint32_t>(out_b);
+        }
+
+        auto render_text(Widget* widget) -> void {
+            if (!widget) {
+                return;
+            }
+
+            const auto text = widget->text_content();
+            const auto font_size = widget->text_font_size();
+            if (!text.empty() && font_size > 0.0f) {
+                set_font_size(font_size);
+
+                auto* buffer = hb_buffer_create();
+                hb_buffer_add_utf8(buffer, text.data(), static_cast<int>(text.size()), 0, static_cast<int>(text.size()));
+                hb_buffer_guess_segment_properties(buffer);
+                hb_shape(hb_font_, buffer, nullptr, 0);
+
+                unsigned int glyph_count = 0;
+                auto* glyph_info = hb_buffer_get_glyph_infos(buffer, &glyph_count);
+                auto* glyph_pos = hb_buffer_get_glyph_positions(buffer, &glyph_count);
+
+                const auto bounds = widget->text_bounds();
+                const auto metrics = ft_face_->size->metrics;
+                const float ascender = static_cast<float>(metrics.ascender) / 64.0f;
+                const float descender = static_cast<float>(metrics.descender) / 64.0f;
+                const float line_height = ascender - descender;
+
+                float total_advance = 0.0f;
+                for (unsigned int index = 0; index < glyph_count; ++index) {
+                    total_advance += static_cast<float>(glyph_pos[index].x_advance) / 64.0f;
+                }
+
+                float pen_x = bounds.x();
+                if (widget->text_align() == TextAlign::center) {
+                    pen_x = bounds.x() + ((bounds.width() - total_advance) * 0.5f);
+                }
+
+                const float baseline = bounds.y() + ((bounds.height() - line_height) * 0.5f) + ascender;
+                const auto color = widget->text_color();
+
+                for (unsigned int index = 0; index < glyph_count; ++index) {
+                    pen_x += static_cast<float>(glyph_pos[index].x_offset) / 64.0f;
+                    const float pen_y = baseline - (static_cast<float>(glyph_pos[index].y_offset) / 64.0f);
+
+                    if (FT_Load_Glyph(ft_face_, glyph_info[index].codepoint, FT_LOAD_RENDER) == 0) {
+                        const auto* glyph = ft_face_->glyph;
+                        const auto& bitmap = glyph->bitmap;
+                        const int bitmap_x = static_cast<int>(std::lround(pen_x)) + glyph->bitmap_left;
+                        const int bitmap_y = static_cast<int>(std::lround(pen_y)) - glyph->bitmap_top;
+
+                        for (unsigned int row = 0; row < bitmap.rows; ++row) {
+                            for (unsigned int column = 0; column < bitmap.width; ++column) {
+                                const auto coverage = bitmap.buffer[row * bitmap.pitch + column];
+                                blend_pixel(bitmap_x + static_cast<int>(column),
+                                            bitmap_y + static_cast<int>(row),
+                                            color,
+                                            coverage);
+                            }
+                        }
+                    }
+
+                    pen_x += static_cast<float>(glyph_pos[index].x_advance) / 64.0f;
+                }
+
+                hb_buffer_destroy(buffer);
+            }
+
+            widget->for_each_child([this](Widget& child) {
+                render_text(&child);
+            });
+        }
+#endif
 
         static auto translate_button(std::uint8_t sdl_btn) noexcept -> MouseButton {
             switch (sdl_btn) {
@@ -229,20 +421,26 @@ export namespace Nandina {
             });
         }
 
-        auto render_text_overlay(Widget& widget) -> void {
-            if (auto* label = dynamic_cast<Label*>(&widget)) {
-                draw_debug_text(widget.x(), widget.y(),
-                                label->get_text(),
-                                label->text_r(), label->text_g(), label->text_b(), label->text_a());
-            } else if (auto* button = dynamic_cast<Button*>(&widget)) {
-                draw_debug_text(widget.x() + 12.0f,
-                                widget.y() + (widget.height() * 0.5f) - 4.0f,
-                                button->get_text(),
-                                255, 255, 255, 255);
+        auto render_debug_text_overlay(Widget* widget) -> void {
+            if (!widget) {
+                return;
             }
 
-            widget.for_each_child([this](Widget& child) {
-                render_text_overlay(child);
+            const auto text = widget->text_content();
+            const auto font_size = widget->text_font_size();
+            if (!text.empty() && font_size > 0.0f) {
+                const auto bounds = widget->text_bounds();
+                const auto color = widget->text_color();
+                float draw_x = bounds.x();
+                if (widget->text_align() == TextAlign::center) {
+                    draw_x = bounds.center_x() - (static_cast<float>(text.size()) * 4.0f);
+                }
+                const float draw_y = bounds.center_y() - 4.0f;
+                draw_debug_text(draw_x, draw_y, std::string(text), color.r, color.g, color.b, color.a);
+            }
+
+            widget->for_each_child([this](Widget& child) {
+                render_debug_text_overlay(&child);
             });
         }
 
@@ -271,6 +469,13 @@ export namespace Nandina {
         std::unique_ptr<SDL_Texture, TextureDeleter> texture_;
         std::vector<std::uint32_t> pixel_buffer_;
         std::unique_ptr<tvg::SwCanvas> canvas_;
+    #ifdef NANDINA_TEXT_ENGINE
+        FT_Library ft_library_ = nullptr;
+        FT_Face ft_face_ = nullptr;
+        hb_font_t* hb_font_ = nullptr;
+        unsigned int current_font_size_ = 0;
+        std::string font_path_;
+    #endif
     };
 
     NanWindow::NanWindow(std::string_view title, const int width, const int height)
@@ -299,6 +504,9 @@ export namespace Nandina {
                             tvg::ColorSpace::ARGB8888) != tvg::Result::Success) {
             throw std::runtime_error("ThorVG canvas binding failed!");
         }
+    #ifdef NANDINA_TEXT_ENGINE
+        initialize_text_engine();
+    #endif
         std::println("[NanWindow] '{}' ({}x{}) initialized.", title, width, height);
     }
 

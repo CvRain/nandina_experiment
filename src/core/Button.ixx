@@ -6,7 +6,9 @@ module;
 export module Nandina.Core.Button;
 
 import Nandina.Core.Component;
+import Nandina.Core.Color;
 import Nandina.Core.Event;
+import Nandina.Core.Widget;
 
 export namespace Nandina {
 
@@ -34,6 +36,10 @@ export namespace Nandina {
         }
 
         [[nodiscard]] auto get_text() const -> const std::string& { return text_; }
+        [[nodiscard]] auto text_content() const noexcept -> std::string_view override { return text_; }
+        [[nodiscard]] auto text_color() const noexcept -> Nandina::Color override { return {255, 255, 255, 255}; }
+        [[nodiscard]] auto text_font_size() const noexcept -> float override { return 18.0f; }
+        [[nodiscard]] auto text_align() const noexcept -> Nandina::TextAlign override { return Nandina::TextAlign::center; }
 
         // Override set_bounds to keep child layers in sync
         auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& override {
