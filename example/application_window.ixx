@@ -2,7 +2,6 @@ module;
 
 #include <format>
 #include <memory>
-#include <print>
 #include <string>
 #include <string_view>
 #include <utility>
@@ -37,95 +36,72 @@ auto CounterPage::Create() -> std::unique_ptr<CounterPage> {
 }
 
 auto CounterPage::build() -> Nandina::WidgetPtr {
-    auto col = Nandina::Column::Create();
-    col->set_bounds(0.0f, 0.0f, 640.0f, 480.0f);
-    col->set_background(0, 0, 0, 0); // transparent — Layer 0 background shows through
-    col->gap(16.0f).padding(40.0f);
+    constexpr float page_width = 640.0f;
+    constexpr float page_height = 480.0f;
+    constexpr float title_x = 40.0f;
+    constexpr float title_y = 24.0f;
+    constexpr float title_width = 560.0f;
+    constexpr float title_height = 48.0f;
+    constexpr float number_width = 240.0f;
+    constexpr float number_height = 64.0f;
+    constexpr float number_x = (page_width - number_width) * 0.5f;
+    constexpr float number_y = (page_height - number_height) * 0.5f;
+    constexpr float button_width = 120.0f;
+    constexpr float button_height = 60.0f;
+    constexpr float button_gap = 16.0f;
+    constexpr float button_row_width = button_width * 2.0f + button_gap;
+    constexpr float button_row_x = (page_width - button_row_width) * 0.5f;
+    constexpr float button_row_y = number_y + number_height + 24.0f;
 
-    // ── Fixed-height title ─────────────────────────────────────────────
-    auto title_box = Nandina::SizedBox::Create();
-    title_box->height(48.0f).set_background(0, 0, 0, 0);
+    auto root = std::make_unique<Nandina::FreeWidget>();
+    root->move_to(0.0f, 0.0f).resize(page_width, page_height);
+    root->set_background(0, 0, 0, 0);
 
     auto title_label = Nandina::Label::Create();
-    title_label->set_size(Nandina::Size::fixed(560.0f, 48.0f));
+    title_label->set_background(0, 0, 0, 0);
+    title_label->set_bounds(title_x, title_y, title_width, title_height);
     title_label->font_size(24.0f).text_color(200, 200, 255);
     title_label->text("Nandina Counter");
-    title_box->child(std::move(title_label));
+    root->add_child(std::move(title_label));
 
-    // ── Expanded center area (3 flex shares) ───────────────────────────
-    auto center_exp = Nandina::Expanded::Create(3);
+    auto number_label = Nandina::Label::Create();
+    number_label->set_background(0, 0, 0, 0);
+    number_label->set_bounds(number_x, number_y, number_width, number_height);
+    number_label->font_size(48.0f).text_color(220, 240, 232);
+    number_label->text("0");
+    auto* number_label_ptr = number_label.get();
+    root->add_child(std::move(number_label));
 
-    auto count_center = Nandina::Center::Create();
-    count_center->set_background(0, 0, 0, 0);
-
-    auto count_label = Nandina::Label::Create();
-    count_label->set_size(Nandina::Size::fixed(400.0f, 64.0f));
-    count_label->font_size(48.0f).text_color(255, 255, 255);
-
-    effect([this, lbl = count_label.get()] {
-        lbl->text(std::format("Count: {}", count_.get()));
-        std::printf("Count: %d\n", count_.get());
+    this->effect([this, number_label_ptr]() {
+        number_label_ptr->text(std::format("{}", count_.get()));
     });
 
-    count_center->child(std::move(count_label));
-    center_exp->child(std::move(count_center));
 
-    // ── Elastic spacer (1 flex share) ──────────────────────────────────
-    auto spacer = Nandina::Spacer::Create(1);
-
-    // ── Button row (fixed height) ──────────────────────────────────────
-    auto btn_row = Nandina::Row::Create();
-    btn_row->set_size(Nandina::Size::fixed(560.0f, 52.0f));
-    btn_row->gap(12.0f).padding(15.0f);
-    btn_row->set_background(0, 0, 0, 0);
-
-    auto left_spacer = Nandina::Spacer::Create(1);
-
-    auto dec = Nandina::Button::Create();
-    dec->set_size(Nandina::Size::fixed(120.0f, 60.0f));
-    dec->text("-1");
-    dec->set_background(234, 153, 156);
-    auto *dec_button = dec.get();
-    dec->on_click([this, dec_button] {
+    auto decrease_button = Nandina::Button::Create();
+    decrease_button->set_bounds(button_row_x, button_row_y, button_width, button_height);
+    decrease_button->text("-1");
+    decrease_button->set_background(234, 153, 156);
+    decrease_button->on_click([this]() {
         count_.set(count_.get() - 1);
-        std::println("decrease button clicked!");
     });
 
-    auto inc = Nandina::Button::Create();
-    inc->set_size(Nandina::Size::fixed(120.0f, 60.0f));
-    inc->text("+1");
-    inc->set_background(234, 153, 156);
-    inc->on_click([this] {
+    root->add_child(std::move(decrease_button));
+
+    auto increase_button = Nandina::Button::Create();
+    increase_button->set_bounds(button_row_x + button_width + button_gap,
+                                button_row_y,
+                                button_width,
+                                button_height);
+    increase_button->text("+1");
+    increase_button->set_background(234, 153, 156);
+    increase_button->on_click([this]() {
         count_.set(count_.get() + 1);
-        std::println("increase button clicked!");
     });
 
-    auto right_spacer = Nandina::Spacer::Create(1);
 
-    btn_row->add(std::move(left_spacer))
-            .add(std::move(dec))
-            .add(std::move(inc))
-            .add(std::move(right_spacer));
-    btn_row->layout();
+    root->add_child(std::move(increase_button));
 
-    // ── Fixed-height version label ─────────────────────────────────────
-    auto ver_box = Nandina::SizedBox::Create();
-    ver_box->height(24.0f);
-    ver_box->set_background(0, 0, 0, 0);
-    auto ver_label = Nandina::Label::Create();
-    ver_label->set_size(Nandina::Size::fixed(560.0f, 24.0f));
-    ver_label->font_size(12.0f).text_color(100, 100, 140);
-    ver_label->text("Nandina Experiment v0.3");
-    ver_box->child(std::move(ver_label));
-
-    col->add(std::move(title_box))
-            .add(std::move(center_exp))
-            .add(std::move(spacer))
-            .add(std::move(btn_row))
-            .add(std::move(ver_box));
-    col->layout();
-
-    return col;
+    return root;
 }
 
 // ── ApplicationWindow ─────────────────────────────────────────────────────────
@@ -169,6 +145,18 @@ void ApplicationWindow::setup() {
                    static_cast<float>(window_height()) - badge_height - badge_margin_y)
             .resize(badge_width, badge_height)
             .set_background(231, 130, 132, 255);
+
+    auto badge_label = Nandina::Label::Create();
+    badge_label->layer(2);
+    badge_label->set_background(0, 0, 0, 0);
+    badge_label->text("v0.0.1-alpha");
+    badge_label->font_size(12.0f).text_color(220, 224, 232);
+
+    const auto &badge_position = badge->position();
+    badge_label->set_position({badge_position.x() + 2.0f, badge_position.y() + 8.0f});
+
+    badge->add_child(std::move(badge_label));
+
     add_child(std::move(badge));
 }
 

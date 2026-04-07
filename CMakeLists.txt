@@ -54,11 +54,11 @@ set(MODULE_SOURCES
 
         src/style/Theme.ixx
 
-        src/application_window.ixx
+        example/application_window.ixx
 )
 
 # ── Executable ────────────────────────────────────────────────────────────────
-add_executable(NandinaExperiment src/main.cpp)
+add_executable(NandinaExperiment example/main.cpp)
 
 target_link_libraries(NandinaExperiment PRIVATE
         PkgConfig::THORVG
