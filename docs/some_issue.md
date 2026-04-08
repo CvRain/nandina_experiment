@@ -239,11 +239,11 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
         auto page = Nandina::Column::Create()
                 ->set_size({640.0f, 480.0f})
                 .set_background(Nandina::Color::Hex(0x323544))
-                .padding_top(15.0f)
-                .padding_bottom(15.0f)
-                .padding_left(20.0f)
-                .padding_right(20.0f)
-                .gap(24.0f);
+                .set_padding_top(15.0f)
+                .set_padding_bottom(15.0f)
+                .set_padding_left(20.0f)
+                .set_padding_right(20.0f)
+                .set_gap(24.0f);
 
         page->add(
                 Nandina::Label::Create()

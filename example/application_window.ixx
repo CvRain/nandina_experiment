@@ -139,25 +139,25 @@ void ApplicationWindow::setup() {
     set_content(std::move(view));
 
     // Version badge in the bottom-right corner (FreeWidget, floats above UI)
-    auto badge = std::make_unique<Nandina::FreeWidget>();
-    badge->layer(2);
-    badge->move_to(static_cast<float>(window_width()) - badge_width - badge_margin_x,
-                   static_cast<float>(window_height()) - badge_height - badge_margin_y)
-            .resize(badge_width, badge_height)
-            .set_background(231, 130, 132, 255);
+    // auto badge = std::make_unique<Nandina::FreeWidget>();
+    // badge->layer(2);
+    // badge->move_to(static_cast<float>(window_width()) - badge_width - badge_margin_x,
+    //                static_cast<float>(window_height()) - badge_height - badge_margin_y)
+    //         .resize(badge_width, badge_height)
+    //         .set_background(231, 130, 132, 255);
+    //
+    // auto badge_label = Nandina::Label::Create();
+    // badge_label->layer(2);
+    // badge_label->set_background(0, 0, 0, 0);
+    // badge_label->text("v0.0.1-alpha");
+    // badge_label->font_size(12.0f).text_color(220, 224, 232);
+    //
+    // const auto &badge_position = badge->position();
+    // badge_label->set_position({badge_position.x() + 2.0f, badge_position.y() + 8.0f});
+    //
+    // badge->add_child(std::move(badge_label));
 
-    auto badge_label = Nandina::Label::Create();
-    badge_label->layer(2);
-    badge_label->set_background(0, 0, 0, 0);
-    badge_label->text("v0.0.1-alpha");
-    badge_label->font_size(12.0f).text_color(220, 224, 232);
-
-    const auto &badge_position = badge->position();
-    badge_label->set_position({badge_position.x() + 2.0f, badge_position.y() + 8.0f});
-
-    badge->add_child(std::move(badge_label));
-
-    add_child(std::move(badge));
+    //add_child(std::move(badge));
 }
 
 std::pair<int, int> ApplicationWindow::initial_size() const {
