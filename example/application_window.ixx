@@ -261,9 +261,9 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
         }
         y += kLabelH + 4.0f;
 
-        // Count label
+        // Count label: shows total count and "+N more" when list exceeds kMaxVisible
         auto count_lbl = Nandina::Label::Create();
-        count_lbl->set_bounds(kMarginX, y, contentW * 0.5f, kLabelH);
+        count_lbl->set_bounds(kMarginX, y, contentW * 0.7f, kLabelH);
         count_lbl->font_size(12.0f).text_color(180, 180, 180);
         count_lbl->text("items: 0");
         auto* count_lbl_ptr = count_lbl.get();
@@ -279,7 +279,14 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
                     item_ptrs[i]->text("—");
                 }
             }
-            count_lbl_ptr->text(std::format("items: {}", item_list_.size()));
+            // Show "+N more" when the list exceeds the visible slots
+            const std::size_t total = item_list_.size();
+            if (total > kMaxVisible) {
+                count_lbl_ptr->text(std::format("items: {}  (+{} more not shown)",
+                                                total, total - kMaxVisible));
+            } else {
+                count_lbl_ptr->text(std::format("items: {}", total));
+            }
         };
 
         // Subscribe with watch() (coarse-grained) — just rebuild all visible slots.
