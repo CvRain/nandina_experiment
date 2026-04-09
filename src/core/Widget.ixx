@@ -11,7 +11,6 @@ export module Nandina.Core.Widget;
 
 import Nandina.Core.Color;
 import Nandina.Core.Event;
-import Nandina.Core.Signal;
 import Nandina.Types.Position;
 import Nandina.Types.Size;
 import Nandina.Types.Rect;
@@ -112,8 +111,8 @@ export namespace Nandina {
             return *this;
         }
 
-        auto on_click(std::function<void()> handler) -> Connection {
-            return clicked_.connect(std::move(handler));
+        auto on_click(std::function<void()> handler) -> void {
+            click_handlers_.push_back(std::move(handler));
         }
 
         auto dispatch_event(Event& ev) -> bool {
@@ -182,7 +181,7 @@ export namespace Nandina {
 
         virtual auto handle_event(Event& ev) -> bool {
             if (ev.type == EventType::click) {
-                clicked_.emit();
+                for (auto& fn : click_handlers_) { if (fn) fn(); }
                 ev.mark_handled();
                 return true;
             }
@@ -209,7 +208,7 @@ export namespace Nandina {
 
         Color  bg_color_{255, 255, 255, 255};
         int    layer_ = -1;
-        EventSignal<> clicked_;
+        std::vector<std::function<void()>> click_handlers_;
         std::vector<Child>   children_;
         std::vector<Widget*> children_ref_;  // Non-owning references (e.g. for RouterView)
     };

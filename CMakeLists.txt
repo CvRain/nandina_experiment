@@ -23,43 +23,42 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
 # ── Module interface sources ──────────────────────────────────────────────────
 set(MODULE_SOURCES
-        # Signal first — used by Reactive.State (on_change returns Connection)
-        src/core/Signal.ixx
+        # ── Reactive primitives (single flat module, no sub-module diamonds) ──
+        # Contains: Connection / ScopedConnection / EventSignal<>
+        #           State<T> / ReadState / Computed / Effect / EffectScope
+        #           Prop<T> / StateList<T> / ListChange / ListChangeKind
+        src/reactive/Reactive.ixx
 
-        # Reactive sub-modules (dependency order: leaves first)
-        src/reactive/State.ixx      # State<T>, ReadState, Computed, Effect, EffectScope
-        src/reactive/Prop.ixx       # Prop<T>: unified static/reactive property wrapper
-        src/reactive/StateList.ixx  # StateList<T>: observable vector
-        src/reactive/Reactive.ixx   # umbrella re-export
-
-        # Geometry types (must precede Widget which imports them)
+        # ── Geometry types (must precede Widget) ──────────────────────────────
         src/types/Position.ixx
         src/types/Size.ixx
         src/types/Rect.ixx
-        src/types/Types.ixx       # umbrella re-export
+        src/types/Types.ixx
 
-        # Nandina.Core sub-modules (dependency order: leaves first)
+        # ── Core widget sub-modules (dependency order: leaves first) ──────────
         src/core/Color.ixx
         src/core/Event.ixx
-        src/core/Widget.ixx
-        src/core/FreeWidget.ixx        # depends on Widget
-        src/core/RenderLayer.ixx       # depends on Widget + Event
-        src/core/Component.ixx
+        src/core/Widget.ixx           # depends on Color, Event, Types; no Reactive dep
+        src/core/FreeWidget.ixx       # depends on Widget
+        src/core/RenderLayer.ixx      # depends on Widget + Event
+        src/core/Component.ixx        # depends on Widget + Reactive
         src/core/CompositeComponent.ixx
         src/core/Router.ixx
         src/core/Button.ixx
-        src/core/Core.ixx         # umbrella re-export
+        src/core/Core.ixx             # umbrella: Reactive + all core sub-modules
 
         src/core/Window.ixx
         src/core/NanApplication.ixx
 
         src/components/Label.ixx
 
-        src/layout/FlexLayout.ixx      # depends on Component + Types
-        src/layout/Layout.ixx          # depends on Core + FlexLayout
+        src/layout/FlexLayout.ixx
+        src/layout/Layout.ixx
 
         src/style/Theme.ixx
 
+        example/pages/DemoPage.ixx
+        example/pages/CounterPage.ixx
         example/application_window.ixx
 )
 
