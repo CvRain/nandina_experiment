@@ -23,7 +23,14 @@ pkg_check_modules(SDL3 REQUIRED IMPORTED_TARGET sdl3)
 
 # ── Module interface sources ──────────────────────────────────────────────────
 set(MODULE_SOURCES
-        src/reactive/Reactive.ixx
+        # Signal first — used by Reactive.State (on_change returns Connection)
+        src/core/Signal.ixx
+
+        # Reactive sub-modules (dependency order: leaves first)
+        src/reactive/State.ixx      # State<T>, ReadState, Computed, Effect, EffectScope
+        src/reactive/Prop.ixx       # Prop<T>: unified static/reactive property wrapper
+        src/reactive/StateList.ixx  # StateList<T>: observable vector
+        src/reactive/Reactive.ixx   # umbrella re-export
 
         # Geometry types (must precede Widget which imports them)
         src/types/Position.ixx
@@ -34,7 +41,6 @@ set(MODULE_SOURCES
         # Nandina.Core sub-modules (dependency order: leaves first)
         src/core/Color.ixx
         src/core/Event.ixx
-        src/core/Signal.ixx
         src/core/Widget.ixx
         src/core/FreeWidget.ixx        # depends on Widget
         src/core/RenderLayer.ixx       # depends on Widget + Event
