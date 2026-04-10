@@ -47,7 +47,7 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
 
     auto root = Nandina::Column::Create();
     root->set_bounds(0.0f, 0.0f, page_width, page_height);
-    root->set_background(28, 32, 46);
+    root->set_background(28, 32, 46, 255);
     root->padding(page_padding).gap(content_gap);
 
     auto title_label = Nandina::Label::Create();
