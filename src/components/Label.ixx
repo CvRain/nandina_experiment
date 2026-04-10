@@ -40,7 +40,8 @@ export namespace Nandina {
             return *this;
         }
 
-        // The bound state must outlive this Label (or at least its EffectScope).
+        // SAFETY: The bound state must remain valid for the lifetime of this Label's
+        // EffectScope. Binding to a local state that gets destroyed is undefined behavior.
         auto bind_text(const State<std::string>& state) -> Label& {
             scope_.add([this, &state] {
                 text(state.get());
@@ -52,7 +53,8 @@ export namespace Nandina {
             requires std::copy_constructible<std::decay_t<F>>
                   && std::invocable<F&, const T&>
                   && std::convertible_to<std::invoke_result_t<F&, const T&>, std::string>
-        // The bound state must outlive this Label (or at least its EffectScope).
+        // SAFETY: The bound state must remain valid for the lifetime of this Label's
+        // EffectScope. Binding to a local state that gets destroyed is undefined behavior.
         auto bind_text(const State<T>& state, F&& formatter) -> Label& {
             scope_.add([this, &state, formatter = std::forward<F>(formatter)] {
                 text(std::invoke(formatter, state.get()));
