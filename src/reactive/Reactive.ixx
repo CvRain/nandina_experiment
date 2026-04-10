@@ -367,8 +367,8 @@ public:
 
     Computed(const Computed&)          = delete;
     auto operator=(const Computed&)    = delete;
-    Computed(Computed&&) noexcept      = default;
-    auto operator=(Computed&&) noexcept -> Computed& = default;
+    Computed(Computed&&)               = delete;
+    auto operator=(Computed&&)         = delete;
 
     [[nodiscard]] auto operator()() const -> const ValueType& {
         if (stale_) { recompute(); }
@@ -409,25 +409,8 @@ public:
 
     Effect(const Effect&)         = delete;
     auto operator=(const Effect&) = delete;
-
-    Effect(Effect&& other) noexcept
-        : fn_(std::move(other.fn_))
-        , active_(other.active_)
-        , self_invalidator_(std::move(other.self_invalidator_))
-        , observer_id_(other.observer_id_) {
-        other.active_ = false;
-    }
-
-    auto operator=(Effect&& other) noexcept -> Effect& {
-        if (this != &other) {
-            fn_               = std::move(other.fn_);
-            active_           = other.active_;
-            self_invalidator_ = std::move(other.self_invalidator_);
-            observer_id_      = other.observer_id_;
-            other.active_     = false;
-        }
-        return *this;
-    }
+    Effect(Effect&&)              = delete;
+    auto operator=(Effect&&)      = delete;
 
     ~Effect() { active_ = false; }
 
@@ -456,7 +439,7 @@ public:
     template<typename F>
         requires std::invocable<F>
     auto add(F&& fn) -> void {
-        effects_.emplace_back(std::forward<F>(fn));
+        effects_.push_back(std::make_unique<Effect>(std::forward<F>(fn)));
     }
 
     auto clear() -> void { effects_.clear(); }
@@ -464,7 +447,7 @@ public:
     [[nodiscard]] auto size() const noexcept -> std::size_t { return effects_.size(); }
 
 private:
-    std::vector<Effect> effects_;
+    std::vector<std::unique_ptr<Effect>> effects_;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -644,4 +627,3 @@ private:
 };
 
 } // export namespace Nandina
-
