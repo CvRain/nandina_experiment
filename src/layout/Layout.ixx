@@ -56,6 +56,9 @@ export namespace Nandina {
 
         auto add(std::unique_ptr<Widget> child) -> LayoutContainer& {
             add_child(std::move(child));
+            if (width() > 0.0f || height() > 0.0f) {
+                layout();
+            }
             return *this;
         }
 

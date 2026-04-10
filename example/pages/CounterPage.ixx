@@ -110,8 +110,6 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     root->add(std::move(button_box));
 
     root->add(Nandina::Spacer::Create(2));
-    // Children are added after the initial set_bounds(), so lay out the finished tree once.
-    root->layout();
 
     return root;
 }

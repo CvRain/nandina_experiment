@@ -44,8 +44,8 @@ export namespace Nandina {
         // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
         // prefer state owned by a parent component or page that outlives this Label.
         auto bind_text(const State<std::string>& state) -> Label& {
-            scope_.add([this, &state] {
-                text(state.get());
+            scope_.add([this, state = std::cref(state)] {
+                text(state.get().get());
             });
             return *this;
         }
@@ -58,8 +58,8 @@ export namespace Nandina {
         // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
         // prefer state owned by a parent component or page that outlives this Label.
         auto bind_text(const State<T>& state, F&& formatter) -> Label& {
-            scope_.add([this, &state, formatter = std::forward<F>(formatter)] {
-                text(std::invoke(formatter, state.get()));
+            scope_.add([this, state = std::cref(state), formatter = std::forward<F>(formatter)] {
+                text(std::invoke(formatter, state.get().get()));
             });
             return *this;
         }
