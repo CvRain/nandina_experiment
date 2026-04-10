@@ -45,7 +45,8 @@ export namespace Nandina {
         // prefer state owned by a parent component or page that outlives this Label.
         auto bind_text(const State<std::string>& state) -> Label& {
             scope_.add([this, state = std::cref(state)] {
-                text(state.get().get());
+                const auto& source = state.get();
+                text(source.get());
             });
             return *this;
         }
@@ -59,7 +60,8 @@ export namespace Nandina {
         // prefer state owned by a parent component or page that outlives this Label.
         auto bind_text(const State<T>& state, F&& formatter) -> Label& {
             scope_.add([this, state = std::cref(state), formatter = std::forward<F>(formatter)] {
-                text(std::invoke(formatter, state.get().get()));
+                const auto& source = state.get();
+                text(std::invoke(formatter, source.get()));
             });
             return *this;
         }
