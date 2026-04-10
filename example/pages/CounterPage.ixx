@@ -97,7 +97,6 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     });
 
     auto button_row = Nandina::Row::Create();
-    auto* button_row_ptr = button_row.get();
     button_row->set_bounds(0.0f, 0.0f, button_row_width, button_height);
     button_row->gap(button_gap);
     button_row->add(std::move(decrease_button));
@@ -112,7 +111,6 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
 
     root->add(Nandina::Spacer::Create(2));
     root->layout();
-    button_row_ptr->layout();
 
     return root;
 }

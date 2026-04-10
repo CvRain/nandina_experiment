@@ -25,6 +25,12 @@ export namespace Nandina {
     // ── LayoutContainer ───────────────────────────────────────────────────────
     class LayoutContainer : public Component {
     public:
+        auto set_bounds(float x, float y, float width, float height) noexcept -> Widget& override {
+            Component::set_bounds(x, y, width, height);
+            layout();
+            return *this;
+        }
+
         auto gap(float value) -> LayoutContainer& {
             gap_ = value; mark_dirty(); return *this;
         }
