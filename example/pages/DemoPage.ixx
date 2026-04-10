@@ -1,5 +1,6 @@
 module;
 
+#include <array>
 #include <format>
 #include <functional>
 #include <memory>
@@ -14,18 +15,13 @@ import Nandina.Core;
 import Nandina.Window;
 import Nandina.Layout;
 import Nandina.Components.Label;
-import Nandina.Types;
+
 // ── DemoPage ──────────────────────────────────────────────────────────────────
-// Demonstrates the three new reactive primitives added in this milestone:
-//
-//   1. Prop<T>       — static vs reactive property wrapper on a Label
-//   2. StateList<T>  — observable list: push / update / remove reflected in UI
-//   3. Upgraded Signal — connect_once and ScopedConnection
-//
-// Layout: three sections stacked vertically inside a FreeWidget.
-//   • Section A (top):    Prop demo — static label + reactive label + toggle button
-//   • Section B (middle): StateList demo — dynamic item labels + Add/Remove buttons
-//   • Section C (bottom): Signal demo   — EventSignal + connect_once counter label
+// A single-page reactive playground focused on manual validation:
+//   • Counter state changes
+//   • Computed derived summary
+//   • EventSignal persistent + once subscriptions
+//   • StateList-backed activity log
 // ─────────────────────────────────────────────────────────────────────────────
 export class DemoPage : public Nandina::Page {
 public:
@@ -34,33 +30,41 @@ public:
     auto build() -> Nandina::WidgetPtr override;
 
 private:
-    // ── Prop demo state ───────────────────────────────────────────────────────
-    Nandina::State<std::string> reactive_text_{"(reactive initial)"};
-    int toggle_count_ = 0;
+    auto record_event(std::string message) -> void;
 
-    // ── StateList demo state ──────────────────────────────────────────────────
-    Nandina::StateList<std::string> item_list_;
+    Nandina::State<int> counter_{0};
+    Nandina::State<std::string> headline_{"Reactive playground ready"};
+    Nandina::State<std::string> status_text_{"Use the controls below to mutate state and inspect the log."};
+    Nandina::State<int> persistent_signal_hits_{0};
+    Nandina::State<int> once_signal_hits_{0};
+    Nandina::State<int> last_signal_value_{0};
 
-    // ── Signal demo state ─────────────────────────────────────────────────────
     Nandina::EventSignal<int> demo_signal_;
-    int signal_fire_count_ = 0; // total fires
-    int once_received_count_ = 0; // fires caught by connect_once slots
+    Nandina::StateList<std::string> event_log_;
+    Nandina::Computed<std::function<std::string()>> derived_summary_{
+        std::function<std::string()>{
+            [this] {
+                const int value = counter_();
+                return std::format("double={} | parity={} | abs={} | signal-last={}",
+                                   value * 2,
+                                   (value % 2 == 0) ? "even" : "odd",
+                                   value < 0 ? -value : value,
+                                   last_signal_value_());
+            }
+        }
+    };
 
-    // Persistent subscriptions kept alive for the page lifetime:
-    //   prop_conn_       — Prop<string>::on_change (Section A)
-    //   list_watch_conn_ — StateList fine-grained on_change (Section B)
-    //   scoped_conn_     — EventSignal persistent subscription (Section C)
-    Nandina::ScopedConnection prop_conn_;
-    Nandina::ScopedConnection list_watch_conn_;
-    Nandina::ScopedConnection scoped_conn_;
+    Nandina::ScopedConnection signal_conn_;
+    Nandina::ScopedConnection log_conn_;
 
-    // Layout helpers
+    int next_signal_value_ = 1;
     static constexpr float kPageW = 640.0f;
     static constexpr float kPageH = 480.0f;
-    static constexpr float kMarginX = 24.0f;
-    static constexpr float kLabelH = 24.0f;
-    static constexpr float kBtnW = 130.0f;
-    static constexpr float kBtnH = 32.0f;
+    static constexpr float kContentW = 592.0f;
+    static constexpr float kButtonW = 136.0f;
+    static constexpr float kButtonH = 34.0f;
+    static constexpr std::size_t kVisibleLogEntries = 4;
+    static constexpr std::size_t kMaxLogEntries = 10;
 };
 
 auto DemoPage::Create() -> std::unique_ptr<DemoPage> {
@@ -69,236 +73,218 @@ auto DemoPage::Create() -> std::unique_ptr<DemoPage> {
     return self;
 }
 
+auto DemoPage::record_event(std::string message) -> void {
+    event_log_.push_back(std::move(message));
+    while (event_log_.size() > kMaxLogEntries) {
+        event_log_.remove_at(0);
+    }
+}
+
 auto DemoPage::build() -> Nandina::WidgetPtr {
-    auto root = std::make_unique<Nandina::FreeWidget>();
-    root->move_to(0.0f, 0.0f).resize(kPageW, kPageH);
-    root->set_background(0, 0, 0, 0);
+    auto root = Nandina::Column::Create();
+    root->set_bounds(0.0f, 0.0f, kPageW, kPageH);
+    root->set_background(28, 32, 46, 255);
+    root->padding(24.0f).gap(12.0f);
 
-    float y = 12.0f;
-    const float contentW = kPageW - kMarginX * 2.0f;
+    auto make_text_box = [](std::unique_ptr<Nandina::Label> label, float height) {
+        auto box = Nandina::SizedBox::Create();
+        box->set_background();
+        box->height(height).child(std::move(label));
+        return box;
+    };
 
-    // ── Page title ────────────────────────────────────────────────────────────
-    {
-        auto lbl = Nandina::Label::Create();
-        lbl->set_bounds(kMarginX, y, contentW, 32.0f);
-        lbl->font_size(22.0f).text_color(180, 210, 255);
-        lbl->text("Reactive Demo: Prop / StateList / Signal");
-        root->add_child(std::move(lbl));
-        y += 38.0f;
-    }
+    auto make_button = [](std::string text, std::uint8_t r, std::uint8_t g, std::uint8_t b) {
+        auto button = Nandina::Button::Create();
+        button->set_bounds(0.0f, 0.0f, kButtonW, kButtonH);
+        button->text(std::move(text));
+        button->set_background(r, g, b);
+        return button;
+    };
 
-    // ════════════════════════════════════════════════════════════════
-    // Section A — Prop<std::string> demo
-    // ════════════════════════════════════════════════════════════════
-    {
-        auto hdr = Nandina::Label::Create();
-        hdr->set_bounds(kMarginX, y, contentW, kLabelH);
-        hdr->font_size(14.0f).text_color(150, 230, 150);
-        hdr->text("A) Prop<string>: static vs reactive");
-        root->add_child(std::move(hdr));
-        y += kLabelH + 4.0f;
+    auto title = Nandina::Label::Create();
+    title->set_bounds(0.0f, 0.0f, kContentW, 34.0f);
+    title->font_size(24.0f).text_color(198, 214, 255);
+    title->text("Reactive Playground");
+    root->add(make_text_box(std::move(title), 34.0f));
 
-        // Static Prop (never changes after construction)
-        Nandina::Prop<std::string> static_prop{std::string{"[static] Hello, Nandina!"}};
+    auto headline = Nandina::Label::Create();
+    headline->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
+    headline->font_size(14.0f).text_color(148, 221, 182);
+    headline->bind_text(headline_);
+    root->add(make_text_box(std::move(headline), 22.0f));
 
-        auto static_lbl = Nandina::Label::Create();
-        static_lbl->set_bounds(kMarginX, y, contentW * 0.6f, kLabelH);
-        static_lbl->font_size(13.0f).text_color(220, 220, 220);
-        static_lbl->text(static_prop.get()); // read static value once
-        root->add_child(std::move(static_lbl));
-        y += kLabelH + 4.0f;
+    auto counter_value = Nandina::Label::Create();
+    counter_value->set_bounds(0.0f, 0.0f, kContentW, 56.0f);
+    counter_value->font_size(46.0f).text_color(236, 244, 255);
+    counter_value->bind_text(counter_, [](int value) {
+        return std::format("count = {}", value);
+    });
+    root->add(make_text_box(std::move(counter_value), 64.0f));
 
-        // Reactive Prop — bound to reactive_text_
-        Nandina::Prop<std::string> reactive_prop{reactive_text_};
+    auto derived_label = Nandina::Label::Create();
+    derived_label->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
+    derived_label->font_size(13.0f).text_color(255, 210, 150);
+    auto *derived_label_ptr = derived_label.get();
+    root->add(make_text_box(std::move(derived_label), 22.0f));
 
-        auto reactive_lbl = Nandina::Label::Create();
-        reactive_lbl->set_bounds(kMarginX, y, contentW * 0.6f, kLabelH);
-        reactive_lbl->font_size(13.0f).text_color(255, 220, 160);
-        reactive_lbl->text(reactive_prop.get());
-        auto *reactive_lbl_ptr = reactive_lbl.get();
-        root->add_child(std::move(reactive_lbl));
-        y += kLabelH + 4.0f;
+    effect([this, derived_label_ptr] {
+        derived_label_ptr->text(derived_summary_());
+    });
 
-        // Prop::on_change() presents a uniform subscription API regardless of whether
-        // the prop is static or reactive. For a reactive prop it delegates to the
-        // underlying State's on_change(); reactive_prop may go out of scope after wiring
-        // because the Connection (stored in prop_conn_) is anchored to reactive_text_.
-        prop_conn_ = Nandina::ScopedConnection{
-            reactive_prop.on_change([reactive_lbl_ptr](const std::string& v) {
-                reactive_lbl_ptr->text(v);
-            })
+    auto signal_stats = Nandina::Label::Create();
+    signal_stats->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
+    signal_stats->font_size(13.0f).text_color(217, 188, 255);
+    auto *signal_stats_ptr = signal_stats.get();
+    root->add(make_text_box(std::move(signal_stats), 22.0f));
+
+    effect([this, signal_stats_ptr] {
+        signal_stats_ptr->text(std::format("signal persistent={} | once={} | last={}",
+                                           persistent_signal_hits_(),
+                                           once_signal_hits_(),
+                                           last_signal_value_()));
+    });
+
+    auto status_label = Nandina::Label::Create();
+    status_label->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
+    status_label->font_size(12.0f).text_color(180, 188, 205);
+    status_label->bind_text(status_text_);
+    root->add(make_text_box(std::move(status_label), 22.0f));
+
+    auto counter_row = Nandina::Row::Create();
+    counter_row->set_background(0, 0, 0, 0);
+    counter_row->set_bounds(0.0f, 0.0f, kContentW, kButtonH);
+    counter_row->gap(12.0f);
+
+    auto decrement_button = make_button("-1", 196, 111, 111);
+    decrement_button->on_click([this]() {
+        counter_.set(counter_() - 1);
+        headline_.set("Counter decremented");
+        status_text_.set("State<int> changed and dependent labels re-rendered.");
+        record_event(std::format("counter -> {}", counter_()));
+    });
+    counter_row->add(std::move(decrement_button));
+
+    auto increment_button = make_button("+1", 102, 150, 236);
+    increment_button->on_click([this]() {
+        counter_.set(counter_() + 1);
+        headline_.set("Counter incremented");
+        status_text_.set("Computed summary should update together with the counter.");
+        record_event(std::format("counter -> {}", counter_()));
+    });
+    counter_row->add(std::move(increment_button));
+
+    auto reset_button = make_button("Reset", 116, 185, 129);
+    reset_button->on_click([this]() {
+        counter_.set(0);
+        headline_.set("Counter reset");
+        status_text_.set("State reset to zero.");
+        record_event("counter reset to 0");
+    });
+    counter_row->add(std::move(reset_button));
+    root->add(std::move(counter_row));
+
+    auto action_row = Nandina::Row::Create();
+    action_row->set_background(0, 0, 0, 0);
+    action_row->set_bounds(0.0f, 0.0f, kContentW, kButtonH);
+    action_row->gap(12.0f);
+
+    auto banner_button = make_button("Cycle headline", 203, 147, 88);
+    banner_button->on_click([this]() {
+        static constexpr std::array<std::string_view, 4> messages{
+            "Reactive playground ready",
+            "Verifying State and Label binding",
+            "Computed summary is live",
+            "Event log is fed by StateList"
         };
+        const auto index = static_cast<std::size_t>(
+            (counter_() < 0 ? -counter_() : counter_()) % static_cast<int>(messages.size()));
+        headline_.set(std::string{messages[index]});
+        status_text_.set("String state updated via Label::bind_text.");
+        record_event(std::format("headline -> {}", messages[index]));
+    });
+    action_row->add(std::move(banner_button));
 
-        // Toggle button — cycles through a few strings to show reactivity
-        auto toggle_btn = Nandina::Button::Create();
-        toggle_btn->set_bounds(kMarginX, y, kBtnW, kBtnH);
-        toggle_btn->text("Toggle reactive text");
-        toggle_btn->set_background(100, 140, 200);
-        toggle_btn->on_click([this]() {
-            const std::vector<std::string> options{
-                "(reactive initial)",
-                "Prop is reactive!",
-                "State changed!",
-                "Hello from toggle"
-            };
-            toggle_count_ = (toggle_count_ + 1) % static_cast<int>(options.size());
-            reactive_text_.set(options[static_cast<std::size_t>(toggle_count_)]);
+    auto signal_button = make_button("Fire signal", 151, 103, 220);
+    signal_button->on_click([this]() {
+        demo_signal_.connect_once([this](int value) {
+            once_signal_hits_.set(once_signal_hits_() + 1);
+            status_text_.set("connect_once handler consumed the latest signal.");
+            record_event(std::format("signal once received {}", value));
         });
-        root->add_child(std::move(toggle_btn));
-        y += kBtnH + 10.0f;
+
+        const int emitted_value = next_signal_value_++;
+        demo_signal_.emit(emitted_value);
+        headline_.set("Signal emitted");
+        record_event(std::format("signal emitted {}", emitted_value));
+    });
+    action_row->add(std::move(signal_button));
+
+    auto clear_log_button = make_button("Clear log", 120, 128, 148);
+    clear_log_button->on_click([this]() {
+        event_log_.clear();
+        headline_.set("Log cleared");
+        status_text_.set("StateList was reset.");
+        record_event("log cleared");
+    });
+    action_row->add(std::move(clear_log_button));
+    root->add(std::move(action_row));
+
+    auto log_title = Nandina::Label::Create();
+    log_title->set_bounds(0.0f, 0.0f, kContentW, 20.0f);
+    log_title->font_size(13.0f).text_color(145, 213, 255);
+    log_title->text("Activity log (StateList watcher)");
+    root->add(make_text_box(std::move(log_title), 20.0f));
+
+    auto log_count = Nandina::Label::Create();
+    log_count->set_bounds(0.0f, 0.0f, kContentW, 18.0f);
+    log_count->font_size(12.0f).text_color(158, 166, 184);
+    auto *log_count_ptr = log_count.get();
+    root->add(make_text_box(std::move(log_count), 18.0f));
+
+    std::array<Nandina::Label *, kVisibleLogEntries> log_entries{};
+    for (std::size_t index = 0; index < kVisibleLogEntries; ++index) {
+        auto entry = Nandina::Label::Create();
+        entry->set_bounds(0.0f, 0.0f, kContentW, 18.0f);
+        entry->font_size(12.0f).text_color(220, 224, 233);
+        entry->text("- (empty)");
+        log_entries[index] = entry.get();
+        root->add(make_text_box(std::move(entry), 18.0f));
     }
 
-    // ════════════════════════════════════════════════════════════════
-    // Section B — StateList<std::string> demo
-    // ════════════════════════════════════════════════════════════════
-    {
-        auto hdr = Nandina::Label::Create();
-        hdr->set_bounds(kMarginX, y, contentW, kLabelH);
-        hdr->font_size(14.0f).text_color(150, 230, 150);
-        hdr->text("B) StateList<string>: push / update / remove");
-        root->add_child(std::move(hdr));
-        y += kLabelH + 4.0f;
+    auto refresh_log = [this, log_entries, log_count_ptr]() {
+        log_count_ptr->text(std::format("entries: {} (showing latest {})",
+                                        event_log_.size(),
+                                        kVisibleLogEntries));
 
-        // We render up to 3 item labels side by side, then show a count.
-        constexpr std::size_t kMaxVisible = 3;
-        constexpr float kItemW = 140.0f;
-        constexpr float kItemGap = 6.0f;
+        for (std::size_t slot = 0; slot < kVisibleLogEntries; ++slot) {
+            const std::size_t visible_count = event_log_.size() < kVisibleLogEntries
+                                                  ? event_log_.size()
+                                                  : kVisibleLogEntries;
 
-        // Pre-create label slots (reused as items change)
-        std::array<Nandina::Label *, kMaxVisible> item_ptrs{};
-        for (std::size_t i = 0; i < kMaxVisible; ++i) {
-            auto lbl = Nandina::Label::Create();
-            lbl->set_bounds(kMarginX + static_cast<float>(i) * (kItemW + kItemGap),
-                            y, kItemW, kLabelH);
-            lbl->font_size(12.0f).text_color(255, 200, 120);
-            lbl->text("—");
-            item_ptrs[i] = lbl.get();
-            root->add_child(std::move(lbl));
+            if (slot < visible_count) {
+                const std::size_t source_index = event_log_.size() - visible_count + slot;
+                log_entries[slot]->text(std::format("- {}", event_log_[source_index]));
+            }
+            else {
+                log_entries[slot]->text("- (empty)");
+            }
         }
-        y += kLabelH + 4.0f;
+    };
 
-        // Count label: shows total count and "+N more" when list exceeds kMaxVisible
-        auto count_lbl = Nandina::Label::Create();
-        count_lbl->set_bounds(kMarginX, y, contentW * 0.7f, kLabelH);
-        count_lbl->font_size(12.0f).text_color(180, 180, 180);
-        count_lbl->text("items: 0");
-        auto *count_lbl_ptr = count_lbl.get();
-        root->add_child(std::move(count_lbl));
-        y += kLabelH + 4.0f;
+    log_conn_ = Nandina::ScopedConnection{
+        event_log_.watch(refresh_log)
+    };
 
-        // Fine-grained subscription with on_change(): Updated events only touch the
-        // changed slot (O(1)); all other mutations re-sync all visible slots from the
-        // current list. The callback also fires automatically for the seeded push_backs.
-        list_watch_conn_ = Nandina::ScopedConnection{
-            item_list_.on_change([this, item_ptrs, count_lbl_ptr](const Nandina::ListChange<std::string>& ch) {
-                if (ch.kind == Nandina::ListChangeKind::Updated) {
-                    if (ch.index < kMaxVisible && ch.value) {
-                        item_ptrs[ch.index]->text(*ch.value);
-                    }
-                } else {
-                    for (std::size_t i = 0; i < kMaxVisible; ++i) {
-                        item_ptrs[i]->text(i < item_list_.size() ? item_list_[i] : "—");
-                    }
-                }
-                const std::size_t total = item_list_.size();
-                count_lbl_ptr->text(total > kMaxVisible
-                    ? std::format("items: {}  (+{} more not shown)", total, total - kMaxVisible)
-                    : std::format("items: {}", total));
-            })
-        };
+    signal_conn_ = Nandina::ScopedConnection{
+        demo_signal_.connect([this](int value) {
+            persistent_signal_hits_.set(persistent_signal_hits_() + 1);
+            last_signal_value_.set(value);
+            status_text_.set("Persistent signal subscriber ran before the once-only subscriber count update settled.");
+        })
+    };
 
-        // Seed a couple of items — the on_change callback fires for each push_back
-        item_list_.push_back("Alpha");
-        item_list_.push_back("Beta");
-
-        // Buttons row: Push / Update[0] / Remove Last
-        constexpr float kBtnGap = 8.0f;
-        float bx = kMarginX;
-
-        auto push_btn = Nandina::Button::Create();
-        push_btn->set_bounds(bx, y, kBtnW, kBtnH);
-        push_btn->text("Push item");
-        push_btn->set_background(80, 160, 100);
-        // Use item_list_.size() each time so the label is always unique.
-        push_btn->on_click([this]() {
-            item_list_.push_back(std::format("Item {}", item_list_.size() + 1));
-        });
-        root->add_child(std::move(push_btn));
-        bx += kBtnW + kBtnGap;
-
-        auto update_btn = Nandina::Button::Create();
-        update_btn->set_bounds(bx, y, kBtnW, kBtnH);
-        update_btn->text("Update [0]");
-        update_btn->set_background(80, 130, 180);
-        update_btn->on_click([this]() {
-            if (!item_list_.empty()) {
-                item_list_.update_at(0, "[updated]");
-            }
-        });
-        root->add_child(std::move(update_btn));
-        bx += kBtnW + kBtnGap;
-
-        auto remove_btn = Nandina::Button::Create();
-        remove_btn->set_bounds(bx, y, kBtnW, kBtnH);
-        remove_btn->text("Remove last");
-        remove_btn->set_background(180, 80, 80);
-        remove_btn->on_click([this]() {
-            if (!item_list_.empty()) {
-                item_list_.remove_at(item_list_.size() - 1);
-            }
-        });
-        root->add_child(std::move(remove_btn));
-        y += kBtnH + 10.0f;
-    }
-
-    // ════════════════════════════════════════════════════════════════
-    // Section C — Upgraded Signal: connect_once + ScopedConnection
-    // ════════════════════════════════════════════════════════════════
-    {
-        auto hdr = Nandina::Label::Create();
-        hdr->set_bounds(kMarginX, y, contentW, kLabelH);
-        hdr->font_size(14.0f).text_color(150, 230, 150);
-        hdr->text("C) Signal: connect_once + ScopedConnection");
-        root->add_child(std::move(hdr));
-        y += kLabelH + 4.0f;
-
-        // Status label shows: "fires: N  once-caught: M"
-        auto status_lbl = Nandina::Label::Create();
-        status_lbl->set_bounds(kMarginX, y, contentW * 0.7f, kLabelH);
-        status_lbl->font_size(13.0f).text_color(230, 200, 255);
-        status_lbl->text("fires: 0  once-caught: 0");
-        auto *status_lbl_ptr = status_lbl.get();
-        root->add_child(std::move(status_lbl));
-        y += kLabelH + 4.0f;
-
-        // Persistent subscription: receives every emit and updates the label.
-        // signal_fire_count_ is pre-incremented in on_click before emit(), so v
-        // already reflects the new total. once_received_count_ lags by one slot-fire
-        // order; the connect_once callback (registered before each emit) corrects it.
-        scoped_conn_ = Nandina::ScopedConnection{
-            demo_signal_.connect([this, status_lbl_ptr](int v) {
-                status_lbl_ptr->text(std::format("fires: {}  once-caught: {}  (last={})",
-                                                 v, once_received_count_, v));
-            })
-        };
-
-        // Fire button — pre-increments the fire counter, registers a connect_once slot,
-        // then emits. The once slot fires after the persistent one, bumps
-        // once_received_count_, and re-renders the label so both counters are in sync.
-        auto fire_btn = Nandina::Button::Create();
-        fire_btn->set_bounds(kMarginX, y, kBtnW, kBtnH);
-        fire_btn->text("Fire signal");
-        fire_btn->set_background(140, 80, 180);
-        fire_btn->on_click([this, status_lbl_ptr]() {
-            demo_signal_.connect_once([this, status_lbl_ptr](int v) {
-                ++once_received_count_;
-                status_lbl_ptr->text(std::format("fires: {}  once-caught: {}  (last={})",
-                                                 v, once_received_count_, v));
-            });
-            demo_signal_.emit(++signal_fire_count_);
-        });
-        root->add_child(std::move(fire_btn));
-    }
+    refresh_log();
+    record_event("playground initialized");
 
     return root;
 }

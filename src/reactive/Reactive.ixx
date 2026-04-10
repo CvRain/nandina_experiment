@@ -246,6 +246,24 @@ namespace detail {
 
     inline thread_local TrackingContext* current_tracking_context = nullptr;
 
+    class TrackingContextGuard {
+    public:
+        explicit TrackingContextGuard(TrackingContext& context) noexcept
+            : previous_(current_tracking_context) {
+            current_tracking_context = &context;
+        }
+
+        TrackingContextGuard(const TrackingContextGuard&) = delete;
+        auto operator=(const TrackingContextGuard&) -> TrackingContextGuard& = delete;
+
+        ~TrackingContextGuard() {
+            current_tracking_context = previous_;
+        }
+
+    private:
+        TrackingContext* previous_ = nullptr;
+    };
+
     inline auto next_tracking_id() -> std::size_t {
         static std::atomic_size_t next_id{1};
         return next_id.fetch_add(1, std::memory_order_relaxed);
@@ -255,6 +273,50 @@ namespace detail {
         std::size_t id       = 0;
         bool        active   = true;
         std::function<void()> invalidate;
+    };
+
+    inline auto has_observer_id(const std::vector<ObserverEntry>& observers, std::size_t id) -> bool {
+        for (const auto& observer : observers) {
+            if (observer.active && observer.id == id) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    class PendingObserverRestore {
+    public:
+        PendingObserverRestore(std::vector<ObserverEntry>& observers,
+                               const std::vector<ObserverEntry>& snapshot,
+                               std::size_t& next_index) noexcept
+            : observers_(observers), snapshot_(snapshot), next_index_(next_index) {}
+
+        PendingObserverRestore(const PendingObserverRestore&) = delete;
+        auto operator=(const PendingObserverRestore&) -> PendingObserverRestore& = delete;
+
+        ~PendingObserverRestore() {
+            if (committed_) {
+                return;
+            }
+
+            for (std::size_t index = next_index_; index < snapshot_.size(); ++index) {
+                const auto& observer = snapshot_[index];
+                if (!observer.active || has_observer_id(observers_, observer.id)) {
+                    continue;
+                }
+                observers_.push_back(observer);
+            }
+        }
+
+        auto commit() noexcept -> void {
+            committed_ = true;
+        }
+
+    private:
+        std::vector<ObserverEntry>& observers_;
+        const std::vector<ObserverEntry>& snapshot_;
+        std::size_t& next_index_;
+        bool committed_ = false;
     };
 } // namespace detail
 
@@ -318,9 +380,15 @@ private:
     auto notify() -> void {
         auto snapshot = std::move(observers_);
         observers_    = {};
-        for (auto& entry : snapshot) {
+        std::size_t next_observer = 0;
+        detail::PendingObserverRestore restore_guard{observers_, snapshot, next_observer};
+
+        for (; next_observer < snapshot.size(); ++next_observer) {
+            auto& entry = snapshot[next_observer];
             if (entry.active && entry.invalidate) { entry.invalidate(); }
         }
+
+        restore_guard.commit();
         change_signal_.emit(value_);
     }
 
@@ -377,13 +445,13 @@ public:
 
 private:
     auto recompute() const -> void {
-        stale_ = false;
         auto invalidator = std::function<void()>{ [this]{ stale_ = true; } };
         detail::TrackingContext context{observer_id_, &invalidator};
-        auto* prev = detail::current_tracking_context;
-        detail::current_tracking_context = &context;
-        cached_ = compute_fn_();
-        detail::current_tracking_context = prev;
+        detail::TrackingContextGuard guard{context};
+
+        auto recomputed_value = compute_fn_();
+        cached_ = std::move(recomputed_value);
+        stale_ = false;
     }
 
     F                  compute_fn_;
@@ -419,10 +487,8 @@ private:
         if (!active_) { return; }
         self_invalidator_ = [this]{ run(); };
         detail::TrackingContext context{observer_id_, &self_invalidator_};
-        auto* prev = detail::current_tracking_context;
-        detail::current_tracking_context = &context;
+        detail::TrackingContextGuard guard{context};
         fn_();
-        detail::current_tracking_context = prev;
     }
 
     std::function<void()> fn_;
