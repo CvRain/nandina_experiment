@@ -1,7 +1,10 @@
 module;
+#include <concepts>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 export module Nandina.Components.Label;
@@ -27,16 +30,41 @@ export namespace Nandina {
             auto label = std::unique_ptr<Label>(new Label());
             label->set_hit_test_visible(false);
             if (props.text_signal) {
-                const auto* sig = props.text_signal;
-                label->scope_.add([lbl = label.get(), sig]{
-                    lbl->text_.set((*sig)());
-                });
+                label->bind_text(*props.text_signal);
             }
             return label;
         }
 
         auto text(std::string t) -> Label& {
             text_.set(std::move(t));
+            return *this;
+        }
+
+        // SAFETY: The bound state must remain valid for the lifetime of this Label's
+        // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
+        // prefer state owned by a parent component or page that outlives this Label.
+        // Violations can show up as crashes or stale text during later state updates.
+        auto bind_text(const State<std::string>& state) -> Label& {
+            scope_.add([text_state = &text_, state = std::cref(state)] {
+                const auto& source = state.get();
+                text_state->set(source.get());
+            });
+            return *this;
+        }
+
+        template<typename T, typename F>
+            requires std::copy_constructible<std::decay_t<F>>
+                  && std::invocable<F&, const T&>
+                  && std::convertible_to<std::invoke_result_t<F&, const T&>, std::string>
+        // SAFETY: The bound state must remain valid for the lifetime of this Label's
+        // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
+        // prefer state owned by a parent component or page that outlives this Label.
+        // Violations can show up as crashes or stale text during later state updates.
+        auto bind_text(const State<T>& state, F&& formatter) -> Label& {
+            scope_.add([text_state = &text_, state = std::cref(state), formatter = std::forward<F>(formatter)] {
+                const auto& source = state.get();
+                text_state->set(std::invoke(formatter, source.get()));
+            });
             return *this;
         }
 
