@@ -43,6 +43,7 @@ export namespace Nandina {
         // SAFETY: The bound state must remain valid for the lifetime of this Label's
         // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
         // prefer state owned by a parent component or page that outlives this Label.
+        // Violations can show up as crashes or stale text during later state updates.
         auto bind_text(const State<std::string>& state) -> Label& {
             scope_.add([text_state = &text_, state = std::cref(state)] {
                 const auto& source = state.get();
@@ -58,6 +59,7 @@ export namespace Nandina {
         // SAFETY: The bound state must remain valid for the lifetime of this Label's
         // EffectScope. Binding to a local state that gets destroyed is undefined behavior;
         // prefer state owned by a parent component or page that outlives this Label.
+        // Violations can show up as crashes or stale text during later state updates.
         auto bind_text(const State<T>& state, F&& formatter) -> Label& {
             scope_.add([text_state = &text_, state = std::cref(state), formatter = std::forward<F>(formatter)] {
                 const auto& source = state.get();
