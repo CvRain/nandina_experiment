@@ -69,7 +69,7 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     number_label->set_background(0, 0, 0, 0);
     number_label->set_bounds(0.0f, 0.0f, number_width, number_height);
     number_label->font_size(48.0f).text_color(220, 240, 232);
-    number_label->bind_text(count_, [](int value) {
+    number_label->bind_text(count_.as_read_only(), [](int value) {
         return std::format("{}", value);
     });
 

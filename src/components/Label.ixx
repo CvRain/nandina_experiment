@@ -3,6 +3,7 @@ module;
 #include <cstdint>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <type_traits>
 #include <utility>
@@ -15,7 +16,10 @@ import Nandina.Reactive;
 export namespace Nandina {
 
     struct LabelProps {
-        const State<std::string>* text_signal = nullptr;
+        // Component inputs should prefer Prop/ReadState so the child only sees
+        // a read-only dependency. Direct State binding remains available for
+        // component-internal wiring where write access still belongs locally.
+        std::optional<Prop<std::string>> text;
     };
 
     class Label final : public Component {
@@ -26,11 +30,15 @@ export namespace Nandina {
             return label;
         }
 
+        static auto Create(Prop<std::string> text) -> std::unique_ptr<Label> {
+            return Create(LabelProps{.text = std::optional<Prop<std::string>>{std::move(text)}});
+        }
+
         static auto Create(LabelProps props) -> std::unique_ptr<Label> {
             auto label = std::unique_ptr<Label>(new Label());
             label->set_hit_test_visible(false);
-            if (props.text_signal) {
-                label->bind_text(*props.text_signal);
+            if (props.text) {
+                label->bind_text(std::move(*props.text));
             }
             return label;
         }
@@ -38,6 +46,17 @@ export namespace Nandina {
         auto text(std::string t) -> Label& {
             text_.set(std::move(t));
             return *this;
+        }
+
+        auto bind_text(Prop<std::string> prop) -> Label& {
+            if (auto* state = prop.state_ptr()) {
+                return bind_text(*state);
+            }
+            return text(std::string{prop.get()});
+        }
+
+        auto bind_text(ReadState<std::string> state) -> Label& {
+            return bind_text(Prop<std::string>{state});
         }
 
         // SAFETY: The bound state must remain valid for the lifetime of this Label's
@@ -50,6 +69,25 @@ export namespace Nandina {
                 text_state->set(source.get());
             });
             return *this;
+        }
+
+        template<typename T, typename F>
+            requires std::copy_constructible<std::decay_t<F>>
+                  && std::invocable<F&, const T&>
+                  && std::convertible_to<std::invoke_result_t<F&, const T&>, std::string>
+        auto bind_text(Prop<T> prop, F&& formatter) -> Label& {
+            if (auto* state = prop.state_ptr()) {
+                return bind_text(*state, std::forward<F>(formatter));
+            }
+            return text(std::invoke(std::forward<F>(formatter), prop.get()));
+        }
+
+        template<typename T, typename F>
+            requires std::copy_constructible<std::decay_t<F>>
+                  && std::invocable<F&, const T&>
+                  && std::convertible_to<std::invoke_result_t<F&, const T&>, std::string>
+        auto bind_text(ReadState<T> state, F&& formatter) -> Label& {
+            return bind_text(Prop<T>{state}, std::forward<F>(formatter));
         }
 
         template<typename T, typename F>

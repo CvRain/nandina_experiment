@@ -30,7 +30,7 @@
 ### 1.4 Label 组件
 
 - [x] 创建 `src/components/Label.ixx`，导出 `Nandina.Components.Label`
-- [x] `LabelProps` 结构体：`text_signal` 可选响应式绑定
+- [x] `LabelProps` 结构体：`text` 使用 `Prop<std::string>` 统一静态值与只读响应式输入
 - [x] `Label::Create()` 无参工厂
 - [x] `Label::Create(LabelProps)` Props 工厂，支持响应式文本绑定
 - [x] 链式 API：`text()`, `font_size()`, `text_color()`

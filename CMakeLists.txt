@@ -5,6 +5,8 @@ project(NandinaExperiment
         LANGUAGES CXX
 )
 
+enable_testing()
+
 # ── C++26, modules enabled ──────────────────────────────────────────────────
 set(CMAKE_CXX_STANDARD 26)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
@@ -62,6 +64,25 @@ set(MODULE_SOURCES
         example/application_window.ixx
 )
 
+set(TEST_MODULE_SOURCES
+        src/reactive/Reactive.ixx
+        src/types/Position.ixx
+        src/types/Size.ixx
+        src/types/Rect.ixx
+        src/types/Types.ixx
+        src/core/Color.ixx
+        src/core/Event.ixx
+        src/core/Widget.ixx
+        src/core/FreeWidget.ixx
+        src/core/RenderLayer.ixx
+        src/core/Component.ixx
+        src/core/CompositeComponent.ixx
+        src/core/Router.ixx
+        src/core/Button.ixx
+        src/core/Core.ixx
+        src/components/Label.ixx
+)
+
 # ── Executable ────────────────────────────────────────────────────────────────
 add_executable(NandinaExperiment example/main.cpp)
 
@@ -104,3 +125,27 @@ set_target_properties(${PROJECT_NAME} PROPERTIES
         CXX_EXTENSIONS NO
         RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
+
+add_executable(NandinaReactiveTests tests/reactive_smoke.cpp)
+
+target_sources(NandinaReactiveTests
+        PRIVATE tests/reactive_smoke.cpp)
+
+target_sources(NandinaReactiveTests
+        PRIVATE FILE_SET CXX_MODULES FILES
+        ${TEST_MODULE_SOURCES})
+
+target_compile_options(NandinaReactiveTests PRIVATE
+        -Wall -Wextra -Wpedantic
+)
+
+target_compile_features(NandinaReactiveTests PRIVATE cxx_std_26)
+
+set_target_properties(NandinaReactiveTests PROPERTIES
+        CXX_STANDARD 26
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+add_test(NAME NandinaReactiveSmoke COMMAND ${CMAKE_BINARY_DIR}/bin/NandinaReactiveTests)

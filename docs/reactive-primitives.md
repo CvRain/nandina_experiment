@@ -6,10 +6,9 @@ This document describes the three reactive primitives added in this milestone an
 
 ## 1. `Prop<T>` — Unified property wrapper
 
-**Module:** `Nandina.Reactive.Prop`  
-**Re-exported by:** `Nandina.Reactive`
+**Module:** `Nandina.Reactive`
 
-`Prop<T>` provides a single type that a component attribute can accept regardless of whether the value is static or reactive. This eliminates the need for separate `set_text()` / `bind_text()` pairs.
+`Prop<T>` provides a single type that a component attribute can accept regardless of whether the value is static or reactive. This eliminates the need for separate `set_text()` / `bind_text()` pairs and lets component props prefer read-only reactive input.
 
 ```cpp
 import Nandina.Reactive;
@@ -19,14 +18,14 @@ using namespace Nandina;
 // Static — value never changes
 Prop<std::string> title{ std::string{"Hello, world!"} };
 
-// Reactive — reads from a State<std::string>
+// Reactive — reads from a ReadState<std::string>
 State<std::string> name{"Nandina"};
-Prop<std::string> greeting{ name };
+Prop<std::string> greeting{ name.as_read_only() };
 
 // Access the current value (works for both)
 auto v = greeting.get();          // -> const std::string&
 
-// Query whether it's bound to a State
+// Query whether it's bound to a reactive source
 greeting.is_reactive();           // -> bool
 
 // Subscribe to changes
@@ -42,15 +41,16 @@ name.set("World");
 
 ### Design notes
 
-- `Prop<T>` holds a `std::variant<T, State<T>*>`. The reactive variant stores a **non-owning pointer** — the caller must ensure `State<T>` outlives the `Prop`.
+- `Prop<T>` holds a static value or a non-owning pointer to a reactive source derived from `State<T>` / `ReadState<T>`. The caller must ensure the owning `State<T>` outlives the `Prop`.
 - `get()` inside an `Effect` auto-registers the effect as an observer (reads from the bound State transparently).
+- Component props should prefer `Prop<T>` or `ReadState<T>` so child components consume read-only inputs by default.
+- The reactive core now restores tracking context with RAII guards, so exceptions inside `Effect` / `Computed` callbacks do not leave the thread-local tracking state corrupted.
 
 ---
 
 ## 2. `StateList<T>` — Observable vector
 
-**Module:** `Nandina.Reactive.StateList`  
-**Re-exported by:** `Nandina.Reactive`
+**Module:** `Nandina.Reactive`
 
 `StateList<T>` wraps a `std::vector<T>` and emits structured change events on every mutation.
 
@@ -105,12 +105,99 @@ list.items();                     // const std::vector<T>&
 for (const auto& item : list) { ... }
 ```
 
+### `tracked_*` bridge helpers
+
+`StateList<T>` intentionally keeps its structured change stream separate from the automatic `State<T>` / `Effect` dependency graph.
+
+That separation is useful for list-heavy UI because it preserves precise mutation semantics:
+
+- `Inserted` means you can mount one new row.
+- `Removed` means you can unmount one row.
+- `Moved` means you can reorder existing row widgets.
+- `Updated` means you can refresh one row in place.
+
+At the same time, some callers only need a coarse derived value such as:
+
+- item count
+- empty/non-empty state
+- a filtered snapshot for summary text
+- a simple "version changed" invalidation hook
+
+For those cases, `StateList<T>` now exposes explicit bridge helpers:
+
+```cpp
+auto version = list.version();        // ReadState<std::size_t>
+auto count = list.tracked_size();     // std::size_t, tracks coarse list version
+auto empty = list.tracked_empty();    // bool, tracks coarse list version
+auto items = list.tracked_items();    // const std::vector<T>&, tracks coarse list version
+```
+
+These helpers let a list participate in `Computed` / `Effect` recomputation without changing the core meaning of `StateList<T>`.
+
+```cpp
+State<std::string> search_text{""};
+StateList<std::string> files;
+
+Computed match_count{[&] {
+    auto keyword = search_text();
+    const auto& items = files.tracked_items();
+
+    return std::ranges::count_if(items, [&](const std::string& file) {
+        return keyword.empty() || file.contains(keyword);
+    });
+}};
+
+Effect show_summary{[&] {
+    std::println("matched files = {}", match_count());
+}};
+```
+
+### When to use `on_change` vs `tracked_*`
+
+Use `on_change` / `watch` when you need exact structure-aware UI updates:
+
+```cpp
+auto conn = files.on_change([&](const ListChange<FileNode>& ch) {
+    switch (ch.kind) {
+    case ListChangeKind::Inserted:
+        list_view->insert_row(ch.index, make_row(*ch.value));
+        break;
+    case ListChangeKind::Removed:
+        list_view->remove_row(ch.index);
+        break;
+    case ListChangeKind::Updated:
+        list_view->update_row(ch.index, *ch.value);
+        break;
+    case ListChangeKind::Moved:
+        list_view->move_row(*ch.old_index, ch.index);
+        break;
+    case ListChangeKind::Reset:
+        list_view->rebuild_all(files.items());
+        break;
+    }
+});
+```
+
+Use `tracked_*` when you only need a coarse derived value and are comfortable rerunning the whole derived computation:
+
+```cpp
+Computed empty_hint{[&] {
+    return files.tracked_empty() ? std::string{"This folder is empty"}
+                                 : std::string{""};
+}};
+```
+
+Recommended rule:
+
+- Use `State<T>` for scalar reactive state.
+- Use `StateList<T>` for structure-aware collections.
+- Use `tracked_*` only as an explicit bridge from collection state back into the scalar reactive graph.
+
 ---
 
 ## 3. Upgraded `EventSignal<>` — Thread safety, connect_once, ScopedConnection
 
-**Module:** `Nandina.Core.Signal`  
-**Re-exported by:** `Nandina.Reactive`
+**Module:** `Nandina.Reactive`
 
 ### Thread safety
 
@@ -182,13 +269,72 @@ counter.set(3);   // (silent — connection was disconnected)
 
 ---
 
+## 4. Proposed minimal transaction / batch updates
+
+This section describes a recommended future API. It is documentation for the intended direction, not a statement that the API already exists today.
+
+### Problem
+
+Multiple consecutive `State::set()` calls can cause the same `Effect` to rerun multiple times and briefly observe intermediate UI state.
+
+```cpp
+selected_id.set("file-a");
+preview_name.set("file-a");
+preview_loading.set(true);
+
+// A dependent effect may run 3 times.
+```
+
+### Intended shape
+
+```cpp
+batch([&] {
+    selected_id.set("file-a");
+    preview_name.set("file-a");
+    preview_loading.set(true);
+});
+```
+
+The intended semantics are deliberately minimal:
+
+- `set()` inside `batch(...)` marks observers dirty but does not immediately rerun effects.
+- At the end of the batch, dirty effects are deduplicated and flushed once.
+- Effects should observe the final consistent state, not intermediate states.
+- This is closer to a UI commit/batch than a full database transaction with rollback.
+
+### Pseudo example: file manager selection
+
+```cpp
+batch([&] {
+    selected_entry_id.set("report-final.txt");
+    breadcrumb_text.set("/docs/report-final.txt");
+    status_text.set("Loading preview...");
+    preview_visible.set(true);
+});
+```
+
+Without batching, four updates may cause repeated recomputation. With batching, the UI sees one coherent commit.
+
+### Scope of a v1 implementation
+
+If added, a first implementation should stay narrow:
+
+- Batch `State<T>` observer flushing.
+- Deduplicate `Effect` reruns.
+- Do not try to merge or fold multiple `StateList<T>` diffs in the same batch.
+
+That keeps the model simple while solving the most common UI consistency problem.
+
+---
+
 ## Demo page
 
-`DemoPage` in `example/application_window.ixx` demonstrates all three primitives at runtime:
+`DemoPage` in `example/application_window.ixx` demonstrates the current reactive playground at runtime:
 
-- **Section A** — `Prop<std::string>`: a static label and a reactive label that updates when a `State<std::string>` changes (click "Toggle reactive text").
-- **Section B** — `StateList<std::string>`: three item slots reflect push/update/remove operations (click "Push item", "Update [0]", "Remove last").
-- **Section C** — `EventSignal<int>` + `ScopedConnection` + `connect_once`: clicking "Fire signal" emits an event; a persistent `ScopedConnection` updates the status label, while a fresh `connect_once` slot is registered before each emit to track one-shot receptions.
+- Counter state and `Computed` summary update together.
+- `ReadState<T>` / `Prop<T>` drive label props without exposing writable state to child components.
+- `EventSignal<int>` + `ScopedConnection` + `connect_once` update the signal summary.
+- `StateList<std::string>` records the latest activity log entries.
 
 Run the application with:
 ```sh

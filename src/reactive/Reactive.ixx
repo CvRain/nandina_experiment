@@ -17,18 +17,23 @@
 //   EffectScope         — owns a set of Effects; clear() disposes all at once
 //
 //   ── Properties ───────────────────────────────────────────────────────────
-//   Prop<T>             — static or reactive property; uniform get()/on_change() API
+//   Prop<T>             — static or reactive property; accepts State<T> or ReadState<T>
 //
 //   ── Observable collections ───────────────────────────────────────────────
 //   ListChangeKind      — Inserted / Removed / Updated / Moved / Reset
 //   ListChange<T>       — per-mutation descriptor emitted by StateList
 //   StateList<T>        — observable std::vector with fine- and coarse-grained events
+//
+//   ── Batching ─────────────────────────────────────────────────────────────
+//   batch(fn)           — coalesces State-driven invalidations and reruns
+//                          each affected Effect / Computed invalidator once
 module;
 
 #include <algorithm>
 #include <atomic>
 #include <cassert>
 #include <cstddef>
+#include <exception>
 #include <functional>
 #include <memory>
 #include <mutex>
@@ -168,10 +173,22 @@ public:
         }
 
         std::vector<std::size_t> once_ids;
+        std::exception_ptr first_exception;
         for (auto& entry : snapshot) {
-            if (entry.active) {
+            if (!entry.active) {
+                continue;
+            }
+
+            if (entry.once) {
+                once_ids.push_back(entry.id);
+            }
+
+            try {
                 entry.slot(args...);
-                if (entry.once) { once_ids.push_back(entry.id); }
+            } catch (...) {
+                if (!first_exception) {
+                    first_exception = std::current_exception();
+                }
             }
         }
 
@@ -179,6 +196,10 @@ public:
             std::lock_guard lock(mutex_);
             for (auto id : once_ids) { disconnect_locked(id); }
             cleanup_locked();
+        }
+
+        if (first_exception) {
+            std::rethrow_exception(first_exception);
         }
     }
 
@@ -318,7 +339,112 @@ namespace detail {
         std::size_t& next_index_;
         bool committed_ = false;
     };
+
+    struct PendingInvalidation {
+        std::size_t id = 0;
+        std::function<void()> invalidate;
+    };
+
+    inline thread_local std::size_t batch_depth = 0;
+    inline thread_local std::vector<PendingInvalidation> pending_invalidations;
+
+    [[nodiscard]] inline auto is_batching() noexcept -> bool {
+        return batch_depth > 0;
+    }
+
+    inline auto queue_invalidation(std::size_t id, const std::function<void()>& invalidate) -> void {
+        for (const auto& pending : pending_invalidations) {
+            if (pending.id == id) {
+                return;
+            }
+        }
+        pending_invalidations.push_back(PendingInvalidation{id, invalidate});
+    }
+
+    inline auto flush_pending_invalidations() -> void {
+        std::exception_ptr first_exception;
+
+        while (!pending_invalidations.empty()) {
+            auto pending = std::move(pending_invalidations);
+            pending_invalidations.clear();
+
+            for (auto& entry : pending) {
+                try {
+                    entry.invalidate();
+                } catch (...) {
+                    if (!first_exception) {
+                        first_exception = std::current_exception();
+                    }
+                }
+            }
+        }
+
+        if (first_exception) {
+            std::rethrow_exception(first_exception);
+        }
+    }
+
+    class BatchScope {
+    public:
+        BatchScope() noexcept {
+            ++batch_depth;
+        }
+
+        BatchScope(const BatchScope&) = delete;
+        auto operator=(const BatchScope&) -> BatchScope& = delete;
+
+        ~BatchScope() {
+            if (batch_depth == 0) {
+                return;
+            }
+            --batch_depth;
+        }
+
+        [[nodiscard]] auto should_flush() const noexcept -> bool {
+            return batch_depth == 1;
+        }
+    };
 } // namespace detail
+
+template<typename F>
+    requires std::invocable<F>
+auto batch(F&& fn) -> std::invoke_result_t<F> {
+    detail::BatchScope scope;
+
+    if constexpr (std::is_void_v<std::invoke_result_t<F>>) {
+        try {
+            std::invoke(std::forward<F>(fn));
+        } catch (...) {
+            if (scope.should_flush()) {
+                try {
+                    detail::flush_pending_invalidations();
+                } catch (...) {
+                }
+            }
+            throw;
+        }
+
+        if (scope.should_flush()) {
+            detail::flush_pending_invalidations();
+        }
+    } else {
+        try {
+            auto result = std::invoke(std::forward<F>(fn));
+            if (scope.should_flush()) {
+                detail::flush_pending_invalidations();
+            }
+            return result;
+        } catch (...) {
+            if (scope.should_flush()) {
+                try {
+                    detail::flush_pending_invalidations();
+                } catch (...) {
+                }
+            }
+            throw;
+        }
+    }
+}
 
 // ── State<T> ──────────────────────────────────────────────────────────────────
 // Reactive value holder. Reading inside an Effect auto-registers it as an
@@ -356,7 +482,7 @@ public:
     }
 
     /// Persistent subscription (not tied to the Effect tracking system).
-    auto on_change(std::function<void(const T&)> callback) -> Connection {
+    auto on_change(std::function<void(const T&)> callback) const -> Connection {
         return change_signal_.connect(std::move(callback));
     }
 
@@ -384,8 +510,16 @@ private:
         detail::PendingObserverRestore restore_guard{observers_, snapshot, next_observer};
 
         for (; next_observer < snapshot.size(); ++next_observer) {
-            auto& entry = snapshot[next_observer];
-            if (entry.active && entry.invalidate) { entry.invalidate(); }
+            const auto& entry = snapshot[next_observer];
+            if (!entry.active || !entry.invalidate) {
+                continue;
+            }
+
+            if (detail::is_batching()) {
+                detail::queue_invalidation(entry.id, entry.invalidate);
+            } else {
+                entry.invalidate();
+            }
         }
 
         restore_guard.commit();
@@ -394,7 +528,7 @@ private:
 
     T value_;
     mutable std::vector<detail::ObserverEntry> observers_;
-    EventSignal<const T&> change_signal_;
+    mutable EventSignal<const T&> change_signal_;
 };
 
 // ── ReadState<T> ──────────────────────────────────────────────────────────────
@@ -406,13 +540,14 @@ public:
         assert(source != nullptr);
     }
 
-    ReadState(const ReadState&)          = delete;
-    auto operator=(const ReadState&)     = delete;
+    ReadState(const ReadState&) = default;
+    auto operator=(const ReadState&) -> ReadState& = default;
     ReadState(ReadState&&) noexcept      = default;
     auto operator=(ReadState&&) noexcept -> ReadState& = default;
 
     [[nodiscard]] auto operator()() const -> const T& { return (*source_)(); }
     [[nodiscard]] auto get() const -> const T&        { return (*this)(); }
+    [[nodiscard]] auto source_ptr() const noexcept -> const State<T>* { return source_; }
 
 private:
     const State<T>* source_;
@@ -522,12 +657,12 @@ private:
 
 // ── Prop<T> ───────────────────────────────────────────────────────────────────
 // Uniform attribute type for components: holds either a compile-time constant
-// or a live reference to a State<T>, presenting the same get()/on_change() API.
+// or a read-only reactive source, presenting the same get()/on_change() API.
 //
 // Example:
 //   Prop<std::string> title{"Hello"};          // static
 //   State<std::string> name{"world"};
-//   Prop<std::string> greeting{name};           // reactive
+//   Prop<std::string> greeting{name.as_read_only()}; // reactive, read-only input
 //
 //   greeting.get();          // current value
 //   greeting.is_reactive();  // true
@@ -535,34 +670,43 @@ private:
 template<typename T>
 class Prop {
 public:
-    explicit Prop(T value)       : storage_(std::move(value)) {}
-    explicit Prop(State<T>& state) : storage_(&state) {}
+    explicit Prop(T value) : storage_(std::move(value)) {}
+    explicit Prop(State<T>& state) : storage_(static_cast<const State<T>*>(&state)) {}
+    explicit Prop(const State<T>& state) : storage_(&state) {}
+    explicit Prop(const ReadState<T>& state) : storage_(state.source_ptr()) {}
 
-    Prop(const Prop&)            = delete;
-    auto operator=(const Prop&)  = delete;
+    Prop(const Prop&) = default;
+    auto operator=(const Prop&) -> Prop& = default;
     Prop(Prop&&) noexcept        = default;
     auto operator=(Prop&&) noexcept -> Prop& = default;
 
     [[nodiscard]] auto get() const -> const T& {
-        if (const auto* s = std::get_if<State<T>*>(&storage_)) { return (*s)->get(); }
+        if (const auto* s = std::get_if<const State<T>*>(&storage_)) { return (*s)->get(); }
         return std::get<T>(storage_);
     }
 
     [[nodiscard]] auto is_reactive() const -> bool {
-        return std::holds_alternative<State<T>*>(storage_);
+        return std::holds_alternative<const State<T>*>(storage_);
+    }
+
+    [[nodiscard]] auto state_ptr() const noexcept -> const State<T>* {
+        if (const auto* s = std::get_if<const State<T>*>(&storage_)) {
+            return *s;
+        }
+        return nullptr;
     }
 
     /// Reactive prop: returns a live Connection.
     /// Static prop: returns a no-op Connection (connected() == false).
-    [[nodiscard]] auto on_change(std::function<void(const T&)> callback) -> Connection {
-        if (auto* s = std::get_if<State<T>*>(&storage_)) {
+    [[nodiscard]] auto on_change(std::function<void(const T&)> callback) const -> Connection {
+        if (auto* s = std::get_if<const State<T>*>(&storage_)) {
             return (*s)->on_change(std::move(callback));
         }
         return Connection{};
     }
 
 private:
-    std::variant<T, State<T>*> storage_;
+    std::variant<T, const State<T>*> storage_;
 };
 
 // ═════════════════════════════════════════════════════════════════════════════
@@ -597,6 +741,12 @@ struct ListChange {
 // Observable std::vector<T>. Mutations emit fine-grained ListChange<T> events
 // and a coarse-grained "something changed" notification.
 //
+// StateList does not implicitly participate in State/Effect dependency tracking,
+// but it exposes explicit, supported bridge helpers (`version()`,
+// `tracked_size()`, `tracked_empty()`, `tracked_items()`) so callers can opt
+// into coarse-grained Effect reactivity when that is more convenient than
+// manual watch()/on_change() subscriptions.
+//
 // Example:
 //   StateList<std::string> list;
 //   auto conn = list.on_change([](const ListChange<std::string>& c){ … });
@@ -613,6 +763,10 @@ public:
     auto operator=(StateList&&) = delete;
 
     // ── Read access ───────────────────────────────────────────────────────────
+    [[nodiscard]] auto version() const noexcept -> ReadState<std::size_t> {
+        return version_.as_read_only();
+    }
+
     [[nodiscard]] auto size()  const noexcept -> std::size_t { return items_.size(); }
     [[nodiscard]] auto empty() const noexcept -> bool        { return items_.empty(); }
 
@@ -625,6 +779,22 @@ public:
     [[nodiscard]] auto cend()   const noexcept { return items_.cend(); }
 
     [[nodiscard]] auto items() const noexcept -> const std::vector<T>& { return items_; }
+
+    // ── Explicit Effect bridge ───────────────────────────────────────────────
+    [[nodiscard]] auto tracked_size() const -> std::size_t {
+        (void)version_();
+        return items_.size();
+    }
+
+    [[nodiscard]] auto tracked_empty() const -> bool {
+        (void)version_();
+        return items_.empty();
+    }
+
+    [[nodiscard]] auto tracked_items() const -> const std::vector<T>& {
+        (void)version_();
+        return items_;
+    }
 
     // ── Mutations ─────────────────────────────────────────────────────────────
     auto push_back(T value) -> void {
@@ -683,11 +853,13 @@ public:
 
 private:
     auto emit(ListChange<T> change) -> void {
+        version_.set(version_.get() + 1);
         change_signal_.emit(change);
         watch_signal_.emit();
     }
 
     std::vector<T>                     items_;
+    State<std::size_t>                 version_{0};
     EventSignal<const ListChange<T>&>  change_signal_;
     EventSignal<>                      watch_signal_;
 };

@@ -88,7 +88,7 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
 
     auto make_text_box = [](std::unique_ptr<Nandina::Label> label, float height) {
         auto box = Nandina::SizedBox::Create();
-        box->set_background();
+        box->set_background(0, 0, 0, 0);
         box->height(height).child(std::move(label));
         return box;
     };
@@ -101,22 +101,20 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
         return button;
     };
 
-    auto title = Nandina::Label::Create();
+    auto title = Nandina::Label::Create(Nandina::Prop<std::string>{std::string{"Reactive Playground"}});
     title->set_bounds(0.0f, 0.0f, kContentW, 34.0f);
     title->font_size(24.0f).text_color(198, 214, 255);
-    title->text("Reactive Playground");
     root->add(make_text_box(std::move(title), 34.0f));
 
-    auto headline = Nandina::Label::Create();
+    auto headline = Nandina::Label::Create(Nandina::Prop<std::string>{headline_.as_read_only()});
     headline->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
     headline->font_size(14.0f).text_color(148, 221, 182);
-    headline->bind_text(headline_);
     root->add(make_text_box(std::move(headline), 22.0f));
 
     auto counter_value = Nandina::Label::Create();
     counter_value->set_bounds(0.0f, 0.0f, kContentW, 56.0f);
     counter_value->font_size(46.0f).text_color(236, 244, 255);
-    counter_value->bind_text(counter_, [](int value) {
+    counter_value->bind_text(counter_.as_read_only(), [](int value) {
         return std::format("count = {}", value);
     });
     root->add(make_text_box(std::move(counter_value), 64.0f));
@@ -144,10 +142,9 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
                                            last_signal_value_()));
     });
 
-    auto status_label = Nandina::Label::Create();
+    auto status_label = Nandina::Label::Create(Nandina::Prop<std::string>{status_text_.as_read_only()});
     status_label->set_bounds(0.0f, 0.0f, kContentW, 22.0f);
     status_label->font_size(12.0f).text_color(180, 188, 205);
-    status_label->bind_text(status_text_);
     root->add(make_text_box(std::move(status_label), 22.0f));
 
     auto counter_row = Nandina::Row::Create();
@@ -229,10 +226,9 @@ auto DemoPage::build() -> Nandina::WidgetPtr {
     action_row->add(std::move(clear_log_button));
     root->add(std::move(action_row));
 
-    auto log_title = Nandina::Label::Create();
+    auto log_title = Nandina::Label::Create(Nandina::Prop<std::string>{std::string{"Activity log (StateList watcher)"}});
     log_title->set_bounds(0.0f, 0.0f, kContentW, 20.0f);
     log_title->font_size(13.0f).text_color(145, 213, 255);
-    log_title->text("Activity log (StateList watcher)");
     root->add(make_text_box(std::move(log_title), 20.0f));
 
     auto log_count = Nandina::Label::Create();

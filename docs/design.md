@@ -120,7 +120,7 @@ void run() {
 | 层级 | 所有者 | 说明 |
 | :-- | :-- | :-- |
 | 组件局部 | Component::scope_ | 随组件析构自动清理 |
-| 父→子传递 | Props::ReadState<T> | 父组件持有 State，子组件仅读，Widget 树保证子不长于父 |
+| 父→子传递 | Props::Prop<T> / ReadState<T> | 父组件持有 State，子组件通过只读输入模型消费，Widget 树保证子不长于父 |
 | 全局应用 | AppStore | 跨组件共享状态，手动管理生命周期 |
 
 ---
@@ -237,8 +237,14 @@ auto label = Label::Create()
 
 // Props 结构体风格（适合响应式绑定）
 State<std::string> name{"Nandina"};
-auto label = Label::Create({ .text_signal = &name });
+auto label = Label::Create({ .text = Prop<std::string>{name.as_read_only()} });
 ```
+
+组件输入边界约定：
+
+- 父组件向子组件传递响应式数据时，优先传 `ReadState<T>` 或 `Prop<T>`，避免把可写 `State<T>` 直接暴露给子组件。
+- `State<T>` 主要用于组件内部的本地可写状态，或页面/容器对共享状态的拥有端。
+- `Prop<T>` 统一组件属性入口，既可表达静态值，也可表达基于 `ReadState<T>` 的只读响应式输入。
 
 ---
 
@@ -265,7 +271,7 @@ sdl3 / thorvg / freetype / harfbuzz / yoga
 | 里程碑 | 内容 | 状态 |
 | :-- | :-- | :-- |
 | M0 | 窗口 + Button 组合 + 事件分发 + ThorVG SwCanvas | ✅ 完成 |
-| M1 | Reactive 模块（State/Computed/Effect/EffectScope）+ Label + dirty 剪枝 | 🚧 进行中 |
+| M1 | Reactive 模块（State/Computed/Effect/EffectScope）+ Label + dirty 剪枝 | ✅ 完成 |
 | M2 | Row / Column / Stack 布局容器 | ⬜ 待开始 |
 | M3 | ThemeTokens + Design Token + Variant Recipe | ⬜ 待开始 |
 | M4 | FreeType + HarfBuzz 文字渲染 + Glyph Atlas | ⬜ 待开始 |
