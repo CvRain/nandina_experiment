@@ -74,6 +74,73 @@ auto test_nested_batch_flushes_once_at_outer_boundary() -> void {
     assert(value.get() == 3);
 }
 
+auto test_batch_flushes_before_rethrowing_callback_exception() -> void {
+    Nandina::State<int> value{0};
+    int runs = 0;
+    int snapshot = 0;
+
+    Nandina::Effect effect{[&] {
+        ++runs;
+        snapshot = value();
+    }};
+
+    assert(runs == 1);
+    assert(snapshot == 0);
+
+    try {
+        Nandina::batch([&] {
+            value.set(42);
+            throw std::runtime_error{"batch callback failure"};
+        });
+        assert(false && "expected batch callback exception");
+    } catch (const std::runtime_error& error) {
+        assert(std::string_view{error.what()} == "batch callback failure");
+    }
+
+    assert(runs == 2);
+    assert(snapshot == 42);
+}
+
+auto test_batch_rethrows_invalidator_exception_after_flush() -> void {
+    Nandina::State<int> value{0};
+    bool should_throw = true;
+    int throwing_runs = 0;
+    int stable_runs = 0;
+
+    Nandina::EffectScope scope;
+    scope.add([&] {
+        ++throwing_runs;
+        if (value() == 1 && should_throw) {
+            throw std::runtime_error{"batched effect failure"};
+        }
+    });
+    scope.add([&] {
+        ++stable_runs;
+        (void)value();
+    });
+
+    assert(throwing_runs == 1);
+    assert(stable_runs == 1);
+
+    try {
+        Nandina::batch([&] {
+            value.set(1);
+        });
+        assert(false && "expected batched effect exception");
+    } catch (const std::runtime_error& error) {
+        assert(std::string_view{error.what()} == "batched effect failure");
+    }
+
+    assert(throwing_runs == 2);
+    assert(stable_runs == 2);
+
+    should_throw = false;
+    value.set(2);
+
+    assert(throwing_runs == 3);
+    assert(stable_runs == 3);
+}
+
 auto test_state_notify_restores_observers_after_exception() -> void {
     Nandina::State<int> value{0};
     bool should_throw = true;
@@ -347,6 +414,8 @@ auto main() -> int {
     test_effect_deduplicates_reads();
     test_batch_deduplicates_effect_reruns();
     test_nested_batch_flushes_once_at_outer_boundary();
+    test_batch_flushes_before_rethrowing_callback_exception();
+    test_batch_rethrows_invalidator_exception_after_flush();
     test_state_notify_restores_observers_after_exception();
     test_computed_recomputes_lazily();
     test_computed_retries_after_exception();

@@ -140,6 +140,46 @@ cmake --preset debug-vcpkg
 cmake --build --preset debug-vcpkg
 ```
 
+## VS Code 与 C++ Modules
+
+这个项目的构建链已经支持 C++26 modules，但 VS Code 里的代码诊断是否正常，取决于语言服务能不能拿到正确的编译数据库与模块映射。
+
+推荐做法：
+
+- 使用 `clangd` 作为编辑器语言服务，而不是依赖 `ms-vscode.cpptools` 的 IntelliSense 波浪线
+- 先执行一次 `cmake --preset debug-clang-vcpkg`，让 CMake 生成给 clang/clangd 使用的 `compile_commands.json` 和 `.pcm` 映射
+- 工作区已自带 `.clangd` 与 `.vscode/settings.json`，会把 clangd 指向 `build/debug-clang-vcpkg`
+- `.ixx` 文件也已经在工作区里关联为 C++ 文件类型
+
+建议安装的 VS Code 扩展：
+
+- `llvm-vs-code-extensions.vscode-clangd`
+- `ms-vscode.cmake-tools`
+
+如果你刚拉下仓库，建议按下面顺序初始化：
+
+```bash
+cmake --preset debug-clang-vcpkg
+cmake --build --preset debug-vcpkg
+```
+
+如果出现模块相关飘红，但项目实际上能正常编译，通常不是源码错误，而是语言服务还没刷新。优先按下面顺序处理：
+
+```bash
+cmake --preset debug-clang-vcpkg
+```
+
+然后在 VS Code 中：
+
+- 重启 `clangd`
+- 或者执行一次窗口重载
+
+说明：
+
+- `debug-vcpkg` 仍然是日常构建与运行应用的首选 preset
+- `debug-clang-vcpkg` 主要用于给 clangd 提供更稳定的 modules 诊断输入
+- 不要手动给项目追加 `-fmodules-ts`，本项目依赖 CMake 3.28+ 与 Ninja 自动注入模块参数
+
 响应式回归测试：
 
 ```bash
