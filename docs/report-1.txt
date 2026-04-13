@@ -1,4 +1,7 @@
 Nandina 响应式系统深度审阅报告
+
+说明：本报告是历史审阅记录，文中提到的 some_issue.md 与 design-layout.md 已在后续文档整理中归档删除；如需查看当前结论，请以 design.md、development-plan.md、reactive-design.md 和 meeting-notes-2026-04-10.md 为准。
+
 一、核心文件与依赖层次
 1.1 文件清单
 文件	模块名	状态

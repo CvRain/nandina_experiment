@@ -1,118 +1,91 @@
-# Nandina 开发计划（M1 – M5）
+# Nandina 开发计划
 
-## M1：响应式核心 + Label + dirty 剪枝
-
-### 1.1 Nandina.Reactive 模块
-
-- [x] 创建 `src/reactive/Reactive.ixx`，导出 `Nandina.Reactive` 模块
-- [x] 实现 `State<T>`：`operator()()` 读值并自动注册依赖，`set()` 写值并通知观察者
-- [x] 实现 `ReadState<T>`：只读视图，由 `State<T>::as_read_only()` 创建
-- [x] 实现 `Computed<F>`：惰性派生状态，自动追踪 State 依赖
-- [x] 实现 `Effect`：副作用函数，依赖变化时自动重新执行
-- [x] 实现 `EffectScope`：RAII 生命周期容器，析构时断开所有 Effect
-- [x] `detail::current_invalidator` thread_local 依赖追踪机制
-
-### 1.2 Widget dirty 剪枝增强
-
-- [x] `Widget` 添加 `parent_` 非拥有指针（弱引用）
-- [x] `Widget` 添加 `has_dirty_child_` 标志位
-- [x] `add_child()` 设置 `child->parent_ = this`
-- [x] `mark_dirty()` 向上冒泡 `bubble_dirty_child()`
-- [x] `render_widget()` 剪枝：`!dirty && !has_dirty_child` 时跳过子树
-- [x] `clear_dirty()` 同时清除 `dirty_` 和 `has_dirty_child_`
-- [x] `for_each_child()` 改为 public
-
-### 1.3 Component EffectScope
-
-- [x] `Component` 基类添加 `EffectScope scope_` 成员
-- [x] Core.ixx 引入 `import Nandina.Reactive`
-
-### 1.4 Label 组件
-
-- [x] 创建 `src/components/Label.ixx`，导出 `Nandina.Components.Label`
-- [x] `LabelProps` 结构体：`text` 使用 `Prop<std::string>` 统一静态值与只读响应式输入
-- [x] `Label::Create()` 无参工厂
-- [x] `Label::Create(LabelProps)` Props 工厂，支持响应式文本绑定
-- [x] 链式 API：`text()`, `font_size()`, `text_color()`
-- [x] 私有成员：`State<std::string> text_`，`float font_size_`，`text_r/g/b/a_`
-- [x] 私有构造器添加 Effect：读取 `text_()` → 调用 `mark_dirty()`
+本文件只保留当前仍有执行意义的计划项。历史问题分析与讨论过程，分别见 `report-1.txt` 与 [docs/meeting-notes-2026-04-10.md](docs/meeting-notes-2026-04-10.md)。
 
 ---
 
-## M2：布局系统
+## M1：响应式核心与基础组件
 
-### 2.1 LayoutContainer 基类
+状态：已完成
 
-- [x] 创建 `src/layout/Layout.ixx`，导出 `Nandina.Layout`
-- [x] `Align` 枚举：start / center / end / stretch / space_between / space_around
-- [x] `LayoutContainer` 抽象类（继承 Component）
-- [x] 链式 API：`gap()`, `padding()`, `align_items()`, `justify_content()`
-- [x] `add(std::unique_ptr<Widget>)` 返回 `LayoutContainer&`
-- [x] 纯虚 `layout()` 方法
+### 已完成
 
-### 2.2 具体布局容器
+- [x] 单一 `Nandina.Reactive` 模块实现与导出
+- [x] `State<T>` / `ReadState<T>` / `Computed` / `Effect` / `EffectScope`
+- [x] `Prop<T>` 统一组件输入模型
+- [x] `StateList<T>` 结构化集合通知
+- [x] `tracked_size()` / `tracked_empty()` / `tracked_items()` / `version()` 桥接 API
+- [x] `EventSignal` 的 `connect_once`、`ScopedConnection` 与异常后的继续分发语义
+- [x] 最小 `batch(...)` 能力与观察者去重 flush
+- [x] Widget dirty 剪枝与向上冒泡机制
+- [x] `Component::scope_` 生命周期绑定
+- [x] `Label` 组件接入 `Prop<T>` / `ReadState<T>`
+- [x] 响应式 smoke test 基线
 
-- [x] `Column::Create()`，`layout()` 纵向排列子组件
-- [x] `Row::Create()`，`layout()` 横向排列子组件
-- [x] `Stack::Create()`，`layout()` 叠放子组件
+### 收尾项
 
-### 2.3 集成测试
+- [ ] 把 Reactive 1.0 的线程模型、batch 边界与异常优先级写得更明确
+- [ ] 视需要补充少量边界测试，但不再扩展新的响应式模型分支
 
-- [ ] 使用 Row/Column 替换 main.cpp 中的绝对坐标布局
-- [ ] 验证 gap/padding 属性生效
+---
+
+## M2：布局系统与真实页面验证
+
+状态：进行中
+
+### 已完成
+
+- [x] `Layout.ixx`、`Row`、`Column`、`Stack`
+- [x] `gap()` / `padding()` / `align_items()` / `justify_content()` 基础容器 API
+- [x] 页面级接入验证，当前 `DemoPage` 已使用真实列表选择场景跑通布局与响应式组合
+
+### 当前待办
+
+- [ ] 用更多真实页面验证布局边界，而不是只停留在基础容器展示
+- [ ] 梳理当前布局 API 与未来 Yoga 接入之间的兼容边界
+- [ ] 继续检查测量、嵌套容器和复杂重排场景的行为一致性
 
 ---
 
 ## M3：样式系统
 
-### 3.1 ThemeTokens
+状态：未开始
 
-- [ ] 设计 `ThemeTokens` 结构体（颜色、圆角、间距、字体 Token）
-- [ ] 实现默认 Light/Dark 主题
-- [ ] 组件可读取全局主题 Token
+### 待办
 
-### 3.2 Variant Recipe
-
-- [ ] Button 支持 Primary / Ghost / Destructive Variant
-- [ ] 各 Variant 自动解析对应绘制参数
-- [ ] 状态样式（hover / pressed / focused / disabled）
+- [ ] 设计 `ThemeTokens` 结构体与默认主题集合
+- [ ] 定义组件读取主题 token 的最小路径
+- [ ] 为 Button 等基础组件准备 Variant / 状态样式承载位
 
 ---
 
-## M4：文字渲染
+## M4：完整文字栈
 
-### 4.1 文字整形与光栅化
+状态：未开始
 
-- [ ] 集成 HarfBuzz 进行 UTF-8 文本整形，输出 GlyphRun
-- [ ] 集成 FreeType 进行字形光栅化
-- [ ] 实现 Glyph Atlas 缓存（纹理图集）
+### 待办
 
-### 4.2 ThorVG 集成
-
-- [ ] 将 Glyph Atlas 以 ThorVG 纹理形式输出到画布
-- [ ] Label 组件实现实际文字渲染（当前为骨架代码）
+- [ ] 接入 HarfBuzz 文本整形
+- [ ] 接入 FreeType 字形光栅化
+- [ ] 实现 Glyph Atlas 与缓存策略
+- [ ] 让 `Label` 进入真实文本绘制路径
 
 ---
 
-## M5：组件库 + Yoga
+## M5：组件库扩展与 Yoga
 
-### 5.1 组件库扩展
+状态：未开始
 
-- [ ] `Input` 组件（文本输入框）
-- [ ] `Checkbox` 组件
-- [ ] `Switch` 组件
-- [ ] `Dialog` 组件
-- [ ] `Dropdown` 组件
-- [ ] `Toast` 通知组件
+### 待办
 
-### 5.2 Yoga 接入
-
-- [ ] 集成 Yoga 布局引擎
-- [ ] Row/Column/Stack 内部计算替换为 Yoga
-- [ ] 对外 API 保持不变
+- [ ] Input / Checkbox / Switch / Dialog / Dropdown 等组件
+- [ ] Yoga 集成与内部布局实现替换
+- [ ] 保持 Row / Column / Stack 的对外 API 稳定
 
 ---
 
-## 当前执行建议
+## 近期优先级
 
-M1 → M2 → M3 → M4 → M5 顺序推进，每个里程碑完成后在 `docs/design.md` 里程碑表中更新状态。
+1. 完成 M2 的真实页面与布局边界验证。
+2. 把 Reactive 1.0 文档与契约说明收紧到当前实现。
+3. 在 M3 开始前避免再次大幅修改组件输入模型。

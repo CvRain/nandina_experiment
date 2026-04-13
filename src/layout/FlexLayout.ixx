@@ -8,6 +8,15 @@ import Nandina.Core.Widget;
 import Nandina.Types.Size;
 
 export namespace Nandina {
+    namespace detail {
+        inline auto relayout_if_ready(Widget& widget) -> void {
+            widget.mark_dirty();
+            if (widget.width() > 0.0f || widget.height() > 0.0f) {
+                widget.set_bounds(widget.x(), widget.y(), widget.width(), widget.height());
+            }
+        }
+    } // namespace detail
+
     // ── Spacer ────────────────────────────────────────────────────────────────────
     // Elastic blank space in a Row/Column. The flex value determines how many
     // parts of the remaining space this Spacer claims.
@@ -68,17 +77,20 @@ export namespace Nandina {
 
         auto width(float w) -> SizedBox& {
             fixed_w_ = w;
+            detail::relayout_if_ready(*this);
             return *this;
         }
 
         auto height(float h) -> SizedBox& {
             fixed_h_ = h;
+            detail::relayout_if_ready(*this);
             return *this;
         }
 
         auto size(const Size &s) -> SizedBox& {
             fixed_w_ = s.width();
             fixed_h_ = s.height();
+            detail::relayout_if_ready(*this);
             return *this;
         }
 
@@ -136,39 +148,82 @@ export namespace Nandina {
             return std::make_unique<Padding>();
         }
 
-        auto all(float v) -> Padding& {
-            top_ = right_ = bottom_ = left_ = v;
+        auto padding(float value) -> Padding& {
+            top_ = right_ = bottom_ = left_ = value;
+            detail::relayout_if_ready(*this);
             return *this;
+        }
+
+        auto padding(float horizontal, float vertical) -> Padding& {
+            left_ = right_ = horizontal;
+            top_ = bottom_ = vertical;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto padding(float left, float top, float right, float bottom) -> Padding& {
+            left_ = left;
+            top_ = top;
+            right_ = right;
+            bottom_ = bottom;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto padding_left(float value) -> Padding& {
+            left_ = value;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto padding_top(float value) -> Padding& {
+            top_ = value;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto padding_right(float value) -> Padding& {
+            right_ = value;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto padding_bottom(float value) -> Padding& {
+            bottom_ = value;
+            detail::relayout_if_ready(*this);
+            return *this;
+        }
+
+        auto all(float v) -> Padding& {
+            return padding(v);
         }
 
         auto horizontal(float v) -> Padding& {
             left_ = right_ = v;
+            detail::relayout_if_ready(*this);
             return *this;
         }
 
         auto vertical(float v) -> Padding& {
             top_ = bottom_ = v;
+            detail::relayout_if_ready(*this);
             return *this;
         }
 
         auto top(float v) -> Padding& {
-            top_ = v;
-            return *this;
+            return padding_top(v);
         }
 
         auto right(float v) -> Padding& {
-            right_ = v;
-            return *this;
+            return padding_right(v);
         }
 
         auto bottom(float v) -> Padding& {
-            bottom_ = v;
-            return *this;
+            return padding_bottom(v);
         }
 
         auto left(float v) -> Padding& {
-            left_ = v;
-            return *this;
+            return padding_left(v);
         }
 
         auto child(std::unique_ptr<Widget> w) -> Padding& {

@@ -126,6 +126,7 @@ batch([&] {
 | :-- | :-- |
 | [docs/design.md](docs/design.md) | 完整设计文档（架构、响应式、布局、文字渲染等） |
 | [docs/development-plan.md](docs/development-plan.md) | 开发计划与里程碑任务清单（M1–M5） |
+| [docs/meeting-notes-2026-04-10.md](docs/meeting-notes-2026-04-10.md) | 设计讨论纪要与当前落地情况对照 |
 | [docs/reactive-design.md](docs/reactive-design.md) | Nandina.Reactive 模块详细设计 |
 | [docs/reactive-primitives.md](docs/reactive-primitives.md) | Prop、StateList、Signal、tracked_*、batch 的使用说明 |
 
@@ -202,8 +203,8 @@ ctest --test-dir build/debug-vcpkg --output-on-failure
 | 里程碑 | 内容 | 状态 |
 | :-- | :-- | :-- |
 | M0 | 窗口 + Button 组合 + 事件分发 + ThorVG SwCanvas | ✅ 完成 |
-| M1 | Reactive 模块 + Label + dirty 剪枝 | 🚧 进行中 |
-| M2 | Row / Column / Stack 布局容器 | ⬜ 待开始 |
+| M1 | Reactive 模块 + Label + dirty 剪枝 + 响应式测试基线 | ✅ 完成 |
+| M2 | Row / Column / Stack 布局容器 + 示例页验证 | 🚧 进行中 |
 | M3 | ThemeTokens + Design Token + Variant | ⬜ 待开始 |
 | M4 | FreeType + HarfBuzz 文字渲染 | ⬜ 待开始 |
 | M5 | 组件库扩展 + Yoga 布局引擎 | ⬜ 待开始 |
@@ -213,7 +214,7 @@ ctest --test-dir build/debug-vcpkg --output-on-failure
 ## 路线图
 
 ```
-M0 (done) → M1 (reactive + Label) → M2 (layout) → M3 (style) → M4 (text) → M5 (component lib + Yoga)
+M0 (done) → M1 (done) → M2 (in progress) → M3 (style) → M4 (text) → M5 (component lib + Yoga)
 ```
 
 ---

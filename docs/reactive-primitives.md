@@ -269,9 +269,7 @@ counter.set(3);   // (silent — connection was disconnected)
 
 ---
 
-## 4. Proposed minimal transaction / batch updates
-
-This section describes a recommended future API. It is documentation for the intended direction, not a statement that the API already exists today.
+## 4. Minimal batch updates
 
 ### Problem
 
@@ -285,7 +283,7 @@ preview_loading.set(true);
 // A dependent effect may run 3 times.
 ```
 
-### Intended shape
+### API shape
 
 ```cpp
 batch([&] {
@@ -295,11 +293,12 @@ batch([&] {
 });
 ```
 
-The intended semantics are deliberately minimal:
+The current semantics are deliberately minimal:
 
 - `set()` inside `batch(...)` marks observers dirty but does not immediately rerun effects.
-- At the end of the batch, dirty effects are deduplicated and flushed once.
-- Effects should observe the final consistent state, not intermediate states.
+- At the end of the outer batch, dirty invalidators are deduplicated and flushed once.
+- Effects observe the final consistent state, not intermediate states.
+- Exceptions raised during flush are rethrown after the batch performs the required cleanup.
 - This is closer to a UI commit/batch than a full database transaction with rollback.
 
 ### Pseudo example: file manager selection
@@ -315,12 +314,12 @@ batch([&] {
 
 Without batching, four updates may cause repeated recomputation. With batching, the UI sees one coherent commit.
 
-### Scope of a v1 implementation
+### Current scope
 
-If added, a first implementation should stay narrow:
+The current implementation intentionally stays narrow:
 
 - Batch `State<T>` observer flushing.
-- Deduplicate `Effect` reruns.
+- Deduplicate `Effect` and `Computed` invalidator reruns.
 - Do not try to merge or fold multiple `StateList<T>` diffs in the same batch.
 
 That keeps the model simple while solving the most common UI consistency problem.
@@ -329,12 +328,12 @@ That keeps the model simple while solving the most common UI consistency problem
 
 ## Demo page
 
-`DemoPage` in `example/application_window.ixx` demonstrates the current reactive playground at runtime:
+`DemoPage` in `example/pages/DemoPage.ixx` demonstrates a realistic list-selection flow at runtime:
 
-- Counter state and `Computed` summary update together.
-- `ReadState<T>` / `Prop<T>` drive label props without exposing writable state to child components.
-- `EventSignal<int>` + `ScopedConnection` + `connect_once` update the signal summary.
-- `StateList<std::string>` records the latest activity log entries.
+- `StateList<int>` drives a small list view.
+- `tracked_*` helpers feed summary and selected-item derived text.
+- `ReadState<T>` / `Prop<T>` drive labels without exposing writable state to child components.
+- `batch(...)` is used when adding a new item so selection, status text, and next value update as one commit.
 
 Run the application with:
 ```sh

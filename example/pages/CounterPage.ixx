@@ -36,31 +36,33 @@ auto CounterPage::Create() -> std::unique_ptr<CounterPage> {
 auto CounterPage::build() -> Nandina::WidgetPtr {
     constexpr float page_width = 640.0f;
     constexpr float page_height = 480.0f;
+    constexpr float page_padding = 32.0f;
+    constexpr float inner_width = page_width - page_padding * 2.0f;
+    constexpr float title_width = 320.0f;
     constexpr float number_width = 240.0f;
     constexpr float number_height = 64.0f;
     constexpr float button_width = 120.0f;
     constexpr float button_height = 60.0f;
     constexpr float button_gap = 16.0f;
-    constexpr float button_row_width = button_width * 2.0f + button_gap;
     constexpr float content_gap = 24.0f;
-    constexpr float page_padding = 32.0f;
 
     auto root = Nandina::Column::Create();
     root->set_bounds(0.0f, 0.0f, page_width, page_height);
     root->set_background(28, 32, 46, 255);
-    root->padding(page_padding).gap(content_gap);
+    root->padding(page_padding).gap(content_gap).align_items(Nandina::Align::stretch);
 
     auto title_label = Nandina::Label::Create();
     title_label->set_background(0, 0, 0, 0);
-    title_label->set_bounds(0.0f, 0.0f, page_width - page_padding * 2.0f, 48.0f);
+    title_label->set_bounds(0.0f, 0.0f, title_width, 48.0f);
     title_label->font_size(24.0f).text_color(200, 200, 255);
     title_label->text("Counter Page");
 
-    auto title_center = Nandina::Center::Create();
-    title_center->child(std::move(title_label));
+    auto title_row = Nandina::Row::Create();
+    title_row->justify_content(Nandina::Align::center).align_items(Nandina::Align::center);
+    title_row->add(std::move(title_label));
 
     auto title_box = Nandina::SizedBox::Create();
-    title_box->height(48.0f).child(std::move(title_center));
+    title_box->width(inner_width).height(48.0f).child(std::move(title_row));
     root->add(std::move(title_box));
 
     root->add(Nandina::Spacer::Create(1));
@@ -73,11 +75,12 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
         return std::format("{}", value);
     });
 
-    auto number_center = Nandina::Center::Create();
-    number_center->child(std::move(number_label));
+    auto number_row = Nandina::Row::Create();
+    number_row->justify_content(Nandina::Align::center).align_items(Nandina::Align::center);
+    number_row->add(std::move(number_label));
 
     auto number_box = Nandina::SizedBox::Create();
-    number_box->height(96.0f).child(std::move(number_center));
+    number_box->width(inner_width).height(96.0f).child(std::move(number_row));
     root->add(std::move(number_box));
 
     auto decrease_button = Nandina::Button::Create();
@@ -97,16 +100,14 @@ auto CounterPage::build() -> Nandina::WidgetPtr {
     });
 
     auto button_row = Nandina::Row::Create();
-    button_row->set_bounds(0.0f, 0.0f, button_row_width, button_height);
-    button_row->gap(button_gap);
+    button_row->gap(button_gap)
+        .justify_content(Nandina::Align::center)
+        .align_items(Nandina::Align::center);
     button_row->add(std::move(decrease_button));
     button_row->add(std::move(increase_button));
 
-    auto button_center = Nandina::Center::Create();
-    button_center->child(std::move(button_row));
-
     auto button_box = Nandina::SizedBox::Create();
-    button_box->height(button_height).child(std::move(button_center));
+    button_box->width(inner_width).height(button_height).child(std::move(button_row));
     root->add(std::move(button_box));
 
     root->add(Nandina::Spacer::Create(2));
