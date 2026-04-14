@@ -30,6 +30,7 @@ export namespace Nandina {
         }
 
         [[nodiscard]] auto flex_factor() const noexcept -> int override { return flex_; }
+    [[nodiscard]] auto preferred_size() const noexcept -> Size override { return {0.0f, 0.0f}; }
 
     private:
         int flex_ = 1;
@@ -54,6 +55,13 @@ export namespace Nandina {
         }
 
         [[nodiscard]] auto flex_factor() const noexcept -> int override { return flex_; }
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            Size preferred{0.0f, 0.0f};
+            for_each_child([&](Widget& child) {
+                preferred = child.preferred_size();
+            });
+            return preferred;
+        }
 
     private:
         explicit Expanded(const int flex) : flex_(flex) {
@@ -109,6 +117,17 @@ export namespace Nandina {
             return *this;
         }
 
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            Size preferred{0.0f, 0.0f};
+            for_each_child([&](Widget& child) {
+                preferred = child.preferred_size();
+            });
+            return {
+                fixed_w_ > 0.0f ? fixed_w_ : preferred.width(),
+                fixed_h_ > 0.0f ? fixed_h_ : preferred.height(),
+            };
+        }
+
     private:
         float fixed_w_ = 0.0f;
         float fixed_h_ = 0.0f;
@@ -132,11 +151,22 @@ export namespace Nandina {
         auto set_bounds(float x, float y, float w, float h) noexcept -> Widget& override {
             Component::set_bounds(x, y, w, h);
             for_each_child([&](Widget &c) {
-                const float cx = x + (w - c.width()) * 0.5f;
-                const float cy = y + (h - c.height()) * 0.5f;
-                c.set_bounds(cx, cy, c.width(), c.height());
+                const auto preferred = c.preferred_size();
+                const float child_w = c.width() > 0.0f ? c.width() : preferred.width();
+                const float child_h = c.height() > 0.0f ? c.height() : preferred.height();
+                const float cx = x + (w - child_w) * 0.5f;
+                const float cy = y + (h - child_h) * 0.5f;
+                c.set_bounds(cx, cy, child_w, child_h);
             });
             return *this;
+        }
+
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            Size preferred{0.0f, 0.0f};
+            for_each_child([&](Widget& child) {
+                preferred = child.preferred_size();
+            });
+            return preferred;
         }
     };
 
@@ -239,6 +269,17 @@ export namespace Nandina {
                              h - top_ - bottom_);
             });
             return *this;
+        }
+
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            Size preferred{0.0f, 0.0f};
+            for_each_child([&](Widget& child) {
+                preferred = child.preferred_size();
+            });
+            return {
+                preferred.width() + left_ + right_,
+                preferred.height() + top_ + bottom_,
+            };
         }
 
     private:

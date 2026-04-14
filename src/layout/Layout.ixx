@@ -1,5 +1,4 @@
 module;
-#include <algorithm>
 #include <cstdint>
 #include <memory>
 #include <utility>
@@ -8,6 +7,9 @@ module;
 export module Nandina.Layout;
 
 import Nandina.Core;
+import Nandina.Layout.Backend;
+import Nandina.Layout.YogaMapping;
+import Nandina.Types;
 
 export import Nandina.Layout.Flex;
 
@@ -22,67 +24,47 @@ export namespace Nandina {
         space_around,
     };
 
+    class LayoutContainer;
+
     namespace detail {
         [[nodiscard]] inline auto clamp_non_negative(float value) noexcept -> float {
-            return std::max(0.0f, value);
+            return value < 0.0f ? 0.0f : value;
         }
 
-        [[nodiscard]] inline auto resolve_cross_extent(Align align, float available, float desired) noexcept -> float {
-            if (align == Align::stretch) {
-                return clamp_non_negative(available);
+        [[nodiscard]] inline auto preferred_width(const Widget& widget) noexcept -> float {
+            const float current = widget.width();
+            if (current > 0.0f) {
+                return current;
             }
-            return std::min(clamp_non_negative(desired), clamp_non_negative(available));
+            return clamp_non_negative(widget.preferred_size().width());
         }
 
-        [[nodiscard]] inline auto resolve_cross_position(float origin, float available, float extent, Align align) noexcept -> float {
+        [[nodiscard]] inline auto preferred_height(const Widget& widget) noexcept -> float {
+            const float current = widget.height();
+            if (current > 0.0f) {
+                return current;
+            }
+            return clamp_non_negative(widget.preferred_size().height());
+        }
+
+        [[nodiscard]] inline auto map_alignment(Align align) noexcept -> layout_detail::LayoutAlignment {
             switch (align) {
             case Align::center:
-            case Align::space_between:
-            case Align::space_around:
-                return origin + (available - extent) * 0.5f;
+                return layout_detail::LayoutAlignment::center;
             case Align::end:
-                return origin + (available - extent);
-            case Align::start:
+                return layout_detail::LayoutAlignment::end;
             case Align::stretch:
+                return layout_detail::LayoutAlignment::stretch;
+            case Align::space_between:
+                return layout_detail::LayoutAlignment::space_between;
+            case Align::space_around:
+                return layout_detail::LayoutAlignment::space_around;
+            case Align::start:
             default:
-                return origin;
+                return layout_detail::LayoutAlignment::start;
             }
         }
 
-        struct MainAxisPlacement {
-            float start_offset = 0.0f;
-            float gap = 0.0f;
-        };
-
-        [[nodiscard]] inline auto resolve_main_axis_placement(Align justify,
-                                                              int child_count,
-                                                              float used_extent,
-                                                              float available_extent,
-                                                              float base_gap) noexcept -> MainAxisPlacement {
-            const float free_space = clamp_non_negative(available_extent - used_extent);
-
-            switch (justify) {
-            case Align::end:
-                return {.start_offset = free_space, .gap = base_gap};
-            case Align::center:
-                return {.start_offset = free_space * 0.5f, .gap = base_gap};
-            case Align::space_between:
-                if (child_count > 1) {
-                    return {.start_offset = 0.0f, .gap = base_gap + free_space / static_cast<float>(child_count - 1)};
-                }
-                return {.start_offset = free_space * 0.5f, .gap = base_gap};
-            case Align::space_around:
-                if (child_count > 0) {
-                    const float extra = free_space / static_cast<float>(child_count);
-                    return {.start_offset = extra * 0.5f, .gap = base_gap + extra};
-                }
-                return {.start_offset = 0.0f, .gap = base_gap};
-            case Align::start:
-            case Align::stretch:
-            default:
-                return {.start_offset = 0.0f, .gap = base_gap};
-            }
-        }
     } // namespace detail
 
     // ── LayoutContainer ───────────────────────────────────────────────────────
@@ -164,6 +146,14 @@ export namespace Nandina {
             return *this;
         }
 
+        [[nodiscard]] auto gap_value() const noexcept -> float { return gap_; }
+        [[nodiscard]] auto padding_left_value() const noexcept -> float { return padding_left_; }
+        [[nodiscard]] auto padding_top_value() const noexcept -> float { return padding_top_; }
+        [[nodiscard]] auto padding_right_value() const noexcept -> float { return padding_right_; }
+        [[nodiscard]] auto padding_bottom_value() const noexcept -> float { return padding_bottom_; }
+        [[nodiscard]] auto align_items_value() const noexcept -> Align { return align_items_; }
+        [[nodiscard]] auto justify_content_value() const noexcept -> Align { return justify_content_; }
+
         virtual auto layout() -> void = 0;
 
     protected:
@@ -182,6 +172,67 @@ export namespace Nandina {
         Align align_items_     = Align::start;
         Align justify_content_ = Align::start;
     };
+
+    namespace detail {
+        [[nodiscard]] inline auto collect_layout_specs(const LayoutContainer& container) -> std::vector<layout_detail::LayoutChildSpec> {
+            std::vector<layout_detail::LayoutChildSpec> specs;
+            container.for_each_child([&](Widget& child) {
+                specs.push_back({
+                    .preferred_size = {preferred_width(child), preferred_height(child)},
+                    .flex_factor = child.flex_factor(),
+                });
+            });
+            return specs;
+        }
+
+        [[nodiscard]] inline auto collect_layout_targets(const LayoutContainer& container) -> std::vector<Widget*> {
+            std::vector<Widget*> targets;
+            container.for_each_child([&](Widget& child) {
+                targets.push_back(&child);
+            });
+            return targets;
+        }
+
+        [[nodiscard]] inline auto build_layout_request(const LayoutContainer& container,
+                                                       layout_detail::LayoutAxis axis) -> layout_detail::LayoutRequest {
+            layout_detail::LayoutRequest request;
+            request.axis = axis;
+            request.container_bounds = {container.x(), container.y(), container.width(), container.height()};
+            request.padding = {
+                .left = container.padding_left_value(),
+                .top = container.padding_top_value(),
+                .right = container.padding_right_value(),
+                .bottom = container.padding_bottom_value(),
+            };
+            request.gap = container.gap_value();
+            request.cross_alignment = map_alignment(container.align_items_value());
+            request.main_alignment = map_alignment(container.justify_content_value());
+            request.children = collect_layout_specs(container);
+
+            return request;
+        }
+
+        [[nodiscard]] inline auto prepare_yoga_mapping(const LayoutContainer& container,
+                                                       layout_detail::LayoutAxis axis) -> layout_detail::yoga::MappingResult {
+            return layout_detail::yoga::map_request(build_layout_request(container, axis));
+        }
+
+        inline auto apply_backend(LayoutContainer& container, layout_detail::LayoutAxis axis) -> void {
+            auto targets = collect_layout_targets(container);
+            auto request = build_layout_request(container, axis);
+
+            auto frames = layout_detail::default_layout_backend().compute(request);
+
+            const auto count = std::min(targets.size(), frames.size());
+            for (std::size_t index = 0; index < count; ++index) {
+                auto* widget = targets[index];
+                const auto& frame = frames[index];
+                if (widget) {
+                    widget->set_bounds(frame.x(), frame.y(), frame.width(), frame.height());
+                }
+            }
+        }
+    } // namespace detail
 
     // ── Column ────────────────────────────────────────────────────────────────
     class Column final : public LayoutContainer {
@@ -231,55 +282,7 @@ export namespace Nandina {
         }
 
         auto layout() -> void override {
-            const float avail_w = detail::clamp_non_negative(width() - padding_left_ - padding_right_);
-            const float avail_h = detail::clamp_non_negative(height() - padding_top_ - padding_bottom_);
-
-            // ── Pass 1: sum fixed heights and total flex ──────────────────────
-            float fixed_total = 0.0f;
-            int   flex_total  = 0;
-            int   child_count = 0;
-
-            for_each_child([&](Widget& child) {
-                const int f = child.flex_factor();
-                if (f > 0) {
-                    flex_total += f;
-                } else {
-                    fixed_total += child.height();
-                }
-                ++child_count;
-            });
-
-            const float gap_total = (child_count > 1)
-                ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
-            const float remaining = detail::clamp_non_negative(avail_h - fixed_total - gap_total);
-            const float flex_inv  = (flex_total > 0) ? 1.0f / static_cast<float>(flex_total) : 0.0f;
-
-            const float used_h = fixed_total + gap_total + (flex_total > 0 ? remaining : 0.0f);
-            const auto placement = detail::resolve_main_axis_placement(justify_content_, child_count, used_h, avail_h, gap_);
-
-            // ── Pass 2: place children ────────────────────────────────────────
-            float cursor_y = y() + padding_top_ + placement.start_offset;
-            bool  first    = true;
-
-            for_each_child([&](Widget& child) {
-                if (!first) { cursor_y += placement.gap; }
-                first = false;
-
-                const int f = child.flex_factor();
-                const float child_h = (f > 0 && flex_total > 0)
-                    ? remaining * (static_cast<float>(f) * flex_inv)
-                    : child.height();
-                const float child_w = detail::resolve_cross_extent(align_items_, avail_w, child.width());
-                const float child_x = detail::resolve_cross_position(x() + padding_left_, avail_w, child_w, align_items_);
-
-                if (f > 0 && flex_total > 0) {
-                    child.set_bounds(child_x, cursor_y, child_w, child_h);
-                    cursor_y += child_h;
-                } else {
-                    child.set_bounds(child_x, cursor_y, child_w, child_h);
-                    cursor_y += child_h;
-                }
-            });
+            detail::apply_backend(*this, layout_detail::LayoutAxis::column);
         }
     };
 
@@ -331,55 +334,7 @@ export namespace Nandina {
         }
 
         auto layout() -> void override {
-            const float avail_w = detail::clamp_non_negative(width() - padding_left_ - padding_right_);
-            const float avail_h = detail::clamp_non_negative(height() - padding_top_ - padding_bottom_);
-
-            // ── Pass 1: sum fixed widths and total flex ───────────────────────
-            float fixed_total = 0.0f;
-            int   flex_total  = 0;
-            int   child_count = 0;
-
-            for_each_child([&](Widget& child) {
-                const int f = child.flex_factor();
-                if (f > 0) {
-                    flex_total += f;
-                } else {
-                    fixed_total += child.width();
-                }
-                ++child_count;
-            });
-
-            const float gap_total = (child_count > 1)
-                ? gap_ * static_cast<float>(child_count - 1) : 0.0f;
-            const float remaining = detail::clamp_non_negative(avail_w - fixed_total - gap_total);
-            const float flex_inv  = (flex_total > 0) ? 1.0f / static_cast<float>(flex_total) : 0.0f;
-
-            const float used_w = fixed_total + gap_total + (flex_total > 0 ? remaining : 0.0f);
-            const auto placement = detail::resolve_main_axis_placement(justify_content_, child_count, used_w, avail_w, gap_);
-
-            // ── Pass 2: place children ────────────────────────────────────────
-            float cursor_x = x() + padding_left_ + placement.start_offset;
-            bool  first    = true;
-
-            for_each_child([&](Widget& child) {
-                if (!first) { cursor_x += placement.gap; }
-                first = false;
-
-                const int f = child.flex_factor();
-                const float child_w = (f > 0 && flex_total > 0)
-                    ? remaining * (static_cast<float>(f) * flex_inv)
-                    : child.width();
-                const float child_h = detail::resolve_cross_extent(align_items_, avail_h, child.height());
-                const float child_y = detail::resolve_cross_position(y() + padding_top_, avail_h, child_h, align_items_);
-
-                if (f > 0 && flex_total > 0) {
-                    child.set_bounds(cursor_x, child_y, child_w, child_h);
-                    cursor_x += child_w;
-                } else {
-                    child.set_bounds(cursor_x, child_y, child_w, child_h);
-                    cursor_x += child_w;
-                }
-            });
+            detail::apply_backend(*this, layout_detail::LayoutAxis::row);
         }
     };
 
@@ -431,17 +386,7 @@ export namespace Nandina {
         }
 
         auto layout() -> void override {
-            const float cx = x() + padding_left_;
-            const float cy = y() + padding_top_;
-            const float cw = detail::clamp_non_negative(width()  - padding_left_ - padding_right_);
-            const float ch = detail::clamp_non_negative(height() - padding_top_  - padding_bottom_);
-            for_each_child([&](Widget& child) {
-                const float child_w = detail::resolve_cross_extent(align_items_, cw, child.width());
-                const float child_h = detail::resolve_cross_extent(justify_content_, ch, child.height());
-                const float child_x = detail::resolve_cross_position(cx, cw, child_w, align_items_);
-                const float child_y = detail::resolve_cross_position(cy, ch, child_h, justify_content_);
-                child.set_bounds(child_x, child_y, child_w, child_h);
-            });
+            detail::apply_backend(*this, layout_detail::LayoutAxis::stack);
         }
     };
 

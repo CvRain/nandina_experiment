@@ -9,6 +9,7 @@ import Nandina.Core.Component;
 import Nandina.Core.Color;
 import Nandina.Core.Event;
 import Nandina.Core.Widget;
+import Nandina.Types;
 
 export namespace Nandina {
     // ── Button ────────────────────────────────────────────────────────────────
@@ -38,6 +39,10 @@ export namespace Nandina {
         [[nodiscard]] auto text_content() const noexcept -> std::string_view override { return text_; }
         [[nodiscard]] auto text_color() const noexcept -> Nandina::Color override { return {255, 255, 255, 255}; }
         [[nodiscard]] auto text_font_size() const noexcept -> float override { return 18.0f; }
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            const float text_width = static_cast<float>(text_.size()) * 10.0f;
+            return {std::max(96.0f, text_width + 32.0f), 40.0f};
+        }
 
         [[nodiscard]] auto text_align() const noexcept -> Nandina::TextAlign override {
             return Nandina::TextAlign::center;

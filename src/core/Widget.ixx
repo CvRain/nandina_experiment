@@ -162,6 +162,7 @@ export namespace Nandina {
         [[nodiscard]] auto rect() const noexcept -> Rect { return {x_, y_, width_, height_}; }
         [[nodiscard]] auto position() const noexcept -> Position { return {x_, y_}; }
         [[nodiscard]] auto size() const noexcept -> Size { return {width_, height_}; }
+        [[nodiscard]] virtual auto preferred_size() const noexcept -> Size { return size(); }
 
         [[nodiscard]] virtual auto text_content() const noexcept -> std::string_view { return {}; }
         [[nodiscard]] virtual auto text_color() const noexcept -> Color { return {0, 0, 0, 255}; }

@@ -12,6 +12,7 @@ export module Nandina.Components.Label;
 
 import Nandina.Core;
 import Nandina.Reactive;
+import Nandina.Types;
 
 export namespace Nandina {
 
@@ -127,6 +128,13 @@ export namespace Nandina {
         [[nodiscard]] auto text_content() const noexcept -> std::string_view override { return text_.get(); }
         [[nodiscard]] auto text_color() const noexcept -> Color override { return {text_r_, text_g_, text_b_, text_a_}; }
         [[nodiscard]] auto text_font_size() const noexcept -> float override { return font_size_; }
+        [[nodiscard]] auto preferred_size() const noexcept -> Size override {
+            const auto& text = text_.get();
+            const float line_height = font_size_ * 1.4f;
+            const float estimated_width = std::max(font_size_ * 0.75f,
+                                                   static_cast<float>(text.size()) * font_size_ * 0.6f);
+            return {estimated_width, line_height};
+        }
 
     private:
         Label() {

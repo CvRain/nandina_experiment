@@ -55,6 +55,9 @@ set(MODULE_SOURCES
         src/components/Label.ixx
 
         src/layout/FlexLayout.ixx
+        src/layout/LayoutBackend.ixx
+        src/layout/YogaMapping.ixx
+        src/layout/YogaAdapter.ixx
         src/layout/Layout.ixx
 
         src/style/Theme.ixx
@@ -81,6 +84,9 @@ set(TEST_MODULE_SOURCES
         src/core/Button.ixx
         src/core/Core.ixx
         src/components/Label.ixx
+        src/layout/LayoutBackend.ixx
+        src/layout/YogaMapping.ixx
+        src/layout/YogaAdapter.ixx
 )
 
 # ── Executable ────────────────────────────────────────────────────────────────
@@ -149,3 +155,27 @@ set_target_properties(NandinaReactiveTests PROPERTIES
 )
 
 add_test(NAME NandinaReactiveSmoke COMMAND ${CMAKE_BINARY_DIR}/bin/NandinaReactiveTests)
+
+add_executable(NandinaLayoutMappingTests tests/layout_mapping_smoke.cpp)
+
+target_sources(NandinaLayoutMappingTests
+        PRIVATE tests/layout_mapping_smoke.cpp)
+
+target_sources(NandinaLayoutMappingTests
+        PRIVATE FILE_SET CXX_MODULES FILES
+        ${TEST_MODULE_SOURCES})
+
+target_compile_options(NandinaLayoutMappingTests PRIVATE
+        -Wall -Wextra -Wpedantic
+)
+
+target_compile_features(NandinaLayoutMappingTests PRIVATE cxx_std_26)
+
+set_target_properties(NandinaLayoutMappingTests PROPERTIES
+        CXX_STANDARD 26
+        CXX_STANDARD_REQUIRED YES
+        CXX_EXTENSIONS NO
+        RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+
+add_test(NAME NandinaLayoutMappingSmoke COMMAND ${CMAKE_BINARY_DIR}/bin/NandinaLayoutMappingTests)
