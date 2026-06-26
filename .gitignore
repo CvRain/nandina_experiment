@@ -1,5 +1,4 @@
 # This file is used to ignore files which are generated
-# ----------------------------------------------------------------------------
 
 *~
 *.autosave
@@ -85,15 +84,14 @@ Release
 
 .idea
 .vscode
+.zed
 build
 cmake-build-*
 .qmlls.ini
 temp
 .internal-docs/
 .lsp
-.clj-kondo⏎           
-
-gcm
-gcm*
+.clj-kondo
 vcpkg_installed
-vcpkg
+.qtcreator
+.venv

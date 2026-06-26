@@ -1,88 +1,177 @@
 {
+  "cmakeMinimumRequired": {
+    "major": 4,
+    "minor": 0,
+    "patch": 0
+  },
   "version": 6,
-  "cmakeMinimumRequired": { "major": 3, "minor": 28, "patch": 0 },
   "configurePresets": [
     {
       "name": "base",
       "hidden": true,
       "generator": "Ninja",
-      "binaryDir": "${sourceDir}/build/${presetName}",
       "cacheVariables": {
-        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON",
-        "CMAKE_CXX_STANDARD": "26",
-        "CMAKE_CXX_STANDARD_REQUIRED": "ON",
-        "CMAKE_MAKE_PROGRAM": "ninja"
+        "CMAKE_EXPORT_COMPILE_COMMANDS": "ON"
       }
     },
     {
-      "name": "debug",
-      "displayName": "Debug (Ninja)",
+      "name": "windows-clang-base",
+      "hidden": true,
       "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
+      }
+    },
+    {
+      "name": "linux-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Linux"
+      }
+    },
+    {
+      "name": "windows-msvc-base",
+      "hidden": true,
+      "inherits": "base",
+      "condition": {
+        "type": "equals",
+        "lhs": "${hostSystemName}",
+        "rhs": "Windows"
+      },
+      "architecture": {
+        "value": "x64",
+        "strategy": "external"
+      },
+      "cacheVariables": {
+        "CMAKE_C_COMPILER": "cl",
+        "CMAKE_CXX_COMPILER": "cl"
+      }
+    },
+    {
+      "name": "windows-clang-debug",
+      "displayName": "Windows Clang Debug",
+      "description": "Windows x64 Clang Debug",
+      "inherits": "windows-clang-base",
+      "binaryDir": "${sourceDir}/build/windows-clang-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
-        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0"
+        "NANDINA_BUILD_TESTS": "ON"
       }
     },
     {
-      "name": "release",
-      "displayName": "Release (Ninja)",
-      "inherits": "base",
+      "name": "windows-clang-release",
+      "displayName": "Windows Clang Release",
+      "description": "Windows x64 Clang Release",
+      "inherits": "windows-clang-base",
+      "binaryDir": "${sourceDir}/build/windows-clang-release",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Release",
-        "CMAKE_CXX_FLAGS_RELEASE": "-O3 -DNDEBUG"
+        "NANDINA_BUILD_TESTS": "OFF"
       }
     },
     {
-      "name": "debug-clang",
-      "displayName": "Debug + ASan (Clang)",
-      "inherits": "base",
+      "name": "windows-msvc-debug",
+      "displayName": "Windows MSVC Debug",
+      "description": "Windows x64 MSVC Debug",
+      "inherits": "windows-msvc-base",
+      "binaryDir": "${sourceDir}/build/windows-msvc-debug",
       "cacheVariables": {
         "CMAKE_BUILD_TYPE": "Debug",
+        "NANDINA_BUILD_TESTS": "ON"
+      }
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Windows MSVC Release",
+      "description": "Windows x64 MSVC Release",
+      "inherits": "windows-msvc-base",
+      "binaryDir": "${sourceDir}/build/windows-msvc-release",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Release",
+        "NANDINA_BUILD_TESTS": "OFF"
+      }
+    },
+    {
+      "name": "linux-clang-debug",
+      "displayName": "Linux Clang Debug",
+      "description": "Linux x64 Clang Debug",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-clang-debug",
+      "cacheVariables": {
+        "CMAKE_BUILD_TYPE": "Debug",
+        "NANDINA_BUILD_TESTS": "ON",
         "CMAKE_C_COMPILER": "clang",
-        "CMAKE_CXX_COMPILER": "clang++",
-        "CMAKE_CXX_FLAGS_DEBUG": "-g -O0 -fsanitize=address,undefined"
+        "CMAKE_CXX_COMPILER": "clang++"
       }
     },
     {
-      "name": "debug-clang-vcpkg",
-      "displayName": "Debug + ASan + vcpkg (Clang)",
-      "inherits": "debug-clang",
-      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
+      "name": "linux-clang-release",
+      "displayName": "Linux Clang Release",
+      "description": "Linux x64 Clang Release",
+      "inherits": "linux-base",
+      "binaryDir": "${sourceDir}/build/linux-clang-release",
       "cacheVariables": {
-        "VCPKG_MANIFEST_MODE": "ON"
+        "CMAKE_BUILD_TYPE": "Release",
+        "NANDINA_BUILD_TESTS": "OFF",
+        "CMAKE_C_COMPILER": "clang",
+        "CMAKE_CXX_COMPILER": "clang++"
       }
-    },
-    {
-      "name": "debug-vcpkg",
-      "displayName": "Debug + vcpkg (Ninja)",
-      "inherits": "debug",
-      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
-      "cacheVariables": {
-        "VCPKG_MANIFEST_MODE": "ON"
-      }
-    },
-    {
-      "name": "release-vcpkg",
-      "displayName": "Release + vcpkg (Ninja)",
-      "inherits": "release",
-      "toolchainFile": "${sourceDir}/vcpkg/scripts/buildsystems/vcpkg.cmake",
-      "cacheVariables": {
-        "VCPKG_MANIFEST_MODE": "ON"
-      }
-    },
-    {
-      "name": "ci",
-      "displayName": "CI (Release + vcpkg)",
-      "inherits": "release-vcpkg"
     }
   ],
   "buildPresets": [
-    { "name": "debug",         "configurePreset": "debug" },
-    { "name": "release",       "configurePreset": "release" },
-    { "name": "debug-clang",         "configurePreset": "debug-clang" },
-    { "name": "debug-clang-vcpkg",   "configurePreset": "debug-clang-vcpkg" },
-    { "name": "debug-vcpkg",   "configurePreset": "debug-vcpkg" },
-    { "name": "release-vcpkg", "configurePreset": "release-vcpkg" },
-    { "name": "ci",            "configurePreset": "ci" }
+    {
+      "name": "base",
+      "hidden": true,
+      "jobs": 0
+    },
+    {
+      "name": "windows-clang-debug",
+      "displayName": "Windows Clang Debug",
+      "configurePreset": "windows-clang-debug",
+      "inherits": "base"
+    },
+    {
+      "name": "windows-clang-release",
+      "displayName": "Windows Clang Release",
+      "configurePreset": "windows-clang-release",
+      "inherits": "base"
+    },
+    {
+      "name": "windows-msvc-debug",
+      "displayName": "Windows MSVC Debug",
+      "configurePreset": "windows-msvc-debug",
+      "inherits": "base"
+    },
+    {
+      "name": "windows-msvc-release",
+      "displayName": "Windows MSVC Release",
+      "configurePreset": "windows-msvc-release",
+      "inherits": "base"
+    },
+    {
+      "name": "linux-clang-debug",
+      "displayName": "Linux Clang Debug",
+      "configurePreset": "linux-clang-debug",
+      "inherits": "base"
+    },
+    {
+      "name": "linux-clang-release",
+      "displayName": "Linux Clang Release",
+      "configurePreset": "linux-clang-release",
+      "inherits": "base"
+    }
   ]
 }
