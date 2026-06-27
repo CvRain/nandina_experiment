@@ -95,3 +95,4 @@ temp
 vcpkg_installed
 .qtcreator
 .venv
+.wraplock

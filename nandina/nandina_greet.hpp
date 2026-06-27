@@ -1,0 +1,10 @@
+//
+// Created by cvrain on 2026/6/26.
+//
+
+#ifndef NANDINA_EXPERIMENT_NANDINA_GREET_HPP
+#define NANDINA_EXPERIMENT_NANDINA_GREET_HPP
+
+class NandinaGreet {};
+
+#endif // NANDINA_EXPERIMENT_NANDINA_GREET_HPP
