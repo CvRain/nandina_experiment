@@ -3,3 +3,6 @@
 //
 
 #include "nandina_greet.hpp"
+auto NandinaGreet::hello_world() -> std::string_view {
+    return "Hello World";
+}

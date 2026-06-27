@@ -4,6 +4,52 @@ project('nandina_experiment', 'cpp',
         ]
 )
 
+# 根据编译器类型确定子目录名
+compiler_id = meson.get_compiler('cpp').get_id()
+if compiler_id == 'gcc'
+  compiler_dir = 'gcc'
+elif compiler_id == 'clang'
+  compiler_dir = 'clang'
+elif compiler_id == 'msvc'
+  compiler_dir = 'msvc'
+elif compiler_id == 'clang-cl'
+  compiler_dir = 'clang-cl'
+else
+  compiler_dir = compiler_id
+endif
+
+# 根据构建类型确定子目录
+buildtype = get_option('buildtype')
+if buildtype == 'debug'
+  buildtype_dir = 'debug'
+elif buildtype == 'release'
+  buildtype_dir = 'release'
+elif buildtype == 'debugoptimized'
+  buildtype_dir = 'debugoptimized'
+elif buildtype == 'minsize'
+  buildtype_dir = 'minsize'
+else
+  buildtype_dir = buildtype
+endif
+
+# 根据操作系统确定子目录
+host_system = host_machine.system()
+if host_system == 'windows'
+  os_dir = 'windows'
+elif host_system == 'linux'
+  os_dir = 'linux'
+elif host_system == 'darwin'
+  os_dir = 'macos'
+else
+  os_dir = host_system
+endif
+
+# 构建输出目录: builddir/[os]-[compiler]-[buildtype]/
+base_build_dir = join_paths('builddir', os_dir + '-' + compiler_dir + '-' + buildtype_dir)
+
+# 设置构建目标的名称前缀和安装目录
+message('Build output directory: ' + base_build_dir)
+
 # 使用 cmake subproject 集成 SDL
 cmake = import('cmake')
 
@@ -23,4 +69,7 @@ spdlog_subproj = cmake.subproject('spdlog', options : spdlog_options)
 sdl_dep = sdl_subproj.dependency('SDL3-static')
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 
-executable('nandina_app', 'example/main.cpp', dependencies : [sdl_dep, spdlog_dep])
+# 引入子项目
+subdir('nandina')
+subdir('example')
+

@@ -1,5 +1,6 @@
 #include <spdlog/spdlog.h>
-auto main() -> int {
+#include <nandina_greet.hpp>
 
-    spdlog::log(spdlog::level::info, "mst 到此一游");
+auto main() -> int {
+    spdlog::log(spdlog::level::info, NandinaGreet::hello_world());
 }
