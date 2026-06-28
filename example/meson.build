@@ -6,6 +6,6 @@ example_sources = files(
 
 executable('nandina_example',
     example_sources,
-    dependencies : [nandina_dep],
+    dependencies : [nandina_dep,raylib_dep],
     install : true
 )
