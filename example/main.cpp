@@ -1,84 +1,68 @@
-#include "raylib.h"
+#include <raylib.h>
+#include <spdlog/spdlog.h>
 
-#include <cmath>
-#include <format>
-#include <ranges>
-#include <vector>
+#include "foundation/nandina_color.hpp"
 
-auto calcCircleDistance(const Vector2& a, const Vector2& b) -> double {
-    return sqrt(pow(a.x - b.x, 2) + pow(a.y - b.y, 2));
-}
+using namespace nandina;
 
-//------------------------------------------------------------------------------------
-// Program main entry point
-//------------------------------------------------------------------------------------
-int main() {
-    // Initialization
-    //--------------------------------------------------------------------------------------
-    constexpr int screenWidth = 800;
-    constexpr int screenHeight = 450;
+namespace
+{
+    [[nodiscard]] auto to_raylib_color(const nandina::foundation::NanColor& color) -> Color {
+        const auto rgba = color.to<nandina::foundation::NanHexRgb>();
+        return {
+            rgba.red,
+            rgba.green,
+            rgba.blue,
+            rgba.alpha,
+        };
+    }
+} // namespace
 
-    InitWindow(screenWidth, screenHeight, "raylib [core] example - delta time");
+auto main() -> int {
+    spdlog::info("Nandina experiment");
 
-    SetTargetFPS(120);
+    constexpr int screen_width = 800;
+    constexpr int screen_height = 600;
 
-    std::vector<Vector2> ballPositions;
+    InitWindow(screen_width, screen_height, "Nandina experiment");
 
-    auto ballPosition = Vector2 {screenWidth / 2, screenHeight / 2};
+    SetTargetFPS(60);
+
+    const auto base_color = nandina::foundation::NanColor::from(
+        nandina::foundation::NanOklch {
+            .light = 0.62F,
+            .chroma = 0.18F,
+            .hue = 250.0F,
+            .alpha = 1.0F,
+        }
+    );
+
+    const auto light_color = base_color.lighten(0.15F);
+    const auto dark_color = base_color.darken(0.18F);
+    const auto accent_color = base_color.rotate_hue(95.0F).saturate(0.03F);
+
+    const auto background_color = foundation::NanColor::from(
+        foundation::NanHexRgb {.red = 48, .green = 52, .blue = 70, .alpha = 1}
+    );
 
         while (not WindowShouldClose()) {
             BeginDrawing();
+            ClearBackground(to_raylib_color(background_color));
 
-                if (IsKeyDown(KEY_A)) {
-                    ballPosition.x -= GetFrameTime() * 0.6 + 2.0f;
-                }
+            DrawRectangle(80, 120, 160, 280, to_raylib_color(dark_color));
+            DrawRectangle(260, 120, 160, 280, to_raylib_color(base_color));
+            DrawRectangle(440, 120, 160, 280, to_raylib_color(light_color));
+            DrawRectangle(620, 120, 100, 280, to_raylib_color(accent_color));
 
-                if (IsKeyDown(KEY_D)) {
-                    ballPosition.x += GetFrameTime() * 0.6 + 2.0f;
-                }
+            DrawText("NanColor OKLCH conversion demo", 80, 70, 24, BLACK);
+            DrawText("dark", 80, 420, 20, BLACK);
+            DrawText("base", 260, 420, 20, BLACK);
+            DrawText("light", 440, 420, 20, BLACK);
+            DrawText("hue", 620, 420, 20, BLACK);
 
-                if (IsKeyDown(KEY_W)) {
-                    ballPosition.y -= GetFrameTime() * 0.6 + 2.0f;
-                }
-
-                if (IsKeyDown(KEY_S)) {
-                    ballPosition.y += GetFrameTime() * 0.6 + 2.0f;
-                }
-
-            const auto mousePosition = GetMousePosition();
-
-                if (IsMouseButtonPressed(MOUSE_BUTTON_LEFT)) {
-                    ballPositions.push_back({mousePosition.x, mousePosition.y});
-                }
-
-                // 判断鼠标右键按下的位置是否在一个圆内，如果存在则删除此坐标
-                if (IsMouseButtonPressed(MOUSE_BUTTON_RIGHT)) {
-                    const auto iter = std::ranges::find_if(
-                        ballPositions.begin(),
-                        ballPositions.end(),
-                        [&](const Vector2& vec) {
-                            return calcCircleDistance(vec, mousePosition) < 15;
-                        }
-                    );
-                        if (iter != ballPositions.end()) {
-                            ballPositions.erase(iter);
-                        }
-                }
-
-                for (const auto& pos: ballPositions) {
-                    DrawCircleV(pos, 15, PURPLE);
-                }
-
-            const auto fpsStr = std::format("Current Fps {}", GetFPS());
-            DrawText(fpsStr.data(), 25, 25, 16, GRAY);
-
-            DrawCircleV(ballPosition, 50, BROWN);
-
-            ClearBackground(RAYWHITE);
             EndDrawing();
         }
 
     CloseWindow();
-
     return 0;
 }
