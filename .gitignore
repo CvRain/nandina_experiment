@@ -96,3 +96,5 @@ vcpkg_installed
 .qtcreator
 .venv
 .wraplock
+
+dev-docs-*
