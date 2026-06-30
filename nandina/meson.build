@@ -6,7 +6,9 @@ module_fundation = files(
     'foundation/nandina_color_space.hpp',
     'foundation/nandina_color_space.cpp',
     'foundation/geometry.hpp',
-    'foundation/geometry.cpp'
+    'foundation/geometry.cpp',
+    'foundation/transform2d.hpp',
+    'foundation/transform2d.cpp',
 )
 
 # 创建静态库
