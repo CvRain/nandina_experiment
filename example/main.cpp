@@ -1,507 +1,333 @@
 #include <raylib.h>
 #include <spdlog/spdlog.h>
 
+#include <cmath>
+#include <memory>
+#include <numbers>
+
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
-#include "foundation/transform2d.hpp"
+#include "scene/node.hpp"
+#include "scene/node2d.hpp"
+#include "scene/scene_tree.hpp"
 
 using namespace nandina;
 
 namespace
 {
-    [[nodiscard]] auto to_raylib_color(const nandina::foundation::NanColor& color) -> Color {
-        const auto rgba = color.to<nandina::foundation::NanHexRgb>();
-        return {
-            rgba.red,
-            rgba.green,
-            rgba.blue,
-            rgba.alpha,
-        };
+    [[nodiscard]] auto to_raylib(const foundation::NanColor& color) -> Color {
+        const auto rgba = color.to<foundation::NanHexRgb>();
+        return {static_cast<unsigned char>(rgba.red),
+                static_cast<unsigned char>(rgba.green),
+                static_cast<unsigned char>(rgba.blue),
+                static_cast<unsigned char>(rgba.alpha)};
     }
 
-    auto draw_rect_bounds(const foundation::NanRect& rect, Color color) -> void {
-        DrawRectangleLines(
-            static_cast<int>(rect.get_x()),
-            static_cast<int>(rect.get_y()),
-            static_cast<int>(rect.get_width()),
-            static_cast<int>(rect.get_height()),
-            color
-        );
+    /// A drawable colored rectangle with a label.
+    class RectNode : public scene::NanNode2D {
+    public:
+        RectNode(foundation::NanSize size, Color color, std::string label = {})
+            : size_(size), color_(color), label_(std::move(label)) {}
+
+        void on_draw() override {
+            if (!visible()) return;
+
+            const auto gt = global_transform();
+            const auto w = size_.get_width() * gt.scale_x();
+            const auto h = size_.get_height() * gt.scale_y();
+            const auto pos = gt.position();
+
+            DrawRectanglePro(
+                {pos.get_x() - w / 2.0F, pos.get_y() - h / 2.0F, w, h},
+                {w / 2.0F, h / 2.0F},
+                gt.rotation() * 180.0F / std::numbers::pi_v<float>,
+                color_);
+
+            if (!label_.empty()) {
+                const auto tw = static_cast<float>(MeasureText(label_.c_str(), 12));
+                DrawText(label_.c_str(),
+                         static_cast<int>(pos.get_x() - tw / 2.0F),
+                         static_cast<int>(pos.get_y() - 6),
+                         12, WHITE);
+            }
+        }
+
+        [[nodiscard]] auto contains_point(foundation::NanPoint local_point) const -> bool override {
+            const auto hw = size_.get_width() / 2.0F;
+            const auto hh = size_.get_height() / 2.0F;
+            return local_point.get_x() >= -hw && local_point.get_x() <= hw
+                && local_point.get_y() >= -hh && local_point.get_y() <= hh;
+        }
+
+        void set_color(Color c) { color_ = c; }
+
+    private:
+        foundation::NanSize size_;
+        Color color_;
+        std::string label_;
+    };
+
+    /// Builds a deep chain that returns the leaf node for assertions.
+    struct DeepChain {
+        std::unique_ptr<RectNode> root;
+        scene::NanNode2D* leaf = nullptr;
+    };
+
+    auto build_deep_chain(Color color, float dx, float dy) -> DeepChain {
+        auto leaf = std::make_unique<RectNode>(foundation::NanSize(24, 16), color, "L4");
+        auto* leaf_ptr = leaf.get();
+
+        auto l3 = std::make_unique<RectNode>(foundation::NanSize(28, 20), color, "L3");
+        l3->set_position(foundation::NanPoint(dx, dy));
+        l3->add_child(std::move(leaf));
+
+        auto l2 = std::make_unique<RectNode>(foundation::NanSize(32, 24), color, "L2");
+        l2->set_position(foundation::NanPoint(dx, dy));
+        l2->add_child(std::move(l3));
+
+        auto l1 = std::make_unique<RectNode>(foundation::NanSize(36, 28), color, "L1");
+        l1->set_position(foundation::NanPoint(dx, dy));
+        l1->add_child(std::move(l2));
+
+        auto root = std::make_unique<RectNode>(foundation::NanSize(40, 32), color, "root");
+        root->set_name("deep_root");
+        root->add_child(std::move(l1));
+
+        return {std::move(root), leaf_ptr};
     }
 
-    auto fill_rect(const foundation::NanRect& rect, Color color) -> void {
-        DrawRectangle(
-            static_cast<int>(rect.get_x()),
-            static_cast<int>(rect.get_y()),
-            static_cast<int>(rect.get_width()),
-            static_cast<int>(rect.get_height()),
-            color
-        );
+    /// Draw text with background panel.
+    void draw_panel(float x, float y, float w, float h, Color bg, Color border) {
+        DrawRectangle(static_cast<int>(x), static_cast<int>(y),
+                      static_cast<int>(w), static_cast<int>(h), bg);
+        DrawRectangleLines(static_cast<int>(x), static_cast<int>(y),
+                           static_cast<int>(w), static_cast<int>(h), border);
     }
-
 } // namespace
 
 auto main() -> int {
-    spdlog::info("Nandina geometry demo");
+    spdlog::info("Nandina — verification demo");
 
-    constexpr int screen_width = 1024;
-    constexpr int screen_height = 640;
-
-    InitWindow(screen_width, screen_height, "Nandina — Geometry Demo");
+    constexpr int W = 1100;
+    constexpr int H = 700;
+    InitWindow(W, H, "Nandina — Scene Tree Verification");
     SetTargetFPS(60);
 
-    // ---- colors ----
     const auto primary = foundation::NanColor::from(
-        foundation::NanOklch {.light = 0.62F, .chroma = 0.18F, .hue = 250.0F, .alpha = 1.0F}
-    );
-    const auto surface = foundation::NanColor::from(
-        foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 1}
-    );
-    const auto bg = foundation::NanColor::from(
-        foundation::NanHexRgb {.red = 239, .green = 241, .blue = 245, .alpha = 1}
-    );
+        foundation::NanOklch{.light = 0.62F, .chroma = 0.18F, .hue = 250.0F, .alpha = 1.0F});
     const auto accent = primary.rotate_hue(95.0F).saturate(0.03F);
-    const auto muted = primary.lighten(0.12F).desaturate(0.10F);
+    const auto bg = foundation::NanColor::from(
+        foundation::NanHexRgb{.red = 239, .green = 241, .blue = 245, .alpha = 1});
 
-    const Color c_primary = to_raylib_color(primary);
-    const Color c_surface = to_raylib_color(surface);
-    const Color c_bg = to_raylib_color(bg);
-    const Color c_accent = to_raylib_color(accent);
-    const Color c_muted = to_raylib_color(muted);
+    const Color c_bg = to_raylib(bg);
+    const Color c_primary = to_raylib(primary);
+    const Color c_accent = to_raylib(accent);
+    const Color c_chain = {100, 160, 220, 255};
+    const Color c_overlap_a = {220, 120, 80, 200};
+    const Color c_overlap_b = {80, 180, 120, 200};
+    const Color c_overlap_c = {140, 100, 210, 200};
     const Color c_text = {30, 30, 40, 255};
-    const Color c_subtle = {120, 120, 140, 255};
+    const Color c_subtle = {110, 115, 130, 255};
+    const Color c_panel = {255, 255, 255, 255};
     const Color c_border = {200, 205, 215, 255};
+    const Color c_hit = {240, 70, 70, 255};
 
-    // ---- layout demo: panel with padding containing two columns ----
-    const auto panel_rect = foundation::NanRect::from_xywh(24, 52, 460, 540);
-    const auto panel_padding = foundation::NanInsets::all(16);
-    const auto content_rect = panel_padding.apply_to_rect(panel_rect);
-    const auto col_gap = foundation::NanInsets::horizontal(12);
+    // ========== TEST 1: Transform Cascade ==========
+    // Panel (rotates) → Card (scales) → Button (stationary relative to Card)
+    auto tree1 = scene::NanSceneTree();
 
-    const auto col_width = (content_rect.get_width() - col_gap.horizontal_sum()) / 2.0F;
-    const auto col_left = foundation::NanRect::from_xywh(
-        content_rect.get_x(),
-        content_rect.get_y(),
-        col_width,
-        content_rect.get_height()
-    );
-    const auto col_right = foundation::NanRect::from_xywh(
-        content_rect.get_x() + col_width + col_gap.get_left(),
-        content_rect.get_y(),
-        col_width,
-        content_rect.get_height()
-    );
+    auto panel = std::make_unique<RectNode>(foundation::NanSize(140, 100), c_primary, "Panel");
+    panel->set_name("panel");
+    panel->set_position(foundation::NanPoint(200, 140));
 
-    const auto row_height = 44.0F;
-    const auto row_gap = 8.0F;
-    const auto row_label_inset = foundation::NanInsets::only_left(8);
+    auto card = std::make_unique<RectNode>(foundation::NanSize(80, 60), c_accent, "Card");
+    card->set_name("card");
+    card->set_position(foundation::NanPoint(0, 0));
 
-    // ---- vector math demo ----
-    const auto pt_a = foundation::NanPoint(640, 180);
-    const auto pt_b = foundation::NanPoint(880, 420);
-    const auto pt_a_size = foundation::NanSize(12, 12);
-    const auto pt_b_size = foundation::NanSize(16, 16);
+    auto button = std::make_unique<RectNode>(foundation::NanSize(40, 24), Color{220, 180, 80, 255}, "Btn");
+    button->set_name("button");
+    button->set_position(foundation::NanPoint(0, 0));
 
-    // ---- animation state ----
-    float anim_t = 0.0F;
-    float anim_dir = 1.0F;
+    card->add_child(std::move(button));
+    panel->add_child(std::move(card));
+    tree1.set_root(std::move(panel));
 
-    auto draw_row =
-        [&](const foundation::NanRect& bounds, const char* label, const char* value, Color fill) {
-            fill_rect(bounds, fill);
-            draw_rect_bounds(bounds, c_border);
-            const auto label_rect = row_label_inset.apply_to_rect(bounds);
-            DrawText(
-                label,
-                static_cast<int>(label_rect.get_x()),
-                static_cast<int>(label_rect.get_y() + (label_rect.get_height() - 14) / 2.0F),
-                14,
-                c_text
-            );
-            DrawText(
-                value,
-                static_cast<int>(label_rect.get_x() + 100),
-                static_cast<int>(label_rect.get_y() + (label_rect.get_height() - 14) / 2.0F),
-                14,
-                c_subtle
-            );
-        };
+    // ========== TEST 6: Deep Chain Global Position ==========
+    auto tree6 = scene::NanSceneTree();
+    auto [chain1_root, leaf1_ptr] = build_deep_chain(c_chain, 8.0F, 12.0F);
+    auto [chain2_root, leaf2_ptr] = build_deep_chain(c_accent, 14.0F, -8.0F);
+    chain2_root->set_position(foundation::NanPoint(160, 0));
 
-        while (not WindowShouldClose()) {
-            // -- animate lerp --
-            anim_t += 0.008F * anim_dir;
-                if (anim_t >= 1.0F || anim_t <= 0.0F) {
-                    anim_dir = -anim_dir;
-                    anim_t = std::clamp(anim_t, 0.0F, 1.0F);
-                }
+    auto t6_root = std::make_unique<RectNode>(foundation::NanSize(220, 120), c_panel, "Tree6");
+    t6_root->set_position(foundation::NanPoint(420, 140));
+    t6_root->add_child(std::move(chain1_root));
+    t6_root->add_child(std::move(chain2_root));
+    tree6.set_root(std::move(t6_root));
 
-            const auto pt_lerp = foundation::NanPoint::lerp(pt_a, pt_b, anim_t);
-            const auto pt_mid = foundation::NanPoint::lerp(pt_a, pt_b, 0.5F);
-            const auto pt_dir = (pt_b - pt_a).normalized();
+    // ========== TEST 7: Z-Index Occlusion ==========
+    auto tree7 = scene::NanSceneTree();
 
-            BeginDrawing();
-            ClearBackground(c_bg);
+    auto z_root = std::make_unique<RectNode>(foundation::NanSize(180, 120), c_panel, "overlap");
+    z_root->set_name("z_root");
+    z_root->set_position(foundation::NanPoint(1000, 140));
 
-            // ===== TITLE =====
-            DrawText("Nandina — Geometry Demo", 24, 16, 22, c_text);
+    auto z_low = std::make_unique<RectNode>(foundation::NanSize(80, 80), c_overlap_a, "z=0");
+    z_low->set_name("z_low");
+    z_low->set_position(foundation::NanPoint(-30, -20));
 
-            // ===== LEFT: Rect / Layout =====
-            fill_rect(panel_rect, c_surface);
-            draw_rect_bounds(panel_rect, c_border);
+    auto z_mid = std::make_unique<RectNode>(foundation::NanSize(80, 80), c_overlap_b, "z=5");
+    z_mid->set_name("z_mid");
+    z_mid->set_position(foundation::NanPoint(20, -30));
+    z_mid->set_z_index(5);
 
-            // column headers
-            DrawText(
-                "NanSize",
-                static_cast<int>(col_left.get_x() + 8),
-                static_cast<int>(col_left.get_y() + 4),
-                14,
-                c_subtle
-            );
-            DrawText(
-                "NanInsets",
-                static_cast<int>(col_right.get_x() + 8),
-                static_cast<int>(col_right.get_y() + 4),
-                14,
-                c_subtle
-            );
+    auto z_high = std::make_unique<RectNode>(foundation::NanSize(80, 80), c_overlap_c, "z=10");
+    z_high->set_name("z_high");
+    z_high->set_position(foundation::NanPoint(10, 20));
+    z_high->set_z_index(10);
 
-            auto row_y = col_left.get_y() + 24;
+    z_root->add_child(std::move(z_low));
+    z_root->add_child(std::move(z_mid));
+    z_root->add_child(std::move(z_high));
+    tree7.set_root(std::move(z_root));
 
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "zero()",
-                "(0, 0)",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "aspect_ratio",
-                "0.714",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "area()",
-                "28000",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "scaled(2.0)",
-                "400x280",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "constrain",
-                "250x80→250x80",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "max(a,b)",
-                "comp-wise",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_left.get_x(), row_y, col_width, row_height),
-                "fits_in()",
-                "bool",
-                c_muted
-            );
+    // ---- animation ----
+    float time = 0.0F;
+    const scene::NanNode2D* hit1 = nullptr;
+    const scene::NanNode2D* hit7 = nullptr;
 
-            row_y = col_right.get_y() + 24;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "all(16)",
-                "lrtb::16",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "symmetric",
-                "h:12 v:8",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "only_left",
-                "l:8 rtb:0",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "h_sum",
-                "left+right",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "v_sum",
-                "top+bottom",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "operator*",
-                "scale 4 sides",
-                c_muted
-            );
-            row_y += row_height + row_gap;
-            draw_row(
-                foundation::NanRect::from_xywh(col_right.get_x(), row_y, col_width, row_height),
-                "lerp(a,b,t)",
-                "interp",
-                c_muted
-            );
+    while (not WindowShouldClose()) {
+        const auto dt = GetFrameTime();
+        time += dt;
 
-            // ===== RIGHT: Vector Math =====
-            // draw the line between A and B
-            DrawLine(
-                static_cast<int>(pt_a.get_x()),
-                static_cast<int>(pt_a.get_y()),
-                static_cast<int>(pt_b.get_x()),
-                static_cast<int>(pt_b.get_y()),
-                {180, 190, 210, 255}
-            );
-
-            // draw anchor points
-            DrawCircle(
-                static_cast<int>(pt_a.get_x()),
-                static_cast<int>(pt_a.get_y()),
-                static_cast<int>(pt_a_size.get_width() / 2),
-                c_primary
-            );
-            DrawCircle(
-                static_cast<int>(pt_b.get_x()),
-                static_cast<int>(pt_b.get_y()),
-                static_cast<int>(pt_b_size.get_width() / 2),
-                c_accent
-            );
-
-            // draw lerp point
-            DrawCircle(
-                static_cast<int>(pt_lerp.get_x()),
-                static_cast<int>(pt_lerp.get_y()),
-                8,
-                {240, 80, 80, 255}
-            );
-
-            // labels
-            DrawText(
-                "A",
-                static_cast<int>(pt_a.get_x()) - 20,
-                static_cast<int>(pt_a.get_y()) - 20,
-                14,
-                c_text
-            );
-            DrawText(
-                "B",
-                static_cast<int>(pt_b.get_x()) + 8,
-                static_cast<int>(pt_b.get_y()) + 8,
-                14,
-                c_text
-            );
-            DrawText(
-                TextFormat("lerp(%.2f)", anim_t),
-                static_cast<int>(pt_lerp.get_x()) + 12,
-                static_cast<int>(pt_lerp.get_y()) - 8,
-                14,
-                c_text
-            );
-
-            // ===== Transform2D demo =====
-            const auto t_parent = foundation::NanTransform2D(
-                foundation::NanPoint(700, 200),
-                anim_t * std::numbers::pi_v<float> * 2.0F,
-                foundation::NanPoint(1.0F, 1.0F)
-            );
-
-            const auto t_child = foundation::NanTransform2D(
-                foundation::NanPoint(60, 0),
-                anim_t * std::numbers::pi_v<float>,
-                foundation::NanPoint(0.6F, 0.6F)
-            );
-
-            const auto t_world = t_parent * t_child;
-
-            // draw parent
-            const auto parent_local = foundation::NanRect::from_xywh(-30, -20, 60, 40);
-            const auto p_tl = t_parent.transform_point(parent_local.get_top_left());
-            const auto p_size = foundation::NanSize(
-                parent_local.get_width() * t_parent.scale_x(),
-                parent_local.get_height() * t_parent.scale_y()
-            );
-            DrawRectanglePro(
-                {p_tl.get_x(), p_tl.get_y(), p_size.get_width(), p_size.get_height()},
-                {0, 0},
-                t_parent.rotation() * 180.0F / std::numbers::pi_v<float>,
-                c_primary
-            );
-            DrawText(
-                "parent",
-                static_cast<int>(p_tl.get_x() + p_size.get_width() / 2 - 22),
-                static_cast<int>(p_tl.get_y() + p_size.get_height() / 2 - 8),
-                12,
-                BLACK
-            );
-
-            // draw child
-            const auto child_local = foundation::NanRect::from_xywh(-16, -12, 32, 24);
-            const auto c_tl = t_world.transform_point(child_local.get_top_left());
-            const auto c_size = foundation::NanSize(
-                child_local.get_width() * t_world.scale_x(),
-                child_local.get_height() * t_world.scale_y()
-            );
-            DrawRectanglePro(
-                {c_tl.get_x(), c_tl.get_y(), c_size.get_width(), c_size.get_height()},
-                {0, 0},
-                t_world.rotation() * 180.0F / std::numbers::pi_v<float>,
-                c_accent
-            );
-            DrawText(
-                "child",
-                static_cast<int>(c_tl.get_x() + c_size.get_width() / 2 - 18),
-                static_cast<int>(c_tl.get_y() + c_size.get_height() / 2 - 8),
-                12,
-                BLACK
-            );
-
-            // line from parent center to child center
-            const auto p_center = t_parent.transform_point(foundation::NanPoint(0, 0));
-            const auto c_center = t_world.transform_point(foundation::NanPoint(0, 0));
-            DrawLine(
-                static_cast<int>(p_center.get_x()),
-                static_cast<int>(p_center.get_y()),
-                static_cast<int>(c_center.get_x()),
-                static_cast<int>(c_center.get_y()),
-                {180, 190, 210, 180}
-            );
-
-            // Transform2D info panel
-            const auto t_info_rect = foundation::NanRect::from_xywh(520, 310, 480, 60);
-            fill_rect(t_info_rect, c_surface);
-            draw_rect_bounds(t_info_rect, c_border);
-            DrawText(
-                "NanTransform2D — parent * child",
-                static_cast<int>(t_info_rect.get_x() + 10),
-                static_cast<int>(t_info_rect.get_y() + 6),
-                13,
-                c_text
-            );
-            DrawText(
-                TextFormat(
-                    "  compose: pos=(%.0f,%.0f) rot=%.2frad  scale=(%.1f,%.1f)",
-                    t_world.position().get_x(),
-                    t_world.position().get_y(),
-                    t_world.rotation(),
-                    t_world.scale_x(),
-                    t_world.scale_y()
-                ),
-                static_cast<int>(t_info_rect.get_x() + 10),
-                static_cast<int>(t_info_rect.get_y() + 26),
-                12,
-                c_subtle
-            );
-            DrawText(
-                TextFormat(
-                    "  inverse: pos=(%.0f,%.0f)",
-                    t_world.inverse().position().get_x(),
-                    t_world.inverse().position().get_y()
-                ),
-                static_cast<int>(t_info_rect.get_x() + 10),
-                static_cast<int>(t_info_rect.get_y() + 42),
-                12,
-                c_subtle
-            );
-
-            // vector info panel
-            const auto vec_info_rect = foundation::NanRect::from_xywh(520, 420, 480, 160);
-            fill_rect(vec_info_rect, c_surface);
-            draw_rect_bounds(vec_info_rect, c_border);
-
-            const auto vec_info_pad = foundation::NanInsets::all(12);
-            const auto vec_info_content = vec_info_pad.apply_to_rect(vec_info_rect);
-            auto vx = vec_info_content.get_x();
-            auto vy = vec_info_content.get_y();
-
-            const auto ab_vec = pt_b - pt_a;
-            DrawText(
-                "NanPoint — Vector Math",
-                static_cast<int>(vx),
-                static_cast<int>(vy),
-                14,
-                c_text
-            );
-            vy += 22;
-            DrawText(
-                TextFormat(
-                    "  A = (%.0f, %.0f)    B = (%.0f, %.0f)",
-                    pt_a.get_x(),
-                    pt_a.get_y(),
-                    pt_b.get_x(),
-                    pt_b.get_y()
-                ),
-                static_cast<int>(vx),
-                static_cast<int>(vy),
-                14,
-                c_subtle
-            );
-            vy += 20;
-            DrawText(
-                TextFormat(
-                    "  AB = (%.1f, %.1f)    len = %.1f    len^2 = %.1f",
-                    ab_vec.get_x(),
-                    ab_vec.get_y(),
-                    ab_vec.length(),
-                    ab_vec.length_squared()
-                ),
-                static_cast<int>(vx),
-                static_cast<int>(vy),
-                14,
-                c_subtle
-            );
-            vy += 18;
-            DrawText(
-                TextFormat(
-                    "  dir = (%.2f, %.2f)    dot(A,B) = %.1f    cross = %.1f",
-                    pt_dir.get_x(),
-                    pt_dir.get_y(),
-                    pt_a.dot(pt_b),
-                    pt_a.cross(pt_b)
-                ),
-                static_cast<int>(vx),
-                static_cast<int>(vy),
-                14,
-                c_subtle
-            );
-            vy += 18;
-            DrawText(
-                TextFormat(
-                    "  dist = %.1f    mid = (%.0f, %.0f)",
-                    pt_a.distance(pt_b),
-                    pt_mid.get_x(),
-                    pt_mid.get_y()
-                ),
-                static_cast<int>(vx),
-                static_cast<int>(vy),
-                14,
-                c_subtle
-            );
-
-            EndDrawing();
+        // Animate test 1: panel rotates and scales
+        if (auto* p = static_cast<RectNode*>(tree1.root())) {
+            p->set_rotation(time * 0.8F);
+            const auto s = 1.0F + std::sin(time * 1.2F) * 0.15F;
+            p->set_scale(s, s);
         }
+
+        // Hit tests
+        const auto mouse = foundation::NanPoint(
+            static_cast<float>(GetMouseX()),
+            static_cast<float>(GetMouseY()));
+        hit1 = tree1.hit_test(mouse);
+        hit7 = tree7.hit_test(mouse);
+
+        tree1.process(dt);
+        tree6.process(dt);
+        tree7.process(dt);
+
+        // ---- draw ----
+        BeginDrawing();
+        ClearBackground(c_bg);
+
+        DrawText("Scene Tree Verification", 24, 14, 22, c_text);
+
+        // ---- Test 1 ----
+        draw_panel(12, 48, 340, 240, c_panel, c_border);
+        DrawText("Test 1: Transform Cascade", 22, 54, 14, c_text);
+        DrawText("Panel rotates+scales. Button stays centered on Card.", 22, 72, 12, c_subtle);
+        tree1.draw();
+
+        // Test 1 info
+        if (auto* p = static_cast<RectNode*>(tree1.root())) {
+            auto* card_n = static_cast<scene::NanNode2D*>(p->get_child(0));
+            auto* btn_n = card_n ? static_cast<scene::NanNode2D*>(card_n->get_child(0)) : nullptr;
+            const auto gp = btn_n ? btn_n->global_position() : foundation::NanPoint(0, 0);
+            DrawText(TextFormat("panel rot=%.2f  scale=(%.2f,%.2f)",
+                p->rotation(), p->scale().get_x(), p->scale().get_y()),
+                22, 256, 12, c_subtle);
+            DrawText(TextFormat("button global=(%.0f,%.0f)",
+                gp.get_x(), gp.get_y()),
+                22, 270, 12, c_subtle);
+        }
+
+        // ---- Test 6 ----
+        draw_panel(370, 48, 340, 240, c_panel, c_border);
+        DrawText("Test 6: Deep Chain Global Pos", 380, 54, 14, c_text);
+        DrawText("5-layer chains. Leaf position = sum of all offsets.", 380, 72, 12, c_subtle);
+        tree6.draw();
+
+        // Show expected vs actual global positions
+        if (tree6.root()) {
+            const auto gp1 = leaf1_ptr->global_position();
+            const auto gp2 = leaf2_ptr->global_position();
+            // chain1: root_pos(420,140) + L1(8,12) + L2(8,12) + L3(8,12) + L4(8,12) = (452,188)
+            const float ex1_x = 420 + 8*4;
+            const float ex1_y = 140 + 12*4;
+            // chain2: root_pos(420,140) + offset(160,0) + L1(14,-8)*4 = (636,108)
+            const float ex2_x = 420 + 160 + 14*4;
+            const float ex2_y = 140 + 0 + (-8)*4;
+
+            DrawText(TextFormat("chain1 leaf: global=(%.0f,%.0f)  expected=(%.0f,%.0f)",
+                gp1.get_x(), gp1.get_y(), ex1_x, ex1_y),
+                380, 252, 12, std::abs(gp1.get_x() - ex1_x) < 1 ? c_accent : c_hit);
+            DrawText(TextFormat("chain2 leaf: global=(%.0f,%.0f)  expected=(%.0f,%.0f)",
+                gp2.get_x(), gp2.get_y(), ex2_x, ex2_y),
+                380, 266, 12, std::abs(gp2.get_x() - ex2_x) < 1 ? c_accent : c_hit);
+        }
+
+        // ---- Test 7 ----
+        draw_panel(720, 48, 360, 240, c_panel, c_border);
+        DrawText("Test 7: Z-Index Occlusion + Hit", 730, 54, 14, c_text);
+        DrawText("3 overlapping rects: z=0(green) z=5(blue) z=10(purple)", 730, 72, 12, c_subtle);
+        DrawText("Move mouse over overlaps — topmost node is hit.", 730, 86, 12, c_subtle);
+        tree7.draw();
+
+        if (hit7) {
+            DrawText(TextFormat("hit: %s  (z=%d)",
+                hit7->name().data(), static_cast<const scene::NanNode2D*>(hit7)->z_index()),
+                730, 258, 13, c_hit);
+        } else {
+            DrawText("hit: (none)", 730, 258, 13, c_subtle);
+        }
+
+        // ---- Legend / lifecycle log ----
+        draw_panel(12, 300, 1068, 140, c_panel, c_border);
+        DrawText("Lifecycle + queue_delete verification", 22, 306, 14, c_text);
+        DrawText("on_enter_tree: top-down (parent first).  on_ready: bottom-up (children first).", 22, 324, 12, c_subtle);
+        DrawText("Press SPACE to queue_delete the rotating Panel — it will be removed at next frame start.", 22, 340, 12, c_subtle);
+        DrawText("Press R to recreate the Panel subtree (verifies enter→ready lifecycle on re-add).", 22, 356, 12, c_subtle);
+
+        // Handle keyboard
+        static bool panel_deleted = false;
+        if (IsKeyPressed(KEY_SPACE) && !panel_deleted) {
+            if (auto* p = tree1.root()) {
+                tree1.queue_delete(*p);
+                spdlog::info("queue_delete: panel queued for deletion");
+                panel_deleted = true;
+            }
+        }
+        if (IsKeyPressed(KEY_R)) {
+            auto new_panel = std::make_unique<RectNode>(foundation::NanSize(140, 100), c_primary, "Panel");
+            new_panel->set_name("panel");
+
+            auto new_card = std::make_unique<RectNode>(foundation::NanSize(80, 60), c_accent, "Card");
+            new_card->set_name("card");
+            new_card->set_position(foundation::NanPoint(0, 0));
+
+            auto new_button = std::make_unique<RectNode>(foundation::NanSize(40, 24), Color{220, 180, 80, 255}, "Btn");
+            new_button->set_name("button");
+            new_button->set_position(foundation::NanPoint(0, 0));
+            new_card->add_child(std::move(new_button));
+            new_panel->add_child(std::move(new_card));
+            tree1.set_root(std::move(new_panel));
+            spdlog::info("Panel recreated — on_enter_tree + on_ready should fire");
+            panel_deleted = false;
+        }
+
+        auto state = panel_deleted ? "DELETED (press R)" : "alive";
+        DrawText(TextFormat("Panel state: %s", state), 22, 420, 13, panel_deleted ? c_hit : c_accent);
+
+        // Global hit info
+        DrawText(TextFormat("Mouse=(%.0f,%.0f)  Test1 hit=%s  Test7 hit=%s",
+            mouse.get_x(), mouse.get_y(),
+            hit1 ? hit1->name().data() : "-",
+            hit7 ? hit7->name().data() : "-"),
+            22, 440, 12, c_subtle);
+
+        EndDrawing();
+    }
 
     CloseWindow();
     return 0;

@@ -11,10 +11,19 @@ module_fundation = files(
     'foundation/transform2d.cpp',
 )
 
+module_scene = files(
+    'scene/node.hpp',
+    'scene/node.cpp',
+    'scene/node2d.hpp',
+    'scene/node2d.cpp',
+    'scene/scene_tree.hpp',
+    'scene/scene_tree.cpp',
+)
+
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation],
+    [module_fundation, module_scene],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep],
     install : true,
 )
