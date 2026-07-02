@@ -24,7 +24,7 @@ namespace nandina::scene
  *
  * The global transform is lazily cached: the first call to
  * global_transform() after a local change recomputes by composing
- * the parent chain.  Subsequent calls return the cached value.
+ * the parent chain. Subsequent calls return the cached value.
  * The cache is invalidated automatically when any transform mutator
  * is called (set_position, set_rotation, set_scale, etc.).
  */

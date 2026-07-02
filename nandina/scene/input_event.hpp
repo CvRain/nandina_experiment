@@ -97,6 +97,37 @@ public:
         : MouseEvent(screen_pos) {}
 };
 
+/// Base class for keyboard input.
+class KeyEvent : public InputEvent {
+public:
+    enum class Action { press, release };
+
+    KeyEvent(int keycode, Action action)
+        : keycode_(keycode), action_(action) {}
+
+    [[nodiscard]] auto keycode() const -> int {
+        return keycode_;
+    }
+
+    [[nodiscard]] auto action() const -> Action {
+        return action_;
+    }
+
+    [[nodiscard]] auto is_pressed() const -> bool {
+        return action_ == Action::press;
+    }
+
+private:
+    int keycode_;
+    Action action_;
+};
+
+/// Focus entered a node's focus chain.
+class FocusEnterEvent final : public InputEvent {};
+
+/// Focus left a node's focus chain.
+class FocusLeaveEvent final : public InputEvent {};
+
 } // namespace nandina::scene
 
 #endif // NANDINA_EXPERIMENT_INPUT_EVENT_HPP

@@ -21,7 +21,8 @@ namespace nandina::scene
  *   - process(dt): top-down, calls on_process on every node.
  *   - draw():      top-down depth-first, calls on_draw on every visible node.
  *
- * Also provides front-to-back hit-testing and hover-target tracking.
+ * Also provides front-to-back hit-testing, hover tracking, and focus dispatch.
+ * Hit-testing may use a world-space bounds coarse pass before local-space fine tests.
  */
 class NanSceneTree {
 public:
@@ -62,6 +63,15 @@ public:
     /// Current deepest hovered node, or nullptr if none.
     [[nodiscard]] auto hovered_node() const -> NanNode2D*;
 
+    /// Dispatch a key event to the focused node and bubble toward the root.
+    auto dispatch_key(const KeyEvent& event) -> void;
+
+    /// Focused node, or nullptr if none.
+    [[nodiscard]] auto focused_node() const -> NanNode2D*;
+
+    /// Assign focus to a node inside this tree, or clear focus with nullptr.
+    auto set_focus(NanNode2D* node) -> void;
+
     // ---- deferred deletion ----
 
     /**
@@ -86,13 +96,16 @@ private:
 
     auto _bubble_input(NanNode* start, InputEvent& event, const NanNode* stop_exclusive = nullptr) -> void;
     auto _transition_hover(NanNode2D* next_hover, foundation::NanPoint screen_pos) -> void;
+    auto _transition_focus(NanNode2D* next_focus) -> void;
     auto _sync_hover_after_tree_change() -> void;
     auto _hovered_is_inside(const NanNode& node) const -> bool;
+    auto _focused_is_inside(const NanNode& node) const -> bool;
     auto _flush_deletes() -> void;
 
     std::unique_ptr<NanNode2D> root_;
     std::vector<NanNode*> delete_queue_;
     NanNode2D* hovered_node_ = nullptr;
+    NanNode2D* focused_node_ = nullptr;
     foundation::NanPoint last_mouse_pos_ {};
     bool has_mouse_pos_ = false;
 };

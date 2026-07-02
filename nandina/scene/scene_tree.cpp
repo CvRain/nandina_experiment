@@ -26,7 +26,8 @@ namespace
 NanSceneTree::NanSceneTree() = default;
 
 NanSceneTree::~NanSceneTree() {
-    hovered_node_ = nullptr;
+    _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
+    _transition_focus(nullptr);
     _flush_deletes();
     if (root_) {
         root_->_propagate_exit_tree();
@@ -38,7 +39,8 @@ auto NanSceneTree::root() const -> NanNode2D* {
 }
 
 auto NanSceneTree::set_root(std::unique_ptr<NanNode2D> root) -> void {
-    hovered_node_ = nullptr;
+    _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
+    _transition_focus(nullptr);
 
     if (root_) {
         root_->_propagate_exit_tree();
@@ -75,6 +77,7 @@ auto NanSceneTree::dispatch_mouse_button(const MouseButtonEvent& event) -> void 
         return;
     }
 
+    set_focus(hit);
     _bubble_input(hit, copy);
 }
 
@@ -95,6 +98,27 @@ auto NanSceneTree::dispatch_mouse_move(const MouseMoveEvent& event) -> void {
 
 auto NanSceneTree::hovered_node() const -> NanNode2D* {
     return hovered_node_;
+}
+
+auto NanSceneTree::dispatch_key(const KeyEvent& event) -> void {
+    if (!focused_node_) {
+        return;
+    }
+
+    auto copy = event;
+    _bubble_input(focused_node_, copy);
+}
+
+auto NanSceneTree::focused_node() const -> NanNode2D* {
+    return focused_node_;
+}
+
+auto NanSceneTree::set_focus(NanNode2D* node) -> void {
+    if (node && (!node->is_inside_tree() || node->get_tree() != this || !node->is_visible_in_tree())) {
+        return;
+    }
+
+    _transition_focus(node);
 }
 
 auto NanSceneTree::queue_delete(NanNode& node) -> void {
@@ -153,6 +177,11 @@ auto NanSceneTree::_hit_test_node(NanNode2D* node, const foundation::NanPoint wo
         }
     }
 
+    const auto bounds = node->global_bounds();
+    if (bounds.is_valid() && !bounds.contains_point(world_point)) {
+        return nullptr;
+    }
+
     if (const auto local_point = node->to_local(world_point); node->contains_point(local_point)) {
         return node;
     }
@@ -199,6 +228,37 @@ auto NanSceneTree::_transition_hover(NanNode2D* next_hover, const foundation::Na
     }
 }
 
+auto NanSceneTree::_transition_focus(NanNode2D* next_focus) -> void {
+    if (next_focus == focused_node_) {
+        return;
+    }
+
+    auto* old_focus = focused_node_;
+    focused_node_ = next_focus;
+
+    const auto old_chain = build_chain(old_focus);
+    const auto new_chain = build_chain(next_focus);
+
+    size_t old_idx = old_chain.size();
+    size_t new_idx = new_chain.size();
+    while (old_idx > 0 && new_idx > 0 && old_chain[old_idx - 1] == new_chain[new_idx - 1]) {
+        --old_idx;
+        --new_idx;
+    }
+
+    const auto* common_ancestor = (old_idx < old_chain.size()) ? old_chain[old_idx] : nullptr;
+
+    if (old_focus) {
+        FocusLeaveEvent leave_event;
+        _bubble_input(old_focus, leave_event, common_ancestor);
+    }
+
+    if (next_focus) {
+        FocusEnterEvent enter_event;
+        _bubble_input(next_focus, enter_event, common_ancestor);
+    }
+}
+
 auto NanSceneTree::_sync_hover_after_tree_change() -> void {
     if (!has_mouse_pos_) {
         hovered_node_ = nullptr;
@@ -216,6 +276,14 @@ auto NanSceneTree::_hovered_is_inside(const NanNode& node) const -> bool {
     return hovered_node_ == &node || node.is_ancestor_of(*hovered_node_);
 }
 
+auto NanSceneTree::_focused_is_inside(const NanNode& node) const -> bool {
+    if (!focused_node_) {
+        return false;
+    }
+
+    return focused_node_ == &node || node.is_ancestor_of(*focused_node_);
+}
+
 auto NanSceneTree::_flush_deletes() -> void {
     if (delete_queue_.empty()) {
         return;
@@ -227,7 +295,10 @@ auto NanSceneTree::_flush_deletes() -> void {
         }
 
         if (_hovered_is_inside(*node)) {
-            hovered_node_ = nullptr;
+            _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
+        }
+        if (_focused_is_inside(*node)) {
+            _transition_focus(nullptr);
         }
 
         if (auto* parent = node->parent()) {

@@ -1,7 +1,8 @@
 # example 可执行文件
 
 example_sources = files(
-    'main.cpp'
+    'main.cpp',
+    'utils.hpp'
 )
 
 executable('nandina_example',
