@@ -3,8 +3,10 @@
 //
 
 #include "node.hpp"
+#include "node2d.hpp"
 #include "scene_tree.hpp"
 
+#include <algorithm>
 #include <stdexcept>
 
 namespace nandina::scene
@@ -63,6 +65,14 @@ auto NanNode::add_child(std::unique_ptr<NanNode> child) -> NanNode& {
         throw std::runtime_error("NanNode::add_child: child is already in a tree");
     }
 
+    const auto* parent_2d = dynamic_cast<const NanNode2D*>(this);
+    const auto* child_2d = dynamic_cast<const NanNode2D*>(child.get());
+    if ((parent_2d != nullptr) != (child_2d != nullptr)) {
+        throw std::runtime_error(
+            "NanNode::add_child: cannot mix NanNode and NanNode2D on the same edge"
+        );
+    }
+
     child->parent_ = this;
     auto* raw = child.get();
     children_.push_back(std::move(child));
@@ -70,6 +80,7 @@ auto NanNode::add_child(std::unique_ptr<NanNode> child) -> NanNode& {
     // If this node is already in a tree, propagate enter_tree to the new subtree.
     if (tree_) {
         raw->_propagate_enter_tree(tree_);
+        raw->_propagate_ready();
     }
 
     return *raw;
@@ -106,8 +117,17 @@ void NanNode::set_name(std::string name) {
 void NanNode::on_enter_tree() {}
 void NanNode::on_ready() {}
 void NanNode::on_exit_tree() {}
+
+auto NanNode::on_input(InputEvent& /*event*/) -> bool { return false; }
+
 void NanNode::on_process(float /*dt*/) {}
 void NanNode::on_draw() {}
+
+auto NanNode::z_index_hint() const -> int { return 0; }
+
+auto NanNode::is_visible_in_tree() const -> bool {
+    return parent_ == nullptr || parent_->is_visible_in_tree();
+}
 
 void NanNode::_set_tree(NanSceneTree* tree) {
     tree_ = tree;
@@ -119,8 +139,6 @@ void NanNode::_propagate_enter_tree(NanSceneTree* tree) {
     for (auto& child : children_) {
         child->_propagate_enter_tree(tree);
     }
-    // After all descendants have entered, call ready bottom-up.
-    _propagate_ready();
 }
 
 void NanNode::_propagate_ready() {
@@ -147,9 +165,25 @@ void NanNode::_propagate_process(const float dt) {
 }
 
 void NanNode::_propagate_draw() {
+    if (!is_visible_in_tree()) {
+        return;
+    }
+
     on_draw();
-    for (auto& child : children_) {
-        child->_propagate_draw();
+
+    if (children_.empty()) return;
+
+    std::vector<size_t> indices(children_.size());
+    for (size_t i = 0; i < children_.size(); ++i) indices[i] = i;
+    std::stable_sort(indices.begin(), indices.end(),
+        [this](size_t a, size_t b) {
+            const int za = children_[a]->z_index_hint();
+            const int zb = children_[b]->z_index_hint();
+            return za < zb;
+        });
+
+    for (size_t idx : indices) {
+        children_[idx]->_propagate_draw();
     }
 }
 

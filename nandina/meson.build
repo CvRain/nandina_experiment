@@ -12,6 +12,7 @@ module_fundation = files(
 )
 
 module_scene = files(
+    'scene/input_event.hpp',
     'scene/node.hpp',
     'scene/node.cpp',
     'scene/node2d.hpp',

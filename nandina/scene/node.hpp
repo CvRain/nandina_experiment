@@ -13,6 +13,7 @@
 namespace nandina::scene
 {
 
+class InputEvent;
 class NanSceneTree;
 
 /**
@@ -30,11 +31,10 @@ class NanSceneTree;
  *   on_draw()        — top-down, parent drawn before children
  *
  * Lifecycle order on add_child to an in-tree parent:
- *   1. parent.on_enter_tree (if parent was detached, already called otherwise)
- *   2. child.on_enter_tree
- *   3. grandchild.on_enter_tree (recursively)
- *   4. grandchild.on_ready
- *   5. child.on_ready
+ *   1. child.on_enter_tree
+ *   2. grandchild.on_enter_tree (recursively)
+ *   3. grandchild.on_ready
+ *   4. child.on_ready
  *
  * @note Nodes are non-copyable and non-movable while inside the tree.
  *       Ownership is managed through std::unique_ptr.
@@ -79,7 +79,8 @@ public:
      * @return A reference to the added child (non-owning).
      *
      * @pre child is not null and not already owned by another node.
-     * @throws std::runtime_error if child is null or already has a parent.
+     * @throws std::runtime_error if child is null, already has a parent,
+     *         or would mix NanNode/NanNode2D on the same parent-child edge.
      */
     auto add_child(std::unique_ptr<NanNode> child) -> NanNode&;
 
@@ -99,7 +100,7 @@ public:
 
     // ---- lifecycle (override in subclasses) ----
 
-    /// Called after the node (and all descendants) enter the tree (top-down).
+    /// Called when the node enters the tree (top-down: parent before children).
     virtual void on_enter_tree();
 
     /// Called after all descendants' on_enter_tree have completed (bottom-up).
@@ -108,11 +109,26 @@ public:
     /// Called before the node (and all descendants) leave the tree.
     virtual void on_exit_tree();
 
+    /**
+     * Handle an input event routed to this node via hit-testing.
+     * Return true if the event was consumed (stops bubbling to parent).
+     * Default: false (event continues to parent).
+     */
+    virtual auto on_input(InputEvent& event) -> bool;
+
     /// Called every frame.  dt is the elapsed time in seconds.
     virtual void on_process(float dt);
 
     /// Called during draw traversal (top-down: parent drawn before children).
     virtual void on_draw();
+
+    /// Hint for sibling draw/hit-test ordering (higher = on top).
+    /// Override in subclasses that have a z-ordering concept.
+    [[nodiscard]] virtual auto z_index_hint() const -> int;
+
+    /// True if this node should be drawn / hit-tested in the active tree.
+    /// A false return means this node AND all descendants are skipped.
+    [[nodiscard]] virtual auto is_visible_in_tree() const -> bool;
 
 protected:
     /// Internal: set the owning scene tree (called by NanSceneTree).
@@ -130,7 +146,7 @@ protected:
     /// Internal: process this node then recursively process children.
     void _propagate_process(float dt);
 
-    /// Internal: draw children then this node (bottom-up).
+    /// Internal: draw this node then recursively draw children (top-down).
     void _propagate_draw();
 
 private:

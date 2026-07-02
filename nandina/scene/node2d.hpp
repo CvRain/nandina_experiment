@@ -21,6 +21,12 @@ namespace nandina::scene
  *
  * This is the base class for all spatially-located 2D nodes
  * (sprites, labels, collision shapes, etc.).
+ *
+ * The global transform is lazily cached: the first call to
+ * global_transform() after a local change recomputes by composing
+ * the parent chain.  Subsequent calls return the cached value.
+ * The cache is invalidated automatically when any transform mutator
+ * is called (set_position, set_rotation, set_scale, etc.).
  */
 class NanNode2D : public NanNode {
 public:
@@ -52,7 +58,7 @@ public:
 
     // ---- global transform (world-space) ----
 
-    /// Compute world-space transform by composing the parent chain.
+    /// World-space transform.  Lazily recomputed from the parent chain.
     [[nodiscard]] auto global_transform() const -> foundation::NanTransform2D;
 
     [[nodiscard]] auto global_position() const -> foundation::NanPoint;
@@ -66,6 +72,11 @@ public:
     /// Convert a point from global (world) space to local space.
     [[nodiscard]] auto to_local(foundation::NanPoint global_point) const -> foundation::NanPoint;
 
+    /// World-space axis-aligned bounding rectangle of this node.
+    /// Override in subclasses to return the actual interactive/visible area.
+    /// Default: empty rect at global_position.
+    [[nodiscard]] virtual auto global_bounds() const -> foundation::NanRect;
+
     // ---- visibility ----
 
     [[nodiscard]] auto visible() const -> bool;
@@ -76,6 +87,12 @@ public:
     /// z_index controls sibling draw order. Higher values draw on top.
     [[nodiscard]] auto z_index() const -> int;
     void set_z_index(int z);
+
+    [[nodiscard]] auto z_index_hint() const -> int override { return z_index_; }
+
+    [[nodiscard]] auto is_visible_in_tree() const -> bool override {
+        return visible_ && NanNode::is_visible_in_tree();
+    }
 
     // ---- hit testing ----
 
@@ -91,10 +108,19 @@ protected:
     void on_enter_tree() override;
     void on_exit_tree() override;
 
+    /// Invalidate this node's cached global transform.
+    void _invalidate_global();
+
+    /// Invalidate global transform on this node and all descendants.
+    void _propagate_invalidate_global();
+
 private:
     foundation::NanTransform2D transform_;
     bool visible_ = true;
     int z_index_ = 0;
+
+    mutable foundation::NanTransform2D cached_global_;
+    mutable bool global_invalid_ = true;
 };
 
 } // namespace nandina::scene
