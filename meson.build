@@ -32,3 +32,4 @@ raylib_dep = raylib_subproj.dependency('raylib')
 # 引入子项目
 subdir('nandina')
 subdir('example')
+subdir('tests')

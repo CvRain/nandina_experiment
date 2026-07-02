@@ -96,5 +96,6 @@ vcpkg_installed
 .qtcreator
 .venv
 .wraplock
+.ai
 
 dev-docs-*

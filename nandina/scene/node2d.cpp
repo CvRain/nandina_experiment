@@ -72,8 +72,8 @@ void NanNode2D::apply_scale(const foundation::NanPoint factor) {
 auto NanNode2D::global_transform() const -> foundation::NanTransform2D {
     if (global_invalid_) {
         cached_global_ = transform_;
-        for (auto* p = dynamic_cast<const NanNode2D*>(parent()); p != nullptr;
-             p = dynamic_cast<const NanNode2D*>(p->parent())) {
+        for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
+             p = p->parent() ? p->parent()->as_node2d() : nullptr) {
             cached_global_ = p->transform_ * cached_global_;
         }
         global_invalid_ = false;
@@ -86,7 +86,7 @@ auto NanNode2D::global_position() const -> foundation::NanPoint {
 }
 
 void NanNode2D::set_global_position(const foundation::NanPoint pos) {
-    if (auto* p = dynamic_cast<NanNode2D*>(parent())) {
+    if (auto* p = parent() ? parent()->as_node2d() : nullptr) {
         const auto parent_inv = p->global_transform().inverse();
         set_position(parent_inv.transform_point(pos));
     } else {
@@ -96,8 +96,8 @@ void NanNode2D::set_global_position(const foundation::NanPoint pos) {
 
 auto NanNode2D::global_rotation() const -> float {
     auto rot = rotation();
-    for (auto* p = dynamic_cast<const NanNode2D*>(parent()); p != nullptr;
-         p = dynamic_cast<const NanNode2D*>(p->parent())) {
+    for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
+         p = p->parent() ? p->parent()->as_node2d() : nullptr) {
         rot += p->rotation();
     }
     return rot;
@@ -151,8 +151,9 @@ void NanNode2D::_invalidate_global() {
 void NanNode2D::_propagate_invalidate_global() {
     global_invalid_ = true;
     for (size_t i = 0; i < child_count(); ++i) {
-        if (auto* child = dynamic_cast<NanNode2D*>(get_child(i))) {
-            child->_propagate_invalidate_global();
+        auto* child = get_child(i);
+        if (auto* child_2d = child ? child->as_node2d() : nullptr) {
+            child_2d->_propagate_invalidate_global();
         }
     }
 }

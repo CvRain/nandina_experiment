@@ -23,7 +23,7 @@ NanNode::~NanNode() {
 }
 
 auto NanNode::parent() const -> NanNode* {
-    return parent_;
+    return parent_.lock().get();
 }
 
 auto NanNode::child_count() const -> size_t {
@@ -38,7 +38,7 @@ auto NanNode::get_child(const size_t index) const -> NanNode* {
 }
 
 auto NanNode::is_ancestor_of(const NanNode& other) const -> bool {
-    for (auto* p = other.parent_; p != nullptr; p = p->parent_) {
+    for (auto* p = other.parent(); p != nullptr; p = p->parent()) {
         if (p == this) {
             return true;
         }
@@ -54,26 +54,26 @@ auto NanNode::get_tree() const -> NanSceneTree* {
     return tree_;
 }
 
-auto NanNode::add_child(std::unique_ptr<NanNode> child) -> NanNode& {
+auto NanNode::add_child(std::shared_ptr<NanNode> child) -> NanNode& {
     if (!child) {
         throw std::runtime_error("NanNode::add_child: child is null");
     }
-    if (child->parent_ != nullptr) {
+    if (!child->parent_.expired()) {
         throw std::runtime_error("NanNode::add_child: child already has a parent");
     }
     if (child->tree_ != nullptr) {
         throw std::runtime_error("NanNode::add_child: child is already in a tree");
     }
 
-    const auto* parent_2d = dynamic_cast<const NanNode2D*>(this);
-    const auto* child_2d = dynamic_cast<const NanNode2D*>(child.get());
+    const auto* parent_2d = as_node2d();
+    const auto* child_2d = child->as_node2d();
     if ((parent_2d != nullptr) != (child_2d != nullptr)) {
         throw std::runtime_error(
             "NanNode::add_child: cannot mix NanNode and NanNode2D on the same edge"
         );
     }
 
-    child->parent_ = this;
+    child->parent_ = weak_from_this();
     auto* raw = child.get();
     children_.push_back(std::move(child));
 
@@ -86,14 +86,14 @@ auto NanNode::add_child(std::unique_ptr<NanNode> child) -> NanNode& {
     return *raw;
 }
 
-auto NanNode::remove_child(NanNode& child) -> std::unique_ptr<NanNode> {
+auto NanNode::remove_child(NanNode& child) -> std::shared_ptr<NanNode> {
     for (auto it = children_.begin(); it != children_.end(); ++it) {
         if (it->get() == &child) {
             // Exit tree before removing.
             if (tree_) {
                 child._propagate_exit_tree();
             }
-            child.parent_ = nullptr;
+            child.parent_.reset();
             auto result = std::move(*it);
             children_.erase(it);
             return result;
@@ -125,8 +125,11 @@ void NanNode::on_draw() {}
 
 auto NanNode::z_index_hint() const -> int { return 0; }
 
+auto NanNode::is_focusable() const -> bool { return false; }
+
 auto NanNode::is_visible_in_tree() const -> bool {
-    return parent_ == nullptr || parent_->is_visible_in_tree();
+    auto* p = parent();
+    return p == nullptr || p->is_visible_in_tree();
 }
 
 void NanNode::_set_tree(NanSceneTree* tree) {
@@ -134,6 +137,12 @@ void NanNode::_set_tree(NanSceneTree* tree) {
 }
 
 void NanNode::_propagate_enter_tree(NanSceneTree* tree) {
+    // Idempotent: if a user calls add_child() from inside on_enter_tree(),
+    // add_child already propagated enter_tree into the new subtree (because
+    // tree_ was set). The parent's own children loop must not enter it again.
+    if (tree_ == tree) {
+        return;
+    }
     tree_ = tree;
     on_enter_tree();
     for (auto& child : children_) {
@@ -146,7 +155,12 @@ void NanNode::_propagate_ready() {
     for (auto& child : children_) {
         child->_propagate_ready();
     }
-    on_ready();
+    // Idempotent: a node added during on_enter_tree() is readied immediately by
+    // add_child; the later top-level ready sweep must not fire on_ready twice.
+    if (!ready_notified_) {
+        ready_notified_ = true;
+        on_ready();
+    }
 }
 
 void NanNode::_propagate_exit_tree() {
@@ -155,6 +169,7 @@ void NanNode::_propagate_exit_tree() {
         child->_propagate_exit_tree();
     }
     tree_ = nullptr;
+    ready_notified_ = false;  // Allow re-entry (remove + re-add) to fire ready again.
 }
 
 void NanNode::_propagate_process(const float dt) {

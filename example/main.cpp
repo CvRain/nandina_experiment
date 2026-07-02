@@ -5,8 +5,6 @@
 #include <memory>
 #include <numbers>
 #include <string>
-#include <vector>
-
 #include "utils.hpp"
 
 #include "foundation/geometry.hpp"
@@ -16,7 +14,6 @@
 #include "scene/scene_tree.hpp"
 
 using namespace nandina;
-
 
 auto main() -> int {
     spdlog::info("Nandina — SceneTree workspace demo");
@@ -37,18 +34,18 @@ auto main() -> int {
     const Color c_bg = to_raylib(background);
     const Color c_primary = to_raylib(primary);
     const Color c_accent = to_raylib(accent);
-    const Color c_chain = {100, 160, 220, 255};
-    const Color c_overlap_a = {220, 120, 80, 255};
-    const Color c_overlap_b = {80, 180, 120, 255};
-    const Color c_overlap_c = {140, 100, 210, 255};
-    const Color c_text = {30, 30, 40, 255};
-    const Color c_subtle = {110, 115, 130, 255};
-    const Color c_panel = {255, 255, 255, 255};
-    const Color c_border = {200, 205, 215, 255};
-    const Color c_hit = {240, 70, 70, 255};
+    constexpr Color c_chain = {100, 160, 220, 255};
+    constexpr Color c_overlap_a = {220, 120, 80, 255};
+    constexpr Color c_overlap_b = {80, 180, 120, 255};
+    constexpr Color c_overlap_c = {140, 100, 210, 255};
+    constexpr Color c_text = {30, 30, 40, 255};
+    constexpr Color c_subtle = {110, 115, 130, 255};
+    constexpr Color c_panel = {255, 255, 255, 255};
+    constexpr Color c_border = {200, 205, 215, 255};
+    constexpr Color c_hit = {240, 70, 70, 255};
 
     auto tree = scene::NanSceneTree();
-    auto scene_root = std::make_unique<GroupNode>();
+    auto scene_root = std::make_shared<GroupNode>();
     scene_root->set_name("scene_root");
     auto* scene_root_ptr = scene_root.get();
     tree.set_root(std::move(scene_root));
@@ -68,9 +65,6 @@ auto main() -> int {
 
     auto stack_rig =
         build_stack_rig(foundation::NanPoint(980, 146), c_overlap_a, c_overlap_b, c_overlap_c);
-    auto* stack_low = stack_rig.low;
-    auto* stack_mid = stack_rig.mid;
-    auto* stack_high = stack_rig.high;
     scene_root_ptr->add_child(std::move(stack_rig.root));
 
     float time = 0.0F;
@@ -109,25 +103,12 @@ auto main() -> int {
                 }
 
                 if (IsKeyPressed(KEY_TAB)) {
-                    std::vector<scene::NanNode2D*> focusables;
-                        if (transform_present && transform_button) {
-                            focusables.push_back(transform_button);
-                        }
-                    focusables.push_back(stack_low);
-                    focusables.push_back(stack_mid);
-                    focusables.push_back(stack_high);
-
-                        if (!focusables.empty()) {
-                            const auto* current = tree.focused_node();
-                            size_t next_index = 0;
-                                for (size_t i = 0; i < focusables.size(); ++i) {
-                                        if (focusables[i] == current) {
-                                            next_index = (i + 1) % focusables.size();
-                                            break;
-                                        }
-                                }
-                            tree.set_focus(focusables[next_index]);
-                        }
+                    if (IsKeyDown(KEY_LEFT_SHIFT) || IsKeyDown(KEY_RIGHT_SHIFT)) {
+                        tree.focus_previous();
+                    }
+                    else {
+                        tree.focus_next();
+                    }
                 }
 
                 if (IsKeyPressed(KEY_ENTER)) {

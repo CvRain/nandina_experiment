@@ -89,6 +89,10 @@ public:
         return bounds;
     }
 
+    [[nodiscard]] auto is_focusable() const -> bool override {
+        return interactive_;
+    }
+
     auto on_input(scene::InputEvent& event) -> bool override {
             if (!interactive_) {
                 return false;
@@ -214,12 +218,12 @@ private:
 };
 
 struct DeepChain {
-    std::unique_ptr<CardNode> root;
+    std::shared_ptr<CardNode> root;
     scene::NanNode2D* leaf = nullptr;
 };
 
 struct TransformRig {
-    std::unique_ptr<GroupNode> root;
+    std::shared_ptr<GroupNode> root;
     GroupNode* spinner = nullptr;
     CardNode* shell = nullptr;
     scene::NanNode2D* button = nullptr;
@@ -227,37 +231,37 @@ struct TransformRig {
 };
 
 struct ChainRig {
-    std::unique_ptr<GroupNode> root;
+    std::shared_ptr<GroupNode> root;
     scene::NanNode2D* leaf_a = nullptr;
     scene::NanNode2D* leaf_b = nullptr;
 };
 
 struct StackRig {
-    std::unique_ptr<GroupNode> root;
+    std::shared_ptr<GroupNode> root;
     scene::NanNode2D* low = nullptr;
     scene::NanNode2D* mid = nullptr;
     scene::NanNode2D* high = nullptr;
 };
 
 auto build_deep_chain(Color color, float dx, float dy, const char* prefix) -> DeepChain {
-    auto leaf = std::make_unique<CardNode>(foundation::NanSize(24, 16), color, "L4", false);
+    auto leaf = std::make_shared<CardNode>(foundation::NanSize(24, 16), color, "L4", false);
     leaf->set_name(std::string(prefix) + "_leaf");
     leaf->set_position(foundation::NanPoint(dx, dy));
     auto* leaf_ptr = leaf.get();
 
-    auto l3 = std::make_unique<CardNode>(foundation::NanSize(28, 20), color, "L3", false);
+    auto l3 = std::make_shared<CardNode>(foundation::NanSize(28, 20), color, "L3", false);
     l3->set_position(foundation::NanPoint(dx, dy));
     l3->add_child(std::move(leaf));
 
-    auto l2 = std::make_unique<CardNode>(foundation::NanSize(32, 24), color, "L2", false);
+    auto l2 = std::make_shared<CardNode>(foundation::NanSize(32, 24), color, "L2", false);
     l2->set_position(foundation::NanPoint(dx, dy));
     l2->add_child(std::move(l3));
 
-    auto l1 = std::make_unique<CardNode>(foundation::NanSize(36, 28), color, "L1", false);
+    auto l1 = std::make_shared<CardNode>(foundation::NanSize(36, 28), color, "L1", false);
     l1->set_position(foundation::NanPoint(dx, dy));
     l1->add_child(std::move(l2));
 
-    auto root = std::make_unique<CardNode>(foundation::NanSize(40, 32), color, "Root", false);
+    auto root = std::make_shared<CardNode>(foundation::NanSize(40, 32), color, "Root", false);
     root->set_name(std::string(prefix) + "_root");
     root->add_child(std::move(l1));
 
@@ -267,24 +271,24 @@ auto build_deep_chain(Color color, float dx, float dy, const char* prefix) -> De
 auto build_transform_rig(foundation::NanPoint center, Color primary, Color accent) -> TransformRig {
     TransformRig rig;
 
-    auto root = std::make_unique<GroupNode>();
+    auto root = std::make_shared<GroupNode>();
     rig.root_node = root.get();
     rig.root_node->set_name("transform_rig");
     rig.root_node->set_position(center);
 
-    auto spinner = std::make_unique<GroupNode>();
+    auto spinner = std::make_shared<GroupNode>();
     rig.spinner = spinner.get();
     rig.spinner->set_name("transform_spinner");
 
-    auto shell = std::make_unique<CardNode>(foundation::NanSize(148, 104), primary, "Panel", false);
+    auto shell = std::make_shared<CardNode>(foundation::NanSize(148, 104), primary, "Panel", false);
     rig.shell = shell.get();
     rig.shell->set_name("panel_shell");
 
-    auto card = std::make_unique<CardNode>(foundation::NanSize(86, 62), accent, "Card", false);
+    auto card = std::make_shared<CardNode>(foundation::NanSize(86, 62), accent, "Card", false);
     card->set_name("panel_card");
     card->set_position(foundation::NanPoint(0, 0));
 
-    auto button = std::make_unique<CardNode>(
+    auto button = std::make_shared<CardNode>(
         foundation::NanSize(46, 28),
         Color {220, 180, 80, 255},
         "Node",
@@ -306,7 +310,7 @@ auto build_transform_rig(foundation::NanPoint center, Color primary, Color accen
 auto build_chain_rig(foundation::NanPoint center, Color chain_color, Color accent) -> ChainRig {
     ChainRig rig;
 
-    auto root = std::make_unique<GroupNode>();
+    auto root = std::make_shared<GroupNode>();
     root->set_name("chain_rig");
     root->set_position(center);
 
@@ -327,22 +331,22 @@ auto build_chain_rig(foundation::NanPoint center, Color chain_color, Color accen
 auto build_stack_rig(foundation::NanPoint center, Color low, Color mid, Color high) -> StackRig {
     StackRig rig;
 
-    auto root = std::make_unique<GroupNode>();
+    auto root = std::make_shared<GroupNode>();
     root->set_name("stack_rig");
     root->set_position(center);
 
-    auto low_card = std::make_unique<CardNode>(foundation::NanSize(82, 82), low, "z=0", true);
+    auto low_card = std::make_shared<CardNode>(foundation::NanSize(82, 82), low, "z=0", true);
     rig.low = low_card.get();
     low_card->set_name("stack_low");
     low_card->set_position(foundation::NanPoint(-30, -20));
 
-    auto mid_card = std::make_unique<CardNode>(foundation::NanSize(82, 82), mid, "z=5", true);
+    auto mid_card = std::make_shared<CardNode>(foundation::NanSize(82, 82), mid, "z=5", true);
     rig.mid = mid_card.get();
     mid_card->set_name("stack_mid");
     mid_card->set_position(foundation::NanPoint(20, -30));
     mid_card->set_z_index(5);
 
-    auto high_card = std::make_unique<CardNode>(foundation::NanSize(82, 82), high, "z=10", true);
+    auto high_card = std::make_shared<CardNode>(foundation::NanSize(82, 82), high, "z=10", true);
     rig.high = high_card.get();
     high_card->set_name("stack_high");
     high_card->set_position(foundation::NanPoint(10, 20));

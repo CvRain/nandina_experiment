@@ -7,3 +7,6 @@
 [submodule "subprojects/raylib"]
 	path = subprojects/raylib
 	url = https://github.com/raysan5/raylib.git
+[submodule "subprojects/Catch2"]
+	path = subprojects/Catch2
+	url = https://github.com/catchorg/Catch2.git

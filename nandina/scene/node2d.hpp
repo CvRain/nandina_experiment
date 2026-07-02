@@ -94,6 +94,9 @@ public:
         return visible_ && NanNode::is_visible_in_tree();
     }
 
+    [[nodiscard]] auto as_node2d() -> NanNode2D* override { return this; }
+    [[nodiscard]] auto as_node2d() const -> const NanNode2D* override { return this; }
+
     // ---- hit testing ----
 
     /// Check whether a point in local space is inside this node.

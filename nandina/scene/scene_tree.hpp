@@ -41,7 +41,7 @@ public:
      * Set the root node. Ownership transfers to the tree.
      * The previous root (and all its descendants) is destroyed.
      */
-    auto set_root(std::unique_ptr<NanNode2D> root) -> void;
+    auto set_root(std::shared_ptr<NanNode2D> root) -> void;
 
     // ---- per-frame traversal ----
 
@@ -72,6 +72,12 @@ public:
     /// Assign focus to a node inside this tree, or clear focus with nullptr.
     auto set_focus(NanNode2D* node) -> void;
 
+    /// Move focus forward through the tree's focusable nodes.
+    auto focus_next() -> void;
+
+    /// Move focus backward through the tree's focusable nodes.
+    auto focus_previous() -> void;
+
     // ---- deferred deletion ----
 
     /**
@@ -93,8 +99,10 @@ public:
 
 private:
     static auto _hit_test_node(NanNode2D* node, foundation::NanPoint world_point) -> NanNode2D*;
+    static void _collect_focusable_nodes(NanNode* node, std::vector<NanNode2D*>& out);
 
     auto _bubble_input(NanNode* start, InputEvent& event, const NanNode* stop_exclusive = nullptr) -> void;
+    [[nodiscard]] auto _find_focus_target(NanNode* start) const -> NanNode2D*;
     auto _transition_hover(NanNode2D* next_hover, foundation::NanPoint screen_pos) -> void;
     auto _transition_focus(NanNode2D* next_focus) -> void;
     auto _sync_hover_after_tree_change() -> void;
@@ -102,10 +110,13 @@ private:
     auto _focused_is_inside(const NanNode& node) const -> bool;
     auto _flush_deletes() -> void;
 
-    std::unique_ptr<NanNode2D> root_;
-    std::vector<NanNode*> delete_queue_;
-    NanNode2D* hovered_node_ = nullptr;
-    NanNode2D* focused_node_ = nullptr;
+    std::shared_ptr<NanNode2D> root_;
+    // Deferred-delete requests and interaction targets are weak: if a node is
+    // destroyed by another path before we act on it, the weak_ptr simply expires
+    // instead of dangling.
+    std::vector<std::weak_ptr<NanNode>> delete_queue_;
+    std::weak_ptr<NanNode2D> hovered_node_;
+    std::weak_ptr<NanNode2D> focused_node_;
     foundation::NanPoint last_mouse_pos_ {};
     bool has_mouse_pos_ = false;
 };
