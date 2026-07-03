@@ -13,3 +13,10 @@ render_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('render', render_tests)
+
+reactive_tests = executable(
+    'reactive_tests',
+    files('reactive_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('reactive', reactive_tests)

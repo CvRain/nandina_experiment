@@ -11,6 +11,16 @@ module_fundation = files(
     'foundation/transform2d.cpp',
 )
 
+module_reactive = files(
+    'reactive/graph.hpp',
+    'reactive/graph.cpp',
+    'reactive/signal.hpp',
+    'reactive/computed.hpp',
+    'reactive/effect.hpp',
+    'reactive/batch.hpp',
+    'reactive/reactive.hpp',
+)
+
 module_scene = files(
     'scene/input_event.hpp',
     'scene/node.hpp',
@@ -32,7 +42,7 @@ module_render = files(
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_scene, module_render],
+    [module_fundation, module_reactive, module_scene, module_render],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep],
     install : true,
 )
