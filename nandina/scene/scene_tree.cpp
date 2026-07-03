@@ -3,6 +3,7 @@
 //
 
 #include "scene_tree.hpp"
+#include "../render/draw_context.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -74,9 +75,16 @@ auto NanSceneTree::process(const float dt) -> void {
     }
 }
 
-auto NanSceneTree::draw() const -> void {
+auto NanSceneTree::draw(render::IRenderDevice& device) -> void {
+    device.begin_frame();
+    render::DrawContext ctx{device};
+    render(ctx);
+    device.end_frame();
+}
+
+auto NanSceneTree::render(render::DrawContext& ctx) -> void {
     if (root_) {
-        root_->_propagate_draw();
+        root_->_propagate_draw(ctx);
     }
 }
 
@@ -112,6 +120,31 @@ auto NanSceneTree::hovered_node() const -> NanNode2D* {
 }
 
 auto NanSceneTree::dispatch_key(const KeyEvent& event) -> void {
+    auto* focused = focused_node_.lock().get();
+    if (!focused) {
+        return;
+    }
+
+    auto copy = event;
+    _bubble_input(focused, copy);
+}
+
+auto NanSceneTree::dispatch_mouse_wheel(const MouseWheelEvent& event) -> void {
+    // Prefer the current hover target; fall back to a hit-test at the wheel
+    // position so scrolling works even if no move event set hover yet.
+    auto* target = hovered_node_.lock().get();
+    if (!target) {
+        target = hit_test(event.screen_pos());
+    }
+    if (!target) {
+        return;
+    }
+
+    auto copy = event;
+    _bubble_input(target, copy);
+}
+
+auto NanSceneTree::dispatch_text_input(const TextInputEvent& event) -> void {
     auto* focused = focused_node_.lock().get();
     if (!focused) {
         return;

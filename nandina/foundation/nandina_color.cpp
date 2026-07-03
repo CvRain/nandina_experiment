@@ -8,14 +8,6 @@
 
 namespace nandina::foundation
 {
-    constexpr auto NanColor::oklch() const -> NanOklch {
-        return this->color_;
-    }
-
-    constexpr auto NanColor::alpha() const -> float {
-        return color_.alpha;
-    }
-
     auto NanColor::with_alpha(const float alpha) const -> NanColor {
         return NanColor {{
             color_.light,

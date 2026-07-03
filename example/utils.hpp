@@ -11,6 +11,7 @@
 
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
+#include "render/draw_context.hpp"
 #include "scene/input_event.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
@@ -25,6 +26,12 @@ using namespace nandina;
         static_cast<unsigned char>(rgba.blue),
         static_cast<unsigned char>(rgba.alpha)
     };
+}
+
+[[nodiscard]] auto from_raylib(Color color) -> foundation::NanColor {
+    return foundation::NanColor::from(foundation::NanHexRgb {
+        .red = color.r, .green = color.g, .blue = color.b, .alpha = color.a
+    });
 }
 
 [[nodiscard]] auto lighten(Color color, int amount) -> Color {
@@ -94,101 +101,91 @@ public:
     }
 
     auto on_input(scene::InputEvent& event) -> bool override {
-            if (!interactive_) {
-                return false;
-            }
+        if (!interactive_) {
+            return false;
+        }
 
-            if (dynamic_cast<const scene::MouseEnterEvent*>(&event)) {
-                hovered_ = true;
-                return false;
+        // RTTI-free dispatch: switch on the event's type tag, then static_cast.
+        switch (event.type()) {
+        case scene::EventType::mouse_enter:
+            hovered_ = true;
+            return false;
+        case scene::EventType::mouse_leave:
+            hovered_ = false;
+            return false;
+        case scene::EventType::focus_enter:
+            focused_ = true;
+            return false;
+        case scene::EventType::focus_leave:
+            focused_ = false;
+            return false;
+        case scene::EventType::mouse_button: {
+            const auto& button = static_cast<const scene::MouseButtonEvent&>(event);
+            if (button.button() == scene::MouseButtonEvent::Button::left && button.is_pressed()) {
+                toggled_ = !toggled_;
+                event.accept();
+                spdlog::info("click: {}", name());
+                return true;
             }
-
-            if (dynamic_cast<const scene::MouseLeaveEvent*>(&event)) {
-                hovered_ = false;
-                return false;
+            return false;
+        }
+        case scene::EventType::key: {
+            const auto& key = static_cast<const scene::KeyEvent&>(event);
+            if (key.is_pressed() && (key.keycode() == KEY_ENTER || key.keycode() == KEY_SPACE)) {
+                toggled_ = !toggled_;
+                event.accept();
+                spdlog::info("key activate: {}", name());
+                return true;
             }
-
-            if (dynamic_cast<const scene::FocusEnterEvent*>(&event)) {
-                focused_ = true;
-                return false;
-            }
-
-            if (dynamic_cast<const scene::FocusLeaveEvent*>(&event)) {
-                focused_ = false;
-                return false;
-            }
-
-            if (const auto* button = dynamic_cast<const scene::MouseButtonEvent*>(&event)) {
-                    if (button->button() == scene::MouseButtonEvent::Button::left
-                        && button->is_pressed())
-                    {
-                        toggled_ = !toggled_;
-                        event.accept();
-                        spdlog::info("click: {}", name());
-                        return true;
-                    }
-            }
-
-            if (const auto* key = dynamic_cast<const scene::KeyEvent*>(&event)) {
-                    if (key->is_pressed()
-                        && (key->keycode() == KEY_ENTER || key->keycode() == KEY_SPACE))
-                    {
-                        toggled_ = !toggled_;
-                        event.accept();
-                        spdlog::info("key activate: {}", name());
-                        return true;
-                    }
-            }
-
-        return false;
+            return false;
+        }
+        default:
+            return false;
+        }
     }
 
-    void on_draw() override {
-        const auto gt = global_transform();
-        const auto pos = gt.position();
-        const auto w = size_.get_width() * gt.scale_x();
-        const auto h = size_.get_height() * gt.scale_y();
-        const auto angle = gt.rotation() * 180.0F / std::numbers::pi_v<float>;
+    void on_draw(render::DrawContext& ctx) override {
+        // Local bounds centered at the origin; the context's world transform
+        // already includes this node's transform (composed during traversal).
+        const auto hw = size_.get_width() / 2.0F;
+        const auto hh = size_.get_height() / 2.0F;
+        const auto local = foundation::NanRect::from_points(
+            foundation::NanPoint(-hw, -hh), foundation::NanPoint(hw, hh));
+        // v1 render contract: rotated rects draw as their world-space AABB.
+        const auto world = render::world_bounds_from_local(ctx.world_transform(), local);
 
-        const auto fill = current_fill_color();
-        const auto shadow = lerp_color(fill, BLACK, 0.28F);
-        const auto text = hovered_ ? BLACK : Color {32, 34, 42, 255};
+        const float a = ctx.opacity();
+        const auto fill = from_raylib(current_fill_color()).with_alpha(a);
+        const auto shadow = from_raylib(lerp_color(current_fill_color(), BLACK, 0.28F))
+                                .with_alpha(0.16F * a);
 
-        DrawRectanglePro(
-            {pos.get_x() - w / 2.0F + 4.0F, pos.get_y() - h / 2.0F + 5.0F, w, h},
-            {w / 2.0F, h / 2.0F},
-            angle,
-            Color {shadow.r, shadow.g, shadow.b, 42}
-        );
-        DrawRectanglePro(
-            {pos.get_x() - w / 2.0F, pos.get_y() - h / 2.0F, w, h},
-            {w / 2.0F, h / 2.0F},
-            angle,
-            fill
-        );
+        auto& device = ctx.device();
 
-            if (focused_) {
-                DrawRectangleLinesEx(
-                    {pos.get_x() - w / 2.0F - 3.0F,
-                     pos.get_y() - h / 2.0F - 3.0F,
-                     w + 6.0F,
-                     h + 6.0F},
-                    2.0F,
-                    Color {26, 76, 160, 255}
-                );
-            }
+        const auto shadow_rect = foundation::NanRect::from_xywh(
+            world.get_left() + 4.0F, world.get_top() + 5.0F,
+            world.get_width(), world.get_height());
+        device.draw_rect(shadow_rect, shadow);
+        device.draw_rect(world, fill);
 
-            if (!label_.empty()) {
-                const auto font_size = static_cast<int>(h < 28.0F ? 11.0F : 12.0F);
-                const auto tw = static_cast<float>(MeasureText(label_.c_str(), font_size));
-                DrawText(
-                    label_.c_str(),
-                    static_cast<int>(pos.get_x() - tw / 2.0F),
-                    static_cast<int>(pos.get_y() - font_size / 2.0F),
-                    font_size,
-                    text
-                );
-            }
+        if (focused_) {
+            const auto ring = foundation::NanRect::from_xywh(
+                world.get_left() - 3.0F, world.get_top() - 3.0F,
+                world.get_width() + 6.0F, world.get_height() + 6.0F);
+            device.draw_rect_outline(ring, 2.0F,
+                from_raylib(Color {26, 76, 160, 255}).with_alpha(a));
+        }
+
+        if (!label_.empty()) {
+            const float font_size = world.get_height() < 28.0F ? 11.0F : 12.0F;
+            // Rough centering: device text anchors at top-left; estimate width.
+            const float est_w = static_cast<float>(label_.size()) * font_size * 0.5F;
+            const auto text_color = from_raylib(hovered_ ? BLACK : Color {32, 34, 42, 255})
+                                        .with_alpha(a);
+            const foundation::NanPoint text_pos(
+                world.get_center().get_x() - est_w / 2.0F,
+                world.get_center().get_y() - font_size / 2.0F);
+            device.draw_text(label_, text_pos, font_size, text_color);
+        }
     }
 
 private:

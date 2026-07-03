@@ -9,6 +9,8 @@
 
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
+#include "render/backends/raylib_device.hpp"
+#include "render/draw_context.hpp"
 #include "scene/input_event.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
@@ -44,6 +46,7 @@ auto main() -> int {
     constexpr Color c_border = {200, 205, 215, 255};
     constexpr Color c_hit = {240, 70, 70, 255};
 
+    auto device = render::make_raylib_device();
     auto tree = scene::NanSceneTree();
     auto scene_root = std::make_shared<GroupNode>();
     scene_root->set_name("scene_root");
@@ -116,6 +119,21 @@ auto main() -> int {
                 }
                 if (IsKeyPressed(KEY_SPACE)) {
                     tree.dispatch_key(scene::KeyEvent(KEY_SPACE, scene::KeyEvent::Action::press));
+                }
+
+                if (const float wheel = GetMouseWheelMove(); wheel != 0.0F) {
+                    tree.dispatch_mouse_wheel(
+                        scene::MouseWheelEvent(mouse, foundation::NanPoint(0, wheel))
+                    );
+                }
+
+                for (int codepoint = GetCharPressed(); codepoint != 0;
+                     codepoint = GetCharPressed()) {
+                    if (codepoint >= 32) {
+                        tree.dispatch_text_input(
+                            scene::TextInputEvent(std::string(1, static_cast<char>(codepoint)))
+                        );
+                    }
                 }
                 if (IsKeyPressed(KEY_ESCAPE)) {
                     tree.set_focus(nullptr);
@@ -194,7 +212,10 @@ auto main() -> int {
 
             DrawText("Nandina SceneTree Workspace", 24, 14, 22, c_text);
 
-            tree.draw();
+            {
+                render::DrawContext ctx{*device};
+                tree.render(ctx);
+            }
 
                 if (transform_spinner && transform_button) {
                     const auto gp = transform_button->global_position();

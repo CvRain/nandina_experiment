@@ -3,6 +3,7 @@
 //
 
 #include "node2d.hpp"
+#include "../render/draw_context.hpp"
 
 namespace nandina::scene
 {
@@ -169,8 +170,25 @@ void NanNode2D::on_exit_tree() {
     NanNode::on_exit_tree();
 }
 
-void NanNode2D::on_draw() {
-    NanNode::on_draw();
+void NanNode2D::on_draw(render::DrawContext& ctx) {
+    NanNode::on_draw(ctx);
+}
+
+// ---- draw-time transform propagation ----
+
+auto NanNode2D::_push_draw_transform(render::DrawContext& ctx)
+    -> foundation::NanTransform2D {
+    // ctx.world_ currently holds the parent's world transform. Compose this
+    // node's local transform onto it (parent * local) and store as the new world.
+    // This avoids each node re-walking the parent chain via global_transform().
+    auto saved = ctx.world_;
+    ctx.world_ = ctx.world_.compose(transform_);
+    return saved;
+}
+
+void NanNode2D::_pop_draw_transform(render::DrawContext& ctx,
+                                    const foundation::NanTransform2D& saved) {
+    ctx.world_ = saved;
 }
 
 } // namespace nandina::scene

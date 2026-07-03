@@ -31,9 +31,9 @@ namespace nandina::foundation
             return NanColorConverter<std::remove_cvref_t<ColorSpace>>::from_oklch(color_);
         }
 
-        [[nodiscard]] constexpr auto oklch() const -> NanOklch;
+        [[nodiscard]] constexpr auto oklch() const -> NanOklch { return color_; }
 
-        [[nodiscard]] constexpr auto alpha() const -> float;
+        [[nodiscard]] constexpr auto alpha() const -> float { return color_.alpha; }
 
         [[nodiscard]] auto with_alpha(float alpha) const -> NanColor;
 

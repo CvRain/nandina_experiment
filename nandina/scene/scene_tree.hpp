@@ -11,6 +11,11 @@
 #include <memory>
 #include <vector>
 
+namespace nandina::render
+{
+class IRenderDevice;
+} // namespace nandina::render
+
 namespace nandina::scene
 {
 
@@ -49,8 +54,16 @@ public:
     /// Flushes any pending queue_delete() requests before processing.
     auto process(float dt) -> void;
 
-    /// Call on_draw() on every visible node (top-down, depth-first).
-    auto draw() const -> void;
+    /// Draw every visible node (top-down, depth-first) via the given device.
+    /// Brackets the frame with device.begin_frame()/end_frame() and threads a
+    /// DrawContext (world transform + opacity + clip) through the traversal.
+    /// Use this when the scene owns the whole frame.
+    auto draw(render::IRenderDevice& device) -> void;
+
+    /// Render the scene into an already-open frame using the given context.
+    /// Does NOT call begin_frame/end_frame — the caller owns the frame. Useful
+    /// when app chrome is drawn in the same frame as the scene.
+    auto render(render::DrawContext& ctx) -> void;
 
     // ---- input dispatch ----
 
@@ -60,11 +73,18 @@ public:
     /// Dispatch mouse movement, maintaining hover target enter/leave/move semantics.
     auto dispatch_mouse_move(const MouseMoveEvent& event) -> void;
 
+    /// Dispatch a scroll-wheel event to the hovered node and bubble toward root.
+    /// If nothing is hovered, hit-tests at the event position first.
+    auto dispatch_mouse_wheel(const MouseWheelEvent& event) -> void;
+
     /// Current deepest hovered node, or nullptr if none.
     [[nodiscard]] auto hovered_node() const -> NanNode2D*;
 
     /// Dispatch a key event to the focused node and bubble toward the root.
     auto dispatch_key(const KeyEvent& event) -> void;
+
+    /// Dispatch committed text input to the focused node and bubble toward root.
+    auto dispatch_text_input(const TextInputEvent& event) -> void;
 
     /// Focused node, or nullptr if none.
     [[nodiscard]] auto focused_node() const -> NanNode2D*;

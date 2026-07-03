@@ -5,6 +5,8 @@
 #ifndef NANDINA_EXPERIMENT_NODE_HPP
 #define NANDINA_EXPERIMENT_NODE_HPP
 
+#include "../foundation/transform2d.hpp"
+
 #include <memory>
 #include <string>
 #include <string_view>
@@ -16,6 +18,15 @@ namespace nandina::scene
 class InputEvent;
 class NanSceneTree;
 class NanNode2D;
+} // namespace nandina::scene
+
+namespace nandina::render
+{
+class DrawContext;
+} // namespace nandina::render
+
+namespace nandina::scene
+{
 
 /**
  * Base class for all nodes in the scene tree.
@@ -121,7 +132,8 @@ public:
     virtual void on_process(float dt);
 
     /// Called during draw traversal (top-down: parent drawn before children).
-    virtual void on_draw();
+    /// The context carries the world transform, inherited opacity, and clip stack.
+    virtual void on_draw(render::DrawContext& ctx);
 
     /// Hint for sibling draw/hit-test ordering (higher = on top).
     /// Override in subclasses that have a z-ordering concept.
@@ -157,7 +169,17 @@ protected:
     void _propagate_process(float dt);
 
     /// Internal: draw this node then recursively draw children (top-down).
-    void _propagate_draw();
+    /// Threads world transform + inherited opacity + clip via the context.
+    void _propagate_draw(render::DrawContext& ctx);
+
+    /// Internal hook: update ctx world transform for this node before drawing.
+    /// Base is identity (no spatial transform); NanNode2D composes its local
+    /// transform onto the parent world. Returns the parent world to restore.
+    /// Avoids RTTI in the traversal by using a virtual instead of a cast.
+    [[nodiscard]] virtual auto _push_draw_transform(render::DrawContext& ctx)
+        -> foundation::NanTransform2D;
+    virtual void _pop_draw_transform(render::DrawContext& ctx,
+                                     const foundation::NanTransform2D& saved);
 
 private:
     // parent is a non-owning back-reference (children own parent would be a

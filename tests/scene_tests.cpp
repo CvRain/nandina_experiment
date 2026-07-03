@@ -1,15 +1,15 @@
 //
-// Headless logic tests for the scene layer.
-// No third-party framework: a tiny assertion harness keeps the test target
-// dependency-free and runnable without a window (scene/ never calls raylib).
+// Scene-layer unit tests (Catch2 v3).
+// Headless: scene/ never calls raylib, so these run without a window.
 //
+
+#include <catch2/catch_test_macros.hpp>
 
 #include "scene/input_event.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
 
 #include <functional>
-#include <iostream>
 #include <memory>
 #include <string>
 #include <vector>
@@ -19,18 +19,7 @@ using namespace nandina;
 namespace
 {
 
-int g_checks = 0;
-int g_failures = 0;
-
-void check(bool cond, const std::string& what) {
-    ++g_checks;
-    if (!cond) {
-        ++g_failures;
-        std::cerr << "  FAIL: " << what << "\n";
-    }
-}
-
-/// Records lifecycle callbacks into a shared trace for order assertions.
+/// Records lifecycle + input callbacks into a shared trace for order assertions.
 class ProbeNode : public scene::NanNode2D {
 public:
     ProbeNode(std::vector<std::string>* trace, std::string tag, bool focusable = false)
@@ -54,18 +43,30 @@ public:
     void on_exit_tree() override { NanNode2D::on_exit_tree(); log("exit"); }
 
     auto on_input(scene::InputEvent& e) -> bool override {
-        if (dynamic_cast<scene::MouseEnterEvent*>(&e)) { log("hover_enter"); }
-        else if (dynamic_cast<scene::MouseLeaveEvent*>(&e)) { log("hover_leave"); }
-        else if (dynamic_cast<scene::FocusEnterEvent*>(&e)) { log("focus_enter"); }
-        else if (dynamic_cast<scene::FocusLeaveEvent*>(&e)) { log("focus_leave"); }
+        switch (e.type()) {
+        case scene::EventType::mouse_enter: log("hover_enter"); break;
+        case scene::EventType::mouse_leave: log("hover_leave"); break;
+        case scene::EventType::focus_enter: log("focus_enter"); break;
+        case scene::EventType::focus_leave: log("focus_leave"); break;
+        case scene::EventType::mouse_wheel: {
+            const auto& w = static_cast<const scene::MouseWheelEvent&>(e);
+            log("wheel:" + std::to_string(static_cast<int>(w.delta().get_y())));
+            break;
+        }
+        case scene::EventType::text_input: {
+            const auto& t = static_cast<const scene::TextInputEvent&>(e);
+            log("text:" + std::string(t.text()));
+            break;
+        }
+        default: break;
+        }
         return false;
     }
 
-    // Optional: run a callback inside on_enter_tree to exercise reentrancy.
     std::function<void(ProbeNode&)> on_enter_hook;
 
 protected:
-    void log(const char* ev) {
+    void log(const std::string& ev) {
         if (trace_) { trace_->push_back(tag_ + ":" + ev); }
     }
 
@@ -75,7 +76,7 @@ private:
     bool focusable_;
 };
 
-/// ProbeNode variant that adds children during on_enter_tree (P0 regression).
+/// ProbeNode variant that runs a hook during on_enter_tree (P0 regression).
 class HookNode : public ProbeNode {
 public:
     using ProbeNode::ProbeNode;
@@ -85,20 +86,20 @@ public:
     }
 };
 
-auto count_occurrences(const std::vector<std::string>& trace, const std::string& what) -> int {
+auto count(const std::vector<std::string>& trace, const std::string& what) -> int {
     int n = 0;
     for (const auto& s : trace) { if (s == what) { ++n; } }
     return n;
 }
 
-auto index_of(const std::vector<std::string>& trace, const std::string& what) -> int {
-    for (size_t i = 0; i < trace.size(); ++i) { if (trace[i] == what) { return static_cast<int>(i); } }
+auto index_of(const std::vector<std::string>& trace, const std::string& what) -> long {
+    for (size_t i = 0; i < trace.size(); ++i) { if (trace[i] == what) { return static_cast<long>(i); } }
     return -1;
 }
 
-// ---- tests ----
+} // namespace
 
-void test_lifecycle_order() {
+TEST_CASE("lifecycle callbacks fire in the correct order", "[scene][lifecycle]") {
     std::vector<std::string> trace;
 
     auto root = std::make_shared<ProbeNode>(&trace, "root");
@@ -110,38 +111,36 @@ void test_lifecycle_order() {
     scene::NanSceneTree tree;
     tree.set_root(root);
 
-    // enter is top-down: root before child before grandchild.
-    check(index_of(trace, "root:enter") < index_of(trace, "child:enter"), "enter top-down root<child");
-    check(index_of(trace, "child:enter") < index_of(trace, "gc:enter"), "enter top-down child<gc");
-
-    // ready is bottom-up: grandchild before child before root.
-    check(index_of(trace, "gc:ready") < index_of(trace, "child:ready"), "ready bottom-up gc<child");
-    check(index_of(trace, "child:ready") < index_of(trace, "root:ready"), "ready bottom-up child<root");
-
-    // each fires exactly once.
-    check(count_occurrences(trace, "root:ready") == 1, "root ready once");
-    check(count_occurrences(trace, "gc:enter") == 1, "gc enter once");
+    SECTION("enter_tree is top-down") {
+        REQUIRE(index_of(trace, "root:enter") < index_of(trace, "child:enter"));
+        REQUIRE(index_of(trace, "child:enter") < index_of(trace, "gc:enter"));
+    }
+    SECTION("ready is bottom-up") {
+        REQUIRE(index_of(trace, "gc:ready") < index_of(trace, "child:ready"));
+        REQUIRE(index_of(trace, "child:ready") < index_of(trace, "root:ready"));
+    }
+    SECTION("each callback fires exactly once") {
+        REQUIRE(count(trace, "root:ready") == 1);
+        REQUIRE(count(trace, "gc:enter") == 1);
+    }
 }
 
-void test_reentrant_add_during_enter() {
-    // P0 regression: adding a child inside on_enter_tree must not double-fire
-    // enter_tree / ready on the newly added subtree.
+TEST_CASE("adding a child during on_enter_tree does not double-fire (P0)", "[scene][lifecycle][regression]") {
     std::vector<std::string> trace;
 
     auto root = std::make_shared<HookNode>(&trace, "root");
     root->on_enter_hook = [&trace](ProbeNode& self) {
-        auto late = std::make_shared<ProbeNode>(&trace, "late");
-        self.add_child(late);
+        self.add_child(std::make_shared<ProbeNode>(&trace, "late"));
     };
 
     scene::NanSceneTree tree;
     tree.set_root(root);
 
-    check(count_occurrences(trace, "late:enter") == 1, "late enter exactly once (P0)");
-    check(count_occurrences(trace, "late:ready") == 1, "late ready exactly once (P0)");
+    REQUIRE(count(trace, "late:enter") == 1);
+    REQUIRE(count(trace, "late:ready") == 1);
 }
 
-void test_hover_enter_leave() {
+TEST_CASE("hover tracking sends one enter and one leave", "[scene][hover]") {
     auto root = std::make_shared<ProbeNode>(nullptr, "root");
     auto a = std::make_shared<ProbeNode>(nullptr, "a");
     std::vector<std::string> trace;
@@ -154,18 +153,16 @@ void test_hover_enter_leave() {
     scene::NanSceneTree tree;
     tree.set_root(root);
 
-    // Move over b.
     tree.dispatch_mouse_move(scene::MouseMoveEvent(foundation::NanPoint(200, 200), foundation::NanPoint(0, 0)));
-    check(tree.hovered_node() == b.get(), "hover lands on b");
-    check(count_occurrences(trace, "b:hover_enter") == 1, "b got one hover_enter");
+    REQUIRE(tree.hovered_node() == b.get());
+    REQUIRE(count(trace, "b:hover_enter") == 1);
 
-    // Move off everything.
     tree.dispatch_mouse_move(scene::MouseMoveEvent(foundation::NanPoint(500, 500), foundation::NanPoint(0, 0)));
-    check(tree.hovered_node() == nullptr, "hover cleared off-target");
-    check(count_occurrences(trace, "b:hover_leave") == 1, "b got one hover_leave");
+    REQUIRE(tree.hovered_node() == nullptr);
+    REQUIRE(count(trace, "b:hover_leave") == 1);
 }
 
-void test_focus_traversal() {
+TEST_CASE("focus traversal skips non-focusable and wraps", "[scene][focus]") {
     auto root = std::make_shared<ProbeNode>(nullptr, "root");
     auto f1 = std::make_shared<ProbeNode>(nullptr, "f1", true);
     auto f2 = std::make_shared<ProbeNode>(nullptr, "f2", true);
@@ -178,57 +175,53 @@ void test_focus_traversal() {
     tree.set_root(root);
 
     tree.focus_next();
-    check(tree.focused_node() == f1.get(), "focus_next -> f1");
+    REQUIRE(tree.focused_node() == f1.get());
     tree.focus_next();
-    check(tree.focused_node() == f2.get(), "focus_next -> f2 (skips non-focusable)");
+    REQUIRE(tree.focused_node() == f2.get());  // skips non-focusable plain
     tree.focus_next();
-    check(tree.focused_node() == f1.get(), "focus_next wraps -> f1");
+    REQUIRE(tree.focused_node() == f1.get());  // wraps
     tree.focus_previous();
-    check(tree.focused_node() == f2.get(), "focus_previous wraps -> f2");
+    REQUIRE(tree.focused_node() == f2.get());  // wraps back
 }
 
-void test_queue_delete_dedup_and_safety() {
+TEST_CASE("queue_delete dedups descendants and never dangles", "[scene][delete]") {
     auto root = std::make_shared<ProbeNode>(nullptr, "root");
-    auto parentw = std::weak_ptr<scene::NanNode2D>();
-    auto childw = std::weak_ptr<scene::NanNode2D>();
+    std::weak_ptr<scene::NanNode2D> parentw;
+    std::weak_ptr<scene::NanNode2D> childw;
     {
-        // Build the subtree and hand full ownership to root; keep only weak
-        // observers so the tree is the sole strong owner before flush.
         auto parent = std::make_shared<ProbeNode>(nullptr, "parent");
         auto child = std::make_shared<ProbeNode>(nullptr, "child");
         parentw = parent;
         childw = child;
         parent->add_child(child);
-
-        // Queue both: the ancestor should absorb the descendant request.
-        // (queue_delete before set_root would have no tree; do it after.)
-        root->add_child(parent);
+        root->add_child(parent);  // root becomes the sole strong owner
     }
 
     scene::NanSceneTree tree;
     tree.set_root(root);
 
-    tree.queue_delete(*parentw.lock());
-    tree.queue_delete(*childw.lock());  // deduped under parent
+    SECTION("ancestor request absorbs descendant request") {
+        tree.queue_delete(*parentw.lock());
+        tree.queue_delete(*childw.lock());  // deduped under parent
 
-    check(!childw.expired(), "child alive before flush");
-    tree.process(0.016F);  // flush
-    check(childw.expired(), "child destroyed with parent subtree");
-    check(parentw.expired(), "parent destroyed on flush");
-    check(root->child_count() == 0, "parent removed from root");
+        REQUIRE_FALSE(childw.expired());
+        tree.process(0.016F);  // flush
+        REQUIRE(childw.expired());
+        REQUIRE(parentw.expired());
+        REQUIRE(root->child_count() == 0);
+    }
 
-    // Queue a node, then destroy its owner by other means before flush:
-    // weak delete_queue must not dangle.
-    auto lone = std::make_shared<ProbeNode>(nullptr, "lone");
-    root->add_child(lone);
-    tree.queue_delete(*lone);
-    root->remove_and_delete(*lone);  // gone before flush
-    tree.process(0.016F);            // must not crash on expired weak_ptr
-    check(root->child_count() == 0, "lone cleaned; no dangling crash");
+    SECTION("node destroyed by another path before flush is skipped safely") {
+        auto lone = std::make_shared<ProbeNode>(nullptr, "lone");
+        root->add_child(lone);
+        tree.queue_delete(*lone);
+        root->remove_and_delete(*lone);  // gone before flush
+        REQUIRE_NOTHROW(tree.process(0.016F));  // expired weak_ptr must not crash
+        REQUIRE(root->child_count() == 1);  // only 'parent' subtree remains
+    }
 }
 
-void test_remove_readds_ready() {
-    // A removed + re-added node should fire ready again (ready_notified_ reset).
+TEST_CASE("removed and re-added node readies again", "[scene][lifecycle]") {
     std::vector<std::string> trace;
     auto root = std::make_shared<ProbeNode>(&trace, "root");
     auto n = std::make_shared<ProbeNode>(&trace, "n");
@@ -236,34 +229,81 @@ void test_remove_readds_ready() {
 
     scene::NanSceneTree tree;
     tree.set_root(root);
-    check(count_occurrences(trace, "n:ready") == 1, "n ready once initially");
+    REQUIRE(count(trace, "n:ready") == 1);
 
-    auto detached = root->remove_child(*n);  // exit_tree fires
-    check(count_occurrences(trace, "n:exit") == 1, "n exited on remove");
-    root->add_child(detached);  // re-enter + re-ready
-    check(count_occurrences(trace, "n:ready") == 2, "n ready fires again after re-add");
+    auto detached = root->remove_child(*n);
+    REQUIRE(count(trace, "n:exit") == 1);
+    root->add_child(detached);
+    REQUIRE(count(trace, "n:ready") == 2);
 }
 
-} // namespace
+TEST_CASE("mouse wheel dispatches to hovered node and bubbles", "[scene][wheel]") {
+    std::vector<std::string> parent_trace;
+    std::vector<std::string> child_trace;
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto parent = std::make_shared<ProbeNode>(&parent_trace, "parent");
+    auto child = std::make_shared<ProbeNode>(&child_trace, "child");
+    parent->set_position(foundation::NanPoint(100, 100));
+    // child sits at same world position as parent (local origin), so hit-test
+    // lands on child (deepest) and the wheel event bubbles up to parent.
+    parent->add_child(child);
+    root->add_child(parent);
 
-auto main() -> int {
-    struct Case { const char* name; void (*fn)(); };
-    const Case cases[] = {
-        {"lifecycle_order", test_lifecycle_order},
-        {"reentrant_add_during_enter", test_reentrant_add_during_enter},
-        {"hover_enter_leave", test_hover_enter_leave},
-        {"focus_traversal", test_focus_traversal},
-        {"queue_delete_dedup_and_safety", test_queue_delete_dedup_and_safety},
-        {"remove_readds_ready", test_remove_readds_ready},
-    };
+    scene::NanSceneTree tree;
+    tree.set_root(root);
 
-    for (const auto& c : cases) {
-        std::cout << "[ run  ] " << c.name << "\n";
-        const int before = g_failures;
-        c.fn();
-        std::cout << (g_failures == before ? "[ ok   ] " : "[ FAIL ] ") << c.name << "\n";
+    SECTION("falls back to hit-test when nothing hovered") {
+        tree.dispatch_mouse_wheel(scene::MouseWheelEvent(
+            foundation::NanPoint(100, 100), foundation::NanPoint(0, 3)));
+        REQUIRE(count(child_trace, "child:wheel:3") == 1);
+        REQUIRE(count(parent_trace, "parent:wheel:3") == 1);  // bubbled to parent
     }
 
-    std::cout << "\n" << (g_checks - g_failures) << "/" << g_checks << " checks passed\n";
-    return g_failures == 0 ? 0 : 1;
+    SECTION("uses current hover target") {
+        tree.dispatch_mouse_move(scene::MouseMoveEvent(
+            foundation::NanPoint(100, 100), foundation::NanPoint(0, 0)));
+        REQUIRE(tree.hovered_node() == child.get());
+        tree.dispatch_mouse_wheel(scene::MouseWheelEvent(
+            foundation::NanPoint(100, 100), foundation::NanPoint(0, -2)));
+        REQUIRE(count(child_trace, "child:wheel:-2") == 1);
+    }
+}
+
+TEST_CASE("text input dispatches to the focused node", "[scene][text]") {
+    std::vector<std::string> trace;
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto field = std::make_shared<ProbeNode>(&trace, "field", true);
+    root->add_child(field);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    SECTION("no focus: text input is dropped") {
+        tree.dispatch_text_input(scene::TextInputEvent("hi"));
+        REQUIRE(count(trace, "field:text:hi") == 0);
+    }
+
+    SECTION("with focus: text reaches the focused node") {
+        tree.set_focus(field.get());
+        tree.dispatch_text_input(scene::TextInputEvent("hi"));
+        REQUIRE(count(trace, "field:text:hi") == 1);
+    }
+}
+
+TEST_CASE("modifiers propagate through button and key events", "[scene][modifiers]") {
+    scene::KeyModifiers mods;
+    mods.ctrl = true;
+    mods.shift = true;
+
+    scene::KeyEvent key(65, scene::KeyEvent::Action::press, mods);
+    REQUIRE(key.modifiers().ctrl);
+    REQUIRE(key.modifiers().shift);
+    REQUIRE_FALSE(key.modifiers().alt);
+    REQUIRE(key.modifiers().any());
+
+    scene::MouseButtonEvent btn(scene::MouseButtonEvent::Button::left,
+                                scene::MouseButtonEvent::Action::press,
+                                foundation::NanPoint(0, 0), mods);
+    REQUIRE(btn.modifiers().ctrl);
+    REQUIRE(btn.type() == scene::EventType::mouse_button);
 }

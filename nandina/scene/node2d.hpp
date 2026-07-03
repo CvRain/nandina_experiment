@@ -105,11 +105,18 @@ public:
 
     // ---- lifecycle ----
 
-    void on_draw() override;
+    void on_draw(render::DrawContext& ctx) override;
 
 protected:
     void on_enter_tree() override;
     void on_exit_tree() override;
+
+    /// Compose this node's local transform onto the parent world in ctx.
+    /// Returns the parent world so _propagate_draw can restore it afterward.
+    [[nodiscard]] auto _push_draw_transform(render::DrawContext& ctx)
+        -> foundation::NanTransform2D override;
+    void _pop_draw_transform(render::DrawContext& ctx,
+                             const foundation::NanTransform2D& saved) override;
 
     /// Invalidate this node's cached global transform.
     void _invalidate_global();

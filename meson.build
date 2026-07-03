@@ -29,6 +29,11 @@ sdl_dep = sdl_subproj.dependency('SDL3-static')
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 raylib_dep = raylib_subproj.dependency('raylib')
 
+# Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
+# catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。
+catch2_subproj = subproject('Catch2', default_options: ['install=false', 'tests=false'])
+catch2_with_main_dep = catch2_subproj.get_variable('catch2_with_main_dep')
+
 # 引入子项目
 subdir('nandina')
 subdir('example')

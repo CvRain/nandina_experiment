@@ -5,9 +5,11 @@
 #include "node.hpp"
 #include "node2d.hpp"
 #include "scene_tree.hpp"
+#include "../render/draw_context.hpp"
 
 #include <algorithm>
 #include <stdexcept>
+#include <vector>
 
 namespace nandina::scene
 {
@@ -121,7 +123,7 @@ void NanNode::on_exit_tree() {}
 auto NanNode::on_input(InputEvent& /*event*/) -> bool { return false; }
 
 void NanNode::on_process(float /*dt*/) {}
-void NanNode::on_draw() {}
+void NanNode::on_draw(render::DrawContext& /*ctx*/) {}
 
 auto NanNode::z_index_hint() const -> int { return 0; }
 
@@ -179,27 +181,41 @@ void NanNode::_propagate_process(const float dt) {
     }
 }
 
-void NanNode::_propagate_draw() {
+auto NanNode::_push_draw_transform(render::DrawContext& /*ctx*/)
+    -> foundation::NanTransform2D {
+    // Base node has no spatial transform; leave ctx.world unchanged.
+    // NanNode2D overrides this to compose its local transform onto the parent.
+    return {};
+}
+
+void NanNode::_pop_draw_transform(render::DrawContext& /*ctx*/,
+                                  const foundation::NanTransform2D& /*saved*/) {}
+
+void NanNode::_propagate_draw(render::DrawContext& ctx) {
     if (!is_visible_in_tree()) {
-        return;
+        return;  // Whole subtree skipped (visibility is a subtree property).
     }
 
-    on_draw();
+    // Update world transform for this node (virtual: no RTTI in traversal).
+    const auto saved_world = _push_draw_transform(ctx);
 
-    if (children_.empty()) return;
+    on_draw(ctx);
 
-    std::vector<size_t> indices(children_.size());
-    for (size_t i = 0; i < children_.size(); ++i) indices[i] = i;
-    std::stable_sort(indices.begin(), indices.end(),
-        [this](size_t a, size_t b) {
-            const int za = children_[a]->z_index_hint();
-            const int zb = children_[b]->z_index_hint();
-            return za < zb;
-        });
+    if (!children_.empty()) {
+        // z-order: stable_sort keeps insertion order among equal z (unchanged).
+        std::vector<size_t> indices(children_.size());
+        for (size_t i = 0; i < children_.size(); ++i) { indices[i] = i; }
+        std::stable_sort(indices.begin(), indices.end(),
+            [this](size_t a, size_t b) {
+                return children_[a]->z_index_hint() < children_[b]->z_index_hint();
+            });
 
-    for (size_t idx : indices) {
-        children_[idx]->_propagate_draw();
+        for (size_t idx : indices) {
+            children_[idx]->_propagate_draw(ctx);
+        }
     }
+
+    _pop_draw_transform(ctx, saved_world);
 }
 
 } // namespace nandina::scene
