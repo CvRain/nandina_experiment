@@ -122,10 +122,7 @@ namespace nandina::foundation
     }
 
     auto NanPoint::lerp(const NanPoint& a, const NanPoint& b, const float t) -> NanPoint {
-        return NanPoint(
-            std::lerp(a.x_axis, b.x_axis, t),
-            std::lerp(a.y_axis, b.y_axis, t)
-        );
+        return NanPoint(std::lerp(a.x_axis, b.x_axis, t), std::lerp(a.y_axis, b.y_axis, t));
     }
 
     auto NanPoint::equals(const NanPoint& point) const -> bool {
@@ -274,17 +271,11 @@ namespace nandina::foundation
     }
 
     auto NanSize::max(const NanSize& other) const -> NanSize {
-        return NanSize(
-            std::max(this->width, other.width),
-            std::max(this->height, other.height)
-        );
+        return NanSize(std::max(this->width, other.width), std::max(this->height, other.height));
     }
 
     auto NanSize::min(const NanSize& other) const -> NanSize {
-        return NanSize(
-            std::min(this->width, other.width),
-            std::min(this->height, other.height)
-        );
+        return NanSize(std::min(this->width, other.width), std::min(this->height, other.height));
     }
 
     auto NanSize::equals(const NanSize& size) const -> bool {
@@ -370,7 +361,8 @@ namespace nandina::foundation
         return std::make_tuple(this->left, this->top, this->right, this->bottom);
     }
 
-    auto NanRect::from_ltrb(const float left, const float top, const float right, const float bottom)
+    auto
+    NanRect::from_ltrb(const float left, const float top, const float right, const float bottom)
         -> NanRect {
         return NanRect(left, top, right, bottom);
     }
@@ -441,10 +433,7 @@ namespace nandina::foundation
     }
 
     auto NanRect::get_center() const -> NanPoint {
-        return NanPoint(
-            (this->left + this->right) / 2.0F,
-            (this->top + this->bottom) / 2.0F
-        );
+        return NanPoint((this->left + this->right) / 2.0F, (this->top + this->bottom) / 2.0F);
     }
 
     auto NanRect::is_empty() const -> bool {
@@ -483,24 +472,18 @@ namespace nandina::foundation
     }
 
     auto NanRect::contains_point(const NanPoint& point) const -> bool {
-        return point.get_x() >= this->left
-            && point.get_x() <= this->right
-            && point.get_y() >= this->top
-            && point.get_y() <= this->bottom;
+        return point.get_x() >= this->left && point.get_x() <= this->right
+            && point.get_y() >= this->top && point.get_y() <= this->bottom;
     }
 
     auto NanRect::contains_rect(const NanRect& rect) const -> bool {
-        return rect.left >= this->left
-            && rect.top >= this->top
-            && rect.right <= this->right
+        return rect.left >= this->left && rect.top >= this->top && rect.right <= this->right
             && rect.bottom <= this->bottom;
     }
 
     auto NanRect::intersects(const NanRect& rect) const -> bool {
-        return this->left < rect.right
-            && this->right > rect.left
-            && this->top < rect.bottom
-            && this->bottom > rect.top;
+        return this->left<rect.right&& this->right> rect.left
+            && this->top<rect.bottom&& this->bottom> rect.top;
     }
 
     auto NanRect::intersected(const NanRect& rect) const -> NanRect {
@@ -548,12 +531,7 @@ namespace nandina::foundation
         const auto ratio_y = (anchor.get_y() - this->top) / get_height();
         const auto new_left = anchor.get_x() - new_width * ratio_x;
         const auto new_top = anchor.get_y() - new_height * ratio_y;
-        return NanRect(
-            new_left,
-            new_top,
-            new_left + new_width,
-            new_top + new_height
-        );
+        return NanRect(new_left, new_top, new_left + new_width, new_top + new_height);
     }
 
     auto NanRect::with_origin(const NanPoint& origin) const -> NanRect {
@@ -577,9 +555,7 @@ namespace nandina::foundation
     }
 
     auto NanRect::equals(const NanRect& rect) const -> bool {
-        return this->left == rect.left
-            && this->top == rect.top
-            && this->right == rect.right
+        return this->left == rect.left && this->top == rect.top && this->right == rect.right
             && this->bottom == rect.bottom;
     }
 
@@ -767,9 +743,7 @@ namespace nandina::foundation
     }
 
     auto NanInsets::equals(const NanInsets& other) const -> bool {
-        return this->left == other.left
-            && this->right == other.right
-            && this->top == other.top
+        return this->left == other.left && this->right == other.right && this->top == other.top
             && this->bottom == other.bottom;
     }
 

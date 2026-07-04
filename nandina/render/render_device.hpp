@@ -16,46 +16,51 @@
 
 namespace nandina::render
 {
-using foundation::NanColor;
-using foundation::NanPoint;
-using foundation::NanRect;
+    using foundation::NanColor;
+    using foundation::NanPoint;
+    using foundation::NanRect;
 
-/// Abstract drawing device. Coordinates are world-space (screen pixels, y down).
-/// Implementations translate primitives into a concrete backend. Traversal-varying
-/// state (transform, clip, opacity) lives in DrawContext, not here — the device is
-/// a stateless "draw this primitive" executor plus frame/clip bracketing.
-class IRenderDevice {
-public:
-    virtual ~IRenderDevice() = default;
+    /// Abstract drawing device. Coordinates are world-space (screen pixels, y down).
+    /// Implementations translate primitives into a concrete backend. Traversal-varying
+    /// state (transform, clip, opacity) lives in DrawContext, not here — the device is
+    /// a stateless "draw this primitive" executor plus frame/clip bracketing.
+    class IRenderDevice {
+    public:
+        virtual ~IRenderDevice() = default;
 
-    // ---- frame boundaries ----
-    virtual void begin_frame() = 0;
-    virtual void end_frame() = 0;
+        // ---- frame boundaries ----
+        virtual void begin_frame() = 0;
+        virtual void end_frame() = 0;
 
-    // ---- clipping (screen-space axis-aligned rect) ----
-    /// Set the current clip rect; called by ClipStack, not by nodes directly.
-    virtual void set_clip(const NanRect& screen_rect) = 0;
-    virtual void clear_clip() = 0;
+        // ---- clipping (screen-space axis-aligned rect) ----
+        /// Set the current clip rect; called by ClipStack, not by nodes directly.
+        virtual void set_clip(const NanRect& screen_rect) = 0;
+        virtual void clear_clip() = 0;
 
-    // ---- primitives (world-space axis-aligned) ----
-    virtual void draw_rect(const NanRect& rect, const NanColor& color) = 0;
-    virtual void draw_rect_outline(const NanRect& rect, float thickness,
-                                   const NanColor& color) = 0;
-    virtual void draw_rounded_rect(const NanRect& rect, float radius,
-                                   const NanColor& color) = 0;
-    virtual void draw_line(const NanPoint& a, const NanPoint& b,
-                           float thickness, const NanColor& color) = 0;
-    virtual void draw_circle(const NanPoint& center, float radius,
-                             const NanColor& color) = 0;
+        // ---- primitives (world-space axis-aligned) ----
+        virtual void draw_rect(const NanRect& rect, const NanColor& color) = 0;
+        virtual void
+        draw_rect_outline(const NanRect& rect, float thickness, const NanColor& color) = 0;
+        virtual void
+        draw_rounded_rect(const NanRect& rect, float radius, const NanColor& color) = 0;
+        virtual void
+        draw_line(const NanPoint& a, const NanPoint& b, float thickness, const NanColor& color) = 0;
+        virtual void draw_circle(const NanPoint& center, float radius, const NanColor& color) = 0;
 
-    /// Text uses a minimal "top-left anchor + backend default font" interface;
-    /// full text layout is abstracted later.
-    virtual void draw_text(std::string_view text, const NanPoint& pos,
-                           float font_size, const NanColor& color) = 0;
+        /// Text uses a minimal "top-left anchor + backend default font" interface;
+        /// full text layout is abstracted later.
+        virtual void draw_text(
+            std::string_view text,
+            const NanPoint& pos,
+            float font_size,
+            const NanColor& color
+        ) = 0;
 
-    // ---- capability queries (let nodes pick a fallback path) ----
-    [[nodiscard]] virtual auto supports_rounded_rect() const -> bool { return true; }
-};
+        // ---- capability queries (let nodes pick a fallback path) ----
+        [[nodiscard]] virtual auto supports_rounded_rect() const -> bool {
+            return true;
+        }
+    };
 
 } // namespace nandina::render
 

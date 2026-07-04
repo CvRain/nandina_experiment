@@ -28,90 +28,91 @@
 namespace nandina::reactive
 {
 
-/// 惰性缓存、自动失效的派生值。
-template<typename T>
-class Computed final : public Reactor {
-public:
-    /// 由 make_computed 构造。compute 捕获所需的上游 signal/computed。
-    Computed(Graph& graph, std::function<T()> compute)
-        : graph_(&graph), compute_(std::move(compute)) {
-        id = graph.next_id();
-        // 初始为 dirty: 尚未求值, 首次 get 触发计算。
-        state = ReactorState::dirty;
-        source_.id = graph.next_id();
-    }
+    /// 惰性缓存、自动失效的派生值。
+    template<typename T>
+    class Computed final: public Reactor {
+    public:
+        /// 由 make_computed 构造。compute 捕获所需的上游 signal/computed。
+        Computed(Graph& graph, std::function<T()> compute):
+            graph_(&graph),
+            compute_(std::move(compute)) {
+            id = graph.next_id();
+            // 初始为 dirty: 尚未求值, 首次 get 触发计算。
+            state = ReactorState::dirty;
+            source_.id = graph.next_id();
+        }
 
-    ~Computed() override {
-        disposed = true;
-        if (!graph_->is_tearing_down()) {
+        ~Computed() override {
+            disposed = true;
+            if (!graph_->is_tearing_down()) {
+                graph_->clear_reactor_deps(*this);
+                graph_->detach_source(source_);
+            }
+        }
+
+        /// 读取派生值; 若依赖已变化则重算。在追踪上下文中自动注册依赖。
+        [[nodiscard]] auto get() -> const T& {
+            graph_->track(source_);
+            if (state == ReactorState::dirty) {
+                recompute();
+            }
+            return cached_;
+        }
+
+        /// 不建立依赖地读取; 若 dirty 仍会重算以返回最新值。
+        [[nodiscard]] auto peek() -> const T& {
+            if (state == ReactorState::dirty) {
+                recompute();
+            }
+            return cached_;
+        }
+
+        /// 提前释放该 computed: 解绑上下游依赖、释放内存。幂等。
+        void dispose() {
+            graph_->dispose_reactor(this);
+        }
+
+        // ── Reactor 接口 ──────────────────────────────────────────────────────────
+
+        /// 上游变化时把失效继续传播给本 computed 的订阅者。
+        /// 因 invalidate_reactor 在置 dirty 前会判重, 此处不会重复传播。
+        void on_invalidate(Graph& graph) override {
+            const auto snapshot = source_.subs;
+            for (auto* sub: snapshot) {
+                graph.invalidate_reactor(*sub);
+            }
+        }
+
+        /// computed 是 pull 模型, 永不进入 pending 队列, run 不应被调用。
+        void run(Graph& /*graph*/) override {
+            // unreachable
+        }
+
+    private:
+        void recompute() {
             graph_->clear_reactor_deps(*this);
-            graph_->detach_source(source_);
+            state = ReactorState::clean;
+            auto* prev = graph_->begin_read(this);
+            cached_ = compute_();
+            graph_->end_read(prev);
         }
+
+        Graph* graph_;
+        Source source_;
+        std::function<T()> compute_;
+        T cached_ {};
+    };
+
+    /// 创建一个 computed。fn 捕获上游依赖, 签名为 T()。
+    /// 求值惰性: 构造时不执行 fn, 首次 get() 时才计算并缓存。
+    template<typename Fn>
+    [[nodiscard]] auto make_computed(Graph& graph, Fn&& fn) {
+        using T = std::invoke_result_t<Fn>;
+        auto owned = std::make_unique<Computed<T>>(graph, std::function<T()>(std::forward<Fn>(fn)));
+        auto* raw = owned.get();
+        graph.adopt(std::move(owned));
+        return raw;
     }
-
-    /// 读取派生值; 若依赖已变化则重算。在追踪上下文中自动注册依赖。
-    [[nodiscard]] auto get() -> const T& {
-        graph_->track(source_);
-        if (state == ReactorState::dirty) {
-            recompute();
-        }
-        return cached_;
-    }
-
-    /// 不建立依赖地读取; 若 dirty 仍会重算以返回最新值。
-    [[nodiscard]] auto peek() -> const T& {
-        if (state == ReactorState::dirty) {
-            recompute();
-        }
-        return cached_;
-    }
-
-    /// 提前释放该 computed: 解绑上下游依赖、释放内存。幂等。
-    void dispose() {
-        graph_->dispose_reactor(this);
-    }
-
-    // ── Reactor 接口 ──────────────────────────────────────────────────────────
-
-    /// 上游变化时把失效继续传播给本 computed 的订阅者。
-    /// 因 invalidate_reactor 在置 dirty 前会判重, 此处不会重复传播。
-    void on_invalidate(Graph& graph) override {
-        const auto snapshot = source_.subs;
-        for (auto* sub : snapshot) {
-            graph.invalidate_reactor(*sub);
-        }
-    }
-
-    /// computed 是 pull 模型, 永不进入 pending 队列, run 不应被调用。
-    void run(Graph& /*graph*/) override {
-        // unreachable
-    }
-
-private:
-    void recompute() {
-        graph_->clear_reactor_deps(*this);
-        state = ReactorState::clean;
-        auto* prev = graph_->begin_read(this);
-        cached_ = compute_();
-        graph_->end_read(prev);
-    }
-
-    Graph* graph_;
-    Source source_;
-    std::function<T()> compute_;
-    T cached_{};
-};
-
-/// 创建一个 computed。fn 捕获上游依赖, 签名为 T()。
-/// 求值惰性: 构造时不执行 fn, 首次 get() 时才计算并缓存。
-template<typename Fn>
-[[nodiscard]] auto make_computed(Graph& graph, Fn&& fn) {
-    using T = std::invoke_result_t<Fn>;
-    auto owned = std::make_unique<Computed<T>>(graph, std::function<T()>(std::forward<Fn>(fn)));
-    auto* raw = owned.get();
-    graph.adopt(std::move(owned));
-    return raw;
-}
 
 } // namespace nandina::reactive
 

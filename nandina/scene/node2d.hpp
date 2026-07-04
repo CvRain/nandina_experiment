@@ -5,133 +5,143 @@
 #ifndef NANDINA_EXPERIMENT_NODE2D_HPP
 #define NANDINA_EXPERIMENT_NODE2D_HPP
 
-#include "node.hpp"
 #include "../foundation/transform2d.hpp"
+#include "node.hpp"
 
 namespace nandina::scene
 {
 
-/**
- * 2D scene node with a local transform (position, rotation, scale).
- *
- * Inherits from NanNode and adds:
- *   - A local transform relative to the parent node.
- *   - Visibility flag and z-index for draw ordering.
- *   - Global transform computation by walking the parent chain.
- *
- * This is the base class for all spatially-located 2D nodes
- * (sprites, labels, collision shapes, etc.).
- *
- * The global transform is lazily cached: the first call to
- * global_transform() after a local change recomputes by composing
- * the parent chain. Subsequent calls return the cached value.
- * The cache is invalidated automatically when any transform mutator
- * is called (set_position, set_rotation, set_scale, etc.).
- */
-class NanNode2D : public NanNode {
-public:
-    NanNode2D();
+    /**
+     * 2D scene node with a local transform (position, rotation, scale).
+     *
+     * Inherits from NanNode and adds:
+     *   - A local transform relative to the parent node.
+     *   - Visibility flag and z-index for draw ordering.
+     *   - Global transform computation by walking the parent chain.
+     *
+     * This is the base class for all spatially-located 2D nodes
+     * (sprites, labels, collision shapes, etc.).
+     *
+     * The global transform is lazily cached: the first call to
+     * global_transform() after a local change recomputes by composing
+     * the parent chain. Subsequent calls return the cached value.
+     * The cache is invalidated automatically when any transform mutator
+     * is called (set_position, set_rotation, set_scale, etc.).
+     */
+    class NanNode2D: public NanNode {
+    public:
+        NanNode2D();
 
-    // ---- local transform ----
+        // ---- local transform ----
 
-    [[nodiscard]] auto transform() const -> const foundation::NanTransform2D&;
-    void set_transform(const foundation::NanTransform2D& t);
+        [[nodiscard]] auto transform() const -> const foundation::NanTransform2D&;
+        void set_transform(const foundation::NanTransform2D& t);
 
-    [[nodiscard]] auto position() const -> foundation::NanPoint;
-    void set_position(foundation::NanPoint pos);
+        [[nodiscard]] auto position() const -> foundation::NanPoint;
+        void set_position(foundation::NanPoint pos);
 
-    [[nodiscard]] auto rotation() const -> float;
-    void set_rotation(float radians);
+        [[nodiscard]] auto rotation() const -> float;
+        void set_rotation(float radians);
 
-    [[nodiscard]] auto scale() const -> foundation::NanPoint;
-    void set_scale(foundation::NanPoint s);
-    void set_scale(float sx, float sy);
+        [[nodiscard]] auto scale() const -> foundation::NanPoint;
+        void set_scale(foundation::NanPoint s);
+        void set_scale(float sx, float sy);
 
-    /// Translate by offset in local space.
-    void translate(foundation::NanPoint offset);
+        /// Translate by offset in local space.
+        void translate(foundation::NanPoint offset);
 
-    /// Rotate by radians (adds to current rotation).
-    void rotate(float radians);
+        /// Rotate by radians (adds to current rotation).
+        void rotate(float radians);
 
-    /// Multiply current scale by factor.
-    void apply_scale(foundation::NanPoint factor);
+        /// Multiply current scale by factor.
+        void apply_scale(foundation::NanPoint factor);
 
-    // ---- global transform (world-space) ----
+        // ---- global transform (world-space) ----
 
-    /// World-space transform.  Lazily recomputed from the parent chain.
-    [[nodiscard]] auto global_transform() const -> foundation::NanTransform2D;
+        /// World-space transform.  Lazily recomputed from the parent chain.
+        [[nodiscard]] auto global_transform() const -> foundation::NanTransform2D;
 
-    [[nodiscard]] auto global_position() const -> foundation::NanPoint;
-    void set_global_position(foundation::NanPoint pos);
+        [[nodiscard]] auto global_position() const -> foundation::NanPoint;
+        void set_global_position(foundation::NanPoint pos);
 
-    [[nodiscard]] auto global_rotation() const -> float;
+        [[nodiscard]] auto global_rotation() const -> float;
 
-    /// Convert a point from local space to global (world) space.
-    [[nodiscard]] auto to_global(foundation::NanPoint local_point) const -> foundation::NanPoint;
+        /// Convert a point from local space to global (world) space.
+        [[nodiscard]] auto to_global(foundation::NanPoint local_point) const
+            -> foundation::NanPoint;
 
-    /// Convert a point from global (world) space to local space.
-    [[nodiscard]] auto to_local(foundation::NanPoint global_point) const -> foundation::NanPoint;
+        /// Convert a point from global (world) space to local space.
+        [[nodiscard]] auto to_local(foundation::NanPoint global_point) const
+            -> foundation::NanPoint;
 
-    /// World-space axis-aligned bounding rectangle of this node.
-    /// Override in subclasses to return the actual interactive/visible area.
-    /// Default: empty rect at global_position.
-    [[nodiscard]] virtual auto global_bounds() const -> foundation::NanRect;
+        /// World-space axis-aligned bounding rectangle of this node.
+        /// Override in subclasses to return the actual interactive/visible area.
+        /// Default: empty rect at global_position.
+        [[nodiscard]] virtual auto global_bounds() const -> foundation::NanRect;
 
-    // ---- visibility ----
+        // ---- visibility ----
 
-    [[nodiscard]] auto visible() const -> bool;
-    void set_visible(bool v);
+        [[nodiscard]] auto visible() const -> bool;
+        void set_visible(bool v);
 
-    // ---- draw order ----
+        // ---- draw order ----
 
-    /// z_index controls sibling draw order. Higher values draw on top.
-    [[nodiscard]] auto z_index() const -> int;
-    void set_z_index(int z);
+        /// z_index controls sibling draw order. Higher values draw on top.
+        [[nodiscard]] auto z_index() const -> int;
+        void set_z_index(int z);
 
-    [[nodiscard]] auto z_index_hint() const -> int override { return z_index_; }
+        [[nodiscard]] auto z_index_hint() const -> int override {
+            return z_index_;
+        }
 
-    [[nodiscard]] auto is_visible_in_tree() const -> bool override {
-        return visible_ && NanNode::is_visible_in_tree();
-    }
+        [[nodiscard]] auto is_visible_in_tree() const -> bool override {
+            return visible_ && NanNode::is_visible_in_tree();
+        }
 
-    [[nodiscard]] auto as_node2d() -> NanNode2D* override { return this; }
-    [[nodiscard]] auto as_node2d() const -> const NanNode2D* override { return this; }
+        [[nodiscard]] auto as_node2d() -> NanNode2D* override {
+            return this;
+        }
+        [[nodiscard]] auto as_node2d() const -> const NanNode2D* override {
+            return this;
+        }
 
-    // ---- hit testing ----
+        // ---- hit testing ----
 
-    /// Check whether a point in local space is inside this node.
-    /// Override in subclasses to define the node's interactive area.
-    [[nodiscard]] virtual auto contains_point(foundation::NanPoint local_point) const -> bool;
+        /// Check whether a point in local space is inside this node.
+        /// Override in subclasses to define the node's interactive area.
+        [[nodiscard]] virtual auto contains_point(foundation::NanPoint local_point) const -> bool;
 
-    // ---- lifecycle ----
+        // ---- lifecycle ----
 
-    void on_draw(render::DrawContext& ctx) override;
+        void on_draw(render::DrawContext& ctx) override;
 
-protected:
-    void on_enter_tree() override;
-    void on_exit_tree() override;
+    protected:
+        void on_enter_tree() override;
+        void on_exit_tree() override;
 
-    /// Compose this node's local transform onto the parent world in ctx.
-    /// Returns the parent world so _propagate_draw can restore it afterward.
-    [[nodiscard]] auto _push_draw_transform(render::DrawContext& ctx)
-        -> foundation::NanTransform2D override;
-    void _pop_draw_transform(render::DrawContext& ctx,
-                             const foundation::NanTransform2D& saved) override;
+        /// Compose this node's local transform onto the parent world in ctx.
+        /// Returns the parent world so _propagate_draw can restore it afterward.
+        [[nodiscard]] auto _push_draw_transform(render::DrawContext& ctx)
+            -> foundation::NanTransform2D override;
+        void _pop_draw_transform(
+            render::DrawContext& ctx,
+            const foundation::NanTransform2D& saved
+        ) override;
 
-    /// Invalidate this node's cached global transform.
-    void _invalidate_global();
+        /// Invalidate this node's cached global transform.
+        void _invalidate_global();
 
-    /// Invalidate global transform on this node and all descendants.
-    void _propagate_invalidate_global();
+        /// Invalidate global transform on this node and all descendants.
+        void _propagate_invalidate_global();
 
-private:
-    foundation::NanTransform2D transform_;
-    bool visible_ = true;
-    int z_index_ = 0;
+    private:
+        foundation::NanTransform2D transform_;
+        bool visible_ = true;
+        int z_index_ = 0;
 
-    mutable foundation::NanTransform2D cached_global_;
-    mutable bool global_invalid_ = true;
-};
+        mutable foundation::NanTransform2D cached_global_;
+        mutable bool global_invalid_ = true;
+    };
 
 } // namespace nandina::scene
 

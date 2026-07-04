@@ -8,187 +8,193 @@
 namespace nandina::scene
 {
 
-NanNode2D::NanNode2D() = default;
+    NanNode2D::NanNode2D() = default;
 
-// ---- local transform (all mutators invalidate global cache) ----
+    // ---- local transform (all mutators invalidate global cache) ----
 
-auto NanNode2D::transform() const -> const foundation::NanTransform2D& {
-    return transform_;
-}
+    auto NanNode2D::transform() const -> const foundation::NanTransform2D& {
+        return transform_;
+    }
 
-void NanNode2D::set_transform(const foundation::NanTransform2D& t) {
-    transform_ = t;
-    _propagate_invalidate_global();
-}
+    void NanNode2D::set_transform(const foundation::NanTransform2D& t) {
+        transform_ = t;
+        _propagate_invalidate_global();
+    }
 
-auto NanNode2D::position() const -> foundation::NanPoint {
-    return transform_.position();
-}
+    auto NanNode2D::position() const -> foundation::NanPoint {
+        return transform_.position();
+    }
 
-void NanNode2D::set_position(const foundation::NanPoint pos) {
-    transform_.set_position(pos);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::set_position(const foundation::NanPoint pos) {
+        transform_.set_position(pos);
+        _propagate_invalidate_global();
+    }
 
-auto NanNode2D::rotation() const -> float {
-    return transform_.rotation();
-}
+    auto NanNode2D::rotation() const -> float {
+        return transform_.rotation();
+    }
 
-void NanNode2D::set_rotation(const float radians) {
-    transform_.set_rotation(radians);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::set_rotation(const float radians) {
+        transform_.set_rotation(radians);
+        _propagate_invalidate_global();
+    }
 
-auto NanNode2D::scale() const -> foundation::NanPoint {
-    return transform_.scale();
-}
+    auto NanNode2D::scale() const -> foundation::NanPoint {
+        return transform_.scale();
+    }
 
-void NanNode2D::set_scale(const foundation::NanPoint s) {
-    transform_.set_scale(s);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::set_scale(const foundation::NanPoint s) {
+        transform_.set_scale(s);
+        _propagate_invalidate_global();
+    }
 
-void NanNode2D::set_scale(const float sx, const float sy) {
-    transform_.set_scale_xy(sx, sy);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::set_scale(const float sx, const float sy) {
+        transform_.set_scale_xy(sx, sy);
+        _propagate_invalidate_global();
+    }
 
-void NanNode2D::translate(const foundation::NanPoint offset) {
-    transform_.translate(offset);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::translate(const foundation::NanPoint offset) {
+        transform_.translate(offset);
+        _propagate_invalidate_global();
+    }
 
-void NanNode2D::rotate(const float radians) {
-    transform_.rotate(radians);
-    _propagate_invalidate_global();
-}
+    void NanNode2D::rotate(const float radians) {
+        transform_.rotate(radians);
+        _propagate_invalidate_global();
+    }
 
-void NanNode2D::apply_scale(const foundation::NanPoint factor) {
-    transform_.scale_by_xy(factor.get_x(), factor.get_y());
-    _propagate_invalidate_global();
-}
+    void NanNode2D::apply_scale(const foundation::NanPoint factor) {
+        transform_.scale_by_xy(factor.get_x(), factor.get_y());
+        _propagate_invalidate_global();
+    }
 
-// ---- cached global transform ----
+    // ---- cached global transform ----
 
-auto NanNode2D::global_transform() const -> foundation::NanTransform2D {
-    if (global_invalid_) {
-        cached_global_ = transform_;
+    auto NanNode2D::global_transform() const -> foundation::NanTransform2D {
+        if (global_invalid_) {
+            cached_global_ = transform_;
+            for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
+                 p = p->parent() ? p->parent()->as_node2d() : nullptr)
+            {
+                cached_global_ = p->transform_ * cached_global_;
+            }
+            global_invalid_ = false;
+        }
+        return cached_global_;
+    }
+
+    auto NanNode2D::global_position() const -> foundation::NanPoint {
+        return global_transform().position();
+    }
+
+    void NanNode2D::set_global_position(const foundation::NanPoint pos) {
+        if (auto* p = parent() ? parent()->as_node2d() : nullptr) {
+            const auto parent_inv = p->global_transform().inverse();
+            set_position(parent_inv.transform_point(pos));
+        }
+        else {
+            set_position(pos);
+        }
+    }
+
+    auto NanNode2D::global_rotation() const -> float {
+        auto rot = rotation();
         for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
-             p = p->parent() ? p->parent()->as_node2d() : nullptr) {
-            cached_global_ = p->transform_ * cached_global_;
+             p = p->parent() ? p->parent()->as_node2d() : nullptr)
+        {
+            rot += p->rotation();
         }
-        global_invalid_ = false;
+        return rot;
     }
-    return cached_global_;
-}
 
-auto NanNode2D::global_position() const -> foundation::NanPoint {
-    return global_transform().position();
-}
-
-void NanNode2D::set_global_position(const foundation::NanPoint pos) {
-    if (auto* p = parent() ? parent()->as_node2d() : nullptr) {
-        const auto parent_inv = p->global_transform().inverse();
-        set_position(parent_inv.transform_point(pos));
-    } else {
-        set_position(pos);
+    auto NanNode2D::to_global(const foundation::NanPoint local_point) const
+        -> foundation::NanPoint {
+        return global_transform().transform_point(local_point);
     }
-}
 
-auto NanNode2D::global_rotation() const -> float {
-    auto rot = rotation();
-    for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
-         p = p->parent() ? p->parent()->as_node2d() : nullptr) {
-        rot += p->rotation();
+    auto NanNode2D::to_local(const foundation::NanPoint global_point) const
+        -> foundation::NanPoint {
+        return global_transform().inverse_transform_point(global_point);
     }
-    return rot;
-}
 
-auto NanNode2D::to_global(const foundation::NanPoint local_point) const -> foundation::NanPoint {
-    return global_transform().transform_point(local_point);
-}
+    auto NanNode2D::global_bounds() const -> foundation::NanRect {
+        const auto pos = global_position();
+        return foundation::NanRect::from_xywh(pos.get_x(), pos.get_y(), 0, 0);
+    }
 
-auto NanNode2D::to_local(const foundation::NanPoint global_point) const -> foundation::NanPoint {
-    return global_transform().inverse_transform_point(global_point);
-}
+    // ---- visibility ----
 
-auto NanNode2D::global_bounds() const -> foundation::NanRect {
-    const auto pos = global_position();
-    return foundation::NanRect::from_xywh(pos.get_x(), pos.get_y(), 0, 0);
-}
+    auto NanNode2D::visible() const -> bool {
+        return visible_;
+    }
 
-// ---- visibility ----
+    void NanNode2D::set_visible(const bool v) {
+        visible_ = v;
+    }
 
-auto NanNode2D::visible() const -> bool {
-    return visible_;
-}
+    // ---- draw order ----
 
-void NanNode2D::set_visible(const bool v) {
-    visible_ = v;
-}
+    auto NanNode2D::z_index() const -> int {
+        return z_index_;
+    }
 
-// ---- draw order ----
+    void NanNode2D::set_z_index(const int z) {
+        z_index_ = z;
+    }
 
-auto NanNode2D::z_index() const -> int {
-    return z_index_;
-}
+    // ---- hit testing ----
 
-void NanNode2D::set_z_index(const int z) {
-    z_index_ = z;
-}
+    auto NanNode2D::contains_point(foundation::NanPoint /*local_point*/) const -> bool {
+        return false;
+    }
 
-// ---- hit testing ----
+    // ---- cache invalidation ----
 
-auto NanNode2D::contains_point(foundation::NanPoint /*local_point*/) const -> bool {
-    return false;
-}
+    void NanNode2D::_invalidate_global() {
+        global_invalid_ = true;
+    }
 
-// ---- cache invalidation ----
-
-void NanNode2D::_invalidate_global() {
-    global_invalid_ = true;
-}
-
-void NanNode2D::_propagate_invalidate_global() {
-    global_invalid_ = true;
-    for (size_t i = 0; i < child_count(); ++i) {
-        auto* child = get_child(i);
-        if (auto* child_2d = child ? child->as_node2d() : nullptr) {
-            child_2d->_propagate_invalidate_global();
+    void NanNode2D::_propagate_invalidate_global() {
+        global_invalid_ = true;
+        for (size_t i = 0; i < child_count(); ++i) {
+            auto* child = get_child(i);
+            if (auto* child_2d = child ? child->as_node2d() : nullptr) {
+                child_2d->_propagate_invalidate_global();
+            }
         }
     }
-}
 
-// ---- lifecycle ----
+    // ---- lifecycle ----
 
-void NanNode2D::on_enter_tree() {
-    NanNode::on_enter_tree();
-    global_invalid_ = true;  // Force recompute now that we have a parent chain.
-}
+    void NanNode2D::on_enter_tree() {
+        NanNode::on_enter_tree();
+        global_invalid_ = true; // Force recompute now that we have a parent chain.
+    }
 
-void NanNode2D::on_exit_tree() {
-    NanNode::on_exit_tree();
-}
+    void NanNode2D::on_exit_tree() {
+        NanNode::on_exit_tree();
+    }
 
-void NanNode2D::on_draw(render::DrawContext& ctx) {
-    NanNode::on_draw(ctx);
-}
+    void NanNode2D::on_draw(render::DrawContext& ctx) {
+        NanNode::on_draw(ctx);
+    }
 
-// ---- draw-time transform propagation ----
+    // ---- draw-time transform propagation ----
 
-auto NanNode2D::_push_draw_transform(render::DrawContext& ctx)
-    -> foundation::NanTransform2D {
-    // ctx.world_ currently holds the parent's world transform. Compose this
-    // node's local transform onto it (parent * local) and store as the new world.
-    // This avoids each node re-walking the parent chain via global_transform().
-    auto saved = ctx.world_;
-    ctx.world_ = ctx.world_.compose(transform_);
-    return saved;
-}
+    auto NanNode2D::_push_draw_transform(render::DrawContext& ctx) -> foundation::NanTransform2D {
+        // ctx.world_ currently holds the parent's world transform. Compose this
+        // node's local transform onto it (parent * local) and store as the new world.
+        // This avoids each node re-walking the parent chain via global_transform().
+        auto saved = ctx.world_;
+        ctx.world_ = ctx.world_.compose(transform_);
+        return saved;
+    }
 
-void NanNode2D::_pop_draw_transform(render::DrawContext& ctx,
-                                    const foundation::NanTransform2D& saved) {
-    ctx.world_ = saved;
-}
+    void NanNode2D::_pop_draw_transform(
+        render::DrawContext& ctx,
+        const foundation::NanTransform2D& saved
+    ) {
+        ctx.world_ = saved;
+    }
 
 } // namespace nandina::scene

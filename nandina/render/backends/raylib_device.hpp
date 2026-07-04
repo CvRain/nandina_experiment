@@ -15,10 +15,10 @@
 namespace nandina::render
 {
 
-/// Create a render device backed by raylib. Requires an active raylib window
-/// (InitWindow) before any draw calls. begin_frame/end_frame wrap
-/// BeginDrawing/EndDrawing.
-[[nodiscard]] auto make_raylib_device() -> std::unique_ptr<IRenderDevice>;
+    /// Create a render device backed by raylib. Requires an active raylib window
+    /// (InitWindow) before any draw calls. begin_frame/end_frame wrap
+    /// BeginDrawing/EndDrawing.
+    [[nodiscard]] auto make_raylib_device() -> std::unique_ptr<IRenderDevice>;
 
 } // namespace nandina::render
 

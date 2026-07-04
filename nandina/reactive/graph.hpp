@@ -30,117 +30,119 @@
 namespace nandina::reactive
 {
 
-class Graph;
+    class Graph;
 
-/// 响应者状态。
-enum class ReactorState : std::uint8_t {
-    clean,  ///< 已是最新值, 依赖未变化。
-    dirty,  ///< 至少一个直接依赖被失效, 需要重新执行 / 重算。
-};
+    /// 响应者状态。
+    enum class ReactorState : std::uint8_t {
+        clean, ///< 已是最新值, 依赖未变化。
+        dirty, ///< 至少一个直接依赖被失效, 需要重新执行 / 重算。
+    };
 
-/// 数据源: 可被订阅、值变化时通知所有订阅者的节点 (signal / computed 内嵌持有)。
-struct Source {
-    std::uint64_t id = 0;
-    /// 单调递增版本号, 每次值真正变化时 +1。供更精细的脏检查使用。
-    std::uint64_t version = 1;
-    /// 当前订阅它的 reactor 列表 (非拥有)。
-    std::vector<class Reactor*> subs;
-};
+    /// 数据源: 可被订阅、值变化时通知所有订阅者的节点 (signal / computed 内嵌持有)。
+    using Source = struct Source {
+        std::uint64_t id = 0;
+        /// 单调递增版本号, 每次值真正变化时 +1。供更精细的脏检查使用。
+        std::uint64_t version = 1;
+        /// 当前订阅它的 reactor 列表 (非拥有)。
+        std::vector<class Reactor*> subs;
+    };
 
-/// 响应者: 能在依赖变化时被通知的节点 (effect / computed)。
-/// 抽象基类, 通过虚函数分发, 不使用 RTTI。
-class Reactor {
-public:
-    Reactor() = default;
-    virtual ~Reactor() = default;
+    /// 响应者: 能在依赖变化时被通知的节点 (effect / computed)。
+    /// 抽象基类, 通过虚函数分发, 不使用 RTTI。
+    class Reactor {
+    public:
+        Reactor() = default;
+        virtual ~Reactor() = default;
 
-    Reactor(const Reactor&) = delete;
-    auto operator=(const Reactor&) -> Reactor& = delete;
-    Reactor(Reactor&&) = delete;
-    auto operator=(Reactor&&) -> Reactor& = delete;
+        Reactor(const Reactor&) = delete;
+        auto operator=(const Reactor&) -> Reactor& = delete;
+        Reactor(Reactor&&) = delete;
+        auto operator=(Reactor&&) -> Reactor& = delete;
 
-    /// 依赖变化时的失效传播逻辑。
-    /// - effect:   标记 dirty 并入队等待 flush。
-    /// - computed: 标记自身 dirty, 并把失效继续传播给它自己的订阅者。
-    virtual void on_invalidate(Graph& graph) = 0;
+        /// 依赖变化时的失效传播逻辑。
+        /// - effect:   标记 dirty 并入队等待 flush。
+        /// - computed: 标记自身 dirty, 并把失效继续传播给它自己的订阅者。
+        virtual void on_invalidate(Graph& graph) = 0;
 
-    /// 被 flush 调度时的执行逻辑。仅 effect 会进入 pending 队列;
-    /// computed 是 pull 模型, 永远不会被 flush 调用。
-    virtual void run(Graph& graph) = 0;
+        /// 被 flush 调度时的执行逻辑。仅 effect 会进入 pending 队列;
+        /// computed 是 pull 模型, 永远不会被 flush 调用。
+        virtual void run(Graph& graph) = 0;
 
-    std::uint64_t id = 0;
-    ReactorState state = ReactorState::clean;
-    /// 该 reactor 正在订阅的 source 列表 (非拥有)。
-    std::vector<Source*> sources;
-    bool in_queue = false;   ///< 是否已在 pending 队列中 (去重)。
-    bool disposed = false;   ///< 是否已被 dispose。
-};
+        std::uint64_t id = 0;
+        ReactorState state = ReactorState::clean;
+        /// 该 reactor 正在订阅的 source 列表 (非拥有)。
+        std::vector<Source*> sources;
+        bool in_queue = false; ///< 是否已在 pending 队列中 (去重)。
+        bool disposed = false; ///< 是否已被 dispose。
+    };
 
-/// 响应式调度图。所有 signal / computed / effect 必须依附于一个 Graph 实例。
-class Graph {
-public:
-    Graph() = default;
-    ~Graph();
+    /// 响应式调度图。所有 signal / computed / effect 必须依附于一个 Graph 实例。
+    class Graph {
+    public:
+        Graph() = default;
+        ~Graph();
 
-    Graph(const Graph&) = delete;
-    auto operator=(const Graph&) -> Graph& = delete;
-    Graph(Graph&&) = delete;
-    auto operator=(Graph&&) -> Graph& = delete;
+        Graph(const Graph&) = delete;
+        auto operator=(const Graph&) -> Graph& = delete;
+        Graph(Graph&&) = delete;
+        auto operator=(Graph&&) -> Graph& = delete;
 
-    /// 分配下一个唯一 id。
-    [[nodiscard]] auto next_id() -> std::uint64_t;
+        /// 分配下一个唯一 id。
+        [[nodiscard]] auto next_id() -> std::uint64_t;
 
-    // ── 节点持有 ────────────────────────────────────────────────────────────
-    /// 把 Computed/Effect 的所有权交给 Graph, 返回裸指针供业务持有。
-    auto adopt(std::unique_ptr<Reactor> reactor) -> Reactor*;
+        // ── 节点持有 ────────────────────────────────────────────────────────────
+        /// 把 Computed/Effect 的所有权交给 Graph, 返回裸指针供业务持有。
+        auto adopt(std::unique_ptr<Reactor> reactor) -> Reactor*;
 
-    /// 提前销毁单个 reactor: 解绑依赖后释放。幂等。
-    void dispose_reactor(Reactor* reactor);
+        /// 提前销毁单个 reactor: 解绑依赖后释放。幂等。
+        void dispose_reactor(Reactor* reactor);
 
-    // ── 依赖追踪 ────────────────────────────────────────────────────────────
-    /// 把当前 reader (若存在) 登记为 source 的订阅者, 双向去重。
-    void track(Source& source);
+        // ── 依赖追踪 ────────────────────────────────────────────────────────────
+        /// 把当前 reader (若存在) 登记为 source 的订阅者, 双向去重。
+        void track(Source& source) const;
 
-    /// 进入读取上下文, 返回先前的 reader (用于嵌套恢复)。
-    [[nodiscard]] auto begin_read(Reactor* reactor) -> Reactor*;
-    void end_read(Reactor* previous);
+        /// 进入读取上下文, 返回先前的 reader (用于嵌套恢复)。
+        [[nodiscard]] auto begin_read(Reactor* reactor) -> Reactor*;
+        void end_read(Reactor* previous);
 
-    /// 清空 reactor 的所有依赖边 (双向)。在 reactor 即将重新执行时调用。
-    void clear_reactor_deps(Reactor& reactor);
+        /// 清空 reactor 的所有依赖边 (双向)。在 reactor 即将重新执行时调用。
+        void clear_reactor_deps(Reactor& reactor);
 
-    /// 解除 source 与其全部订阅者的双向绑定 (source 即将销毁时调用)。
-    void detach_source(Source& source);
+        /// 解除 source 与其全部订阅者的双向绑定 (source 即将销毁时调用)。
+        void detach_source(Source& source);
 
-    // ── 失效与调度 ──────────────────────────────────────────────────────────
-    /// source 值变化后调用: 递增 version, 把全部订阅者标 dirty,
-    /// 非 batch 且非 flush 中时立即 flush。
-    void notify_source(Source& source);
+        // ── 失效与调度 ──────────────────────────────────────────────────────────
+        /// source 值变化后调用: 递增 version, 把全部订阅者标 dirty,
+        /// 非 batch 且非 flush 中时立即 flush。
+        void notify_source(Source& source);
 
-    /// 把 reactor 标记 dirty 并执行其失效传播逻辑 (判重, 幂等)。
-    void invalidate_reactor(Reactor& reactor);
+        /// 把 reactor 标记 dirty 并执行其失效传播逻辑 (判重, 幂等)。
+        void invalidate_reactor(Reactor& reactor);
 
-    /// 把 reactor 加入待执行队列 (去重)。由 effect 的 on_invalidate 调用。
-    void enqueue(Reactor& reactor);
+        /// 把 reactor 加入待执行队列 (去重)。由 effect 的 on_invalidate 调用。
+        void enqueue(Reactor& reactor);
 
-    /// 执行所有待处理 reactor。batch 退出、或 source 变化 (非 batch 中) 时自动调用。
-    void flush();
+        /// 执行所有待处理 reactor。batch 退出、或 source 变化 (非 batch 中) 时自动调用。
+        void flush();
 
-    // ── batch ───────────────────────────────────────────────────────────────
-    void begin_batch();
-    void end_batch();
+        // ── batch ───────────────────────────────────────────────────────────────
+        void begin_batch();
+        void end_batch();
 
-    [[nodiscard]] auto is_tearing_down() const -> bool { return tearing_down_; }
+        [[nodiscard]] auto is_tearing_down() const -> bool {
+            return tearing_down_;
+        }
 
-private:
-    std::uint64_t next_id_ = 1;
-    Reactor* current_reader_ = nullptr;
-    std::vector<Reactor*> pending_;
-    std::uint32_t batch_depth_ = 0;
-    bool flushing_ = false;
-    bool tearing_down_ = false;
-    /// Graph 持有的 Computed/Effect。Signal 由调用方持有, 不在此列。
-    std::vector<std::unique_ptr<Reactor>> reactors_;
-};
+    private:
+        std::uint64_t next_id_ = 1;
+        Reactor* current_reader_ = nullptr;
+        std::vector<Reactor*> pending_;
+        std::uint32_t batch_depth_ = 0;
+        bool flushing_ = false;
+        bool tearing_down_ = false;
+        /// Graph 持有的 Computed/Effect。Signal 由调用方持有, 不在此列。
+        std::vector<std::unique_ptr<Reactor>> reactors_;
+    };
 
 } // namespace nandina::reactive
 

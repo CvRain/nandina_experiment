@@ -82,25 +82,25 @@ namespace nandina::foundation
 
     [[nodiscard]] inline auto nan_normalize_degrees(float degrees) -> float {
         auto result = std::fmod(degrees, 360.0F);
-            if (result < 0.0F) {
-                result += 360.0F;
-            }
+        if (result < 0.0F) {
+            result += 360.0F;
+        }
         return result;
     }
 
     [[nodiscard]] inline auto nan_srgb_to_linear_channel(float channel) -> float {
         channel = nan_clamp01(channel);
-            if (channel <= 0.04045F) {
-                return channel / 12.92F;
-            }
+        if (channel <= 0.04045F) {
+            return channel / 12.92F;
+        }
         return std::pow((channel + 0.055F) / 1.055F, 2.4F);
     }
 
     [[nodiscard]] inline auto nan_linear_to_srgb_channel(float channel) -> float {
         channel = nan_clamp01(channel);
-            if (channel <= 0.0031308F) {
-                return channel * 12.92F;
-            }
+        if (channel <= 0.0031308F) {
+            return channel * 12.92F;
+        }
         return 1.055F * std::pow(channel, 1.0F / 2.4F) - 0.055F;
     }
 
@@ -112,15 +112,15 @@ namespace nandina::foundation
     nan_hsl_hue_to_rgb(const float chroma_minimum, const float chroma_maximum, float hue) -> float {
         hue = nan_normalize_degrees(hue);
 
-            if (hue < 60.0F) {
-                return chroma_minimum + (chroma_maximum - chroma_minimum) * hue / 60.0F;
-            }
-            if (hue < 180.0F) {
-                return chroma_maximum;
-            }
-            if (hue < 240.0F) {
-                return chroma_minimum + (chroma_maximum - chroma_minimum) * (240.0F - hue) / 60.0F;
-            }
+        if (hue < 60.0F) {
+            return chroma_minimum + (chroma_maximum - chroma_minimum) * hue / 60.0F;
+        }
+        if (hue < 180.0F) {
+            return chroma_maximum;
+        }
+        if (hue < 240.0F) {
+            return chroma_minimum + (chroma_maximum - chroma_minimum) * (240.0F - hue) / 60.0F;
+        }
 
         return chroma_minimum;
     }
@@ -144,9 +144,9 @@ namespace nandina::foundation
         [[nodiscard]] static auto to_oklch(const NanOklab& color) -> NanOklch {
             const auto chroma = std::sqrt(color.a * color.a + color.b * color.b);
             auto hue = 0.0F;
-                if (chroma > nan_epsilon) {
-                    hue = std::atan2(color.b, color.a) * 180.0F / nan_pi;
-                }
+            if (chroma > nan_epsilon) {
+                hue = std::atan2(color.b, color.a) * 180.0F / nan_pi;
+            }
 
             return {
                 nan_clamp01(color.light),
@@ -307,30 +307,30 @@ namespace nandina::foundation
             auto green = 0.0F;
             auto blue = 0.0F;
 
-                if (hue_sector < 1.0F) {
-                    red = chroma;
-                    green = x;
-                }
-                else if (hue_sector < 2.0F) {
-                    red = x;
-                    green = chroma;
-                }
-                else if (hue_sector < 3.0F) {
-                    green = chroma;
-                    blue = x;
-                }
-                else if (hue_sector < 4.0F) {
-                    green = x;
-                    blue = chroma;
-                }
-                else if (hue_sector < 5.0F) {
-                    red = x;
-                    blue = chroma;
-                }
-                else {
-                    red = chroma;
-                    blue = x;
-                }
+            if (hue_sector < 1.0F) {
+                red = chroma;
+                green = x;
+            }
+            else if (hue_sector < 2.0F) {
+                red = x;
+                green = chroma;
+            }
+            else if (hue_sector < 3.0F) {
+                green = chroma;
+                blue = x;
+            }
+            else if (hue_sector < 4.0F) {
+                green = x;
+                blue = chroma;
+            }
+            else if (hue_sector < 5.0F) {
+                red = x;
+                blue = chroma;
+            }
+            else {
+                red = chroma;
+                blue = x;
+            }
 
             return {
                 red + match,
@@ -349,17 +349,17 @@ namespace nandina::foundation
             const auto delta = maximum - minimum;
 
             auto hue = 0.0F;
-                if (delta > nan_epsilon) {
-                        if (maximum == red) {
-                            hue = 60.0F * std::fmod((green - blue) / delta, 6.0F);
-                        }
-                        else if (maximum == green) {
-                            hue = 60.0F * ((blue - red) / delta + 2.0F);
-                        }
-                        else {
-                            hue = 60.0F * ((red - green) / delta + 4.0F);
-                        }
+            if (delta > nan_epsilon) {
+                if (maximum == red) {
+                    hue = 60.0F * std::fmod((green - blue) / delta, 6.0F);
                 }
+                else if (maximum == green) {
+                    hue = 60.0F * ((blue - red) / delta + 2.0F);
+                }
+                else {
+                    hue = 60.0F * ((red - green) / delta + 4.0F);
+                }
+            }
 
             return {
                 nan_normalize_degrees(hue),
@@ -385,14 +385,14 @@ namespace nandina::foundation
             const auto saturation = nan_clamp01(color.saturation);
             const auto lightness = nan_clamp01(color.lightness);
 
-                if (saturation <= nan_epsilon) {
-                    return {
-                        lightness,
-                        lightness,
-                        lightness,
-                        nan_clamp01(color.alpha),
-                    };
-                }
+            if (saturation <= nan_epsilon) {
+                return {
+                    lightness,
+                    lightness,
+                    lightness,
+                    nan_clamp01(color.alpha),
+                };
+            }
 
             const auto chroma_maximum = lightness < 0.5F
                 ? lightness * (1.0F + saturation)
@@ -419,19 +419,19 @@ namespace nandina::foundation
             auto hue = 0.0F;
             auto saturation = 0.0F;
 
-                if (delta > nan_epsilon) {
-                    saturation = delta / (1.0F - std::fabs(2.0F * lightness - 1.0F));
+            if (delta > nan_epsilon) {
+                saturation = delta / (1.0F - std::fabs(2.0F * lightness - 1.0F));
 
-                        if (maximum == red) {
-                            hue = 60.0F * std::fmod((green - blue) / delta, 6.0F);
-                        }
-                        else if (maximum == green) {
-                            hue = 60.0F * ((blue - red) / delta + 2.0F);
-                        }
-                        else {
-                            hue = 60.0F * ((red - green) / delta + 4.0F);
-                        }
+                if (maximum == red) {
+                    hue = 60.0F * std::fmod((green - blue) / delta, 6.0F);
                 }
+                else if (maximum == green) {
+                    hue = 60.0F * ((blue - red) / delta + 2.0F);
+                }
+                else {
+                    hue = 60.0F * ((red - green) / delta + 4.0F);
+                }
+            }
 
             return {
                 nan_normalize_degrees(hue),

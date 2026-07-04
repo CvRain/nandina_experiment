@@ -20,3 +20,10 @@ reactive_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('reactive', reactive_tests)
+
+widget_tests = executable(
+    'widget_tests',
+    files('widget_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('widget', widget_tests)

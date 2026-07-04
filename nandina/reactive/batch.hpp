@@ -19,21 +19,25 @@
 namespace nandina::reactive
 {
 
-/// 在批处理作用域内执行 fn。fn 签名为 void()。
-template<typename Fn>
-    requires std::invocable<Fn>
-void batch(Graph& graph, Fn&& fn) {
-    struct Guard {
-        Graph& g;
-        explicit Guard(Graph& graph_ref) : g(graph_ref) { g.begin_batch(); }
-        ~Guard() { g.end_batch(); }
-        Guard(const Guard&) = delete;
-        auto operator=(const Guard&) -> Guard& = delete;
-        Guard(Guard&&) = delete;
-        auto operator=(Guard&&) -> Guard& = delete;
-    } guard{graph};
-    std::forward<Fn>(fn)();
-}
+    /// 在批处理作用域内执行 fn。fn 签名为 void()。
+    template<typename Fn>
+        requires std::invocable<Fn>
+    void batch(Graph& graph, Fn&& fn) {
+        struct Guard {
+            Graph& g;
+            explicit Guard(Graph& graph_ref): g(graph_ref) {
+                g.begin_batch();
+            }
+            ~Guard() {
+                g.end_batch();
+            }
+            Guard(const Guard&) = delete;
+            auto operator=(const Guard&) -> Guard& = delete;
+            Guard(Guard&&) = delete;
+            auto operator=(Guard&&) -> Guard& = delete;
+        } guard {graph};
+        std::forward<Fn>(fn)();
+    }
 
 } // namespace nandina::reactive
 

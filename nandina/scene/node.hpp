@@ -15,187 +15,192 @@
 namespace nandina::scene
 {
 
-class InputEvent;
-class NanSceneTree;
-class NanNode2D;
+    class InputEvent;
+    class NanSceneTree;
+    class NanNode2D;
 } // namespace nandina::scene
 
 namespace nandina::render
 {
-class DrawContext;
+    class DrawContext;
 } // namespace nandina::render
 
 namespace nandina::scene
 {
 
-/**
- * Base class for all nodes in the scene tree.
- *
- * Nodes form a tree: each node owns zero or more children via unique_ptr.
- * The tree root is owned by NanSceneTree.  When a node is destroyed all
- * descendants are recursively destroyed.
- *
- * Lifecycle callbacks (override in subclasses):
- *   on_enter_tree()  — top-down, called when the node enters the active tree
- *   on_ready()       — bottom-up, called after ALL descendants have entered
- *   on_exit_tree()   — called before the node leaves the active tree
- *   on_process(dt)   — top-down, every frame (dt in seconds)
- *   on_draw()        — top-down, parent drawn before children
- *
- * Lifecycle order on add_child to an in-tree parent:
- *   1. child.on_enter_tree
- *   2. grandchild.on_enter_tree (recursively)
- *   3. grandchild.on_ready
- *   4. child.on_ready
- *
- * @note Nodes are non-copyable and non-movable while inside the tree.
- *       Ownership is managed through std::unique_ptr.
- */
-class NanNode : public std::enable_shared_from_this<NanNode> {
-    friend class NanSceneTree;
-public:
-    NanNode();
-    virtual ~NanNode();
-
-    NanNode(const NanNode&) = delete;
-    auto operator=(const NanNode&) -> NanNode& = delete;
-    NanNode(NanNode&&) = delete;
-    auto operator=(NanNode&&) -> NanNode& = delete;
-
-    // ---- hierarchy ----
-
-    /// Parent node, or nullptr if this is the root or detached.
-    [[nodiscard]] auto parent() const -> NanNode*;
-
-    /// Number of direct children.
-    [[nodiscard]] auto child_count() const -> size_t;
-
-    /// Get child by index [0, child_count).
-    [[nodiscard]] auto get_child(size_t index) const -> NanNode*;
-
-    /// True if this node is an ancestor of `other`.
-    [[nodiscard]] auto is_ancestor_of(const NanNode& other) const -> bool;
-
-    // ---- tree membership ----
-
-    /// True while this node is part of an active scene tree.
-    [[nodiscard]] auto is_inside_tree() const -> bool;
-
-    /// The scene tree this node belongs to, or nullptr.
-    [[nodiscard]] auto get_tree() const -> NanSceneTree*;
-
-    // ---- child management ----
-
     /**
-     * Add a child node.  Ownership transfers to this node.
-     * @return A reference to the added child (non-owning).
+     * Base class for all nodes in the scene tree.
      *
-     * @pre child is not null and not already owned by another node.
-     * @throws std::runtime_error if child is null, already has a parent,
-     *         or would mix NanNode/NanNode2D on the same parent-child edge.
+     * Nodes form a tree: each node owns zero or more children via unique_ptr.
+     * The tree root is owned by NanSceneTree.  When a node is destroyed all
+     * descendants are recursively destroyed.
+     *
+     * Lifecycle callbacks (override in subclasses):
+     *   on_enter_tree()  — top-down, called when the node enters the active tree
+     *   on_ready()       — bottom-up, called after ALL descendants have entered
+     *   on_exit_tree()   — called before the node leaves the active tree
+     *   on_process(dt)   — top-down, every frame (dt in seconds)
+     *   on_draw()        — top-down, parent drawn before children
+     *
+     * Lifecycle order on add_child to an in-tree parent:
+     *   1. child.on_enter_tree
+     *   2. grandchild.on_enter_tree (recursively)
+     *   3. grandchild.on_ready
+     *   4. child.on_ready
+     *
+     * @note Nodes are non-copyable and non-movable while inside the tree.
+     *       Ownership is managed through std::unique_ptr.
      */
-    auto add_child(std::shared_ptr<NanNode> child) -> NanNode&;
+    class NanNode: public std::enable_shared_from_this<NanNode> {
+        friend class NanSceneTree;
 
-    /**
-     * Remove a child node and return ownership to the caller.
-     * @return The removed child as shared_ptr, or nullptr if not found.
-     */
-    auto remove_child(NanNode& child) -> std::shared_ptr<NanNode>;
+    public:
+        NanNode();
+        virtual ~NanNode();
 
-    /// Remove and immediately destroy a child.
-    void remove_and_delete(NanNode& child);
+        NanNode(const NanNode&) = delete;
+        auto operator=(const NanNode&) -> NanNode& = delete;
+        NanNode(NanNode&&) = delete;
+        auto operator=(NanNode&&) -> NanNode& = delete;
 
-    // ---- name ----
+        // ---- hierarchy ----
 
-    [[nodiscard]] auto name() const -> std::string_view;
-    void set_name(std::string name);
+        /// Parent node, or nullptr if this is the root or detached.
+        [[nodiscard]] auto parent() const -> NanNode*;
 
-    // ---- lifecycle (override in subclasses) ----
+        /// Number of direct children.
+        [[nodiscard]] auto child_count() const -> size_t;
 
-    /// Called when the node enters the tree (top-down: parent before children).
-    virtual void on_enter_tree();
+        /// Get child by index [0, child_count).
+        [[nodiscard]] auto get_child(size_t index) const -> NanNode*;
 
-    /// Called after all descendants' on_enter_tree have completed (bottom-up).
-    virtual void on_ready();
+        /// True if this node is an ancestor of `other`.
+        [[nodiscard]] auto is_ancestor_of(const NanNode& other) const -> bool;
 
-    /// Called before the node (and all descendants) leave the tree.
-    virtual void on_exit_tree();
+        // ---- tree membership ----
 
-    /**
-     * Handle an input event routed to this node via hit-testing.
-     * Return true if the event was consumed (stops bubbling to parent).
-     * Default: false (event continues to parent).
-     */
-    virtual auto on_input(InputEvent& event) -> bool;
+        /// True while this node is part of an active scene tree.
+        [[nodiscard]] auto is_inside_tree() const -> bool;
 
-    /// Called every frame.  dt is the elapsed time in seconds.
-    virtual void on_process(float dt);
+        /// The scene tree this node belongs to, or nullptr.
+        [[nodiscard]] auto get_tree() const -> NanSceneTree*;
 
-    /// Called during draw traversal (top-down: parent drawn before children).
-    /// The context carries the world transform, inherited opacity, and clip stack.
-    virtual void on_draw(render::DrawContext& ctx);
+        // ---- child management ----
 
-    /// Hint for sibling draw/hit-test ordering (higher = on top).
-    /// Override in subclasses that have a z-ordering concept.
-    [[nodiscard]] virtual auto z_index_hint() const -> int;
+        /**
+         * Add a child node.  Ownership transfers to this node.
+         * @return A reference to the added child (non-owning).
+         *
+         * @pre child is not null and not already owned by another node.
+         * @throws std::runtime_error if child is null, already has a parent,
+         *         or would mix NanNode/NanNode2D on the same parent-child edge.
+         */
+        auto add_child(std::shared_ptr<NanNode> child) -> NanNode&;
 
-    /// True if this node can become the focus target.
-    [[nodiscard]] virtual auto is_focusable() const -> bool;
+        /**
+         * Remove a child node and return ownership to the caller.
+         * @return The removed child as shared_ptr, or nullptr if not found.
+         */
+        auto remove_child(NanNode& child) -> std::shared_ptr<NanNode>;
 
-    /// True if this node should be drawn / hit-tested in the active tree.
-    /// A false return means this node AND all descendants are skipped.
-    [[nodiscard]] virtual auto is_visible_in_tree() const -> bool;
+        /// Remove and immediately destroy a child.
+        void remove_and_delete(NanNode& child);
 
-    /// Safe down-cast to NanNode2D without RTTI.
-    /// Base returns nullptr; NanNode2D overrides to return itself.
-    /// Prefer this over dynamic_cast for traversal-time type discrimination.
-    [[nodiscard]] virtual auto as_node2d() -> NanNode2D* { return nullptr; }
-    [[nodiscard]] virtual auto as_node2d() const -> const NanNode2D* { return nullptr; }
+        // ---- name ----
 
-protected:
-    /// Internal: set the owning scene tree (called by NanSceneTree).
-    void _set_tree(NanSceneTree* tree);
+        [[nodiscard]] auto name() const -> std::string_view;
+        void set_name(std::string name);
 
-    /// Internal: propagate enter_tree to this node and all descendants.
-    void _propagate_enter_tree(NanSceneTree* tree);
+        // ---- lifecycle (override in subclasses) ----
 
-    /// Internal: propagate ready to all descendants then this node (bottom-up).
-    void _propagate_ready();
+        /// Called when the node enters the tree (top-down: parent before children).
+        virtual void on_enter_tree();
 
-    /// Internal: propagate exit_tree to this node and all descendants.
-    void _propagate_exit_tree();
+        /// Called after all descendants' on_enter_tree have completed (bottom-up).
+        virtual void on_ready();
 
-    /// Internal: process this node then recursively process children.
-    void _propagate_process(float dt);
+        /// Called before the node (and all descendants) leave the tree.
+        virtual void on_exit_tree();
 
-    /// Internal: draw this node then recursively draw children (top-down).
-    /// Threads world transform + inherited opacity + clip via the context.
-    void _propagate_draw(render::DrawContext& ctx);
+        /**
+         * Handle an input event routed to this node via hit-testing.
+         * Return true if the event was consumed (stops bubbling to parent).
+         * Default: false (event continues to parent).
+         */
+        virtual auto on_input(InputEvent& event) -> bool;
 
-    /// Internal hook: update ctx world transform for this node before drawing.
-    /// Base is identity (no spatial transform); NanNode2D composes its local
-    /// transform onto the parent world. Returns the parent world to restore.
-    /// Avoids RTTI in the traversal by using a virtual instead of a cast.
-    [[nodiscard]] virtual auto _push_draw_transform(render::DrawContext& ctx)
-        -> foundation::NanTransform2D;
-    virtual void _pop_draw_transform(render::DrawContext& ctx,
-                                     const foundation::NanTransform2D& saved);
+        /// Called every frame.  dt is the elapsed time in seconds.
+        virtual void on_process(float dt);
 
-private:
-    // parent is a non-owning back-reference (children own parent would be a
-    // cycle); weak_ptr expires gracefully if a detached child outlives its parent.
-    std::weak_ptr<NanNode> parent_;
-    std::vector<std::shared_ptr<NanNode>> children_;
-    // tree_ is a non-owning back-pointer: NanSceneTree owns the root and always
-    // outlives the nodes, so a raw pointer is safe here (a tree is not a node).
-    NanSceneTree* tree_ = nullptr;
-    std::string name_;
+        /// Called during draw traversal (top-down: parent drawn before children).
+        /// The context carries the world transform, inherited opacity, and clip stack.
+        virtual void on_draw(render::DrawContext& ctx);
 
-    /// True once on_ready() has fired for the current tree membership.
-    /// Guards against double-ready when children are added during on_enter_tree().
-    /// Reset on exit_tree so a removed + re-added node readies again.
-    bool ready_notified_ = false;
-};
+        /// Hint for sibling draw/hit-test ordering (higher = on top).
+        /// Override in subclasses that have a z-ordering concept.
+        [[nodiscard]] virtual auto z_index_hint() const -> int;
+
+        /// True if this node can become the focus target.
+        [[nodiscard]] virtual auto is_focusable() const -> bool;
+
+        /// True if this node should be drawn / hit-tested in the active tree.
+        /// A false return means this node AND all descendants are skipped.
+        [[nodiscard]] virtual auto is_visible_in_tree() const -> bool;
+
+        /// Safe down-cast to NanNode2D without RTTI.
+        /// Base returns nullptr; NanNode2D overrides to return itself.
+        /// Prefer this over dynamic_cast for traversal-time type discrimination.
+        [[nodiscard]] virtual auto as_node2d() -> NanNode2D* {
+            return nullptr;
+        }
+        [[nodiscard]] virtual auto as_node2d() const -> const NanNode2D* {
+            return nullptr;
+        }
+
+    protected:
+        /// Internal: set the owning scene tree (called by NanSceneTree).
+        void _set_tree(NanSceneTree* tree);
+
+        /// Internal: propagate enter_tree to this node and all descendants.
+        void _propagate_enter_tree(NanSceneTree* tree);
+
+        /// Internal: propagate ready to all descendants then this node (bottom-up).
+        void _propagate_ready();
+
+        /// Internal: propagate exit_tree to this node and all descendants.
+        void _propagate_exit_tree();
+
+        /// Internal: process this node then recursively process children.
+        void _propagate_process(float dt);
+
+        /// Internal: draw this node then recursively draw children (top-down).
+        /// Threads world transform + inherited opacity + clip via the context.
+        void _propagate_draw(render::DrawContext& ctx);
+
+        /// Internal hook: update ctx world transform for this node before drawing.
+        /// Base is identity (no spatial transform); NanNode2D composes its local
+        /// transform onto the parent world. Returns the parent world to restore.
+        /// Avoids RTTI in the traversal by using a virtual instead of a cast.
+        [[nodiscard]] virtual auto _push_draw_transform(render::DrawContext& ctx)
+            -> foundation::NanTransform2D;
+        virtual void
+        _pop_draw_transform(render::DrawContext& ctx, const foundation::NanTransform2D& saved);
+
+    private:
+        // parent is a non-owning back-reference (children own parent would be a
+        // cycle); weak_ptr expires gracefully if a detached child outlives its parent.
+        std::weak_ptr<NanNode> parent_;
+        std::vector<std::shared_ptr<NanNode>> children_;
+        // tree_ is a non-owning back-pointer: NanSceneTree owns the root and always
+        // outlives the nodes, so a raw pointer is safe here (a tree is not a node).
+        NanSceneTree* tree_ = nullptr;
+        std::string name_;
+
+        /// True once on_ready() has fired for the current tree membership.
+        /// Guards against double-ready when children are added during on_enter_tree().
+        /// Reset on exit_tree so a removed + re-added node readies again.
+        bool ready_notified_ = false;
+    };
 
 } // namespace nandina::scene
 

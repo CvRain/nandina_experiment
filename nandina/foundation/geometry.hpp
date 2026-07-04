@@ -213,16 +213,19 @@ namespace nandina::foundation
         [[nodiscard]] static auto empty() -> NanRect;
 
         /// Construct from boundary coordinates.
-        [[nodiscard]] static auto from_ltrb(float left, float top, float right, float bottom) -> NanRect;
+        [[nodiscard]] static auto from_ltrb(float left, float top, float right, float bottom)
+            -> NanRect;
 
         /// Construct from position (x, y) and size (width, height).
         [[nodiscard]] static auto from_xywh(float x, float y, float width, float height) -> NanRect;
 
         /// Construct from origin point and size.
-        [[nodiscard]] static auto from_origin_size(const NanPoint& origin, const NanSize& size) -> NanRect;
+        [[nodiscard]] static auto from_origin_size(const NanPoint& origin, const NanSize& size)
+            -> NanRect;
 
         /// Construct centered on a point with a given size.
-        [[nodiscard]] static auto from_center(const NanPoint& center, const NanSize& size) -> NanRect;
+        [[nodiscard]] static auto from_center(const NanPoint& center, const NanSize& size)
+            -> NanRect;
 
         /// Construct from any two opposite corner points.
         [[nodiscard]] static auto from_points(const NanPoint& p1, const NanPoint& p2) -> NanRect;
@@ -406,7 +409,8 @@ namespace nandina::foundation
         [[nodiscard]] auto min(const NanInsets& other) const -> NanInsets;
 
         /// Linear interpolation: (1 - t) * a + t * b.
-        [[nodiscard]] static auto lerp(const NanInsets& a, const NanInsets& b, float t) -> NanInsets;
+        [[nodiscard]] static auto lerp(const NanInsets& a, const NanInsets& b, float t)
+            -> NanInsets;
 
         // ---- comparison ----
 

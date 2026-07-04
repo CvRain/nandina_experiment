@@ -29,6 +29,8 @@ module_scene = files(
     'scene/node2d.cpp',
     'scene/scene_tree.hpp',
     'scene/scene_tree.cpp',
+    'scene/control.hpp',
+    'scene/control.cpp',
 )
 
 module_render = files(
@@ -39,10 +41,15 @@ module_render = files(
     'render/backends/raylib_device.cpp',
 )
 
+module_widget = files(
+    'widget/reactive_control.hpp',
+    'widget/bindable_rect.hpp',
+)
+
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_scene, module_render],
+    [module_fundation, module_reactive, module_scene, module_render, module_widget],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep],
     install : true,
 )
