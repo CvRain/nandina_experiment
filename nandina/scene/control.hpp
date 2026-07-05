@@ -32,60 +32,37 @@ namespace nandina::scene
     class NanControl: public NanNode2D {
     public:
         NanControl() = default;
-        explicit NanControl(foundation::NanSize size): size_(size) {}
+        explicit NanControl(const foundation::NanSize& size);
 
         // ---- size ----
 
-        [[nodiscard]] auto size() const -> foundation::NanSize {
-            return size_;
-        }
-        void set_size(foundation::NanSize size) {
-            size_ = size;
-        }
+        [[nodiscard]] auto size() const -> foundation::NanSize;
+        auto set_size(foundation::NanSize size) -> void;
 
-        [[nodiscard]] auto width() const -> float {
-            return size_.get_width();
-        }
-        [[nodiscard]] auto height() const -> float {
-            return size_.get_height();
-        }
+        [[nodiscard]] auto width() const -> float;
+        [[nodiscard]] auto height() const -> float;
 
         /// 局部空间矩形 [0,0,w,h]。
-        [[nodiscard]] auto local_rect() const -> foundation::NanRect {
-            return foundation::NanRect::from_xywh(
-                0.0F,
-                0.0F,
-                size_.get_width(),
-                size_.get_height()
-            );
-        }
+        [[nodiscard]] auto local_rect() const -> foundation::NanRect;
 
         // ---- background (可选) ----
 
         /// 设置背景填充色; 未设置时 on_draw 不绘制背景 (透明容器)。
-        void set_background(foundation::NanColor color) {
-            background_ = color;
-        }
-        void clear_background() {
-            background_.reset();
-        }
-        [[nodiscard]] auto background() const -> const std::optional<foundation::NanColor>& {
-            return background_;
-        }
+        auto set_background(foundation::NanColor color) -> void;
+        auto clear_background() -> void;
+
+        [[nodiscard]] auto background() const -> const std::optional<foundation::NanColor>&;
 
         // ---- overrides ----
 
         /// 矩形命中: 局部点落在 [0,w]x[0,h] 内。
-        [[nodiscard]] auto contains_point(foundation::NanPoint local_point) const -> bool override {
-            return local_point.get_x() >= 0.0F && local_point.get_x() <= size_.get_width()
-                && local_point.get_y() >= 0.0F && local_point.get_y() <= size_.get_height();
-        }
+        [[nodiscard]] auto contains_point(foundation::NanPoint local_point) const -> bool override;
 
         /// 世界空间 AABB: 局部矩形四角变换取包围盒 (旋转时为 AABB)。
         [[nodiscard]] auto global_bounds() const -> foundation::NanRect override;
 
         /// 默认绘制: 若设置了背景色, 填充世界空间矩形 (乘继承 opacity)。
-        void on_draw(render::DrawContext& ctx) override;
+        auto on_draw(render::DrawContext& ctx) -> void override;
 
     private:
         foundation::NanSize size_ {};

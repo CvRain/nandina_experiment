@@ -46,10 +46,18 @@ module_widget = files(
     'widget/bindable_rect.hpp',
 )
 
+module_app = files(
+    'app/window_config.hpp',
+    'app/nan_application.hpp',
+    'app/nan_application.cpp',
+    'app/nan_window.hpp',
+    'app/nan_window.cpp',
+)
+
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_scene, module_render, module_widget],
+    [module_fundation, module_reactive, module_scene, module_render, module_widget, module_app],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep],
     install : true,
 )

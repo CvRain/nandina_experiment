@@ -2,7 +2,6 @@
 
 example_sources = files(
     'main.cpp',
-    'utils.hpp'
 )
 
 executable('nandina_example',

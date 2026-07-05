@@ -32,6 +32,10 @@ namespace nandina::render
         virtual void begin_frame() = 0;
         virtual void end_frame() = 0;
 
+        /// Clear the whole framebuffer to a solid color (called at frame start).
+        /// Default no-op so offscreen / recording devices need not implement it.
+        virtual void clear(const NanColor& /*color*/) {}
+
         // ---- clipping (screen-space axis-aligned rect) ----
         /// Set the current clip rect; called by ClipStack, not by nodes directly.
         virtual void set_clip(const NanRect& screen_rect) = 0;

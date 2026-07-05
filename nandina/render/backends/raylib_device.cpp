@@ -45,6 +45,10 @@ namespace nandina::render
             EndDrawing();
         }
 
+        void clear(const NanColor& c) override {
+            ClearBackground(to_rl(c));
+        }
+
         void set_clip(const NanRect& r) override {
             // raylib scissor doesn't nest (each call overrides). That's fine: the
             // ClipStack always submits the already-intersected top rect.
