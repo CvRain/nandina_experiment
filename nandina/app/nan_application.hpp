@@ -19,6 +19,13 @@
 #define NANDINA_EXPERIMENT_APP_NAN_APPLICATION_HPP
 
 #include "../reactive/graph.hpp"
+#include "nan_page.hpp"
+#include "nan_store.hpp"
+
+#include <concepts>
+#include <memory>
+#include <stdexcept>
+#include <utility>
 
 namespace nandina::app
 {
@@ -36,15 +43,35 @@ namespace nandina::app
         auto operator=(NanApplication&&) -> NanApplication& = delete;
 
         /// 响应式调度图。所有 signal / effect 依附其上; 生命周期覆盖整个 app。
-        [[nodiscard]] auto graph() -> reactive::Graph& {
-            return graph_;
+        [[nodiscard]] auto graph() -> reactive::Graph&;
+
+        template<typename StoreT, typename... Args>
+            requires std::derived_from<StoreT, NanStore>
+        auto use_store(Args&&... args) -> StoreT& {
+            store_ = std::make_unique<StoreT>(graph_, std::forward<Args>(args)...);
+            store_key_ = nan_type_key<StoreT>();
+            return static_cast<StoreT&>(*store_);
         }
+
+        template<typename StoreT>
+            requires std::derived_from<StoreT, NanStore>
+        [[nodiscard]] auto store() -> StoreT& {
+            if (store_ == nullptr || store_key_ != nan_type_key<StoreT>()) {
+                throw std::runtime_error("NanApplication::store: requested store type is not installed");
+            }
+            return static_cast<StoreT&>(*store_);
+        }
+
+        [[nodiscard]] auto store_base() -> NanStore*;
+        [[nodiscard]] auto store_type_key() const -> NanTypeKey;
 
         /// 进入阻塞主循环: 打开窗口, 每帧 tick, 直到窗口关闭。返回进程退出码。
         auto run(NanWindow& window) -> int;
 
     private:
         reactive::Graph graph_;
+        std::unique_ptr<NanStore> store_;
+        NanTypeKey store_key_ = nullptr;
     };
 
 } // namespace nandina::app

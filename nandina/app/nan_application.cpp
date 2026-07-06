@@ -16,6 +16,18 @@ namespace nandina::app
 
     NanApplication::~NanApplication() = default;
 
+    auto NanApplication::graph() -> reactive::Graph& {
+        return graph_;
+    }
+
+    auto NanApplication::store_base() -> NanStore* {
+        return store_.get();
+    }
+
+    auto NanApplication::store_type_key() const -> NanTypeKey {
+        return store_key_;
+    }
+
     auto NanApplication::run(NanWindow& window) -> int {
         window.open();
         while (!window.should_close()) {

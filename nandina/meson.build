@@ -48,6 +48,10 @@ module_widget = files(
 
 module_app = files(
     'app/window_config.hpp',
+    'app/nan_store.hpp',
+    'app/nan_page.hpp',
+    'app/nan_router.hpp',
+    'app/nan_router.cpp',
     'app/nan_application.hpp',
     'app/nan_application.cpp',
     'app/nan_window.hpp',

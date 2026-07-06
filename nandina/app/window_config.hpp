@@ -18,7 +18,7 @@ namespace nandina::app
 {
 
     /// 窗口创建参数。所有字段有合理默认值, 标准桌面窗口可直接 `WindowConfig{}`。
-    struct WindowConfig {
+    using WindowConfig = struct WindowConfig {
         std::string title = "Nandina";
         int width = 1100;
         int height = 700;

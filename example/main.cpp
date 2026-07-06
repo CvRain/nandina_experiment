@@ -1,19 +1,26 @@
 //
-// Nandina — App/Window demo
+// Nandina — Router + Store demo
 //
-// 展示新的应用入口: 开发者不再手写 raylib 主循环 / 输入翻译 / 颜色转换。
-// 只需构造 NanApplication + NanWindow, set_content 挂载一个 NanControl 树,
-// 然后 app.run(window)。整个 raylib 样板与 utils.hpp 已被 app 层吸收。
+// 展示新的 App 层心智模型:
+//   - NanApplication 持有全局 Graph 与开发者 Store;
+//   - NanWindow.use_router() 创建 keep-alive Router 并挂载 host;
+//   - Page 只负责 typed params 向下传递与 build UI;
+//   - 横向 / 向上同步走 Store 里的 Signal, 不靠反向路由参数。
 //
 
 #include "app/nan_application.hpp"
+#include "app/nan_page.hpp"
+#include "app/nan_router.hpp"
+#include "app/nan_store.hpp"
 #include "app/nan_window.hpp"
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
+#include "reactive/signal.hpp"
 #include "scene/control.hpp"
+#include "widget/bindable_rect.hpp"
 
 #include <memory>
-#include <ranges>
+#include <string_view>
 
 using namespace nandina;
 
@@ -26,55 +33,165 @@ namespace
         );
     }
 
-    /// 构建一个简单的静态页面: 一个面板 + 三张彩色卡片, 全部用 NanControl。
-    auto build_demo_root() -> std::shared_ptr<scene::NanControl> {
-        // 根: 占满窗口的透明容器 (无背景, 由窗口清屏色打底)。
-        auto root = std::make_shared<scene::NanControl>(foundation::NanSize(1100, 700));
+    struct DemoStore final: app::NanStore {
+        explicit DemoStore(reactive::Graph& graph):
+            blog_count(graph, 3),
+            accent_position(graph, foundation::NanPoint(620.0F, 60.0F)),
+            accent_color(graph, oklch(0.39F, 0.03F, 276.0F)) {}
 
-        // 面板。
-        auto panel = std::make_shared<scene::NanControl>(foundation::NanSize(360, 220));
-        panel->set_position(foundation::NanPoint(60, 60));
-        panel->set_background(oklch(0.28F, 0.03F, 260.0F));
-        root->add_child(panel);
+        reactive::Signal<int> blog_count;
+        reactive::Signal<foundation::NanPoint> accent_position;
+        reactive::Signal<foundation::NanColor> accent_color;
+    };
 
-        const auto card_colors = std::array<foundation::NanColor, 3> {
-            oklch(0.62F, 0.18F, 250.0F),
-            oklch(0.68F, 0.16F, 150.0F),
-            oklch(0.70F, 0.15F, 60.0F),
-        };
+    struct ConsoleParams {
+        int user_id = 0;
+    };
 
-        for (size_t i = 0; i < card_colors.size(); i++) {
-            auto card = std::make_shared<scene::NanControl>(foundation::NanSize(90, 120));
-            card->set_position(foundation::NanPoint(20.0F + static_cast<float>(i) * 110.0F, 50.0F));
-            card->set_background(card_colors.at(i));
-            panel->add_child(card);
+    struct BlogParams {
+        int user_id = 0;
+        int blog_id = 0;
+    };
+
+    auto add_card(
+        scene::NanControl& parent,
+        foundation::NanPoint position,
+        foundation::NanSize size,
+        foundation::NanColor color
+    ) -> std::shared_ptr<scene::NanControl> {
+        auto card = std::make_shared<scene::NanControl>(size);
+        card->set_position(position);
+        card->set_background(color);
+        parent.add_child(card);
+        return card;
+    }
+
+    class BlogPage final: public app::NanPageT<BlogParams> {
+    public:
+        explicit BlogPage(BlogParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "blog";
         }
 
-        // 右侧一个大的强调块。
-        const auto accent = std::make_shared<scene::NanControl>(foundation::NanSize(420, 500));
-        accent->set_position(foundation::NanPoint(620, 60));
-        accent->set_background(oklch(0.39F, 0.03F, 276.0F));
-        root->add_child(accent);
+        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+            auto& store = context.store<DemoStore>();
 
-        return root;
-    }
+            // 模拟深层页面修改共享状态: 控制台页 keep-alive, pop 回去时已看到新值。
+            store.blog_count.update([](int& value) { value += 1; });
+            store.accent_position.set(foundation::NanPoint(560.0F + static_cast<float>(params().blog_id) * 18.0F, 80.0F));
+            store.accent_color.set(oklch(0.58F, 0.13F, 35.0F + static_cast<float>(params().blog_id) * 25.0F));
+
+            auto root = std::make_shared<scene::NanControl>(foundation::NanSize(1100, 700));
+
+            auto shell = add_card(
+                *root,
+                foundation::NanPoint(60.0F, 60.0F),
+                foundation::NanSize(460.0F, 300.0F),
+                oklch(0.28F, 0.03F, 260.0F)
+            );
+
+            add_card(
+                *shell,
+                foundation::NanPoint(24.0F, 24.0F),
+                foundation::NanSize(160.0F, 64.0F),
+                oklch(0.65F, 0.17F, 35.0F)
+            );
+            add_card(
+                *shell,
+                foundation::NanPoint(24.0F, 112.0F),
+                foundation::NanSize(320.0F, 48.0F),
+                oklch(0.45F, 0.08F, 260.0F)
+            );
+            add_card(
+                *shell,
+                foundation::NanPoint(24.0F, 184.0F),
+                foundation::NanSize(260.0F, 48.0F),
+                oklch(0.50F, 0.12F, 140.0F)
+            );
+
+            auto pop_hint = add_card(
+                *root,
+                foundation::NanPoint(620.0F, 430.0F),
+                foundation::NanSize(360.0F, 70.0F),
+                oklch(0.72F, 0.12F, 120.0F)
+            );
+            pop_hint->set_name("Blog page mutated Store; press Escape after future key binding.");
+
+            return root;
+        }
+    };
+
+    class ConsolePage final: public app::NanPageT<ConsoleParams> {
+    public:
+        explicit ConsolePage(ConsoleParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "console";
+        }
+
+        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+            auto& store = context.store<DemoStore>();
+
+            auto root = std::make_shared<scene::NanControl>(foundation::NanSize(1100, 700));
+
+            auto panel = add_card(
+                *root,
+                foundation::NanPoint(60.0F, 60.0F),
+                foundation::NanSize(420.0F, 260.0F),
+                oklch(0.28F, 0.03F, 260.0F)
+            );
+
+            add_card(
+                *panel,
+                foundation::NanPoint(24.0F, 24.0F),
+                foundation::NanSize(170.0F, 54.0F),
+                oklch(0.62F, 0.18F, 250.0F)
+            );
+            add_card(
+                *panel,
+                foundation::NanPoint(24.0F, 102.0F),
+                foundation::NanSize(130.0F + static_cast<float>(params().user_id), 54.0F),
+                oklch(0.68F, 0.16F, 150.0F)
+            );
+
+            // 响应式强调块: BlogPage 修改 Store 后, 这个 keep-alive 控件会立即更新。
+            auto accent = std::make_shared<widget::BindableRect>(context.graph(), foundation::NanSize(420.0F, 500.0F));
+            accent->bind_position(store.accent_position);
+            accent->bind_background(store.accent_color);
+            root->add_child(accent);
+
+            // 当前还没有 Button / Label, 暂用色块表示「博客数量」。
+            add_card(
+                *root,
+                foundation::NanPoint(620.0F, 600.0F),
+                foundation::NanSize(260.0F + static_cast<float>(store.blog_count.peek()) * 18.0F, 44.0F),
+                oklch(0.74F, 0.13F, 95.0F)
+            );
+
+            return root;
+        }
+    };
 
 } // namespace
 
 auto main() -> int {
     app::NanApplication application;
+    application.use_store<DemoStore>();
 
     app::NanWindow window {
         application,
         app::WindowConfig {
-            .title = "Nandina — App/Window Demo",
+            .title = "Nandina — Router + Store Demo",
             .width = 1100,
             .height = 700,
             .background = oklch(0.33F, 0.03F, 275.0F),
         }
     };
 
-    window.set_content(build_demo_root());
+    auto& router = window.use_router();
+    router.push<ConsolePage>(ConsoleParams {.user_id = 42});
+    router.push<BlogPage>(BlogParams {.user_id = 42, .blog_id = application.store<DemoStore>().blog_count.peek()});
 
     return application.run(window);
 }

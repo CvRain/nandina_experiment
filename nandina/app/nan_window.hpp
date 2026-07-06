@@ -26,6 +26,7 @@
 
 #include "../render/render_device.hpp"
 #include "../scene/scene_tree.hpp"
+#include "nan_router.hpp"
 #include "window_config.hpp"
 
 #include <memory>
@@ -52,6 +53,13 @@ namespace nandina::app
 
         /// 挂载页面根组件 (成为 SceneTree 的 root)。
         void set_content(std::shared_ptr<scene::NanNode2D> root);
+
+        /// 创建一个 keep-alive Router, 并把 Router host 挂为窗口内容。
+        [[nodiscard]] auto use_router() -> NanRouter&;
+
+        [[nodiscard]] auto router() -> NanRouter* {
+            return router_.get();
+        }
 
         /// 访问响应式图 (来自 App)。
         [[nodiscard]] auto graph() -> reactive::Graph&;
@@ -92,6 +100,7 @@ namespace nandina::app
         NanApplication& app_;
         WindowConfig config_;
         scene::NanSceneTree tree_;
+        std::unique_ptr<NanRouter> router_;
         std::unique_ptr<render::IRenderDevice> device_;
         bool opened_ = false;
 

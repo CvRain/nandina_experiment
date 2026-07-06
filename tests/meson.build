@@ -27,3 +27,10 @@ widget_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('widget', widget_tests)
+
+router_tests = executable(
+    'router_tests',
+    files('router_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('router', router_tests)
