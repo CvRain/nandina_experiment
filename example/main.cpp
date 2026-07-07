@@ -18,6 +18,7 @@
 #include "reactive/signal.hpp"
 #include "scene/control.hpp"
 #include "widget/bindable_rect.hpp"
+#include "widget/button.hpp"
 
 #include <memory>
 #include <string_view>
@@ -74,13 +75,18 @@ namespace
             return "blog";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto& store = context.store<DemoStore>();
 
             // 模拟深层页面修改共享状态: 控制台页 keep-alive, pop 回去时已看到新值。
             store.blog_count.update([](int& value) { value += 1; });
-            store.accent_position.set(foundation::NanPoint(560.0F + static_cast<float>(params().blog_id) * 18.0F, 80.0F));
-            store.accent_color.set(oklch(0.58F, 0.13F, 35.0F + static_cast<float>(params().blog_id) * 25.0F));
+            store.accent_position.set(
+                foundation::NanPoint(560.0F + static_cast<float>(params().blog_id) * 18.0F, 80.0F)
+            );
+            store.accent_color.set(
+                oklch(0.58F, 0.13F, 35.0F + static_cast<float>(params().blog_id) * 25.0F)
+            );
 
             auto root = std::make_shared<scene::NanControl>(foundation::NanSize(1100, 700));
 
@@ -130,7 +136,8 @@ namespace
             return "console";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto& store = context.store<DemoStore>();
 
             auto root = std::make_shared<scene::NanControl>(foundation::NanSize(1100, 700));
@@ -148,15 +155,23 @@ namespace
                 foundation::NanSize(170.0F, 54.0F),
                 oklch(0.62F, 0.18F, 250.0F)
             );
-            add_card(
-                *panel,
-                foundation::NanPoint(24.0F, 102.0F),
-                foundation::NanSize(130.0F + static_cast<float>(params().user_id), 54.0F),
-                oklch(0.68F, 0.16F, 150.0F)
-            );
+            auto open_blog = std::make_shared<widget::Button>("Open blog");
+            open_blog->set_position(foundation::NanPoint(24.0F, 184.0F));
+            open_blog->set_tone(theme::ButtonTone::primary);
+            open_blog->set_treatment(theme::ButtonTreatment::filled);
+            auto& router = context.router();
+            open_blog->set_on_click([&router, user_id = params().user_id, &store] {
+                router.push<BlogPage>(
+                    BlogParams {.user_id = user_id, .blog_id = store.blog_count.peek()}
+                );
+            });
+            panel->add_child(open_blog);
 
             // 响应式强调块: BlogPage 修改 Store 后, 这个 keep-alive 控件会立即更新。
-            auto accent = std::make_shared<widget::BindableRect>(context.graph(), foundation::NanSize(420.0F, 500.0F));
+            auto accent = std::make_shared<widget::BindableRect>(
+                context.graph(),
+                foundation::NanSize(420.0F, 500.0F)
+            );
             accent->bind_position(store.accent_position);
             accent->bind_background(store.accent_color);
             root->add_child(accent);
@@ -165,7 +180,10 @@ namespace
             add_card(
                 *root,
                 foundation::NanPoint(620.0F, 600.0F),
-                foundation::NanSize(260.0F + static_cast<float>(store.blog_count.peek()) * 18.0F, 44.0F),
+                foundation::NanSize(
+                    260.0F + static_cast<float>(store.blog_count.peek()) * 18.0F,
+                    44.0F
+                ),
                 oklch(0.74F, 0.13F, 95.0F)
             );
 
@@ -191,7 +209,6 @@ auto main() -> int {
 
     auto& router = window.use_router();
     router.push<ConsolePage>(ConsoleParams {.user_id = 42});
-    router.push<BlogPage>(BlogParams {.user_id = 42, .blog_id = application.store<DemoStore>().blog_count.peek()});
 
     return application.run(window);
 }

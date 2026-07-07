@@ -34,3 +34,10 @@ router_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('router', router_tests)
+
+button_tests = executable(
+    'button_tests',
+    files('button_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('button', button_tests)

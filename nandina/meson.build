@@ -41,9 +41,22 @@ module_render = files(
     'render/backends/raylib_device.cpp',
 )
 
+module_theme = files(
+    'theme/tokens.hpp',
+    'theme/theme.hpp',
+    'theme/button_style.hpp',
+    'theme/button_style.cpp',
+)
+
 module_widget = files(
     'widget/reactive_control.hpp',
     'widget/bindable_rect.hpp',
+    'widget/primitives/surface.hpp',
+    'widget/primitives/surface.cpp',
+    'widget/primitives/pressable.hpp',
+    'widget/primitives/pressable.cpp',
+    'widget/button.hpp',
+    'widget/button.cpp',
 )
 
 module_app = files(
@@ -61,7 +74,7 @@ module_app = files(
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_scene, module_render, module_widget, module_app],
+    [module_fundation, module_reactive, module_scene, module_render, module_theme, module_widget, module_app],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep],
     install : true,
 )
