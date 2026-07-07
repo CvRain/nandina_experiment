@@ -7,8 +7,14 @@
 namespace nandina::app
 {
 
-    NanRouter::NanRouter(reactive::Graph& graph, NanStore* store, NanTypeKey store_key):
+    NanRouter::NanRouter(
+        reactive::Graph& graph,
+        const theme::NanTheme& theme,
+        NanStore* store,
+        NanTypeKey store_key
+    ):
         graph_(&graph),
+        theme_(&theme),
         store_(store),
         store_key_(store_key),
         host_(std::make_shared<scene::NanControl>()) {}
@@ -19,6 +25,10 @@ namespace nandina::app
 
     auto NanRouter::graph() -> reactive::Graph& {
         return *graph_;
+    }
+
+    auto NanRouter::theme() const -> const theme::NanTheme& {
+        return *theme_;
     }
 
     auto NanRouter::store_base() -> NanStore* {
@@ -93,7 +103,7 @@ namespace nandina::app
             throw std::runtime_error("NanRouter::push_page: page is null");
         }
 
-        PageContext context {*this, *graph_, store_, store_key_};
+        PageContext context {*this, *graph_, *theme_, store_, store_key_};
         auto root = page->build(context);
         if (!root) {
             throw std::runtime_error("NanRouter::push_page: page build returned null root");

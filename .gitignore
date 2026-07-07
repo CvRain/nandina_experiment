@@ -97,5 +97,6 @@ vcpkg_installed
 .venv
 .wraplock
 .ai
+.kilo
 
 dev-docs-*

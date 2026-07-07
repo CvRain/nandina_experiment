@@ -5,6 +5,8 @@
 #include "button.hpp"
 #include "../render/draw_context.hpp"
 
+#include <utility>
+
 namespace nandina::widget
 {
 
@@ -12,6 +14,10 @@ namespace nandina::widget
         text_(std::move(text)),
         theme_(theme) {
         apply_metrics();
+    }
+
+    auto Button::create(std::string text, theme::NanTheme theme) -> std::shared_ptr<Button> {
+        return std::make_shared<Button>(std::move(text), theme);
     }
 
     void Button::set_text(std::string text) {

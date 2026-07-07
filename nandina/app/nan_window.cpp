@@ -68,13 +68,22 @@ namespace nandina::app
     }
 
     auto NanWindow::use_router() -> NanRouter& {
-        router_ = std::make_unique<NanRouter>(app_.graph(), app_.store_base(), app_.store_type_key());
+        router_ = std::make_unique<NanRouter>(
+            app_.graph(),
+            app_.theme(),
+            app_.store_base(),
+            app_.store_type_key()
+        );
         set_content(router_->host());
         return *router_;
     }
 
     auto NanWindow::graph() -> reactive::Graph& {
         return app_.graph();
+    }
+
+    auto NanWindow::theme() const -> const theme::NanTheme& {
+        return app_.theme();
     }
 
     void NanWindow::open() {

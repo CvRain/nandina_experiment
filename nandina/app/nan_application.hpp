@@ -19,6 +19,7 @@
 #define NANDINA_EXPERIMENT_APP_NAN_APPLICATION_HPP
 
 #include "../reactive/graph.hpp"
+#include "../theme/theme.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
 
@@ -45,6 +46,9 @@ namespace nandina::app
         /// 响应式调度图。所有 signal / effect 依附其上; 生命周期覆盖整个 app。
         [[nodiscard]] auto graph() -> reactive::Graph&;
 
+        void set_theme(theme::NanTheme theme);
+        [[nodiscard]] auto theme() const -> const theme::NanTheme&;
+
         template<typename StoreT, typename... Args>
             requires std::derived_from<StoreT, NanStore>
         auto use_store(Args&&... args) -> StoreT& {
@@ -70,6 +74,7 @@ namespace nandina::app
 
     private:
         reactive::Graph graph_;
+        theme::NanTheme theme_;
         std::unique_ptr<NanStore> store_;
         NanTypeKey store_key_ = nullptr;
     };

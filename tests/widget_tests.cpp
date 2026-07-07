@@ -15,9 +15,12 @@
 #include "scene/control.hpp"
 #include "scene/scene_tree.hpp"
 #include "widget/bindable_rect.hpp"
+#include "widget/button.hpp"
+#include "widget/label.hpp"
 
 #include <memory>
 #include <string>
+#include <string_view>
 #include <vector>
 
 using namespace nandina;
@@ -32,7 +35,12 @@ public:
         foundation::NanRect rect;
         float alpha;
     };
+    struct TextCall {
+        std::string text;
+        float alpha;
+    };
     std::vector<RectCall> rects;
+    std::vector<TextCall> texts;
 
     void begin_frame() override {}
     void end_frame() override {}
@@ -46,8 +54,10 @@ public:
     void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float,
                    const foundation::NanColor&) override {}
     void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
-    void draw_text(std::string_view, const foundation::NanPoint&, float,
-                   const foundation::NanColor&) override {}
+    void draw_text(std::string_view text, const foundation::NanPoint&, float,
+                   const foundation::NanColor& color) override {
+        texts.push_back({std::string(text), color.alpha()});
+    }
 };
 
 auto opaque_color(float light) -> foundation::NanColor {
@@ -186,4 +196,74 @@ TEST_CASE("BindableRect: unmount clears subscriptions (no update after removal)"
     REQUIRE_NOTHROW(visible.set(true));
     // Its visible flag stays at the last bound value (no effect re-ran).
     REQUIRE_FALSE(rect->visible());
+}
+
+TEST_CASE("Label text follows computed state changed by buttons", "[widget][label][button][reactive]") {
+    reactive::Graph graph;
+    reactive::Signal<int> count {graph, 0};
+    auto* text = reactive::make_computed(graph, [&] {
+        return std::string("Count: ") + std::to_string(count.get());
+    });
+
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>(foundation::NanSize(320.0F, 160.0F));
+
+    auto label = std::make_shared<widget::Label>(graph);
+    label->bind_text(*text);
+    root->add_child(label);
+
+    auto decrement = std::make_shared<widget::Button>("-1");
+    decrement->set_position(foundation::NanPoint(0.0F, 48.0F));
+    decrement->set_on_click([&] { count.update([](int& value) { --value; }); });
+    root->add_child(decrement);
+
+    auto increment = std::make_shared<widget::Button>("+1");
+    increment->set_position(foundation::NanPoint(80.0F, 48.0F));
+    increment->set_on_click([&] { count.update([](int& value) { ++value; }); });
+    root->add_child(increment);
+
+    tree.set_root(root);
+
+    tree.draw(dev);
+    REQUIRE_FALSE(dev.texts.empty());
+    REQUIRE(dev.texts.front().text == "Count: 0");
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(90.0F, 58.0F),
+        foundation::NanPoint::zero(),
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        foundation::NanPoint(90.0F, 58.0F),
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        foundation::NanPoint(90.0F, 58.0F),
+    });
+
+    dev.texts.clear();
+    tree.draw(dev);
+    REQUIRE(dev.texts.front().text == "Count: 1");
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(10.0F, 58.0F),
+        foundation::NanPoint(-80.0F, 0.0F),
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        foundation::NanPoint(10.0F, 58.0F),
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        foundation::NanPoint(10.0F, 58.0F),
+    });
+
+    dev.texts.clear();
+    tree.draw(dev);
+    REQUIRE(dev.texts.front().text == "Count: 0");
 }

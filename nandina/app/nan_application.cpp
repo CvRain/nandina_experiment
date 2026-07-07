@@ -20,6 +20,14 @@ namespace nandina::app
         return graph_;
     }
 
+    void NanApplication::set_theme(theme::NanTheme theme) {
+        theme_ = theme;
+    }
+
+    auto NanApplication::theme() const -> const theme::NanTheme& {
+        return theme_;
+    }
+
     auto NanApplication::store_base() -> NanStore* {
         return store_.get();
     }

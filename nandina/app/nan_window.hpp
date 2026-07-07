@@ -64,6 +64,8 @@ namespace nandina::app
         /// 访问响应式图 (来自 App)。
         [[nodiscard]] auto graph() -> reactive::Graph&;
 
+        [[nodiscard]] auto theme() const -> const theme::NanTheme&;
+
         /// 访问场景树 (高级用途; 一般通过 set_content 即可)。
         [[nodiscard]] auto scene_tree() -> scene::NanSceneTree& {
             return tree_;

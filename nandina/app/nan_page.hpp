@@ -10,9 +10,10 @@
 #ifndef NANDINA_EXPERIMENT_APP_NAN_PAGE_HPP
 #define NANDINA_EXPERIMENT_APP_NAN_PAGE_HPP
 
-#include "nan_store.hpp"
 #include "../reactive/graph.hpp"
 #include "../scene/node2d.hpp"
+#include "../theme/theme.hpp"
+#include "nan_store.hpp"
 
 #include <concepts>
 #include <memory>
@@ -26,6 +27,8 @@ namespace nandina::app
 
     using NanTypeKey = const void*;
 
+    struct NoParams {};
+
     template<typename T>
     [[nodiscard]] auto nan_type_key() -> NanTypeKey {
         static const int token = 0;
@@ -36,9 +39,16 @@ namespace nandina::app
 
     class PageContext {
     public:
-        PageContext(NanRouter& router, reactive::Graph& graph, NanStore* store, NanTypeKey store_key):
+        PageContext(
+            NanRouter& router,
+            reactive::Graph& graph,
+            const theme::NanTheme& theme,
+            NanStore* store,
+            NanTypeKey store_key
+        ):
             router_(&router),
             graph_(&graph),
+            theme_(&theme),
             store_(store),
             store_key_(store_key) {}
 
@@ -50,6 +60,10 @@ namespace nandina::app
             return *graph_;
         }
 
+        [[nodiscard]] auto theme() const -> const theme::NanTheme& {
+            return *theme_;
+        }
+
         [[nodiscard]] auto has_store() const -> bool {
             return store_ != nullptr;
         }
@@ -58,7 +72,9 @@ namespace nandina::app
             requires std::derived_from<StoreT, NanStore>
         [[nodiscard]] auto store() -> StoreT& {
             if (store_ == nullptr || store_key_ != nan_type_key<StoreT>()) {
-                throw std::runtime_error("PageContext::store: requested store type is not installed");
+                throw std::runtime_error(
+                    "PageContext::store: requested store type is not installed"
+                );
             }
             return static_cast<StoreT&>(*store_);
         }
@@ -66,6 +82,7 @@ namespace nandina::app
     private:
         NanRouter* router_;
         reactive::Graph* graph_;
+        const theme::NanTheme* theme_;
         NanStore* store_;
         NanTypeKey store_key_ = nullptr;
     };
@@ -81,7 +98,8 @@ namespace nandina::app
 
         [[nodiscard]] virtual auto route_key() const -> std::string_view = 0;
         [[nodiscard]] virtual auto params_type_key() const -> NanTypeKey = 0;
-        [[nodiscard]] virtual auto build(PageContext& context) -> std::shared_ptr<scene::NanNode2D> = 0;
+        [[nodiscard]] virtual auto build(PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> = 0;
 
     protected:
         NanPage() = default;
@@ -92,6 +110,9 @@ namespace nandina::app
     public:
         using Params = ParamsT;
 
+        NanPageT()
+            requires std::default_initializable<Params>
+        = default;
         explicit NanPageT(Params params): params_(std::move(params)) {}
 
         [[nodiscard]] auto params() const -> const Params& {

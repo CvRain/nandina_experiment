@@ -29,7 +29,12 @@ namespace nandina::app
 
     class NanRouter {
     public:
-        explicit NanRouter(reactive::Graph& graph, NanStore* store = nullptr, NanTypeKey store_key = nullptr);
+        explicit NanRouter(
+            reactive::Graph& graph,
+            const theme::NanTheme& theme,
+            NanStore* store = nullptr,
+            NanTypeKey store_key = nullptr
+        );
         ~NanRouter() = default;
 
         NanRouter(const NanRouter&) = delete;
@@ -39,6 +44,7 @@ namespace nandina::app
 
         [[nodiscard]] auto host() -> std::shared_ptr<scene::NanControl>;
         [[nodiscard]] auto graph() -> reactive::Graph&;
+        [[nodiscard]] auto theme() const -> const theme::NanTheme&;
         [[nodiscard]] auto store_base() -> NanStore*;
         [[nodiscard]] auto depth() const -> std::size_t;
         [[nodiscard]] auto empty() const -> bool;
@@ -63,6 +69,16 @@ namespace nandina::app
             return *raw;
         }
 
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+                && std::default_initializable<PageT>
+        auto push() -> PageT& {
+            auto page = std::make_unique<PageT>();
+            auto* raw = page.get();
+            push_page(std::move(page));
+            return *raw;
+        }
+
         template<typename PageT, typename ParamsT>
             requires std::derived_from<PageT, NanPageT<ParamsT>>
         auto replace(ParamsT params) -> PageT& {
@@ -70,6 +86,16 @@ namespace nandina::app
                 pop();
             }
             return push<PageT>(std::move(params));
+        }
+
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+                && std::default_initializable<PageT>
+        auto replace() -> PageT& {
+            if (!frames_.empty()) {
+                pop();
+            }
+            return push<PageT>();
         }
 
         auto pop() -> bool;
@@ -91,6 +117,7 @@ namespace nandina::app
         void detach_root(const std::shared_ptr<scene::NanNode2D>& root);
 
         reactive::Graph* graph_;
+        const theme::NanTheme* theme_;
         NanStore* store_ = nullptr;
         NanTypeKey store_key_ = nullptr;
         std::shared_ptr<scene::NanControl> host_;

@@ -10,6 +10,7 @@
 
 #include <string>
 #include <string_view>
+#include <memory>
 
 namespace nandina::widget
 {
@@ -17,6 +18,9 @@ namespace nandina::widget
     class Button: public primitives::Pressable {
     public:
         explicit Button(std::string text, theme::NanTheme theme = theme::default_theme());
+
+        [[nodiscard]] static auto create(std::string text, theme::NanTheme theme = theme::default_theme())
+            -> std::shared_ptr<Button>;
 
         void set_text(std::string text);
         [[nodiscard]] auto text() const -> std::string_view;
