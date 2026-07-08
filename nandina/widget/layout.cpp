@@ -5,6 +5,8 @@
 #include "layout.hpp"
 
 #include <algorithm>
+#include <cmath>
+#include <limits>
 #include <stdexcept>
 
 namespace nandina::widget
@@ -55,8 +57,375 @@ namespace nandina::widget
             return measured;
         }
 
+        [[nodiscard]] auto main_extent(foundation::NanSize size, LayoutAxis axis) -> float {
+            return axis == LayoutAxis::horizontal ? size.get_width() : size.get_height();
+        }
+
+        [[nodiscard]] auto cross_extent(foundation::NanSize size, LayoutAxis axis) -> float {
+            return axis == LayoutAxis::horizontal ? size.get_height() : size.get_width();
+        }
+
+        [[nodiscard]] auto max_main(scene::LayoutConstraints constraints, LayoutAxis axis) -> float {
+            return axis == LayoutAxis::horizontal ? constraints.max_width : constraints.max_height;
+        }
+
+        [[nodiscard]] auto size_from_extents(float main, float cross, LayoutAxis axis)
+            -> foundation::NanSize {
+            if (axis == LayoutAxis::horizontal) {
+                return foundation::NanSize(main, cross);
+            }
+            return foundation::NanSize(cross, main);
+        }
+
+        [[nodiscard]] auto rect_from_extents(
+            float main_pos,
+            float cross_pos,
+            float main_size,
+            float cross_size,
+            LayoutAxis axis
+        ) -> foundation::NanRect {
+            if (axis == LayoutAxis::horizontal) {
+                return foundation::NanRect::from_xywh(main_pos, cross_pos, main_size, cross_size);
+            }
+            return foundation::NanRect::from_xywh(cross_pos, main_pos, cross_size, main_size);
+        }
+
+        [[nodiscard]] auto effective_limit(float limit) -> float {
+            return std::isfinite(limit) ? limit : std::numeric_limits<float>::infinity();
+        }
+
         [[nodiscard]] auto expanded_flex(const std::shared_ptr<scene::NanControl>& child) -> int;
+
+        struct WrapRun {
+            std::vector<std::shared_ptr<scene::NanControl>> children;
+            float main = 0.0F;
+            float cross = 0.0F;
+        };
+
+        [[nodiscard]] auto collect_wrap_runs(
+            std::vector<std::weak_ptr<scene::NanControl>>& items,
+            scene::LayoutConstraints constraints,
+            LayoutAxis axis,
+            float gap
+        ) -> std::vector<WrapRun> {
+            prune_expired(items);
+
+            std::vector<WrapRun> runs;
+            WrapRun current;
+            const float limit = effective_limit(max_main(constraints, axis));
+            const bool can_wrap = std::isfinite(limit) && limit >= 0.0F;
+
+            for (auto& item: items) {
+                auto child = item.lock();
+                if (!child || !child->visible()) {
+                    continue;
+                }
+
+                const auto measured = child->measure_layout(child_constraints(constraints));
+                const float child_main = main_extent(measured, axis);
+                const float child_cross = cross_extent(measured, axis);
+                const float next_main = current.children.empty()
+                    ? child_main
+                    : current.main + gap + child_main;
+
+                if (can_wrap && !current.children.empty() && next_main > limit) {
+                    runs.push_back(std::move(current));
+                    current = WrapRun {};
+                }
+
+                if (!current.children.empty()) {
+                    current.main += gap;
+                }
+                current.main += child_main;
+                current.cross = std::max(current.cross, child_cross);
+                current.children.push_back(std::move(child));
+            }
+
+            if (!current.children.empty()) {
+                runs.push_back(std::move(current));
+            }
+            return runs;
+        }
     } // namespace
+
+    Flex::Flex(LayoutAxis axis): axis_(axis) {}
+
+    auto Flex::create(LayoutAxis axis) -> std::shared_ptr<Flex> {
+        return std::make_shared<Flex>(axis);
+    }
+
+    auto Flex::add(std::shared_ptr<scene::NanControl> child) -> Flex& {
+        if (!child) {
+            throw std::runtime_error("Flex::add: child is null");
+        }
+        items_.push_back(child);
+        add_child(std::move(child));
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Flex::set_axis(LayoutAxis axis) -> Flex& {
+        axis_ = axis;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Flex::set_gap(float gap) -> Flex& {
+        gap_ = gap;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Flex::set_main_alignment(LayoutAlignment alignment) -> Flex& {
+        main_alignment_ = alignment;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Flex::set_cross_alignment(LayoutAlignment alignment) -> Flex& {
+        cross_alignment_ = alignment;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Flex::axis() const -> LayoutAxis {
+        return axis_;
+    }
+
+    auto Flex::gap() const -> float {
+        return gap_;
+    }
+
+    auto Flex::main_alignment() const -> LayoutAlignment {
+        return main_alignment_;
+    }
+
+    auto Flex::cross_alignment() const -> LayoutAlignment {
+        return cross_alignment_;
+    }
+
+    void Flex::relayout() {
+        (void)measure_layout(scene::LayoutConstraints::loose());
+        layout_to(foundation::NanRect::from_origin_size(position(), measured_size()));
+    }
+
+    auto Flex::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        prune_expired(items_);
+
+        float used_main = 0.0F;
+        float used_cross = 0.0F;
+        std::size_t visible_count = 0;
+        for (auto& item: items_) {
+            auto child = item.lock();
+            if (!child || !child->visible()) {
+                continue;
+            }
+            if (visible_count > 0) {
+                used_main += gap_;
+            }
+            const auto measured = child->measure_layout(child_constraints(constraints));
+            used_main += main_extent(measured, axis_);
+            used_cross = std::max(used_cross, cross_extent(measured, axis_));
+            ++visible_count;
+        }
+
+        return constraints.constrain(size_from_extents(used_main, used_cross, axis_));
+    }
+
+    auto Flex::on_layout() -> void {
+        prune_expired(items_);
+
+        const float available_main = main_extent(size(), axis_);
+        const float available_cross = cross_extent(size(), axis_);
+        float fixed_main = 0.0F;
+        int total_flex = 0;
+        std::size_t count = 0;
+        for (auto& item: items_) {
+            auto child = item.lock();
+            if (!child || !child->visible()) {
+                continue;
+            }
+            if (count > 0) {
+                fixed_main += gap_;
+            }
+            if (const int flex = expanded_flex(child); flex > 0) {
+                total_flex += flex;
+            } else {
+                fixed_main += main_extent(child->measured_size(), axis_);
+            }
+            ++count;
+        }
+
+        const auto remaining_main = std::max(0.0F, available_main - fixed_main);
+        const auto used_main = total_flex > 0 ? available_main : fixed_main;
+        float main_pos = alignment_offset(main_alignment_, available_main, used_main);
+        std::size_t visible_count = 0;
+        for (auto& item: items_) {
+            auto child = item.lock();
+            if (!child || !child->visible()) {
+                continue;
+            }
+            if (visible_count > 0) {
+                main_pos += gap_;
+            }
+
+            const auto child_size = child->measured_size();
+            const int flex = expanded_flex(child);
+            const auto child_main = total_flex > 0 && flex > 0
+                ? remaining_main * (static_cast<float>(flex) / static_cast<float>(total_flex))
+                : main_extent(child_size, axis_);
+            const auto child_cross = stretched_extent(cross_alignment_, available_cross, cross_extent(child_size, axis_));
+            const auto child_cross_pos = alignment_offset(cross_alignment_, available_cross, child_cross);
+
+            child->layout_to(rect_from_extents(main_pos, child_cross_pos, child_main, child_cross, axis_));
+            main_pos += child_main;
+            ++visible_count;
+        }
+    }
+
+    void Flex::on_ready() {
+        scene::NanControl::on_ready();
+        relayout();
+    }
+
+    Wrap::Wrap(LayoutAxis axis): axis_(axis) {}
+
+    auto Wrap::create(LayoutAxis axis) -> std::shared_ptr<Wrap> {
+        return std::make_shared<Wrap>(axis);
+    }
+
+    auto Wrap::add(std::shared_ptr<scene::NanControl> child) -> Wrap& {
+        if (!child) {
+            throw std::runtime_error("Wrap::add: child is null");
+        }
+        items_.push_back(child);
+        add_child(std::move(child));
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_axis(LayoutAxis axis) -> Wrap& {
+        axis_ = axis;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_gap(float gap) -> Wrap& {
+        gap_ = gap;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_run_gap(float gap) -> Wrap& {
+        run_gap_ = gap;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_main_alignment(LayoutAlignment alignment) -> Wrap& {
+        main_alignment_ = alignment;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_cross_alignment(LayoutAlignment alignment) -> Wrap& {
+        cross_alignment_ = alignment;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::set_run_alignment(LayoutAlignment alignment) -> Wrap& {
+        run_alignment_ = alignment;
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Wrap::axis() const -> LayoutAxis {
+        return axis_;
+    }
+
+    auto Wrap::gap() const -> float {
+        return gap_;
+    }
+
+    auto Wrap::run_gap() const -> float {
+        return run_gap_;
+    }
+
+    auto Wrap::main_alignment() const -> LayoutAlignment {
+        return main_alignment_;
+    }
+
+    auto Wrap::cross_alignment() const -> LayoutAlignment {
+        return cross_alignment_;
+    }
+
+    auto Wrap::run_alignment() const -> LayoutAlignment {
+        return run_alignment_;
+    }
+
+    void Wrap::relayout() {
+        (void)measure_layout(scene::LayoutConstraints::loose());
+        layout_to(foundation::NanRect::from_origin_size(position(), measured_size()));
+    }
+
+    auto Wrap::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        const auto runs = collect_wrap_runs(items_, constraints, axis_, gap_);
+        float used_main = 0.0F;
+        float used_cross = 0.0F;
+        for (std::size_t i = 0; i < runs.size(); ++i) {
+            used_main = std::max(used_main, runs[i].main);
+            if (i > 0) {
+                used_cross += run_gap_;
+            }
+            used_cross += runs[i].cross;
+        }
+        return constraints.constrain(size_from_extents(used_main, used_cross, axis_));
+    }
+
+    auto Wrap::on_layout() -> void {
+        const auto runs = collect_wrap_runs(items_, scene::LayoutConstraints::tight(size()), axis_, gap_);
+        const float available_main = main_extent(size(), axis_);
+        const float available_cross = cross_extent(size(), axis_);
+        float used_cross = 0.0F;
+        for (std::size_t i = 0; i < runs.size(); ++i) {
+            if (i > 0) {
+                used_cross += run_gap_;
+            }
+            used_cross += runs[i].cross;
+        }
+
+        float run_pos = alignment_offset(run_alignment_, available_cross, used_cross);
+        for (const auto& run: runs) {
+            float child_pos = alignment_offset(main_alignment_, available_main, run.main);
+            for (const auto& child: run.children) {
+                const auto child_size = child->measured_size();
+                const auto child_main = main_extent(child_size, axis_);
+                const auto child_cross = stretched_extent(cross_alignment_, run.cross, cross_extent(child_size, axis_));
+                const auto child_cross_pos = run_pos + alignment_offset(cross_alignment_, run.cross, child_cross);
+                child->layout_to(rect_from_extents(child_pos, child_cross_pos, child_main, child_cross, axis_));
+                child_pos += child_main + gap_;
+            }
+            run_pos += run.cross + run_gap_;
+        }
+    }
+
+    void Wrap::on_ready() {
+        scene::NanControl::on_ready();
+        relayout();
+    }
 
     auto Column::create() -> std::shared_ptr<Column> {
         return std::make_shared<Column>();

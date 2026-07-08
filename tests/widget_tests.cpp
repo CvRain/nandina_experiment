@@ -448,3 +448,112 @@ TEST_CASE("Column distributes remaining height across Expanded children", "[widg
     REQUIRE(expanded->height() == Catch::Approx(80.0F));
     REQUIRE(expanded_child->height() == Catch::Approx(80.0F));
 }
+
+TEST_CASE("Flex supports both axes and Expanded children", "[widget][layout][flex]") {
+    auto fixed = std::make_shared<scene::NanControl>(foundation::NanSize(24.0F, 10.0F));
+    auto expanded_child = std::make_shared<scene::NanControl>(foundation::NanSize(4.0F, 4.0F));
+    auto expanded = widget::Expanded::create(2);
+    expanded->set_child(expanded_child);
+
+    auto flex = widget::Flex::create(widget::LayoutAxis::horizontal);
+    flex->set_gap(6.0F)
+        .set_cross_alignment(widget::LayoutAlignment::stretch)
+        .add(fixed)
+        .add(expanded);
+
+    (void)flex->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 30.0F)));
+    flex->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 30.0F));
+
+    REQUIRE(fixed->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(fixed->height() == Catch::Approx(30.0F));
+    REQUIRE(expanded->position().get_x() == Catch::Approx(30.0F));
+    REQUIRE(expanded->width() == Catch::Approx(90.0F));
+    REQUIRE(expanded_child->width() == Catch::Approx(90.0F));
+
+    auto vertical_fixed = std::make_shared<scene::NanControl>(foundation::NanSize(24.0F, 10.0F));
+    auto vertical_expanded_child = std::make_shared<scene::NanControl>(foundation::NanSize(4.0F, 4.0F));
+    auto vertical_expanded = widget::Expanded::create(2);
+    vertical_expanded->set_child(vertical_expanded_child);
+
+    auto vertical = widget::Flex::create(widget::LayoutAxis::vertical);
+    vertical->set_gap(6.0F)
+        .set_cross_alignment(widget::LayoutAlignment::stretch)
+        .add(vertical_fixed)
+        .add(vertical_expanded);
+
+    (void)vertical->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(80.0F, 140.0F)));
+    vertical->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 80.0F, 140.0F));
+
+    REQUIRE(vertical_fixed->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(vertical_fixed->width() == Catch::Approx(80.0F));
+    REQUIRE(vertical_expanded->position().get_y() == Catch::Approx(16.0F));
+    REQUIRE(vertical_expanded->height() == Catch::Approx(124.0F));
+    REQUIRE(vertical_expanded_child->height() == Catch::Approx(124.0F));
+}
+
+TEST_CASE("Wrap flows horizontal children into multiple runs", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 20.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(50.0F, 12.0F));
+    auto d = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 8.0F));
+
+    auto wrap = widget::Wrap::create();
+    wrap->set_gap(5.0F).set_run_gap(7.0F).add(a).add(b).add(c).add(d);
+
+    (void)wrap->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(80.0F, 64.0F)));
+    wrap->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 80.0F, 64.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(a->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(45.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(27.0F));
+    REQUIRE(d->position().get_x() == Catch::Approx(55.0F));
+    REQUIRE(d->position().get_y() == Catch::Approx(27.0F));
+}
+
+TEST_CASE("Flow wraps again when assigned bounds shrink", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+
+    auto flow = widget::Flow::create();
+    flow->set_gap(4.0F).set_run_gap(6.0F).add(a).add(b).add(c);
+
+    (void)flow->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(132.0F, 40.0F)));
+    flow->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 132.0F, 40.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(0.0F));
+
+    flow->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 84.0F, 60.0F));
+    REQUIRE(a->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(16.0F));
+}
+
+TEST_CASE("Wrap supports vertical axis and run alignment", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 35.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 20.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(18.0F, 30.0F));
+
+    auto wrap = widget::Wrap::create(widget::LayoutAxis::vertical);
+    wrap->set_gap(5.0F)
+        .set_run_gap(10.0F)
+        .set_main_alignment(widget::LayoutAlignment::center)
+        .set_cross_alignment(widget::LayoutAlignment::end)
+        .set_run_alignment(widget::LayoutAlignment::center)
+        .add(a)
+        .add(b)
+        .add(c);
+
+    (void)wrap->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(100.0F, 60.0F)));
+    wrap->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 100.0F, 60.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(31.0F));
+    REQUIRE(a->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(21.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(40.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(61.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(15.0F));
+}

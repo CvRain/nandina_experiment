@@ -69,8 +69,13 @@ public:
         reset->set_treatment(theme::ButtonTreatment::tonal);
         reset->set_on_click([this] { count_->update([](int& value) { value = 0; }); });
 
-        const auto actions = widget::Row::create();
-        actions->set_gap(12.0F).add(decrement).add(increment).add(reset);
+        const auto actions = widget::Flow::create();
+        actions->set_gap(12.0F)
+            .set_run_gap(12.0F)
+            .set_main_alignment(widget::LayoutAlignment::center)
+            .add(decrement)
+            .add(increment)
+            .add(reset);
 
         const auto content = widget::Column::create();
         content->set_gap(24.0F)
