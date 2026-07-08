@@ -12,15 +12,19 @@
 #include "../theme/theme.hpp"
 #include "primitives/text.hpp"
 
-#include <string>
 #include <memory>
+#include <string>
 
 namespace nandina::widget
 {
 
     class Label: public primitives::Text {
     public:
-        explicit Label(reactive::Graph& graph, std::string text = {}, theme::NanTheme theme = theme::default_theme());
+        explicit Label(
+            reactive::Graph& graph,
+            std::string text = {},
+            theme::NanTheme theme = theme::default_theme()
+        );
 
         [[nodiscard]] static auto create(
             reactive::Graph& graph,

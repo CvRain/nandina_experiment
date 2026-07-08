@@ -8,9 +8,9 @@
 #include "../theme/button_style.hpp"
 #include "primitives/pressable.hpp"
 
+#include <memory>
 #include <string>
 #include <string_view>
-#include <memory>
 
 namespace nandina::widget
 {
@@ -19,7 +19,8 @@ namespace nandina::widget
     public:
         explicit Button(std::string text, theme::NanTheme theme = theme::default_theme());
 
-        [[nodiscard]] static auto create(std::string text, theme::NanTheme theme = theme::default_theme())
+        [[nodiscard]] static auto
+        create(std::string text, theme::NanTheme theme = theme::default_theme())
             -> std::shared_ptr<Button>;
 
         void set_text(std::string text);
@@ -43,6 +44,7 @@ namespace nandina::widget
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
         void on_pressable_state_changed() override;
 
     private:

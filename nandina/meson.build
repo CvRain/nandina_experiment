@@ -59,6 +59,8 @@ module_widget = files(
     'widget/primitives/text.cpp',
     'widget/label.hpp',
     'widget/label.cpp',
+    'widget/layout.hpp',
+    'widget/layout.cpp',
     'widget/button.hpp',
     'widget/button.cpp',
 )

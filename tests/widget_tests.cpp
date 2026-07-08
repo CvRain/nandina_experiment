@@ -17,6 +17,8 @@
 #include "widget/bindable_rect.hpp"
 #include "widget/button.hpp"
 #include "widget/label.hpp"
+#include "widget/layout.hpp"
+#include "widget/primitives/text.hpp"
 
 #include <memory>
 #include <string>
@@ -266,4 +268,141 @@ TEST_CASE("Label text follows computed state changed by buttons", "[widget][labe
     dev.texts.clear();
     tree.draw(dev);
     REQUIRE(dev.texts.front().text == "Count: 0");
+}
+
+TEST_CASE("Row Column and Padding arrange control children", "[widget][layout]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 16.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(12.0F, 8.0F));
+
+    auto row = widget::Row::create();
+    row->set_gap(5.0F).add(a).add(b);
+
+    REQUIRE(row->width() == Catch::Approx(55.0F));
+    REQUIRE(row->height() == Catch::Approx(16.0F));
+    REQUIRE(a->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(25.0F));
+
+    auto column = widget::Column::create();
+    column->set_gap(7.0F).add(row).add(c);
+
+    REQUIRE(column->width() == Catch::Approx(55.0F));
+    REQUIRE(column->height() == Catch::Approx(31.0F));
+    REQUIRE(row->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(23.0F));
+
+    auto padding = widget::Padding::create(foundation::NanInsets::symmetric(11.0F, 13.0F));
+    padding->set_child(column);
+
+    REQUIRE(column->position().get_x() == Catch::Approx(11.0F));
+    REQUIRE(column->position().get_y() == Catch::Approx(13.0F));
+    REQUIRE(padding->width() == Catch::Approx(77.0F));
+    REQUIRE(padding->height() == Catch::Approx(57.0F));
+}
+
+TEST_CASE("Layout constraints remeasure a subtree for changing root bounds", "[widget][layout][responsive]") {
+    auto root = std::make_shared<scene::NanControl>();
+    auto text = std::make_shared<widget::primitives::Text>("a very long line of text");
+    text->set_overflow(widget::primitives::TextOverflow::ellipsis);
+
+    auto padding = widget::Padding::create(foundation::NanInsets::all(10.0F));
+    padding->set_child(text);
+    root->add_child(padding);
+
+    (void)root->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(100.0F, 80.0F)));
+    root->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 100.0F, 80.0F));
+
+    REQUIRE(padding->width() <= 100.0F);
+    REQUIRE(text->width() <= 80.0F);
+
+    (void)root->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(320.0F, 80.0F)));
+    root->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 320.0F, 80.0F));
+
+    REQUIRE(padding->width() > 100.0F);
+    REQUIRE(text->width() > 80.0F);
+}
+
+TEST_CASE("Text size changes mark ancestor layout dirty", "[widget][layout][text]") {
+    auto row = widget::Row::create();
+    auto text = std::make_shared<widget::primitives::Text>("small");
+    row->add(text);
+
+    row->clear_layout_dirty();
+    text->clear_layout_dirty();
+
+    text->set_text("a much larger label");
+    REQUIRE(text->layout_dirty());
+    REQUIRE(row->layout_dirty());
+
+    row->relayout();
+    REQUIRE_FALSE(row->layout_dirty());
+    REQUIRE(row->width() == Catch::Approx(text->width()));
+}
+
+TEST_CASE("Row alignment positions children inside assigned bounds", "[widget][layout][alignment]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 14.0F));
+
+    auto row = widget::Row::create();
+    row->set_gap(10.0F)
+        .set_main_alignment(widget::LayoutAlignment::center)
+        .set_cross_alignment(widget::LayoutAlignment::end)
+        .add(a)
+        .add(b);
+
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 40.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 40.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(30.0F));
+    REQUIRE(a->position().get_y() == Catch::Approx(30.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(60.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(26.0F));
+}
+
+TEST_CASE("Column cross stretch expands children to assigned width", "[widget][layout][alignment]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 14.0F));
+
+    auto column = widget::Column::create();
+    column->set_gap(6.0F)
+        .set_main_alignment(widget::LayoutAlignment::end)
+        .set_cross_alignment(widget::LayoutAlignment::stretch)
+        .add(a)
+        .add(b);
+
+    (void)column->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(90.0F, 60.0F)));
+    column->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 90.0F, 60.0F));
+
+    REQUIRE(a->position().get_y() == Catch::Approx(30.0F));
+    REQUIRE(a->width() == Catch::Approx(90.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(46.0F));
+    REQUIRE(b->width() == Catch::Approx(90.0F));
+}
+
+TEST_CASE("Center positions a single child in assigned bounds", "[widget][layout][center]") {
+    auto child = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    auto center = widget::Center::create();
+    center->set_child(child);
+
+    (void)center->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 80.0F)));
+    center->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 80.0F));
+
+    REQUIRE(child->position().get_x() == Catch::Approx(40.0F));
+    REQUIRE(child->position().get_y() == Catch::Approx(30.0F));
+    REQUIRE(child->width() == Catch::Approx(40.0F));
+    REQUIRE(child->height() == Catch::Approx(20.0F));
+}
+
+TEST_CASE("NanControl single child layout fills parent bounds", "[widget][layout][root]") {
+    auto root = std::make_shared<scene::NanControl>();
+    auto child = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    root->add_child(child);
+
+    (void)root->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(200.0F, 120.0F)));
+    root->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 200.0F, 120.0F));
+
+    REQUIRE(child->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(child->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(child->width() == Catch::Approx(200.0F));
+    REQUIRE(child->height() == Catch::Approx(120.0F));
 }

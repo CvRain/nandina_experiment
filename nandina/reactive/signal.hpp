@@ -29,6 +29,12 @@ namespace nandina::reactive
     template<typename T>
     class ReadSignal;
 
+    template<typename T>
+    class Signal;
+
+    template<typename T>
+    using UniqueSignal = std::unique_ptr<Signal<T>>;
+
     /// 可写的响应式状态容器。
     template<typename T>
     class Signal {

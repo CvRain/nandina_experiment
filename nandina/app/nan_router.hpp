@@ -10,10 +10,10 @@
 #ifndef NANDINA_EXPERIMENT_APP_NAN_ROUTER_HPP
 #define NANDINA_EXPERIMENT_APP_NAN_ROUTER_HPP
 
-#include "nan_page.hpp"
-#include "nan_store.hpp"
 #include "../reactive/graph.hpp"
 #include "../scene/control.hpp"
+#include "nan_page.hpp"
+#include "nan_store.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -71,7 +71,7 @@ namespace nandina::app
 
         template<typename PageT>
             requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
-                && std::default_initializable<PageT>
+            && std::default_initializable<PageT>
         auto push() -> PageT& {
             auto page = std::make_unique<PageT>();
             auto* raw = page.get();
@@ -90,7 +90,7 @@ namespace nandina::app
 
         template<typename PageT>
             requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
-                && std::default_initializable<PageT>
+            && std::default_initializable<PageT>
         auto replace() -> PageT& {
             if (!frames_.empty()) {
                 pop();

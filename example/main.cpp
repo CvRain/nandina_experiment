@@ -12,11 +12,11 @@
 #include "theme/theme.hpp"
 #include "widget/button.hpp"
 #include "widget/label.hpp"
+#include "widget/layout.hpp"
 
 #include <memory>
 #include <string>
 #include <string_view>
-#include <meta>
 
 using namespace nandina;
 
@@ -47,30 +47,49 @@ public:
         auto root = std::make_shared<scene::NanControl>(foundation::NanSize(640.0F, 360.0F));
         root->set_background(app_theme.palette.surface);
 
-        auto label = widget::Label::create(graph, "", app_theme);
-        label->set_position(foundation::NanPoint(48.0F, 48.0F));
-        label->bind_text(*count_text_);
-        root->add_child(label);
+        const auto test_label = widget::Label::create(graph,"A quick brown fox jump to a lazy dog", app_theme);
+        test_label->set_font_size(26);
 
-        auto decrement = widget::Button::create("-1", app_theme);
-        decrement->set_position(foundation::NanPoint(48.0F, 112.0F));
+        const auto label = widget::Label::create(graph, "", app_theme);
+        label->bind_text(*count_text_);
+
+        const auto decrement = widget::Button::create("-1", app_theme);
         decrement->set_tone(theme::ButtonTone::secondary);
         decrement->set_treatment(theme::ButtonTreatment::outlined);
         decrement->set_on_click([this] { count_->update([](int& value) { --value; }); });
-        root->add_child(decrement);
 
-        auto increment = widget::Button::create("+1", app_theme);
-        increment->set_position(foundation::NanPoint(128.0F, 112.0F));
+        const auto increment = widget::Button::create("+1", app_theme);
         increment->set_tone(theme::ButtonTone::primary);
         increment->set_treatment(theme::ButtonTreatment::filled);
         increment->set_on_click([this] { count_->update([](int& value) { ++value; }); });
-        root->add_child(increment);
+
+        const auto reset = widget::Button::create("reset", app_theme);
+        reset->set_tone(theme::ButtonTone::secondary);
+        reset->set_treatment(theme::ButtonTreatment::tonal);
+        reset->set_on_click([this] { count_->update([](int& value) { value = 0; }); });
+
+        const auto actions = widget::Row::create();
+        actions->set_gap(12.0F).add(decrement).add(increment).add(reset);
+
+        const auto content = widget::Column::create();
+        content->set_gap(24.0F)
+            .set_cross_alignment(widget::LayoutAlignment::center)
+            .add(test_label)
+            .add(label)
+            .add(actions);
+
+        const auto padded = widget::Padding::create(foundation::NanInsets::all(48.0F));
+        padded->set_child(content);
+
+        const auto centered = widget::Center::create();
+        centered->set_child(padded);
+        root->add_child(centered);
 
         return root;
     }
 
 private:
-    std::unique_ptr<reactive::Signal<int>> count_;
+    reactive::UniqueSignal<int> count_;
     reactive::Computed<std::string>* count_text_ = nullptr;
 };
 

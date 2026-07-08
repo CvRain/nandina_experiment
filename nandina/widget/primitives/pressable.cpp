@@ -51,54 +51,55 @@ namespace nandina::widget::primitives
         }
 
         switch (event.type()) {
-        case scene::EventType::mouse_enter:
-            set_hovered(true);
-            return false;
-        case scene::EventType::mouse_leave:
-            set_hovered(false);
-            set_pressed(false);
-            return false;
-        case scene::EventType::focus_enter:
-            set_focused(true);
-            return false;
-        case scene::EventType::focus_leave:
-            set_focused(false);
-            set_pressed(false);
-            return false;
-        case scene::EventType::mouse_button: {
-            auto& mouse = static_cast<scene::MouseButtonEvent&>(event);
-            if (mouse.button() != scene::MouseButtonEvent::Button::left) {
+            case scene::EventType::mouse_enter:
+                set_hovered(true);
+                return false;
+            case scene::EventType::mouse_leave:
+                set_hovered(false);
+                set_pressed(false);
+                return false;
+            case scene::EventType::focus_enter:
+                set_focused(true);
+                return false;
+            case scene::EventType::focus_leave:
+                set_focused(false);
+                set_pressed(false);
+                return false;
+            case scene::EventType::mouse_button: {
+                auto& mouse = static_cast<scene::MouseButtonEvent&>(event);
+                if (mouse.button() != scene::MouseButtonEvent::Button::left) {
+                    return false;
+                }
+                if (mouse.is_pressed()) {
+                    set_pressed(true);
+                    event.accept();
+                    return true;
+                }
+                const bool should_click = pressed_ && hovered_;
+                set_pressed(false);
+                if (should_click) {
+                    emit_click();
+                    event.accept();
+                    return true;
+                }
                 return false;
             }
-            if (mouse.is_pressed()) {
-                set_pressed(true);
-                event.accept();
-                return true;
+            case scene::EventType::key: {
+                auto& key = static_cast<scene::KeyEvent&>(event);
+                constexpr int key_enter = 257;
+                constexpr int key_space = 32;
+                if (key.is_pressed() && (key.keycode() == key_enter || key.keycode() == key_space))
+                {
+                    emit_click();
+                    event.accept();
+                    return true;
+                }
+                return false;
             }
-            const bool should_click = pressed_ && hovered_;
-            set_pressed(false);
-            if (should_click) {
-                emit_click();
-                event.accept();
-                return true;
-            }
-            return false;
-        }
-        case scene::EventType::key: {
-            auto& key = static_cast<scene::KeyEvent&>(event);
-            constexpr int key_enter = 257;
-            constexpr int key_space = 32;
-            if (key.is_pressed() && (key.keycode() == key_enter || key.keycode() == key_space)) {
-                emit_click();
-                event.accept();
-                return true;
-            }
-            return false;
-        }
-        case scene::EventType::mouse_move:
-        case scene::EventType::mouse_wheel:
-        case scene::EventType::text_input:
-            return false;
+            case scene::EventType::mouse_move:
+            case scene::EventType::mouse_wheel:
+            case scene::EventType::text_input:
+                return false;
         }
         return false;
     }

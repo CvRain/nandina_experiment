@@ -6,6 +6,27 @@
 
 namespace nandina::app
 {
+    namespace
+    {
+        class PageHost final: public scene::NanControl {
+        protected:
+            [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+                -> foundation::NanSize override {
+                return constraints.constrain(size());
+            }
+
+            auto on_layout() -> void override {
+                for (std::size_t i = 0; i < child_count(); ++i) {
+                    auto* child = dynamic_cast<scene::NanControl*>(get_child(i));
+                    if (!child || !child->visible()) {
+                        continue;
+                    }
+                    (void)child->measure_layout(scene::LayoutConstraints::tight(size()));
+                    child->layout_to(local_rect());
+                }
+            }
+        };
+    } // namespace
 
     NanRouter::NanRouter(
         reactive::Graph& graph,
@@ -17,7 +38,7 @@ namespace nandina::app
         theme_(&theme),
         store_(store),
         store_key_(store_key),
-        host_(std::make_shared<scene::NanControl>()) {}
+        host_(std::make_shared<PageHost>()) {}
 
     auto NanRouter::host() -> std::shared_ptr<scene::NanControl> {
         return host_;
@@ -111,11 +132,13 @@ namespace nandina::app
 
         root->set_visible(false);
         attach_root(root);
-        frames_.push_back(Frame {
-            .page = std::move(page),
-            .root = std::move(root),
-            .key = {},
-        });
+        frames_.push_back(
+            Frame {
+                .page = std::move(page),
+                .root = std::move(root),
+                .key = {},
+            }
+        );
         frames_.back().key = std::string(frames_.back().page->route_key());
         sync_visibility();
     }

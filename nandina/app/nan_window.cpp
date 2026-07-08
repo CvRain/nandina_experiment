@@ -9,6 +9,7 @@
 
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
+#include "../scene/control.hpp"
 #include "../scene/input_event.hpp"
 
 #include <raylib.h>
@@ -193,6 +194,22 @@ namespace nandina::app
         poll_and_dispatch_input();
         tree_.process(dt);
         on_frame(dt);
+
+        if (auto* root = dynamic_cast<scene::NanControl*>(tree_.root())) {
+            const auto window_size = foundation::NanSize(
+                static_cast<float>(GetScreenWidth()),
+                static_cast<float>(GetScreenHeight())
+            );
+            if (root->layout_dirty() || root->size() != window_size) {
+                (void)root->measure_layout(scene::LayoutConstraints::tight(window_size));
+                root->layout_to(foundation::NanRect::from_xywh(
+                    0.0F,
+                    0.0F,
+                    window_size.get_width(),
+                    window_size.get_height()
+                ));
+            }
+        }
 
         device_->begin_frame();
         device_->clear(config_.background);

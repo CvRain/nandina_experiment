@@ -5,6 +5,4 @@
 #include "nandina_color_space.hpp"
 
 namespace nandina::foundation
-{
-
-}
+{}

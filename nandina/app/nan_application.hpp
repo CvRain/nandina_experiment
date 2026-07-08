@@ -61,7 +61,9 @@ namespace nandina::app
             requires std::derived_from<StoreT, NanStore>
         [[nodiscard]] auto store() -> StoreT& {
             if (store_ == nullptr || store_key_ != nan_type_key<StoreT>()) {
-                throw std::runtime_error("NanApplication::store: requested store type is not installed");
+                throw std::runtime_error(
+                    "NanApplication::store: requested store type is not installed"
+                );
             }
             return static_cast<StoreT&>(*store_);
         }

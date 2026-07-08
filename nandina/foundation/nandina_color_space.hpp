@@ -71,7 +71,7 @@ namespace nandina::foundation
         float lightness {0.0F};
         float alpha {1.0F};
     };
-    
+
     [[nodiscard]] constexpr auto nan_clamp01(const float value) -> float {
         return std::clamp(value, 0.0F, 1.0F);
     }

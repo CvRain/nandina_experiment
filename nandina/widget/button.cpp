@@ -10,9 +10,7 @@
 namespace nandina::widget
 {
 
-    Button::Button(std::string text, theme::NanTheme theme):
-        text_(std::move(text)),
-        theme_(theme) {
+    Button::Button(std::string text, theme::NanTheme theme): text_(std::move(text)), theme_(theme) {
         apply_metrics();
     }
 
@@ -22,6 +20,8 @@ namespace nandina::widget
 
     void Button::set_text(std::string text) {
         text_ = std::move(text);
+        mark_layout_dirty();
+        apply_metrics();
     }
 
     auto Button::text() const -> std::string_view {
@@ -124,6 +124,20 @@ namespace nandina::widget
     }
 
     void Button::on_pressable_state_changed() {}
+
+    auto Button::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        const auto style = theme::resolve_button_style(
+            theme_,
+            tone_,
+            treatment_,
+            size_,
+            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
+        );
+        const float text_width = static_cast<float>(text_.size()) * style.font_size * 0.56F;
+        return constraints.constrain(
+            foundation::NanSize(text_width + style.padding_x * 2.0F, style.height)
+        );
+    }
 
     void Button::apply_metrics() {
         const auto style = theme::resolve_button_style(

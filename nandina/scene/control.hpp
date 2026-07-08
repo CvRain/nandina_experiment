@@ -24,9 +24,22 @@
 #include "node2d.hpp"
 
 #include <optional>
+#include <limits>
 
 namespace nandina::scene
 {
+
+    struct LayoutConstraints {
+        float min_width = 0.0F;
+        float max_width = std::numeric_limits<float>::infinity();
+        float min_height = 0.0F;
+        float max_height = std::numeric_limits<float>::infinity();
+
+        [[nodiscard]] static auto loose() -> LayoutConstraints;
+        [[nodiscard]] static auto tight(foundation::NanSize size) -> LayoutConstraints;
+        [[nodiscard]] auto constrain(foundation::NanSize size) const -> foundation::NanSize;
+        [[nodiscard]] auto deflated(foundation::NanInsets insets) const -> LayoutConstraints;
+    };
 
     /// 带尺寸的 2D 控件基类。局部矩形为 [0,0,size.w,size.h] (原点左上角)。
     class NanControl: public NanNode2D {
@@ -44,6 +57,17 @@ namespace nandina::scene
 
         /// 局部空间矩形 [0,0,w,h]。
         [[nodiscard]] auto local_rect() const -> foundation::NanRect;
+
+        // ---- layout protocol ----
+
+        [[nodiscard]] auto measured_size() const -> foundation::NanSize;
+        [[nodiscard]] auto last_layout_constraints() const -> LayoutConstraints;
+        [[nodiscard]] auto layout_dirty() const -> bool;
+        auto mark_layout_dirty() -> void;
+        auto clear_layout_dirty() -> void;
+
+        [[nodiscard]] auto measure_layout(LayoutConstraints constraints) -> foundation::NanSize;
+        auto layout_to(foundation::NanRect rect) -> void;
 
         // ---- background (可选) ----
 
@@ -64,8 +88,15 @@ namespace nandina::scene
         /// 默认绘制: 若设置了背景色, 填充世界空间矩形 (乘继承 opacity)。
         auto on_draw(render::DrawContext& ctx) -> void override;
 
+    protected:
+        [[nodiscard]] virtual auto on_measure(LayoutConstraints constraints) -> foundation::NanSize;
+        virtual auto on_layout() -> void;
+
     private:
         foundation::NanSize size_ {};
+        foundation::NanSize measured_size_ {};
+        LayoutConstraints last_layout_constraints_ {};
+        bool layout_dirty_ = true;
         std::optional<foundation::NanColor> background_;
     };
 
