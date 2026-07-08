@@ -65,6 +65,7 @@ namespace nandina::scene
         [[nodiscard]] auto layout_dirty() const -> bool;
         auto mark_layout_dirty() -> void;
         auto clear_layout_dirty() -> void;
+        [[nodiscard]] virtual auto layout_flex_factor() const -> int;
 
         [[nodiscard]] auto measure_layout(LayoutConstraints constraints) -> foundation::NanSize;
         auto layout_to(foundation::NanRect rect) -> void;
@@ -87,6 +88,13 @@ namespace nandina::scene
 
         /// 默认绘制: 若设置了背景色, 填充世界空间矩形 (乘继承 opacity)。
         auto on_draw(render::DrawContext& ctx) -> void override;
+
+        [[nodiscard]] auto as_control() -> NanControl* override {
+            return this;
+        }
+        [[nodiscard]] auto as_control() const -> const NanControl* override {
+            return this;
+        }
 
     protected:
         [[nodiscard]] virtual auto on_measure(LayoutConstraints constraints) -> foundation::NanSize;

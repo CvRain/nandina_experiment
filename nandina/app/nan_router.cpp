@@ -17,7 +17,7 @@ namespace nandina::app
 
             auto on_layout() -> void override {
                 for (std::size_t i = 0; i < child_count(); ++i) {
-                    auto* child = dynamic_cast<scene::NanControl*>(get_child(i));
+                    auto* child = get_child(i) != nullptr ? get_child(i)->as_control() : nullptr;
                     if (!child || !child->visible()) {
                         continue;
                     }

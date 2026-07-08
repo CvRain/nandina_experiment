@@ -64,7 +64,7 @@ namespace nandina::scene
         }
         size_ = size;
         measured_size_ = size;
-        if (auto* control_parent = dynamic_cast<NanControl*>(parent())) {
+        if (auto* control_parent = parent() != nullptr ? parent()->as_control() : nullptr) {
             control_parent->mark_layout_dirty();
         }
     }
@@ -98,13 +98,17 @@ namespace nandina::scene
             return;
         }
         layout_dirty_ = true;
-        if (auto* control_parent = dynamic_cast<NanControl*>(parent())) {
+        if (auto* control_parent = parent() != nullptr ? parent()->as_control() : nullptr) {
             control_parent->mark_layout_dirty();
         }
     }
 
     auto NanControl::clear_layout_dirty() -> void {
         layout_dirty_ = false;
+    }
+
+    auto NanControl::layout_flex_factor() const -> int {
+        return 0;
     }
 
     auto NanControl::measure_layout(LayoutConstraints constraints) -> foundation::NanSize {
@@ -156,7 +160,7 @@ namespace nandina::scene
     auto NanControl::on_layout() -> void {
         std::vector<NanControl*> visible_children;
         for (std::size_t i = 0; i < child_count(); ++i) {
-            auto* child = dynamic_cast<NanControl*>(get_child(i));
+            auto* child = get_child(i) != nullptr ? get_child(i)->as_control() : nullptr;
             if (!child || !child->visible()) {
                 continue;
             }

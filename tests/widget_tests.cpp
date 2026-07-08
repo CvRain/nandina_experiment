@@ -406,3 +406,45 @@ TEST_CASE("NanControl single child layout fills parent bounds", "[widget][layout
     REQUIRE(child->width() == Catch::Approx(200.0F));
     REQUIRE(child->height() == Catch::Approx(120.0F));
 }
+
+TEST_CASE("Row distributes remaining width across Expanded children", "[widget][layout][expanded]") {
+    auto fixed = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 10.0F));
+    auto first_child = std::make_shared<scene::NanControl>(foundation::NanSize(5.0F, 10.0F));
+    auto second_child = std::make_shared<scene::NanControl>(foundation::NanSize(5.0F, 10.0F));
+    auto first = widget::Expanded::create(1);
+    auto second = widget::Expanded::create(2);
+    first->set_child(first_child);
+    second->set_child(second_child);
+
+    auto row = widget::Row::create();
+    row->set_gap(5.0F).add(fixed).add(first).add(second);
+
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(155.0F, 20.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 155.0F, 20.0F));
+
+    REQUIRE(fixed->width() == Catch::Approx(30.0F));
+    REQUIRE(first->position().get_x() == Catch::Approx(35.0F));
+    REQUIRE(first->width() == Catch::Approx(38.333F).margin(0.01F));
+    REQUIRE(second->position().get_x() == Catch::Approx(78.333F).margin(0.01F));
+    REQUIRE(second->width() == Catch::Approx(76.666F).margin(0.01F));
+    REQUIRE(first_child->width() == Catch::Approx(first->width()));
+    REQUIRE(second_child->width() == Catch::Approx(second->width()));
+}
+
+TEST_CASE("Column distributes remaining height across Expanded children", "[widget][layout][expanded]") {
+    auto fixed = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 12.0F));
+    auto expanded_child = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 5.0F));
+    auto expanded = widget::Expanded::create();
+    expanded->set_child(expanded_child);
+
+    auto column = widget::Column::create();
+    column->set_gap(8.0F).add(fixed).add(expanded);
+
+    (void)column->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(80.0F, 100.0F)));
+    column->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 80.0F, 100.0F));
+
+    REQUIRE(fixed->height() == Catch::Approx(12.0F));
+    REQUIRE(expanded->position().get_y() == Catch::Approx(20.0F));
+    REQUIRE(expanded->height() == Catch::Approx(80.0F));
+    REQUIRE(expanded_child->height() == Catch::Approx(80.0F));
+}

@@ -54,6 +54,8 @@ namespace nandina::widget
             }
             return measured;
         }
+
+        [[nodiscard]] auto expanded_flex(const std::shared_ptr<scene::NanControl>& child) -> int;
     } // namespace
 
     auto Column::create() -> std::shared_ptr<Column> {
@@ -135,7 +137,8 @@ namespace nandina::widget
     auto Column::on_layout() -> void {
         prune_expired(items_);
 
-        float used_height = 0.0F;
+        float fixed_height = 0.0F;
+        int total_flex = 0;
         std::size_t count = 0;
         for (auto& item: items_) {
             auto child = item.lock();
@@ -143,12 +146,18 @@ namespace nandina::widget
                 continue;
             }
             if (count > 0) {
-                used_height += gap_;
+                fixed_height += gap_;
             }
-            used_height += child->measured_size().get_height();
+            if (const int flex = expanded_flex(child); flex > 0) {
+                total_flex += flex;
+            } else {
+                fixed_height += child->measured_size().get_height();
+            }
             ++count;
         }
 
+        const auto remaining_height = std::max(0.0F, height() - fixed_height);
+        const auto used_height = total_flex > 0 ? height() : fixed_height;
         float y = alignment_offset(main_alignment_, height(), used_height);
         std::size_t visible_count = 0;
         for (auto& item: items_) {
@@ -160,15 +169,22 @@ namespace nandina::widget
                 y += gap_;
             }
             const auto child_size = child->measured_size();
+            const auto child_height = [&] {
+                const int flex = expanded_flex(child);
+                if (total_flex > 0 && flex > 0) {
+                    return remaining_height * (static_cast<float>(flex) / static_cast<float>(total_flex));
+                }
+                return child_size.get_height();
+            }();
             const auto child_width = stretched_extent(cross_alignment_, width(), child_size.get_width());
             const auto child_x = alignment_offset(cross_alignment_, width(), child_width);
             child->layout_to(foundation::NanRect::from_xywh(
                 child_x,
                 y,
                 child_width,
-                child_size.get_height()
+                child_height
             ));
-            y += child_size.get_height();
+            y += child_height;
             ++visible_count;
         }
     }
@@ -257,7 +273,8 @@ namespace nandina::widget
     auto Row::on_layout() -> void {
         prune_expired(items_);
 
-        float used_width = 0.0F;
+        float fixed_width = 0.0F;
+        int total_flex = 0;
         std::size_t count = 0;
         for (auto& item: items_) {
             auto child = item.lock();
@@ -265,12 +282,18 @@ namespace nandina::widget
                 continue;
             }
             if (count > 0) {
-                used_width += gap_;
+                fixed_width += gap_;
             }
-            used_width += child->measured_size().get_width();
+            if (const int flex = expanded_flex(child); flex > 0) {
+                total_flex += flex;
+            } else {
+                fixed_width += child->measured_size().get_width();
+            }
             ++count;
         }
 
+        const auto remaining_width = std::max(0.0F, width() - fixed_width);
+        const auto used_width = total_flex > 0 ? width() : fixed_width;
         float x = alignment_offset(main_alignment_, width(), used_width);
         std::size_t visible_count = 0;
         for (auto& item: items_) {
@@ -282,15 +305,22 @@ namespace nandina::widget
                 x += gap_;
             }
             const auto child_size = child->measured_size();
+            const auto child_width = [&] {
+                const int flex = expanded_flex(child);
+                if (total_flex > 0 && flex > 0) {
+                    return remaining_width * (static_cast<float>(flex) / static_cast<float>(total_flex));
+                }
+                return child_size.get_width();
+            }();
             const auto child_height = stretched_extent(cross_alignment_, height(), child_size.get_height());
             const auto child_y = alignment_offset(cross_alignment_, height(), child_height);
             child->layout_to(foundation::NanRect::from_xywh(
                 x,
                 child_y,
-                child_size.get_width(),
+                child_width,
                 child_height
             ));
-            x += child_size.get_width();
+            x += child_width;
             ++visible_count;
         }
     }
@@ -429,5 +459,74 @@ namespace nandina::widget
         scene::NanControl::on_ready();
         relayout();
     }
+
+    Expanded::Expanded(int flex): flex_(std::max(1, flex)) {}
+
+    auto Expanded::create(int flex) -> std::shared_ptr<Expanded> {
+        return std::make_shared<Expanded>(flex);
+    }
+
+    auto Expanded::set_child(std::shared_ptr<scene::NanControl> child) -> Expanded& {
+        if (!child) {
+            throw std::runtime_error("Expanded::set_child: child is null");
+        }
+        if (auto current = child_.lock()) {
+            remove_child(*current);
+        }
+        child_ = child;
+        add_child(std::move(child));
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Expanded::set_flex(int flex) -> Expanded& {
+        flex_ = std::max(1, flex);
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    auto Expanded::flex() const -> int {
+        return flex_;
+    }
+
+    auto Expanded::layout_flex_factor() const -> int {
+        return flex_;
+    }
+
+    void Expanded::relayout() {
+        (void)measure_layout(scene::LayoutConstraints::loose());
+        layout_to(foundation::NanRect::from_origin_size(position(), measured_size()));
+    }
+
+    auto Expanded::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        auto child = child_.lock();
+        if (!child) {
+            return constraints.constrain(foundation::NanSize::zero());
+        }
+        return constraints.constrain(child->measure_layout(child_constraints(constraints)));
+    }
+
+    auto Expanded::on_layout() -> void {
+        auto child = child_.lock();
+        if (!child) {
+            return;
+        }
+        (void)child->measure_layout(scene::LayoutConstraints::tight(size()));
+        child->layout_to(local_rect());
+    }
+
+    void Expanded::on_ready() {
+        scene::NanControl::on_ready();
+        relayout();
+    }
+
+    namespace
+    {
+        auto expanded_flex(const std::shared_ptr<scene::NanControl>& child) -> int {
+            return child != nullptr ? child->layout_flex_factor() : 0;
+        }
+    } // namespace
 
 } // namespace nandina::widget

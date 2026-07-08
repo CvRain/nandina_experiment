@@ -113,6 +113,29 @@ namespace nandina::widget
         std::weak_ptr<scene::NanControl> child_;
     };
 
+    class Expanded: public scene::NanControl {
+    public:
+        explicit Expanded(int flex = 1);
+
+        [[nodiscard]] static auto create(int flex = 1) -> std::shared_ptr<Expanded>;
+
+        auto set_child(std::shared_ptr<scene::NanControl> child) -> Expanded&;
+        auto set_flex(int flex) -> Expanded&;
+        [[nodiscard]] auto flex() const -> int;
+        [[nodiscard]] auto layout_flex_factor() const -> int override;
+
+        void relayout();
+
+    protected:
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        auto on_layout() -> void override;
+        void on_ready() override;
+
+    private:
+        int flex_ = 1;
+        std::weak_ptr<scene::NanControl> child_;
+    };
+
 } // namespace nandina::widget
 
 #endif // NANDINA_EXPERIMENT_WIDGET_LAYOUT_HPP

@@ -195,7 +195,7 @@ namespace nandina::app
         tree_.process(dt);
         on_frame(dt);
 
-        if (auto* root = dynamic_cast<scene::NanControl*>(tree_.root())) {
+        if (auto* root = tree_.root() != nullptr ? tree_.root()->as_control() : nullptr) {
             const auto window_size = foundation::NanSize(
                 static_cast<float>(GetScreenWidth()),
                 static_cast<float>(GetScreenHeight())

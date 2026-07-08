@@ -17,6 +17,7 @@ namespace nandina::scene
 
     class InputEvent;
     class NanSceneTree;
+    class NanControl;
     class NanNode2D;
 } // namespace nandina::scene
 
@@ -154,6 +155,14 @@ namespace nandina::scene
             return nullptr;
         }
         [[nodiscard]] virtual auto as_node2d() const -> const NanNode2D* {
+            return nullptr;
+        }
+
+        /// Safe down-cast to NanControl without RTTI.
+        [[nodiscard]] virtual auto as_control() -> NanControl* {
+            return nullptr;
+        }
+        [[nodiscard]] virtual auto as_control() const -> const NanControl* {
             return nullptr;
         }
 

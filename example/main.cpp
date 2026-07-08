@@ -47,7 +47,8 @@ public:
         auto root = std::make_shared<scene::NanControl>(foundation::NanSize(640.0F, 360.0F));
         root->set_background(app_theme.palette.surface);
 
-        const auto test_label = widget::Label::create(graph,"A quick brown fox jump to a lazy dog", app_theme);
+        const auto test_label =
+            widget::Label::create(graph, "A quick brown fox jump to a lazy dog", app_theme);
         test_label->set_font_size(26);
 
         const auto label = widget::Label::create(graph, "", app_theme);
