@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_NODE_HPP
 
 #include "../foundation/transform2d.hpp"
+#include "../render/clip_stack.hpp"
 
 #include <memory>
 #include <string>
@@ -194,6 +195,11 @@ namespace nandina::scene
             -> foundation::NanTransform2D;
         virtual void
         _pop_draw_transform(render::DrawContext& ctx, const foundation::NanTransform2D& saved);
+
+        /// Internal hook: optionally push a clip before drawing children.
+        /// Base nodes do not clip. Controls override this for overflow policy.
+        [[nodiscard]] virtual auto _push_child_clip(render::DrawContext& ctx)
+            -> render::ClipStack::Guard;
 
     private:
         // parent is a non-owning back-reference (children own parent would be a

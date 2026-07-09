@@ -185,6 +185,8 @@ This is where the previous iterations failed hardest: text overflow must not be 
 
 Goal: make parent-declared clipping a tree/rendering contract, not a local widget trick.
 
+Status: initial tree-level contract landed. `NanControl` now exposes `ControlOverflow::{visible, clip}`, and draw traversal pushes a child clip through `ClipStack` when a control declares clipped overflow.
+
 Tasks:
 
 1. Add explicit overflow policy to controls or a focused container primitive.

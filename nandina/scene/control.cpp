@@ -136,6 +136,14 @@ namespace nandina::scene
         return background_;
     }
 
+    void NanControl::set_overflow(ControlOverflow overflow) {
+        overflow_ = overflow;
+    }
+
+    auto NanControl::overflow() const -> ControlOverflow {
+        return overflow_;
+    }
+
     bool NanControl::contains_point(foundation::NanPoint local_point) const {
         return local_point.get_x() >= 0.0F && local_point.get_x() <= size_.get_width()
             && local_point.get_y() >= 0.0F && local_point.get_y() <= size_.get_height();
@@ -186,6 +194,13 @@ namespace nandina::scene
             );
             child->layout_to(foundation::NanRect::from_origin_size(child->position(), measured));
         }
+    }
+
+    auto NanControl::_push_child_clip(render::DrawContext& ctx) -> render::ClipStack::Guard {
+        if (overflow_ != ControlOverflow::clip) {
+            return {nullptr, false};
+        }
+        return ctx.clip().push(render::world_bounds_from_local(ctx.world_transform(), local_rect()));
     }
 
 } // namespace nandina::scene

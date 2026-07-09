@@ -13,6 +13,7 @@
 #include "render/clip_stack.hpp"
 #include "render/draw_context.hpp"
 #include "render/render_device.hpp"
+#include "scene/control.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
 
@@ -39,17 +40,25 @@ public:
 
     std::vector<RectCall> rects;
     std::vector<ClipCall> clips;
+    std::vector<std::string> events;
     int begin_count = 0;
     int end_count = 0;
 
     void begin_frame() override { ++begin_count; }
     void end_frame() override { ++end_count; }
 
-    void set_clip(const foundation::NanRect& r) override { clips.push_back({r, false}); }
-    void clear_clip() override { clips.push_back({foundation::NanRect::empty(), true}); }
+    void set_clip(const foundation::NanRect& r) override {
+        clips.push_back({r, false});
+        events.push_back("clip");
+    }
+    void clear_clip() override {
+        clips.push_back({foundation::NanRect::empty(), true});
+        events.push_back("clear");
+    }
 
     void draw_rect(const foundation::NanRect& r, const foundation::NanColor& c) override {
         rects.push_back({r, c.alpha()});
+        events.push_back("rect");
     }
     void draw_rect_outline(const foundation::NanRect& r, float /*t*/,
                            const foundation::NanColor& c) override {
@@ -190,6 +199,60 @@ TEST_CASE("ClipStack intersects with the parent clip", "[render][clip]") {
     // outer popped: stack empty => clear_clip issued.
     REQUIRE(clip.depth() == 0);
     REQUIRE(dev.clips.back().cleared);
+}
+
+TEST_CASE("NanControl overflow clip applies to child drawing", "[render][clip][control]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 30.0F));
+    root->set_position(foundation::NanPoint(10.0F, 20.0F));
+    root->set_overflow(scene::ControlOverflow::clip);
+
+    auto child = std::make_shared<RectNode>(1.0F);
+    child->set_position(foundation::NanPoint(30.0F, 20.0F));
+    root->add_child(child);
+    tree.set_root(root);
+
+    tree.draw(dev);
+
+    REQUIRE(dev.clips.size() == 2);
+    REQUIRE_FALSE(dev.clips.front().cleared);
+    REQUIRE(dev.clips.front().rect.get_left() == Catch::Approx(10.0F));
+    REQUIRE(dev.clips.front().rect.get_top() == Catch::Approx(20.0F));
+    REQUIRE(dev.clips.front().rect.get_width() == Catch::Approx(40.0F));
+    REQUIRE(dev.clips.front().rect.get_height() == Catch::Approx(30.0F));
+    REQUIRE(dev.clips.back().cleared);
+    REQUIRE(dev.events.size() == 3);
+    REQUIRE(dev.events[0] == "clip");
+    REQUIRE(dev.events[1] == "rect");
+    REQUIRE(dev.events[2] == "clear");
+}
+
+TEST_CASE("nested control overflow clips are intersected", "[render][clip][control]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 100.0F));
+    root->set_overflow(scene::ControlOverflow::clip);
+
+    auto inner = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 100.0F));
+    inner->set_position(foundation::NanPoint(50.0F, 50.0F));
+    inner->set_overflow(scene::ControlOverflow::clip);
+
+    auto child = std::make_shared<RectNode>(1.0F);
+    inner->add_child(child);
+    root->add_child(inner);
+    tree.set_root(root);
+
+    tree.draw(dev);
+
+    REQUIRE(dev.clips.size() == 4);
+    REQUIRE(dev.clips[0].rect.get_width() == Catch::Approx(100.0F));
+    REQUIRE(dev.clips[1].rect.get_left() == Catch::Approx(50.0F));
+    REQUIRE(dev.clips[1].rect.get_top() == Catch::Approx(50.0F));
+    REQUIRE(dev.clips[1].rect.get_width() == Catch::Approx(50.0F));
+    REQUIRE(dev.clips[1].rect.get_height() == Catch::Approx(50.0F));
+    REQUIRE(dev.clips[2].rect.get_width() == Catch::Approx(100.0F));
+    REQUIRE(dev.clips[3].cleared);
 }
 
 TEST_CASE("inherited opacity multiplies down the tree", "[render][opacity]") {

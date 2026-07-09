@@ -198,6 +198,10 @@ namespace nandina::scene
         const foundation::NanTransform2D& /*saved*/
     ) {}
 
+    auto NanNode::_push_child_clip(render::DrawContext& /*ctx*/) -> render::ClipStack::Guard {
+        return {nullptr, false};
+    }
+
     void NanNode::_propagate_draw(render::DrawContext& ctx) {
         if (!is_visible_in_tree()) {
             return; // Whole subtree skipped (visibility is a subtree property).
@@ -207,6 +211,8 @@ namespace nandina::scene
         const auto saved_world = _push_draw_transform(ctx);
 
         on_draw(ctx);
+
+        auto child_clip = _push_child_clip(ctx);
 
         if (!children_.empty()) {
             // z-order: stable_sort keeps insertion order among equal z (unchanged).

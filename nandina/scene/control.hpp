@@ -29,6 +29,11 @@
 namespace nandina::scene
 {
 
+    enum class ControlOverflow {
+        visible,
+        clip,
+    };
+
     struct LayoutConstraints {
         float min_width = 0.0F;
         float max_width = std::numeric_limits<float>::infinity();
@@ -78,6 +83,9 @@ namespace nandina::scene
 
         [[nodiscard]] auto background() const -> const std::optional<foundation::NanColor>&;
 
+        auto set_overflow(ControlOverflow overflow) -> void;
+        [[nodiscard]] auto overflow() const -> ControlOverflow;
+
         // ---- overrides ----
 
         /// 矩形命中: 局部点落在 [0,w]x[0,h] 内。
@@ -100,12 +108,16 @@ namespace nandina::scene
         [[nodiscard]] virtual auto on_measure(LayoutConstraints constraints) -> foundation::NanSize;
         virtual auto on_layout() -> void;
 
+        [[nodiscard]] auto _push_child_clip(render::DrawContext& ctx)
+            -> render::ClipStack::Guard override;
+
     private:
         foundation::NanSize size_ {};
         foundation::NanSize measured_size_ {};
         LayoutConstraints last_layout_constraints_ {};
         bool layout_dirty_ = true;
         std::optional<foundation::NanColor> background_;
+        ControlOverflow overflow_ = ControlOverflow::visible;
     };
 
 } // namespace nandina::scene
