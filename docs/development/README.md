@@ -29,7 +29,7 @@ The current authority is the code under `nandina/` plus tests under `tests/`. Ol
 | `foundation` | Geometry, color, color spaces, and decomposed `NanTransform2D`. |
 | `scene` | `NanNode`, `NanNode2D`, `NanSceneTree`, input events, focus/hover, deferred delete, `NanControl`. |
 | `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend factory. |
-| `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, batching. |
+| `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, `ReactiveScope`, batching. |
 | `theme` | `NanTheme`, palette/tokens, button style resolver. |
 | `widget` | Text/Label/Button primitives and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
@@ -100,31 +100,35 @@ The current example is a standard counter page using:
 - `NanApplication` with app-level `NanTheme`.
 - `NanWindow` and `NanRouter`.
 - `CounterPage : NanPageT<NoParams>`.
-- local `Signal<int>` plus `Computed<std::string>`.
+- page-scoped `Signal<int>` plus `Computed<std::string>`.
 - `Label` bound to computed text.
 - `Button` controls for decrement/increment/reset.
 - explicit `Center -> Padding -> Column -> Flow` layout.
 
 Example code is not sacred. It can be refactored when it helps validate framework APIs, unless a task explicitly asks to preserve it.
 
-## Known Lifecycle Debt
+## Reactive Lifetime
 
-Page-local reactive state is still too manual. `CounterPage` currently owns signals and manually disposes computed state because computed callbacks may capture the page object.
+Page-local reactive state is owned by `reactive::ReactiveScope`.
+`PageContext::scope()` returns the scope for the page frame currently being built.
+The router keeps that scope alive for as long as the page frame is mounted or kept alive.
 
-The next cleanup should introduce a page or reactive scope:
+`ReactiveScope` can own:
 
-- `PageScope` / `ReactiveScope` owns page-local computed/effect handles.
-- page teardown clears the scope automatically.
-- APIs like `make_computed(scope, fn)` should avoid dangling captures through the global `Graph`.
+- `Signal<T>` values through `scope.signal<T>(...)` or `scope.signal_value(...)`.
+- `Computed<T>` values through `scope.computed(fn)`.
+- `Effect` callbacks through `scope.effect(fn)`.
+
+Router frame teardown detaches the page root first, allowing widgets to run `on_exit_tree()`, then clears the page scope.
+This prevents page-local computed/effect callbacks from surviving the page object that they may capture.
 
 ## Recommended Next Steps
 
-1. Formalize page-local reactive lifetime with `PageScope` or `ReactiveScope`.
-2. Push text layout forward: real font metrics, layout result, single/multi-line drawing, and overflow behavior.
-3. Add container clipping/overflow contract using the existing `ClipStack` and draw traversal.
-4. Refine layout semantics: basis/shrink/min-max policy, main-axis spacing strategies, run stretch, and per-child alignment.
-5. Add more semantic controls only after text/layout behavior is stable enough to support them.
-6. Build authoring DSL later as a layer above the low-level widget API, not as a replacement for it.
+1. Push text layout forward: real font metrics, layout result, single/multi-line drawing, and overflow behavior.
+2. Add container clipping/overflow contract using the existing `ClipStack` and draw traversal.
+3. Refine layout semantics: basis/shrink/min-max policy, main-axis spacing strategies, run stretch, and per-child alignment.
+4. Add more semantic controls only after text/layout behavior is stable enough to support them.
+5. Build authoring DSL later as a layer above the low-level widget API, not as a replacement for it.
 
 ## Verification
 

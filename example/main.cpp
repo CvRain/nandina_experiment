@@ -7,6 +7,7 @@
 #include "app/nan_window.hpp"
 #include "foundation/geometry.hpp"
 #include "reactive/computed.hpp"
+#include "reactive/scope.hpp"
 #include "reactive/signal.hpp"
 #include "scene/control.hpp"
 #include "theme/theme.hpp"
@@ -24,12 +25,6 @@ class CounterPage final: public app::NanPageT<app::NoParams> {
 public:
     CounterPage() = default;
 
-    ~CounterPage() override {
-        if (count_text_ != nullptr) {
-            count_text_->dispose();
-        }
-    }
-
     [[nodiscard]] auto route_key() const -> std::string_view override {
         return "counter";
     }
@@ -37,10 +32,11 @@ public:
     [[nodiscard]] auto build(app::PageContext& context)
         -> std::shared_ptr<scene::NanNode2D> override {
         auto& graph = context.graph();
+        auto& scope = context.scope();
         const auto& app_theme = context.theme();
 
-        count_ = std::make_unique<reactive::Signal<int>>(graph, 0);
-        count_text_ = reactive::make_computed(graph, [this] {
+        count_ = &scope.signal<int>(0);
+        auto& count_text = scope.computed([this] {
             return std::string("Count: ") + std::to_string(count_->get());
         });
 
@@ -50,14 +46,17 @@ public:
         const auto test_label =
             widget::Label::create(graph, "A quick brown fox jump to a lazy dog", app_theme);
         test_label->set_font_size(26);
+        test_label->set_overflow(widget::primitives::TextOverflow::scale);
 
         const auto label = widget::Label::create(graph, "", app_theme);
-        label->bind_text(*count_text_);
+        label->bind_text(count_text);
 
         const auto decrement = widget::Button::create("-1", app_theme);
         decrement->set_tone(theme::ButtonTone::secondary);
         decrement->set_treatment(theme::ButtonTreatment::outlined);
         decrement->set_on_click([this] { count_->update([](int& value) { --value; }); });
+        //todo: button->set_overflow
+        //todo: 是否所有组件都需要有scale的功能，以及带有文字渲染的组件的set_overflow处理方式
 
         const auto increment = widget::Button::create("+1", app_theme);
         increment->set_tone(theme::ButtonTone::primary);
@@ -95,8 +94,7 @@ public:
     }
 
 private:
-    reactive::UniqueSignal<int> count_;
-    reactive::Computed<std::string>* count_text_ = nullptr;
+    reactive::Signal<int>* count_ = nullptr;
 };
 
 auto main() -> int {

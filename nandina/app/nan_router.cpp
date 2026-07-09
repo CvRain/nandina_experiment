@@ -82,7 +82,7 @@ namespace nandina::app
             return false;
         }
 
-        detach_root(frames_.back().root);
+        drop_frame(frames_.back());
         frames_.pop_back();
         sync_visibility();
         return true;
@@ -105,7 +105,7 @@ namespace nandina::app
         }
 
         while (frames_.size() > target + 1) {
-            detach_root(frames_.back().root);
+            drop_frame(frames_.back());
             frames_.pop_back();
         }
         sync_visibility();
@@ -114,7 +114,7 @@ namespace nandina::app
 
     void NanRouter::clear() {
         while (!frames_.empty()) {
-            detach_root(frames_.back().root);
+            drop_frame(frames_.back());
             frames_.pop_back();
         }
     }
@@ -124,7 +124,8 @@ namespace nandina::app
             throw std::runtime_error("NanRouter::push_page: page is null");
         }
 
-        PageContext context {*this, *graph_, *theme_, store_, store_key_};
+        auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
+        PageContext context {*this, *graph_, *scope, *theme_, store_, store_key_};
         auto root = page->build(context);
         if (!root) {
             throw std::runtime_error("NanRouter::push_page: page build returned null root");
@@ -136,6 +137,7 @@ namespace nandina::app
             Frame {
                 .page = std::move(page),
                 .root = std::move(root),
+                .scope = std::move(scope),
                 .key = {},
             }
         );
@@ -158,6 +160,13 @@ namespace nandina::app
             return;
         }
         host_->remove_child(*root);
+    }
+
+    void NanRouter::drop_frame(Frame& frame) {
+        detach_root(frame.root);
+        if (frame.scope != nullptr) {
+            frame.scope->clear();
+        }
     }
 
 } // namespace nandina::app

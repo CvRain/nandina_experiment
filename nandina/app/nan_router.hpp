@@ -108,6 +108,7 @@ namespace nandina::app
         struct Frame {
             std::unique_ptr<NanPage> page;
             std::shared_ptr<scene::NanNode2D> root;
+            std::unique_ptr<reactive::ReactiveScope> scope;
             std::string key;
         };
 
@@ -115,6 +116,7 @@ namespace nandina::app
         void sync_visibility();
         void attach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void detach_root(const std::shared_ptr<scene::NanNode2D>& root);
+        void drop_frame(Frame& frame);
 
         reactive::Graph* graph_;
         const theme::NanTheme* theme_;

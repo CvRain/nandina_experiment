@@ -11,6 +11,7 @@
 #define NANDINA_EXPERIMENT_APP_NAN_PAGE_HPP
 
 #include "../reactive/graph.hpp"
+#include "../reactive/scope.hpp"
 #include "../scene/node2d.hpp"
 #include "../theme/theme.hpp"
 #include "nan_store.hpp"
@@ -42,12 +43,14 @@ namespace nandina::app
         PageContext(
             NanRouter& router,
             reactive::Graph& graph,
+            reactive::ReactiveScope& scope,
             const theme::NanTheme& theme,
             NanStore* store,
             NanTypeKey store_key
         ):
             router_(&router),
             graph_(&graph),
+            scope_(&scope),
             theme_(&theme),
             store_(store),
             store_key_(store_key) {}
@@ -58,6 +61,10 @@ namespace nandina::app
 
         [[nodiscard]] auto graph() -> reactive::Graph& {
             return *graph_;
+        }
+
+        [[nodiscard]] auto scope() -> reactive::ReactiveScope& {
+            return *scope_;
         }
 
         [[nodiscard]] auto theme() const -> const theme::NanTheme& {
@@ -82,6 +89,7 @@ namespace nandina::app
     private:
         NanRouter* router_;
         reactive::Graph* graph_;
+        reactive::ReactiveScope* scope_;
         const theme::NanTheme* theme_;
         NanStore* store_;
         NanTypeKey store_key_ = nullptr;

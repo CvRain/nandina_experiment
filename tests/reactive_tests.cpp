@@ -255,6 +255,38 @@ TEST_CASE("EffectScope clears all effects together", "[reactive][effect][scope]"
     REQUIRE(runs_b == 2);
 }
 
+TEST_CASE("ReactiveScope owns signals computed values and effects", "[reactive][scope]") {
+    Graph g;
+    int seen = 0;
+    int runs = 0;
+    Signal<int>* count = nullptr;
+
+    {
+        ReactiveScope scope {g};
+        count = &scope.signal<int>(1);
+        auto& doubled = scope.computed([&] { return count->get() * 2; });
+        scope.effect([&] {
+            seen = doubled.get();
+            ++runs;
+        });
+
+        REQUIRE(scope.signal_count() == 1);
+        REQUIRE(scope.computed_count() == 1);
+        REQUIRE(scope.effect_count() == 1);
+        REQUIRE(seen == 2);
+        REQUIRE(runs == 1);
+
+        count->set(3);
+        REQUIRE(seen == 6);
+        REQUIRE(runs == 2);
+
+        scope.clear();
+        REQUIRE(scope.signal_count() == 0);
+        REQUIRE(scope.computed_count() == 0);
+        REQUIRE(scope.effect_count() == 0);
+    }
+}
+
 TEST_CASE("Undisposed effect is released by Graph destruction", "[reactive][lifetime]") {
     // No leak / crash: effect and computed outlive their handles but the Graph
     // owns them and tears down cleanly. (Signal must outlive the Graph.)

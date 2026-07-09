@@ -79,6 +79,34 @@ namespace
             return root;
         }
     };
+
+    struct ScopedObserverLog {
+        int observed = 0;
+        int runs = 0;
+    };
+
+    struct ScopedObserverParams {
+        ScopedObserverLog* log = nullptr;
+    };
+
+    class ScopedObserverPage final: public app::NanPageT<ScopedObserverParams> {
+    public:
+        explicit ScopedObserverPage(ScopedObserverParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "scoped-observer";
+        }
+
+        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+            auto& store = context.store<TestStore>();
+            auto* log = params().log;
+            context.scope().effect([&store, log] {
+                log->observed = store.count.get();
+                ++log->runs;
+            });
+            return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
 } // namespace
 
 TEST_CASE("router pushes keep-alive pages and toggles top visibility", "[app][router]") {
@@ -175,4 +203,27 @@ TEST_CASE("router supports no-params pages and passes theme through context", "[
     auto* control = static_cast<scene::NanControl*>(root);
     REQUIRE(control->background().has_value());
     REQUIRE(control->background()->alpha() == app_theme.palette.primary.alpha());
+}
+
+TEST_CASE("router clears page reactive scope when a frame is popped", "[app][router][scope]") {
+    reactive::Graph graph;
+    TestStore store {graph};
+    ScopedObserverLog log;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme, &store, app::nan_type_key<TestStore>()};
+
+    router.push<HomePage>(HomeParams {.user_id = 1});
+    router.push<ScopedObserverPage>(ScopedObserverParams {.log = &log});
+
+    REQUIRE(log.observed == 1);
+    REQUIRE(log.runs == 1);
+
+    store.count.set(5);
+    REQUIRE(log.observed == 5);
+    REQUIRE(log.runs == 2);
+
+    REQUIRE(router.pop());
+    store.count.set(9);
+    REQUIRE(log.observed == 5);
+    REQUIRE(log.runs == 2);
 }

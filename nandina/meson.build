@@ -18,6 +18,7 @@ module_reactive = files(
     'reactive/computed.hpp',
     'reactive/effect.hpp',
     'reactive/batch.hpp',
+    'reactive/scope.hpp',
     'reactive/reactive.hpp',
 )
 
