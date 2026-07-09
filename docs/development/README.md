@@ -122,13 +122,139 @@ The router keeps that scope alive for as long as the page frame is mounted or ke
 Router frame teardown detaches the page root first, allowing widgets to run `on_exit_tree()`, then clears the page scope.
 This prevents page-local computed/effect callbacks from surviving the page object that they may capture.
 
-## Recommended Next Steps
+## Development Roadmap
 
-1. Push text layout forward: real font metrics, layout result, single/multi-line drawing, and overflow behavior.
-2. Add container clipping/overflow contract using the existing `ClipStack` and draw traversal.
-3. Refine layout semantics: basis/shrink/min-max policy, main-axis spacing strategies, run stretch, and per-child alignment.
-4. Add more semantic controls only after text/layout behavior is stable enough to support them.
-5. Build authoring DSL later as a layer above the low-level widget API, not as a replacement for it.
+This roadmap merges the current code state, the useful parts of `dev-docs-*`, and the recent implementation decisions.
+The main line should stay narrow: finish text/layout/clip foundations before adding many new semantic controls.
+
+### Completed Foundation
+
+The current baseline is:
+
+1. `reactive::ReactiveScope` owns page-local `Signal`, `Computed`, and `Effect` lifetimes.
+2. `PageContext::scope()` exposes the page frame scope.
+3. `NanRouter` owns one scope per keep-alive page frame and clears it when the frame is popped or cleared.
+4. `CounterPage` uses page scope and no longer manually disposes `Computed`.
+5. Router/reactive tests cover scope teardown and page-frame cleanup.
+
+This closes the first lifecycle risk. New work should not reintroduce page-local reactive objects that outlive their page scope.
+
+### Main Line
+
+#### M1. Text Capability Contract
+
+Goal: make text a reusable primitive capability instead of logic copied into each text-bearing component.
+
+Status: initial foundation landed. `TextStyle` is now the shared style value for `Text`, `Label` still layers on top of `Text`, and `Button` measures/draws through an internal `primitives::Text` instead of maintaining its own text measurement path.
+
+Tasks:
+
+1. Introduce `TextStyle` as a shared value object for text visual/layout inputs.
+   It should start small: font size, color, overflow, max lines, and later font family, weight, line height, alignment, and baseline policy.
+2. Move `Button` away from manual `text_.size() * font_size` measurement.
+   Button should consume `primitives::Text` or a small `TextSlot` internally.
+3. Keep `Label` as a semantic wrapper over `Text`, not a separate text system.
+4. Give text-bearing controls a shared text styling path.
+   Common setters such as `set_text(...)` can remain on semantic controls, but they should forward to their text primitive/slot.
+5. Keep low-level escape hatches possible, for example `button->text_node()` or `button->text_slot()`, but do not make that the only normal API.
+
+Boundary:
+
+- `Text` owns UTF-8 text, style, measurement, layout result, and drawing.
+- `Label` owns label semantics.
+- `Button` owns press/click semantics and maps button state to a resolved text style.
+- `TextField` / `EditableText` will own editing state later; ordinary `Text` should not become an editor.
+
+#### M2. Text Layout Result
+
+Goal: make measuring and drawing use the same computed layout data.
+
+Tasks:
+
+1. Introduce `TextLayoutInput` and `TextLayoutResult`.
+2. Include measured size, laid-out lines, visible text ranges, effective font size, baseline information, and overflow result.
+3. Replace ad-hoc `laid_out_text_` / `laid_out_font_size_` state with the layout result.
+4. Keep the first backend simple and deterministic; exact shaping can come later.
+5. Ensure `Button`, `Label`, and future text consumers all measure through this contract.
+
+This is where the previous iterations failed hardest: text overflow must not be patched separately in Button, Label, Card, Field, and TextField.
+
+#### M3. Container Clip / Overflow Contract
+
+Goal: make parent-declared clipping a tree/rendering contract, not a local widget trick.
+
+Tasks:
+
+1. Add explicit overflow policy to controls or a focused container primitive.
+2. Support at least `visible` and `clip` first.
+3. Use the existing `ClipStack` in draw traversal so children are clipped by parent policy.
+4. Connect `TextOverflow::clip` to render clipping rather than string truncation only.
+5. Keep the path open for `ScrollView`, `Card`, `Dialog`, and popover-like containers.
+
+#### M4. EditableText / TextField
+
+Goal: build input on top of the text layout contract, not beside it.
+
+Tasks:
+
+1. Add an `EditableText` primitive or internal control for caret, selection, IME/text input, and editing commands.
+2. Build `TextField` as Surface + EditableText + placeholder Text + FocusRing + editing state machine.
+3. Keep `TextField` responsible for value, placeholder, focus, read-only, disabled, invalid, on_change, and on_submit.
+4. Keep Field/Form-level label/helper/error/required semantics outside `TextField`.
+
+#### M5. Layout Refinement
+
+Goal: refine the existing layout primitives after text and clip semantics are stable.
+
+Tasks:
+
+1. Add flex basis/shrink/min-max policy where needed.
+2. Add main-axis spacing strategies such as `space_between` only when a real page/control needs them.
+3. Add run stretch and per-child alignment to `Wrap` / `Flow`.
+4. Decide whether Grid, Anchor, or Scroll viewport enters the low-level widget set next.
+5. Keep Yoga or any third-party solver behind a backend boundary; it should not define the public widget API.
+
+### Side Tracks
+
+These are useful, but should not interrupt the main text/layout/clip line unless a feature directly requires them.
+
+#### Theme Context
+
+Current `NanApplication` owns a `NanTheme` value. Runtime theme switching is not reactive yet.
+
+Possible direction:
+
+- Add `ThemeContext` or `Signal<NanTheme>`.
+- Let widgets derive resolved styles through effects or scoped subscriptions.
+- Make window background and existing page widgets refresh when theme changes.
+
+#### Router Lifecycle
+
+Router currently supports keep-alive page stack and visibility switching.
+
+Possible direction:
+
+- Add activate/deactivate hooks.
+- Add pop/replace lifecycle callbacks.
+- Add route history or deep-link serialization later.
+- Add page transition animation after animation primitives exist.
+
+#### Animation And Impact Effects
+
+The long-term identity of v3 includes game-like interaction.
+
+Possible direction:
+
+- Add a small tween/animation primitive that can animate `NanNode2D` transform and control properties.
+- Let Button click spawn ripple/impact nodes or events.
+- Keep animation independent of Button so other components can reuse it.
+
+#### Authoring DSL
+
+Do this after low-level widgets are stable.
+
+The low-level widget API remains valid. A DSL should sit above it, not replace it.
+Do not block framework progress on a final authoring syntax.
 
 ## Verification
 

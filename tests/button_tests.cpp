@@ -181,3 +181,17 @@ TEST_CASE("button draws background and text and reacts to press state", "[widget
     });
     REQUIRE(clicks == 1);
 }
+
+TEST_CASE("button forwards text state through its text primitive", "[widget][button][text]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("A very long button label");
+    button->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 72.0F, button->height()));
+    tree.set_root(button);
+
+    tree.draw(dev);
+
+    REQUIRE(button->text_node().font_size() == Catch::Approx(button->resolved_style().font_size));
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts[0].text.ends_with("..."));
+}

@@ -21,12 +21,24 @@ namespace nandina::widget::primitives
         scale,
     };
 
+    struct TextStyle {
+        foundation::NanColor color = foundation::NanColor::from(
+            foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255}
+        );
+        float font_size = 16.0F;
+        TextOverflow overflow = TextOverflow::ellipsis;
+        int max_lines = 1;
+    };
+
     class Text: public scene::NanControl {
     public:
         explicit Text(std::string text = {});
 
         void set_text(std::string text);
         [[nodiscard]] auto text() const -> std::string_view;
+
+        void set_style(TextStyle style);
+        [[nodiscard]] auto style() const -> const TextStyle&;
 
         void set_color(foundation::NanColor color);
         [[nodiscard]] auto color() const -> foundation::NanColor;
@@ -40,6 +52,10 @@ namespace nandina::widget::primitives
         void set_max_lines(int lines);
         [[nodiscard]] auto max_lines() const -> int;
 
+        [[nodiscard]] auto measured_text_width() const -> float;
+        [[nodiscard]] auto laid_out_font_size() const -> float;
+
+        void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
@@ -51,13 +67,8 @@ namespace nandina::widget::primitives
 
         std::string text_;
         std::string laid_out_text_;
-        foundation::NanColor color_ = foundation::NanColor::from(
-            foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255}
-        );
-        float font_size_ = 16.0F;
+        TextStyle style_ {};
         float laid_out_font_size_ = 16.0F;
-        TextOverflow overflow_ = TextOverflow::ellipsis;
-        int max_lines_ = 1;
     };
 
 } // namespace nandina::widget::primitives

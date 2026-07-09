@@ -5,10 +5,34 @@
 #include "button.hpp"
 #include "../render/draw_context.hpp"
 
+#include <algorithm>
+#include <cmath>
 #include <utility>
 
 namespace nandina::widget
 {
+
+    namespace
+    {
+        [[nodiscard]] auto near(float lhs, float rhs) -> bool {
+            return std::abs(lhs - rhs) <= foundation::nan_epsilon;
+        }
+
+        [[nodiscard]] auto same_color(foundation::NanColor lhs, foundation::NanColor rhs) -> bool {
+            const auto a = lhs.oklch();
+            const auto b = rhs.oklch();
+            return near(a.light, b.light) && near(a.chroma, b.chroma) && near(a.hue, b.hue)
+                && near(a.alpha, b.alpha);
+        }
+
+        [[nodiscard]] auto same_text_style(
+            const primitives::TextStyle& lhs,
+            const primitives::TextStyle& rhs
+        ) -> bool {
+            return same_color(lhs.color, rhs.color) && near(lhs.font_size, rhs.font_size)
+                && lhs.overflow == rhs.overflow && lhs.max_lines == rhs.max_lines;
+        }
+    } // namespace
 
     Button::Button(std::string text, theme::NanTheme theme): text_(std::move(text)), theme_(theme) {
         apply_metrics();
@@ -19,17 +43,26 @@ namespace nandina::widget
     }
 
     void Button::set_text(std::string text) {
-        text_ = std::move(text);
+        text_.set_text(std::move(text));
         mark_layout_dirty();
         apply_metrics();
     }
 
     auto Button::text() const -> std::string_view {
+        return text_.text();
+    }
+
+    auto Button::text_node() -> primitives::Text& {
+        return text_;
+    }
+
+    auto Button::text_node() const -> const primitives::Text& {
         return text_;
     }
 
     void Button::set_theme(theme::NanTheme theme) {
         theme_ = theme;
+        mark_layout_dirty();
         apply_metrics();
     }
 
@@ -39,6 +72,8 @@ namespace nandina::widget
 
     void Button::set_tone(theme::ButtonTone tone) {
         tone_ = tone;
+        mark_layout_dirty();
+        apply_metrics();
     }
 
     auto Button::tone() const -> theme::ButtonTone {
@@ -47,6 +82,8 @@ namespace nandina::widget
 
     void Button::set_treatment(theme::ButtonTreatment treatment) {
         treatment_ = treatment;
+        mark_layout_dirty();
+        apply_metrics();
     }
 
     auto Button::treatment() const -> theme::ButtonTreatment {
@@ -101,17 +138,20 @@ namespace nandina::widget
             );
         }
 
-        const float text_width = static_cast<float>(text_.size()) * style.font_size * 0.56F;
+        apply_text_style(visual_state());
+        const float content_width = std::max(0.0F, world.get_width() - style.padding_x * 2.0F);
+        (void)text_.measure_layout(scene::LayoutConstraints {
+            .min_width = 0.0F,
+            .max_width = content_width,
+            .min_height = 0.0F,
+            .max_height = style.height,
+        });
+        const float text_width = text_.measured_text_width();
         const auto text_pos = foundation::NanPoint(
             world.get_left() + (world.get_width() - text_width) * 0.5F,
-            world.get_top() + (world.get_height() - style.font_size) * 0.5F
+            world.get_top() + (world.get_height() - text_.laid_out_font_size()) * 0.5F
         );
-        ctx.device().draw_text(
-            text_,
-            text_pos,
-            style.font_size,
-            style.foreground.with_alpha(style.foreground.alpha() * ctx.opacity())
-        );
+        text_.draw_at(ctx, text_pos);
 
         if (focused() && !disabled() && style.focus_ring_width > 0.0F) {
             const auto ring = world.expanded(style.focus_ring_width + 1.0F);
@@ -133,9 +173,18 @@ namespace nandina::widget
             size_,
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
-        const float text_width = static_cast<float>(text_.size()) * style.font_size * 0.56F;
+        apply_text_style(disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal);
+        const float max_text_width = std::isfinite(constraints.max_width)
+            ? std::max(0.0F, constraints.max_width - style.padding_x * 2.0F)
+            : constraints.max_width;
+        (void)text_.measure_layout(scene::LayoutConstraints {
+            .min_width = 0.0F,
+            .max_width = max_text_width,
+            .min_height = 0.0F,
+            .max_height = style.height,
+        });
         return constraints.constrain(
-            foundation::NanSize(text_width + style.padding_x * 2.0F, style.height)
+            foundation::NanSize(text_.width() + style.padding_x * 2.0F, style.height)
         );
     }
 
@@ -147,8 +196,23 @@ namespace nandina::widget
             size_,
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
-        const float text_width = static_cast<float>(text_.size()) * style.font_size * 0.56F;
-        set_size(foundation::NanSize(text_width + style.padding_x * 2.0F, style.height));
+        apply_text_style(disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal);
+        (void)text_.measure_layout(scene::LayoutConstraints::loose());
+        set_size(foundation::NanSize(text_.width() + style.padding_x * 2.0F, style.height));
+    }
+
+    void Button::apply_text_style(theme::ButtonVisualState state) {
+        const auto style = theme::resolve_button_style(theme_, tone_, treatment_, size_, state);
+        const primitives::TextStyle text_style {
+            .color = style.foreground,
+            .font_size = style.font_size,
+            .overflow = primitives::TextOverflow::ellipsis,
+            .max_lines = 1,
+        };
+        if (same_text_style(text_.style(), text_style)) {
+            return;
+        }
+        text_.set_style(text_style);
     }
 
 } // namespace nandina::widget

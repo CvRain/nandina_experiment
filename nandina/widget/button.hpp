@@ -7,6 +7,7 @@
 
 #include "../theme/button_style.hpp"
 #include "primitives/pressable.hpp"
+#include "primitives/text.hpp"
 
 #include <memory>
 #include <string>
@@ -25,6 +26,8 @@ namespace nandina::widget
 
         void set_text(std::string text);
         [[nodiscard]] auto text() const -> std::string_view;
+        [[nodiscard]] auto text_node() -> primitives::Text&;
+        [[nodiscard]] auto text_node() const -> const primitives::Text&;
 
         void set_theme(theme::NanTheme theme);
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
@@ -49,8 +52,9 @@ namespace nandina::widget
 
     private:
         void apply_metrics();
+        void apply_text_style(theme::ButtonVisualState state);
 
-        std::string text_;
+        primitives::Text text_;
         theme::NanTheme theme_;
         theme::ButtonTone tone_ = theme::ButtonTone::primary;
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;

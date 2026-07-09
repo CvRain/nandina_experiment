@@ -339,6 +339,33 @@ TEST_CASE("Text size changes mark ancestor layout dirty", "[widget][layout][text
     REQUIRE(row->width() == Catch::Approx(text->width()));
 }
 
+TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto text = std::make_shared<widget::primitives::Text>("abcdef");
+    text->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.7F).with_alpha(0.5F),
+        .font_size = 20.0F,
+        .overflow = widget::primitives::TextOverflow::clip,
+        .max_lines = 1,
+    });
+    (void)text->measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 40.0F,
+        .min_height = 0.0F,
+        .max_height = 80.0F,
+    });
+    tree.set_root(text);
+
+    tree.draw(dev);
+
+    REQUIRE(text->font_size() == Catch::Approx(20.0F));
+    REQUIRE(text->overflow() == widget::primitives::TextOverflow::clip);
+    REQUIRE(text->width() <= 40.0F);
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts[0].alpha == Catch::Approx(0.5F));
+}
+
 TEST_CASE("Row alignment positions children inside assigned bounds", "[widget][layout][alignment]") {
     auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
     auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 14.0F));
