@@ -10,6 +10,7 @@
 
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace nandina::widget::primitives
 {
@@ -28,6 +29,28 @@ namespace nandina::widget::primitives
         float font_size = 16.0F;
         TextOverflow overflow = TextOverflow::ellipsis;
         int max_lines = 1;
+    };
+
+    struct TextLayoutInput {
+        std::string_view text;
+        TextStyle style;
+        scene::LayoutConstraints constraints = scene::LayoutConstraints::loose();
+    };
+
+    struct TextLayoutLine {
+        std::size_t text_offset = 0;
+        std::size_t text_length = 0;
+        std::string visible_text;
+        foundation::NanSize size {};
+        float baseline = 0.0F;
+    };
+
+    struct TextLayoutResult {
+        foundation::NanSize size {};
+        std::vector<TextLayoutLine> lines;
+        float font_size = 16.0F;
+        float baseline = 0.0F;
+        bool overflowed = false;
     };
 
     class Text: public scene::NanControl {
@@ -54,6 +77,7 @@ namespace nandina::widget::primitives
 
         [[nodiscard]] auto measured_text_width() const -> float;
         [[nodiscard]] auto laid_out_font_size() const -> float;
+        [[nodiscard]] auto layout_result() const -> const TextLayoutResult&;
 
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
         auto on_draw(render::DrawContext& ctx) -> void override;
@@ -63,12 +87,12 @@ namespace nandina::widget::primitives
 
     private:
         void update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
+        [[nodiscard]] auto layout_text(TextLayoutInput input) const -> TextLayoutResult;
         [[nodiscard]] auto text_width(std::string_view text, float font_size) const -> float;
 
         std::string text_;
-        std::string laid_out_text_;
         TextStyle style_ {};
-        float laid_out_font_size_ = 16.0F;
+        TextLayoutResult layout_ {};
     };
 
 } // namespace nandina::widget::primitives

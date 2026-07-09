@@ -192,6 +192,7 @@ TEST_CASE("button forwards text state through its text primitive", "[widget][but
     tree.draw(dev);
 
     REQUIRE(button->text_node().font_size() == Catch::Approx(button->resolved_style().font_size));
+    REQUIRE(button->text_node().layout_result().overflowed);
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts[0].text.ends_with("..."));
 }

@@ -169,6 +169,8 @@ Boundary:
 
 Goal: make measuring and drawing use the same computed layout data.
 
+Status: initial data contract in progress. `TextLayoutInput`, `TextLayoutLine`, and `TextLayoutResult` now capture the current deterministic text layout output; richer shaping, true line breaking, and baseline policy remain future work.
+
 Tasks:
 
 1. Introduce `TextLayoutInput` and `TextLayoutResult`.

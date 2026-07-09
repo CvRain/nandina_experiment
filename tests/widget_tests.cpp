@@ -366,6 +366,35 @@ TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text
     REQUIRE(dev.texts[0].alpha == Catch::Approx(0.5F));
 }
 
+TEST_CASE("Text exposes a layout result shared by measure and draw", "[widget][text][layout]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto text = std::make_shared<widget::primitives::Text>("abcdefghi");
+    text->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.8F),
+        .font_size = 10.0F,
+        .overflow = widget::primitives::TextOverflow::ellipsis,
+        .max_lines = 1,
+    });
+
+    (void)text->measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 28.0F,
+        .min_height = 0.0F,
+        .max_height = 80.0F,
+    });
+    tree.set_root(text);
+    tree.draw(dev);
+
+    const auto& layout = text->layout_result();
+    REQUIRE(layout.overflowed);
+    REQUIRE(layout.font_size == Catch::Approx(10.0F));
+    REQUIRE(layout.size.get_width() <= 28.0F);
+    REQUIRE(layout.lines.size() == 1);
+    REQUIRE(layout.lines.front().visible_text == dev.texts.front().text);
+    REQUIRE(layout.lines.front().visible_text.ends_with("..."));
+}
+
 TEST_CASE("Row alignment positions children inside assigned bounds", "[widget][layout][alignment]") {
     auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
     auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 14.0F));
