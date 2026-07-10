@@ -39,11 +39,26 @@ namespace nandina::widget
                 return remaining * 0.5F;
             case LayoutAlignment::end:
                 return remaining;
+            case LayoutAlignment::space_between:
+                return 0.0F;
             case LayoutAlignment::start:
             case LayoutAlignment::stretch:
             default:
                 return 0.0F;
             }
+        }
+
+        [[nodiscard]] auto distributed_gap(
+            LayoutAlignment alignment,
+            float base_gap,
+            float available,
+            float used,
+            std::size_t count
+        ) -> float {
+            if (alignment != LayoutAlignment::space_between || count < 2) {
+                return base_gap;
+            }
+            return base_gap + std::max(0.0F, available - used) / static_cast<float>(count - 1);
         }
 
         [[nodiscard]] auto stretched_extent(
@@ -263,6 +278,8 @@ namespace nandina::widget
 
         const auto remaining_main = std::max(0.0F, available_main - fixed_main);
         const auto used_main = total_flex > 0 ? available_main : fixed_main;
+        const auto effective_gap = total_flex > 0 ? gap_
+            : distributed_gap(main_alignment_, gap_, available_main, used_main, count);
         float main_pos = alignment_offset(main_alignment_, available_main, used_main);
         std::size_t visible_count = 0;
         for (auto& item: items_) {
@@ -271,7 +288,7 @@ namespace nandina::widget
                 continue;
             }
             if (visible_count > 0) {
-                main_pos += gap_;
+                main_pos += effective_gap;
             }
 
             const auto child_size = child->measured_size();
@@ -527,6 +544,8 @@ namespace nandina::widget
 
         const auto remaining_height = std::max(0.0F, height() - fixed_height);
         const auto used_height = total_flex > 0 ? height() : fixed_height;
+        const auto effective_gap = total_flex > 0 ? gap_
+            : distributed_gap(main_alignment_, gap_, height(), used_height, count);
         float y = alignment_offset(main_alignment_, height(), used_height);
         std::size_t visible_count = 0;
         for (auto& item: items_) {
@@ -535,7 +554,7 @@ namespace nandina::widget
                 continue;
             }
             if (visible_count > 0) {
-                y += gap_;
+                y += effective_gap;
             }
             const auto child_size = child->measured_size();
             const auto child_height = [&] {
@@ -663,6 +682,8 @@ namespace nandina::widget
 
         const auto remaining_width = std::max(0.0F, width() - fixed_width);
         const auto used_width = total_flex > 0 ? width() : fixed_width;
+        const auto effective_gap = total_flex > 0 ? gap_
+            : distributed_gap(main_alignment_, gap_, width(), used_width, count);
         float x = alignment_offset(main_alignment_, width(), used_width);
         std::size_t visible_count = 0;
         for (auto& item: items_) {
@@ -671,7 +692,7 @@ namespace nandina::widget
                 continue;
             }
             if (visible_count > 0) {
-                x += gap_;
+                x += effective_gap;
             }
             const auto child_size = child->measured_size();
             const auto child_width = [&] {

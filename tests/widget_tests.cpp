@@ -524,6 +524,40 @@ TEST_CASE("Column cross stretch expands children to assigned width", "[widget][l
     REQUIRE(b->width() == Catch::Approx(90.0F));
 }
 
+TEST_CASE("Row and Column distribute main-axis space between children", "[widget][layout][alignment]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 10.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 10.0F));
+
+    auto row = widget::Row::create();
+    row->set_gap(5.0F)
+        .set_main_alignment(widget::LayoutAlignment::space_between)
+        .add(a)
+        .add(b)
+        .add(c);
+
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 20.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 20.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(50.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(110.0F));
+
+    auto top = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 20.0F));
+    auto bottom = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 30.0F));
+    auto column = widget::Column::create();
+    column->set_gap(5.0F)
+        .set_main_alignment(widget::LayoutAlignment::space_between)
+        .add(top)
+        .add(bottom);
+
+    (void)column->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(40.0F, 100.0F)));
+    column->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 40.0F, 100.0F));
+
+    REQUIRE(top->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(bottom->position().get_y() == Catch::Approx(70.0F));
+}
+
 TEST_CASE("Center positions a single child in assigned bounds", "[widget][layout][center]") {
     auto child = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
     auto center = widget::Center::create();
@@ -634,6 +668,26 @@ TEST_CASE("Flex supports both axes and Expanded children", "[widget][layout][fle
     REQUIRE(vertical_expanded->position().get_y() == Catch::Approx(16.0F));
     REQUIRE(vertical_expanded->height() == Catch::Approx(124.0F));
     REQUIRE(vertical_expanded_child->height() == Catch::Approx(124.0F));
+}
+
+TEST_CASE("Flex distributes main-axis space between fixed children", "[widget][layout][flex]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+
+    auto flex = widget::Flex::create(widget::LayoutAxis::horizontal);
+    flex->set_gap(4.0F)
+        .set_main_alignment(widget::LayoutAlignment::space_between)
+        .add(a)
+        .add(b)
+        .add(c);
+
+    (void)flex->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 20.0F)));
+    flex->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 20.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(50.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(100.0F));
 }
 
 TEST_CASE("Wrap flows horizontal children into multiple runs", "[widget][layout][wrap]") {

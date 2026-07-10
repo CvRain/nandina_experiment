@@ -19,6 +19,7 @@ namespace nandina::widget
         center,
         end,
         stretch,
+        space_between,
     };
 
     enum class LayoutAxis {

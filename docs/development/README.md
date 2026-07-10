@@ -212,6 +212,8 @@ Tasks:
 
 Goal: refine the existing layout primitives after text and clip semantics are stable.
 
+Status: first refinement in progress. Flex/Row/Column now support `LayoutAlignment::space_between` for fixed-size children; flex basis/shrink and grid/scroll primitives remain future work.
+
 Tasks:
 
 1. Add flex basis/shrink/min-max policy where needed.
