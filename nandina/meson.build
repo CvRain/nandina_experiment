@@ -58,6 +58,8 @@ module_widget = files(
     'widget/primitives/pressable.cpp',
     'widget/primitives/text.hpp',
     'widget/primitives/text.cpp',
+    'widget/primitives/editable_text.hpp',
+    'widget/primitives/editable_text.cpp',
     'widget/label.hpp',
     'widget/label.cpp',
     'widget/layout.hpp',

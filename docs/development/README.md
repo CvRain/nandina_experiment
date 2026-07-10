@@ -199,6 +199,8 @@ Tasks:
 
 Goal: build input on top of the text layout contract, not beside it.
 
+Status: initial `EditableText` primitive in progress. It owns editable value/caret/focus handling and reuses `Text` for layout and drawing; the semantic `TextField` shell remains next.
+
 Tasks:
 
 1. Add an `EditableText` primitive or internal control for caret, selection, IME/text input, and editing commands.

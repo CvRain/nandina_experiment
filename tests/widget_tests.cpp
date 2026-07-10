@@ -18,6 +18,7 @@
 #include "widget/button.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
+#include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
 
 #include <memory>
@@ -41,6 +42,7 @@ public:
         std::string text;
         float alpha;
     };
+    int line_count = 0;
     std::vector<RectCall> rects;
     std::vector<TextCall> texts;
 
@@ -54,7 +56,9 @@ public:
     void draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {}
     void draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {}
     void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float,
-                   const foundation::NanColor&) override {}
+                   const foundation::NanColor&) override {
+        ++line_count;
+    }
     void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
     void draw_text(std::string_view text, const foundation::NanPoint&, float,
                    const foundation::NanColor& color) override {
@@ -393,6 +397,48 @@ TEST_CASE("Text exposes a layout result shared by measure and draw", "[widget][t
     REQUIRE(layout.lines.size() == 1);
     REQUIRE(layout.lines.front().visible_text == dev.texts.front().text);
     REQUIRE(layout.lines.front().visible_text.ends_with("..."));
+}
+
+TEST_CASE("EditableText accepts focused text input and backspace", "[widget][editable-text]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("A");
+    std::vector<std::string> changes;
+    edit->set_on_change([&](std::string_view value) { changes.emplace_back(value); });
+
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.dispatch_text_input(scene::TextInputEvent("x"));
+    REQUIRE(edit->value() == "A");
+
+    tree.set_focus(edit.get());
+    tree.dispatch_text_input(scene::TextInputEvent("x"));
+    REQUIRE(edit->value() == "Ax");
+    REQUIRE(edit->caret() == 2);
+    REQUIRE(changes.back() == "Ax");
+
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "A");
+    REQUIRE(edit->caret() == 1);
+    REQUIRE(changes.back() == "A");
+}
+
+TEST_CASE("EditableText draws text and focused caret", "[widget][editable-text]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto edit = std::make_shared<widget::primitives::EditableText>("Edit");
+    edit->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.8F),
+        .font_size = 16.0F,
+        .overflow = widget::primitives::TextOverflow::ellipsis,
+        .max_lines = 1,
+    });
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    tree.draw(dev);
+
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts.front().text == "Edit");
+    REQUIRE(dev.line_count == 1);
 }
 
 TEST_CASE("Row alignment positions children inside assigned bounds", "[widget][layout][alignment]") {
