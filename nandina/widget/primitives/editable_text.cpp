@@ -59,6 +59,23 @@ namespace nandina::widget::primitives
         return text_;
     }
 
+    void EditableText::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
+        text_.draw_at(ctx, position);
+
+        if (!focused_) {
+            return;
+        }
+
+        const auto color = text_.color().with_alpha(text_.color().alpha() * ctx.opacity());
+        const float x = position.get_x() + caret_x();
+        ctx.device().draw_line(
+            foundation::NanPoint(x, position.get_y()),
+            foundation::NanPoint(x, position.get_y() + text_.height()),
+            caret_width,
+            color
+        );
+    }
+
     auto EditableText::is_focusable() const -> bool {
         return true;
     }
@@ -100,20 +117,7 @@ namespace nandina::widget::primitives
 
     void EditableText::on_draw(render::DrawContext& ctx) {
         const auto pos = ctx.world_transform().transform_point(foundation::NanPoint::zero());
-        text_.draw_at(ctx, pos);
-
-        if (!focused_) {
-            return;
-        }
-
-        const auto color = text_.color().with_alpha(text_.color().alpha() * ctx.opacity());
-        const float x = pos.get_x() + caret_x();
-        ctx.device().draw_line(
-            foundation::NanPoint(x, pos.get_y()),
-            foundation::NanPoint(x, pos.get_y() + text_.height()),
-            caret_width,
-            color
-        );
+        draw_at(ctx, pos);
     }
 
     auto EditableText::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {

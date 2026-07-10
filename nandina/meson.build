@@ -66,6 +66,8 @@ module_widget = files(
     'widget/layout.cpp',
     'widget/button.hpp',
     'widget/button.cpp',
+    'widget/text_field.hpp',
+    'widget/text_field.cpp',
 )
 
 module_app = files(

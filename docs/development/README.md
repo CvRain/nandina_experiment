@@ -199,7 +199,7 @@ Tasks:
 
 Goal: build input on top of the text layout contract, not beside it.
 
-Status: initial `EditableText` primitive in progress. It owns editable value/caret/focus handling and reuses `Text` for layout and drawing; the semantic `TextField` shell remains next.
+Status: initial `EditableText` primitive landed, and a thin semantic `TextField` shell is in progress. `EditableText` owns editable value/caret/focus handling and reuses `Text` for layout and drawing; `TextField` composes surface, placeholder, and editable text behavior.
 
 Tasks:
 

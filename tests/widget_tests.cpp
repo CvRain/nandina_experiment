@@ -20,6 +20,7 @@
 #include "widget/layout.hpp"
 #include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
+#include "widget/text_field.hpp"
 
 #include <memory>
 #include <string>
@@ -43,6 +44,8 @@ public:
         float alpha;
     };
     int line_count = 0;
+    int outline_count = 0;
+    int rounded_count = 0;
     std::vector<RectCall> rects;
     std::vector<TextCall> texts;
 
@@ -53,8 +56,12 @@ public:
     void draw_rect(const foundation::NanRect& r, const foundation::NanColor& c) override {
         rects.push_back({r, c.alpha()});
     }
-    void draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {}
-    void draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {}
+    void draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        ++outline_count;
+    }
+    void draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        ++rounded_count;
+    }
     void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float,
                    const foundation::NanColor&) override {
         ++line_count;
@@ -438,6 +445,42 @@ TEST_CASE("EditableText draws text and focused caret", "[widget][editable-text]"
 
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts.front().text == "Edit");
+    REQUIRE(dev.line_count == 1);
+}
+
+TEST_CASE("TextField draws placeholder through semantic shell", "[widget][text-field]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto field = std::make_shared<widget::TextField>("", "Name");
+    tree.set_root(field);
+
+    tree.draw(dev);
+
+    REQUIRE(field->value().empty());
+    REQUIRE(field->placeholder() == "Name");
+    REQUIRE(dev.rounded_count == 1);
+    REQUIRE(dev.outline_count == 1);
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts.front().text == "Name");
+}
+
+TEST_CASE("TextField forwards text editing and change callback", "[widget][text-field]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto field = std::make_shared<widget::TextField>("", "Name");
+    std::vector<std::string> changes;
+    field->set_on_change([&](std::string_view value) { changes.emplace_back(value); });
+    tree.set_root(field);
+    tree.set_focus(field.get());
+
+    tree.dispatch_text_input(scene::TextInputEvent("A"));
+    REQUIRE(field->value() == "A");
+    REQUIRE(changes.size() == 1);
+    REQUIRE(changes.back() == "A");
+
+    tree.draw(dev);
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts.front().text == "A");
     REQUIRE(dev.line_count == 1);
 }
 

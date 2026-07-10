@@ -33,6 +33,8 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto text_node() -> Text&;
         [[nodiscard]] auto text_node() const -> const Text&;
 
+        void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
+
         [[nodiscard]] auto is_focusable() const -> bool override;
         auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& ctx) -> void override;
