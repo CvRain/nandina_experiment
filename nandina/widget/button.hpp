@@ -29,6 +29,9 @@ namespace nandina::widget
         [[nodiscard]] auto text_node() -> primitives::Text&;
         [[nodiscard]] auto text_node() const -> const primitives::Text&;
 
+        void set_text_overflow(primitives::TextOverflow overflow);
+        [[nodiscard]] auto text_overflow() const -> primitives::TextOverflow;
+
         void set_theme(theme::NanTheme theme);
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
 
@@ -59,6 +62,7 @@ namespace nandina::widget
         theme::ButtonTone tone_ = theme::ButtonTone::primary;
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;
         theme::ButtonSize size_ = theme::ButtonSize::medium;
+        primitives::TextOverflow text_overflow_ = primitives::TextOverflow::ellipsis;
     };
 
 } // namespace nandina::widget

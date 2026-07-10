@@ -187,6 +187,8 @@ Goal: make parent-declared clipping a tree/rendering contract, not a local widge
 
 Status: initial tree-level contract landed. `NanControl` now exposes `ControlOverflow::{visible, clip}`, and draw traversal pushes a child clip through `ClipStack` when a control declares clipped overflow.
 
+Note: `ControlOverflow` clips child scene nodes. Text-bearing semantic controls that draw composed internal text, such as `Button`, should expose their own text overflow API that forwards to `TextOverflow`.
+
 Tasks:
 
 1. Add explicit overflow policy to controls or a focused container primitive.

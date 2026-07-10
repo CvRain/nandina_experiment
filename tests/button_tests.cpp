@@ -196,3 +196,20 @@ TEST_CASE("button forwards text state through its text primitive", "[widget][but
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts[0].text.ends_with("..."));
 }
+
+TEST_CASE("button text overflow controls its internal text primitive", "[widget][button][text]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("A very long button label");
+    button->set_text_overflow(widget::primitives::TextOverflow::clip);
+    button->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 72.0F, button->height()));
+    tree.set_root(button);
+
+    tree.draw(dev);
+
+    REQUIRE(button->text_overflow() == widget::primitives::TextOverflow::clip);
+    REQUIRE(button->text_node().overflow() == widget::primitives::TextOverflow::clip);
+    REQUIRE(button->text_node().layout_result().overflowed);
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE_FALSE(dev.texts[0].text.ends_with("..."));
+}

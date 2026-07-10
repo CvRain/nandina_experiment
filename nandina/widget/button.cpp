@@ -60,6 +60,16 @@ namespace nandina::widget
         return text_;
     }
 
+    void Button::set_text_overflow(primitives::TextOverflow overflow) {
+        text_overflow_ = overflow;
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    auto Button::text_overflow() const -> primitives::TextOverflow {
+        return text_overflow_;
+    }
+
     void Button::set_theme(theme::NanTheme theme) {
         theme_ = theme;
         mark_layout_dirty();
@@ -206,7 +216,7 @@ namespace nandina::widget
         const primitives::TextStyle text_style {
             .color = style.foreground,
             .font_size = style.font_size,
-            .overflow = primitives::TextOverflow::ellipsis,
+            .overflow = text_overflow_,
             .max_lines = 1,
         };
         if (same_text_style(text_.style(), text_style)) {
