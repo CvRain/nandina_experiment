@@ -1,5 +1,12 @@
 # 单元测试 (Catch2 v3, 无窗口)
 
+foundation_tests = executable(
+    'foundation_tests',
+    files('foundation_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('foundation', foundation_tests)
+
 scene_tests = executable(
     'scene_tests',
     files('scene_tests.cpp'),

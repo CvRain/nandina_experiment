@@ -9,6 +9,7 @@
 
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
+#include "../foundation/utf8.hpp"
 #include "../scene/control.hpp"
 #include "../scene/input_event.hpp"
 
@@ -182,7 +183,7 @@ namespace nandina::app
         for (int codepoint = GetCharPressed(); codepoint != 0; codepoint = GetCharPressed()) {
             if (codepoint >= 32) {
                 tree_.dispatch_text_input(
-                    scene::TextInputEvent {std::string(1, static_cast<char>(codepoint))}
+                    scene::TextInputEvent {foundation::utf8::encode(static_cast<char32_t>(codepoint))}
                 );
             }
         }

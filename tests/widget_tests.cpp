@@ -406,6 +406,28 @@ TEST_CASE("Text exposes a layout result shared by measure and draw", "[widget][t
     REQUIRE(layout.lines.front().visible_text.ends_with("..."));
 }
 
+TEST_CASE("Text overflow preserves UTF-8 codepoint boundaries", "[widget][text][utf8]") {
+    auto text = std::make_shared<widget::primitives::Text>("中文测试字");
+    text->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.8F),
+        .font_size = 10.0F,
+        .overflow = widget::primitives::TextOverflow::ellipsis,
+        .max_lines = 1,
+    });
+
+    (void)text->measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 23.0F,
+        .min_height = 0.0F,
+        .max_height = 80.0F,
+    });
+
+    const auto& line = text->layout_result().lines.front();
+    REQUIRE(text->layout_result().overflowed);
+    REQUIRE(line.text_length == std::string("中").size());
+    REQUIRE(line.visible_text == "中...");
+}
+
 TEST_CASE("EditableText accepts focused text input and backspace", "[widget][editable-text]") {
     auto edit = std::make_shared<widget::primitives::EditableText>("A");
     std::vector<std::string> changes;
@@ -426,6 +448,26 @@ TEST_CASE("EditableText accepts focused text input and backspace", "[widget][edi
     REQUIRE(edit->value() == "A");
     REQUIRE(edit->caret() == 1);
     REQUIRE(changes.back() == "A");
+}
+
+TEST_CASE("EditableText caret and backspace preserve UTF-8 boundaries", "[widget][editable-text][utf8]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("A中🙂");
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    REQUIRE(edit->caret() == std::string("A中🙂").size());
+    edit->set_caret(2);
+    REQUIRE(edit->caret() == 1);
+    edit->set_caret(edit->value().size());
+
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "A中");
+    REQUIRE(edit->caret() == std::string("A中").size());
+
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "A");
+    REQUIRE(edit->caret() == 1);
 }
 
 TEST_CASE("EditableText draws text and focused caret", "[widget][editable-text]") {

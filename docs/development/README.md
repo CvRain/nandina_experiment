@@ -58,7 +58,7 @@ Implemented layout controls:
 Current layout capabilities:
 
 - `LayoutAxis::{horizontal, vertical}`.
-- `LayoutAlignment::{start, center, end, stretch}`.
+- `LayoutAlignment::{start, center, end, stretch, space_between}`.
 - gap and run gap.
 - main/cross alignment.
 - basic cross-axis stretch.
@@ -68,9 +68,9 @@ Current layout capabilities:
 Current layout limitations:
 
 - No basis/shrink/min-max policy comparable to full CSS flexbox.
-- No `space-between` / `space-around` main-axis strategies yet.
+- No `space-around` main-axis strategy yet; `space_between` currently targets fixed Flex/Row/Column children.
 - No run stretch or per-child alignment in `Wrap` / `Flow`.
-- No grid, anchors, scroll viewport, or clipping container yet.
+- No grid, anchors, or scroll viewport yet; controls now support child-subtree clipping.
 - `Padding` does not model full content-box / border-box semantics.
 - Layout dirty/cache invalidation is still coarse.
 - Default `NanControl::on_layout()` direct-child behavior is transitional.
@@ -81,7 +81,7 @@ The current text stack is intentionally minimal:
 
 - `Text` supports text, color, font size, estimated measurement, `TextOverflow`, and `max_lines`.
 - `Label` is the semantic text control and can bind to `Signal<std::string>` or `Computed<std::string>`.
-- `Button` still draws text through `IRenderDevice::draw_text` using estimated width.
+- `Button` measures and draws through an internal `Text` primitive.
 
 Text limitations:
 
@@ -169,7 +169,7 @@ Boundary:
 
 Goal: make measuring and drawing use the same computed layout data.
 
-Status: initial data contract in progress. `TextLayoutInput`, `TextLayoutLine`, and `TextLayoutResult` now capture the current deterministic text layout output; richer shaping, true line breaking, and baseline policy remain future work.
+Status: initial data contract in progress. `TextLayoutInput`, `TextLayoutLine`, and `TextLayoutResult` capture the current deterministic text layout output. UTF-8 codepoint encoding, counting, boundary-safe truncation, and editing deletion are now available; grapheme clusters, shaping, true line breaking, and baseline policy remain future work.
 
 Tasks:
 

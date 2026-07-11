@@ -4,6 +4,7 @@
 
 #include "editable_text.hpp"
 
+#include "../../foundation/utf8.hpp"
 #include "../../render/draw_context.hpp"
 #include "../../scene/input_event.hpp"
 
@@ -22,7 +23,7 @@ namespace nandina::widget::primitives
 
     void EditableText::set_value(std::string value) {
         value_ = std::move(value);
-        caret_ = std::min(caret_, value_.size());
+        caret_ = foundation::utf8::clamp_boundary(value_, std::min(caret_, value_.size()));
         sync_text();
     }
 
@@ -40,7 +41,7 @@ namespace nandina::widget::primitives
     }
 
     void EditableText::set_caret(std::size_t offset) {
-        caret_ = std::min(offset, value_.size());
+        caret_ = foundation::utf8::clamp_boundary(value_, offset);
     }
 
     auto EditableText::caret() const -> std::size_t {
@@ -140,8 +141,8 @@ namespace nandina::widget::primitives
         if (caret_ == 0 || value_.empty()) {
             return;
         }
-        const auto erase_at = caret_ - 1;
-        value_.erase(erase_at, 1);
+        const auto erase_at = foundation::utf8::previous_boundary(value_, caret_);
+        value_.erase(erase_at, caret_ - erase_at);
         caret_ = erase_at;
         sync_text();
         emit_change();
@@ -165,13 +166,20 @@ namespace nandina::widget::primitives
         if (layout.lines.empty() || value_.empty()) {
             return 0.0F;
         }
-        const auto visible = layout.lines.front().visible_text;
-        const auto visible_count = std::min(caret_, visible.size());
-        if (visible.empty()) {
+        const auto& line = layout.lines.front();
+        const auto visible_source_length = std::min(line.text_length, value_.size());
+        const auto visible_count = foundation::utf8::codepoint_count(
+            std::string_view(value_).substr(0, visible_source_length)
+        );
+        if (visible_count == 0) {
             return 0.0F;
         }
-        return layout.lines.front().size.get_width()
-            * (static_cast<float>(visible_count) / static_cast<float>(visible.size()));
+        const auto caret_source_length = std::min(caret_, visible_source_length);
+        const auto caret_count = foundation::utf8::codepoint_count(
+            std::string_view(value_).substr(0, caret_source_length)
+        );
+        return line.size.get_width()
+            * (static_cast<float>(caret_count) / static_cast<float>(visible_count));
     }
 
 } // namespace nandina::widget::primitives

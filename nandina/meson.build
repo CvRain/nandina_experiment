@@ -9,6 +9,8 @@ module_fundation = files(
     'foundation/geometry.cpp',
     'foundation/transform2d.hpp',
     'foundation/transform2d.cpp',
+    'foundation/utf8.hpp',
+    'foundation/utf8.cpp',
 )
 
 module_reactive = files(

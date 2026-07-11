@@ -3,6 +3,7 @@
 //
 
 #include "text.hpp"
+#include "../../foundation/utf8.hpp"
 #include "../../render/draw_context.hpp"
 
 #include <algorithm>
@@ -129,6 +130,7 @@ namespace nandina::widget::primitives
         result.font_size = input.style.font_size;
 
         std::string laid_out_text {input.text};
+        std::size_t source_text_length = input.text.size();
         const bool has_width_constraint = std::isfinite(input.constraints.max_width);
         const float unconstrained_width = text_width(input.text, input.style.font_size);
 
@@ -144,17 +146,23 @@ namespace nandina::widget::primitives
                 const float dots_width = text_width(dots, input.style.font_size);
                 const float budget = std::max(0.0F, input.constraints.max_width - dots_width);
                 const auto keep = static_cast<std::size_t>(std::floor(budget / char_width));
-                laid_out_text = std::string(input.text.substr(0, std::min(keep, input.text.size()))) + std::string(dots);
+                source_text_length = foundation::utf8::byte_offset_for_codepoints(input.text, keep);
+                laid_out_text = std::string(input.text.substr(0, source_text_length)) + std::string(dots);
             } else if (input.style.overflow == TextOverflow::clip) {
                 const auto keep = static_cast<std::size_t>(std::floor(input.constraints.max_width / char_width));
-                laid_out_text = std::string(input.text.substr(0, std::min(keep, input.text.size())));
+                source_text_length = foundation::utf8::byte_offset_for_codepoints(input.text, keep);
+                laid_out_text = std::string(input.text.substr(0, source_text_length));
             } else if (input.style.overflow == TextOverflow::wrap) {
                 const auto chars_per_line = std::max<std::size_t>(1, static_cast<std::size_t>(input.constraints.max_width / char_width));
                 const auto line_count = std::min<std::size_t>(
                     static_cast<std::size_t>(input.style.max_lines),
-                    (input.text.size() + chars_per_line - 1) / chars_per_line
+                    (foundation::utf8::codepoint_count(input.text) + chars_per_line - 1) / chars_per_line
                 );
-                laid_out_text = std::string(input.text.substr(0, std::min(input.text.size(), chars_per_line * line_count)));
+                source_text_length = foundation::utf8::byte_offset_for_codepoints(
+                    input.text,
+                    chars_per_line * line_count
+                );
+                laid_out_text = std::string(input.text.substr(0, source_text_length));
             }
         }
 
@@ -170,7 +178,7 @@ namespace nandina::widget::primitives
         result.baseline = result.font_size;
         result.lines.push_back(TextLayoutLine {
             .text_offset = 0,
-            .text_length = std::min(input.text.size(), laid_out_text.size()),
+            .text_length = source_text_length,
             .visible_text = std::move(laid_out_text),
             .size = foundation::NanSize(width, line_height),
             .baseline = result.baseline,
@@ -179,7 +187,7 @@ namespace nandina::widget::primitives
     }
 
     auto Text::text_width(std::string_view text, float font_size) const -> float {
-        return static_cast<float>(text.size()) * font_size * 0.56F;
+        return static_cast<float>(foundation::utf8::codepoint_count(text)) * font_size * 0.56F;
     }
 
 } // namespace nandina::widget::primitives
