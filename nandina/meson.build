@@ -54,6 +54,8 @@ module_theme = files(
 module_text = files(
     'text/font_face.hpp',
     'text/freetype_font_face.cpp',
+    'text/glyph_atlas.hpp',
+    'text/glyph_atlas.cpp',
 )
 
 module_widget = files(

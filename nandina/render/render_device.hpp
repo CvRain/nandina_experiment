@@ -12,6 +12,8 @@
 #include "../foundation/geometry.hpp"
 #include "../foundation/nandina_color.hpp"
 
+#include <cstdint>
+#include <span>
 #include <string_view>
 
 namespace nandina::render
@@ -19,6 +21,16 @@ namespace nandina::render
     using foundation::NanColor;
     using foundation::NanPoint;
     using foundation::NanRect;
+
+    struct TextureHandle {
+        std::uint64_t value = 0;
+
+        [[nodiscard]] explicit operator bool() const {
+            return value != 0;
+        }
+
+        auto operator==(const TextureHandle&) const -> bool = default;
+    };
 
     /// Abstract drawing device. Coordinates are world-space (screen pixels, y down).
     /// Implementations translate primitives into a concrete backend. Traversal-varying
@@ -59,6 +71,34 @@ namespace nandina::render
             float font_size,
             const NanColor& color
         ) = 0;
+
+        [[nodiscard]] virtual auto supports_alpha_textures() const -> bool {
+            return false;
+        }
+
+        [[nodiscard]] virtual auto create_alpha_texture(
+            int /*width*/,
+            int /*height*/,
+            std::span<const std::uint8_t> /*alpha*/
+        ) -> TextureHandle {
+            return {};
+        }
+
+        virtual void update_alpha_texture(
+            TextureHandle /*texture*/,
+            int /*width*/,
+            int /*height*/,
+            std::span<const std::uint8_t> /*alpha*/
+        ) {}
+
+        virtual void destroy_texture(TextureHandle /*texture*/) {}
+
+        virtual void draw_texture_region(
+            TextureHandle /*texture*/,
+            const NanRect& /*source*/,
+            const NanRect& /*destination*/,
+            const NanColor& /*tint*/
+        ) {}
 
         // ---- capability queries (let nodes pick a fallback path) ----
         [[nodiscard]] virtual auto supports_rounded_rect() const -> bool {

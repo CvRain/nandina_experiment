@@ -12,8 +12,12 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <cstdint>
 #include <memory>
+#include <span>
 #include <string>
+#include <unordered_map>
+#include <vector>
 
 namespace nandina::render
 {
@@ -33,11 +37,28 @@ namespace nandina::render
             return {r.get_left(), r.get_top(), r.get_width(), r.get_height()};
         }
 
+        [[nodiscard]] auto alpha_to_rgba(std::span<const std::uint8_t> alpha)
+            -> std::vector<::Color> {
+            std::vector<::Color> pixels;
+            pixels.reserve(alpha.size());
+            for (const auto value: alpha) {
+                pixels.push_back(::Color {255, 255, 255, value});
+            }
+            return pixels;
+        }
+
     } // namespace
 
     /// raylib-backed device. Stateless w.r.t. traversal; only frame/clip bracketing.
     class RaylibRenderDevice final: public IRenderDevice {
     public:
+        ~RaylibRenderDevice() override {
+            for (const auto& [handle, texture]: textures_) {
+                (void)handle;
+                UnloadTexture(texture);
+            }
+        }
+
         void begin_frame() override {
             BeginDrawing();
         }
@@ -112,6 +133,90 @@ namespace nandina::render
                 to_rl(c)
             );
         }
+
+        [[nodiscard]] auto supports_alpha_textures() const -> bool override {
+            return true;
+        }
+
+        [[nodiscard]] auto create_alpha_texture(
+            int width,
+            int height,
+            std::span<const std::uint8_t> alpha
+        ) -> TextureHandle override {
+            if (width <= 0 || height <= 0
+                || alpha.size() != static_cast<std::size_t>(width * height))
+            {
+                return {};
+            }
+
+            auto rgba = alpha_to_rgba(alpha);
+            Image image {
+                .data = rgba.data(),
+                .width = width,
+                .height = height,
+                .mipmaps = 1,
+                .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+            };
+            const auto texture = LoadTextureFromImage(image);
+            if (texture.id == 0) {
+                return {};
+            }
+            SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+
+            const TextureHandle handle {.value = next_texture_handle_++};
+            textures_.emplace(handle.value, texture);
+            return handle;
+        }
+
+        void update_alpha_texture(
+            TextureHandle handle,
+            int width,
+            int height,
+            std::span<const std::uint8_t> alpha
+        ) override {
+            const auto found = textures_.find(handle.value);
+            if (found == textures_.end() || found->second.width != width
+                || found->second.height != height
+                || alpha.size() != static_cast<std::size_t>(width * height))
+            {
+                return;
+            }
+            const auto rgba = alpha_to_rgba(alpha);
+            UpdateTexture(found->second, rgba.data());
+        }
+
+        void destroy_texture(TextureHandle handle) override {
+            const auto found = textures_.find(handle.value);
+            if (found == textures_.end()) {
+                return;
+            }
+            UnloadTexture(found->second);
+            textures_.erase(found);
+        }
+
+        void draw_texture_region(
+            TextureHandle handle,
+            const NanRect& source,
+            const NanRect& destination,
+            const NanColor& tint
+        ) override {
+            const auto found = textures_.find(handle.value);
+            if (found == textures_.end()) {
+                return;
+            }
+            DrawTexturePro(
+                found->second,
+                to_rl(source),
+                to_rl(destination),
+                ::Vector2 {0.0F, 0.0F},
+                0.0F,
+                to_rl(tint)
+            );
+        }
+
+    private:
+        std::unordered_map<std::uint64_t, ::Texture2D> textures_;
+        std::uint64_t next_texture_handle_ = 1;
     };
 
     auto make_raylib_device() -> std::unique_ptr<IRenderDevice> {

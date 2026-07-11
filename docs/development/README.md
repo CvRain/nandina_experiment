@@ -171,7 +171,7 @@ Goal: make measuring and drawing use the same computed layout data.
 
 Status: the deterministic layout contract now produces independent UTF-8-safe lines for width wrapping and explicit newlines, and measure/draw consume the same line results. `ITextLayoutBackend` separates `Text` from the fallback codepoint-width algorithm and provides the integration boundary for a future FreeType/HarfBuzz backend. UTF-8 codepoint encoding, counting, boundary-safe truncation, and editing deletion are available; grapheme clusters, word-aware wrapping, shaping, and a richer baseline policy remain future work.
 
-The FreeType foundation now loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. Glyph atlas upload, render-device submission, fallback fonts, and HarfBuzz shaping are not connected yet.
+The FreeType foundation loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. A CPU glyph atlas now packs and caches those bitmaps, while `IRenderDevice` and the Raylib backend support alpha texture upload, revision updates, and tinted region drawing. Text layout results do not carry glyph runs yet, so the atlas is not connected to `Text`; fallback fonts and HarfBuzz shaping remain future work.
 
 Tasks:
 
