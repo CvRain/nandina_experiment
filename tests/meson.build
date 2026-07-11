@@ -7,6 +7,15 @@ foundation_tests = executable(
 )
 test('foundation', foundation_tests)
 
+font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'api' / 'fonts' / 'Inconsolata-Regular.ab.ttf'
+font_tests = executable(
+    'font_tests',
+    files('font_tests.cpp'),
+    cpp_args : ['-DNANDINA_TEST_FONT_PATH="' + font_test_path + '"'],
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('font', font_tests)
+
 scene_tests = executable(
     'scene_tests',
     files('scene_tests.cpp'),

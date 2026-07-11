@@ -10,3 +10,9 @@
 [submodule "subprojects/Catch2"]
 	path = subprojects/Catch2
 	url = https://github.com/catchorg/Catch2.git
+[submodule "subprojects/harfbuzz"]
+	path = subprojects/harfbuzz
+	url = https://github.com/harfbuzz/harfbuzz.git
+[submodule "subprojects/freetype"]
+	path = subprojects/freetype
+	url = https://gitlab.freedesktop.org/freetype/freetype.git

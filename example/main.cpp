@@ -32,69 +32,40 @@ public:
     [[nodiscard]] auto build(app::PageContext& context)
         -> std::shared_ptr<scene::NanNode2D> override {
         auto& graph = context.graph();
-        auto& scope = context.scope();
         const auto& app_theme = context.theme();
-
-        count_ = &scope.signal<int>(0);
-        auto& count_text = scope.computed([this] {
-            return std::string("Count: ") + std::to_string(count_->get());
-        });
 
         auto root = std::make_shared<scene::NanControl>(foundation::NanSize(640.0F, 360.0F));
         root->set_background(app_theme.palette.surface);
 
-        const auto test_label =
-            widget::Label::create(graph, "A quick brown fox jump to a lazy dog", app_theme);
-        test_label->set_font_size(26);
-        test_label->set_overflow(widget::primitives::TextOverflow::scale);
+        const auto todo_label = widget::Label::create(graph, "Current todo", app_theme);
+        todo_label->set_font_size(22);
+        todo_label->set_overflow(widget::primitives::TextOverflow::clip);
 
-        const auto label = widget::Label::create(graph, "", app_theme);
-        label->bind_text(count_text);
+        const auto todo_item_1 =
+            widget::Label::create(graph, "todo item 1: Hello world!", app_theme);
+        todo_item_1->set_font_size(18);
 
-        const auto decrement = widget::Button::create("-1", app_theme);
-        decrement->set_tone(theme::ButtonTone::secondary);
-        decrement->set_treatment(theme::ButtonTreatment::outlined);
-        decrement->set_on_click([this] { count_->update([](int& value) { --value; }); });
-        //todo: button->set_overflow
-        //todo: 是否所有组件都需要有scale的功能，以及带有文字渲染的组件的set_overflow处理方式
+        const auto todo_item_2 = widget::Label::create(graph, "todo item 2", app_theme);
+        todo_item_2->set_font_size(18);
 
-        const auto increment = widget::Button::create("+1", app_theme);
-        increment->set_tone(theme::ButtonTone::primary);
-        increment->set_treatment(theme::ButtonTreatment::filled);
-        increment->set_on_click([this] { count_->update([](int& value) { ++value; }); });
+        const auto todo_item_3 = widget::Label::create(graph, "todo item 3", app_theme);
+        todo_item_3->set_font_size(18);
 
-        const auto reset = widget::Button::create("reset", app_theme);
-        reset->set_tone(theme::ButtonTone::secondary);
-        reset->set_treatment(theme::ButtonTreatment::tonal);
-        reset->set_on_click([this] { count_->update([](int& value) { value = 0; }); });
+        const auto todo_item_group = widget::Column::create();
+        todo_item_group->set_gap(5).add(todo_item_1).add(todo_item_2).add(todo_item_3);
 
-        const auto actions = widget::Flow::create();
-        actions->set_gap(12.0F)
-            .set_run_gap(12.0F)
-            .set_main_alignment(widget::LayoutAlignment::center)
-            .add(decrement)
-            .add(increment)
-            .add(reset);
+        const auto actions = widget::Column::create();
+        actions->set_gap(15.0F)
+            .set_main_alignment(widget::LayoutAlignment::start)
+            .set_cross_alignment(widget::LayoutAlignment::start)
+            .add(todo_label)
+            .add(todo_item_group);
 
-        const auto content = widget::Column::create();
-        content->set_gap(24.0F)
-            .set_cross_alignment(widget::LayoutAlignment::center)
-            .add(test_label)
-            .add(label)
-            .add(actions);
-
-        const auto padded = widget::Padding::create(foundation::NanInsets::all(48.0F));
-        padded->set_child(content);
-
-        const auto centered = widget::Center::create();
-        centered->set_child(padded);
-        root->add_child(centered);
-
+        root->add_child(actions);
         return root;
     }
 
 private:
-    reactive::Signal<int>* count_ = nullptr;
 };
 
 auto main() -> int {

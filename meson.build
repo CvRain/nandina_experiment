@@ -23,11 +23,16 @@ raylib_options.add_cmake_defines({})
 sdl_subproj = cmake.subproject('SDL', options: sdl_options)
 spdlog_subproj = cmake.subproject('spdlog', options: spdlog_options)
 raylib_subproj = cmake.subproject('raylib', options: raylib_options)
+freetype_subproj = subproject(
+    'freetype',
+    default_options: ['tests=disabled', 'harfbuzz=disabled'],
+)
 
 # 获取依赖（静态库）
 sdl_dep = sdl_subproj.dependency('SDL3-static')
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 raylib_dep = raylib_subproj.dependency('raylib')
+freetype_dep = freetype_subproj.get_variable('freetype_dep')
 
 # Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
 # catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。

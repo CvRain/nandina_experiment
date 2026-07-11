@@ -100,3 +100,8 @@ vcpkg_installed
 .kilo
 
 dev-docs-*
+
+# Meson fallback downloads generated while configuring optional font features.
+/subprojects/packagecache/
+/subprojects/libpng-*/
+/subprojects/libpng.wrap

@@ -51,6 +51,11 @@ module_theme = files(
     'theme/button_style.cpp',
 )
 
+module_text = files(
+    'text/font_face.hpp',
+    'text/freetype_font_face.cpp',
+)
+
 module_widget = files(
     'widget/reactive_control.hpp',
     'widget/bindable_rect.hpp',
@@ -90,8 +95,8 @@ module_app = files(
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_scene, module_render, module_theme, module_widget, module_app],
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep],
+    [module_fundation, module_reactive, module_scene, module_render, module_theme, module_text, module_widget, module_app],
+    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep],
     install : true,
 )
 
@@ -99,5 +104,5 @@ nandina_lib = static_library(
 nandina_dep = declare_dependency(
     link_with : nandina_lib,
     include_directories : include_directories('.'),
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep],
+    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep],
 )
