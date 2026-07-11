@@ -88,7 +88,7 @@ Text limitations:
 - Width is estimated from character count.
 - `ellipsis` uses ASCII `...`.
 - `clip` truncates by estimated character count, not render clipping.
-- `wrap` affects measurement but is not real multi-line text rendering.
+- `wrap` produces deterministic codepoint-based lines and draws them separately; word/grapheme-aware wrapping is not implemented yet.
 - No shaping, kerning, bidi, CJK, emoji, baseline model, glyph runs, or font cache yet.
 
 Text overflow should become a first-class layout result, not a late patch inside individual widgets.
@@ -169,7 +169,7 @@ Boundary:
 
 Goal: make measuring and drawing use the same computed layout data.
 
-Status: initial data contract in progress. `TextLayoutInput`, `TextLayoutLine`, and `TextLayoutResult` capture the current deterministic text layout output. UTF-8 codepoint encoding, counting, boundary-safe truncation, and editing deletion are now available; grapheme clusters, shaping, true line breaking, and baseline policy remain future work.
+Status: the deterministic layout contract now produces independent UTF-8-safe lines for width wrapping and explicit newlines, and measure/draw consume the same line results. UTF-8 codepoint encoding, counting, boundary-safe truncation, and editing deletion are available; grapheme clusters, word-aware wrapping, shaping, and a richer baseline policy remain future work.
 
 Tasks:
 

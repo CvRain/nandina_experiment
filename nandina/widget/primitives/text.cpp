@@ -82,7 +82,11 @@ namespace nandina::widget::primitives
     }
 
     auto Text::measured_text_width() const -> float {
-        return layout_.lines.empty() ? 0.0F : layout_.lines.front().size.get_width();
+        float width = 0.0F;
+        for (const auto& line: layout_.lines) {
+            width = std::max(width, line.size.get_width());
+        }
+        return width;
     }
 
     auto Text::laid_out_font_size() const -> float {
@@ -94,16 +98,23 @@ namespace nandina::widget::primitives
     }
 
     void Text::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
-        if (layout_.lines.empty() || layout_.lines.front().visible_text.empty() || style_.color.alpha() <= 0.0F) {
+        if (layout_.lines.empty() || style_.color.alpha() <= 0.0F) {
             return;
         }
 
-        ctx.device().draw_text(
-            layout_.lines.front().visible_text,
-            position,
-            layout_.font_size,
-            style_.color.with_alpha(style_.color.alpha() * ctx.opacity())
-        );
+        const auto color = style_.color.with_alpha(style_.color.alpha() * ctx.opacity());
+        float y = position.get_y();
+        for (const auto& line: layout_.lines) {
+            if (!line.visible_text.empty()) {
+                ctx.device().draw_text(
+                    line.visible_text,
+                    foundation::NanPoint(position.get_x(), y),
+                    layout_.font_size,
+                    color
+                );
+            }
+            y += line.size.get_height();
+        }
     }
 
     void Text::on_draw(render::DrawContext& ctx) {
@@ -129,9 +140,68 @@ namespace nandina::widget::primitives
         TextLayoutResult result;
         result.font_size = input.style.font_size;
 
+        const bool has_width_constraint = std::isfinite(input.constraints.max_width);
+        const float line_height = result.font_size * 1.2F;
+        result.baseline = result.font_size;
+
+        if (input.style.overflow == TextOverflow::wrap) {
+            const float char_width = std::max(1.0F, result.font_size * 0.56F);
+            const auto chars_per_line = has_width_constraint
+                ? std::max<std::size_t>(
+                      1,
+                      static_cast<std::size_t>(std::max(0.0F, input.constraints.max_width) / char_width)
+                  )
+                : std::max<std::size_t>(1, foundation::utf8::codepoint_count(input.text));
+            const auto max_lines = static_cast<std::size_t>(std::max(1, input.style.max_lines));
+
+            std::size_t offset = 0;
+            bool pending_empty_line = input.text.empty();
+            while ((offset < input.text.size() || pending_empty_line) && result.lines.size() < max_lines) {
+                const auto line_offset = offset;
+                std::size_t line_end = offset;
+                std::size_t codepoints = 0;
+                pending_empty_line = false;
+
+                while (line_end < input.text.size() && input.text[line_end] != '\n'
+                       && codepoints < chars_per_line)
+                {
+                    line_end = foundation::utf8::next_boundary(input.text, line_end);
+                    ++codepoints;
+                }
+
+                const auto line_text = input.text.substr(line_offset, line_end - line_offset);
+                const float line_width = has_width_constraint
+                    ? std::min(text_width(line_text, result.font_size), input.constraints.max_width)
+                    : text_width(line_text, result.font_size);
+                result.lines.push_back(TextLayoutLine {
+                    .text_offset = line_offset,
+                    .text_length = line_end - line_offset,
+                    .visible_text = std::string(line_text),
+                    .size = foundation::NanSize(line_width, line_height),
+                    .baseline = result.baseline,
+                });
+
+                offset = line_end;
+                if (offset < input.text.size() && input.text[offset] == '\n') {
+                    ++offset;
+                    pending_empty_line = offset == input.text.size();
+                }
+            }
+
+            result.overflowed = offset < input.text.size() || pending_empty_line;
+            float width = 0.0F;
+            for (const auto& line: result.lines) {
+                width = std::max(width, line.size.get_width());
+            }
+            result.size = foundation::NanSize(
+                width,
+                line_height * static_cast<float>(result.lines.size())
+            );
+            return result;
+        }
+
         std::string laid_out_text {input.text};
         std::size_t source_text_length = input.text.size();
-        const bool has_width_constraint = std::isfinite(input.constraints.max_width);
         const float unconstrained_width = text_width(input.text, input.style.font_size);
 
         if (has_width_constraint && input.constraints.max_width >= 0.0F
@@ -152,30 +222,14 @@ namespace nandina::widget::primitives
                 const auto keep = static_cast<std::size_t>(std::floor(input.constraints.max_width / char_width));
                 source_text_length = foundation::utf8::byte_offset_for_codepoints(input.text, keep);
                 laid_out_text = std::string(input.text.substr(0, source_text_length));
-            } else if (input.style.overflow == TextOverflow::wrap) {
-                const auto chars_per_line = std::max<std::size_t>(1, static_cast<std::size_t>(input.constraints.max_width / char_width));
-                const auto line_count = std::min<std::size_t>(
-                    static_cast<std::size_t>(input.style.max_lines),
-                    (foundation::utf8::codepoint_count(input.text) + chars_per_line - 1) / chars_per_line
-                );
-                source_text_length = foundation::utf8::byte_offset_for_codepoints(
-                    input.text,
-                    chars_per_line * line_count
-                );
-                laid_out_text = std::string(input.text.substr(0, source_text_length));
             }
         }
 
         const float width = has_width_constraint
             ? std::min(text_width(laid_out_text, result.font_size), input.constraints.max_width)
             : text_width(laid_out_text, result.font_size);
-        const float line_count = input.style.overflow == TextOverflow::wrap && has_width_constraint
-            ? static_cast<float>(std::max(1, input.style.max_lines))
-            : 1.0F;
-        const float line_height = result.font_size * 1.2F;
 
-        result.size = foundation::NanSize(width, line_height * line_count);
-        result.baseline = result.font_size;
+        result.size = foundation::NanSize(width, line_height);
         result.lines.push_back(TextLayoutLine {
             .text_offset = 0,
             .text_length = source_text_length,

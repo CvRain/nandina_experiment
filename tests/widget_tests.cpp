@@ -42,6 +42,7 @@ public:
     struct TextCall {
         std::string text;
         float alpha;
+        foundation::NanPoint position;
     };
     int line_count = 0;
     int outline_count = 0;
@@ -67,9 +68,9 @@ public:
         ++line_count;
     }
     void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
-    void draw_text(std::string_view text, const foundation::NanPoint&, float,
+    void draw_text(std::string_view text, const foundation::NanPoint& position, float,
                    const foundation::NanColor& color) override {
-        texts.push_back({std::string(text), color.alpha()});
+        texts.push_back({std::string(text), color.alpha(), position});
     }
 };
 
@@ -426,6 +427,61 @@ TEST_CASE("Text overflow preserves UTF-8 codepoint boundaries", "[widget][text][
     REQUIRE(text->layout_result().overflowed);
     REQUIRE(line.text_length == std::string("中").size());
     REQUIRE(line.visible_text == "中...");
+}
+
+TEST_CASE("Text wrap produces and draws actual UTF-8 lines", "[widget][text][wrap]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto text = std::make_shared<widget::primitives::Text>("A中文B测试");
+    text->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.8F),
+        .font_size = 10.0F,
+        .overflow = widget::primitives::TextOverflow::wrap,
+        .max_lines = 3,
+    });
+
+    (void)text->measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 17.0F,
+        .min_height = 0.0F,
+        .max_height = 80.0F,
+    });
+    tree.set_root(text);
+    tree.draw(dev);
+
+    const auto& layout = text->layout_result();
+    REQUIRE(layout.lines.size() == 2);
+    REQUIRE_FALSE(layout.overflowed);
+    REQUIRE(layout.lines[0].visible_text == "A中文");
+    REQUIRE(layout.lines[0].text_offset == 0);
+    REQUIRE(layout.lines[0].text_length == std::string("A中文").size());
+    REQUIRE(layout.lines[1].visible_text == "B测试");
+    REQUIRE(layout.lines[1].text_offset == std::string("A中文").size());
+    REQUIRE(layout.size.get_height() == Catch::Approx(24.0F));
+    REQUIRE(dev.texts.size() == 2);
+    REQUIRE(dev.texts[0].text == "A中文");
+    REQUIRE(dev.texts[1].text == "B测试");
+    REQUIRE(dev.texts[1].position.get_y() - dev.texts[0].position.get_y() == Catch::Approx(12.0F));
+}
+
+TEST_CASE("Text wrap honors explicit newlines and max lines", "[widget][text][wrap]") {
+    auto text = std::make_shared<widget::primitives::Text>("first\nsecond\nthird");
+    text->set_style(widget::primitives::TextStyle {
+        .color = opaque_color(0.8F),
+        .font_size = 10.0F,
+        .overflow = widget::primitives::TextOverflow::wrap,
+        .max_lines = 2,
+    });
+
+    (void)text->measure_layout(scene::LayoutConstraints::loose());
+
+    const auto& layout = text->layout_result();
+    REQUIRE(layout.lines.size() == 2);
+    REQUIRE(layout.overflowed);
+    REQUIRE(layout.lines[0].visible_text == "first");
+    REQUIRE(layout.lines[1].visible_text == "second");
+    REQUIRE(layout.lines[1].text_offset == std::string("first\n").size());
+    REQUIRE(layout.size.get_height() == Catch::Approx(24.0F));
 }
 
 TEST_CASE("EditableText accepts focused text input and backspace", "[widget][editable-text]") {
