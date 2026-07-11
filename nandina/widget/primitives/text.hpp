@@ -5,57 +5,20 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_HPP
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_HPP
 
-#include "../../foundation/nandina_color.hpp"
-#include "../../scene/control.hpp"
+#include "text_layout_backend.hpp"
 
 #include <string>
 #include <string_view>
-#include <vector>
 
 namespace nandina::widget::primitives
 {
 
-    enum class TextOverflow {
-        clip,
-        ellipsis,
-        wrap,
-        scale,
-    };
-
-    struct TextStyle {
-        foundation::NanColor color = foundation::NanColor::from(
-            foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255}
-        );
-        float font_size = 16.0F;
-        TextOverflow overflow = TextOverflow::ellipsis;
-        int max_lines = 1;
-    };
-
-    struct TextLayoutInput {
-        std::string_view text;
-        TextStyle style;
-        scene::LayoutConstraints constraints = scene::LayoutConstraints::loose();
-    };
-
-    struct TextLayoutLine {
-        std::size_t text_offset = 0;
-        std::size_t text_length = 0;
-        std::string visible_text;
-        foundation::NanSize size {};
-        float baseline = 0.0F;
-    };
-
-    struct TextLayoutResult {
-        foundation::NanSize size {};
-        std::vector<TextLayoutLine> lines;
-        float font_size = 16.0F;
-        float baseline = 0.0F;
-        bool overflowed = false;
-    };
-
     class Text: public scene::NanControl {
     public:
-        explicit Text(std::string text = {});
+        explicit Text(
+            std::string text = {},
+            const ITextLayoutBackend& backend = deterministic_text_layout_backend()
+        );
 
         void set_text(std::string text);
         [[nodiscard]] auto text() const -> std::string_view;
@@ -79,6 +42,10 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto laid_out_font_size() const -> float;
         [[nodiscard]] auto layout_result() const -> const TextLayoutResult&;
 
+        /// The referenced backend must outlive this Text instance.
+        void set_layout_backend(const ITextLayoutBackend& backend);
+        [[nodiscard]] auto layout_backend() const -> const ITextLayoutBackend&;
+
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
         auto on_draw(render::DrawContext& ctx) -> void override;
 
@@ -87,12 +54,11 @@ namespace nandina::widget::primitives
 
     private:
         void update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
-        [[nodiscard]] auto layout_text(TextLayoutInput input) const -> TextLayoutResult;
-        [[nodiscard]] auto text_width(std::string_view text, float font_size) const -> float;
 
         std::string text_;
         TextStyle style_ {};
         TextLayoutResult layout_ {};
+        const ITextLayoutBackend* backend_ = nullptr;
     };
 
 } // namespace nandina::widget::primitives

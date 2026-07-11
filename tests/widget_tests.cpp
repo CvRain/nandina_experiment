@@ -74,6 +74,31 @@ public:
     }
 };
 
+class FixedTextLayoutBackend final: public widget::primitives::ITextLayoutBackend {
+public:
+    mutable int calls = 0;
+
+    [[nodiscard]] auto layout(widget::primitives::TextLayoutInput input) const
+        -> widget::primitives::TextLayoutResult override {
+        ++calls;
+        return widget::primitives::TextLayoutResult {
+            .size = foundation::NanSize(42.0F, 18.0F),
+            .lines = {
+                widget::primitives::TextLayoutLine {
+                    .text_offset = 0,
+                    .text_length = input.text.size(),
+                    .visible_text = "backend",
+                    .size = foundation::NanSize(42.0F, 18.0F),
+                    .baseline = 12.0F,
+                },
+            },
+            .font_size = 12.0F,
+            .baseline = 12.0F,
+            .overflowed = false,
+        };
+    }
+};
+
 auto opaque_color(float light) -> foundation::NanColor {
     return foundation::NanColor::from(
         foundation::NanOklch{.light = light, .chroma = 0.1F, .hue = 120.0F, .alpha = 1.0F});
@@ -376,6 +401,26 @@ TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text
     REQUIRE(text->width() <= 40.0F);
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts[0].alpha == Catch::Approx(0.5F));
+}
+
+TEST_CASE("Text layout backend controls measurement and draw output", "[widget][text][backend]") {
+    FixedTextLayoutBackend backend;
+    auto text = std::make_shared<widget::primitives::Text>("source", backend);
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    tree.set_root(text);
+
+    (void)text->measure_layout(scene::LayoutConstraints::loose());
+    tree.draw(dev);
+
+    REQUIRE(&text->layout_backend() == &backend);
+    REQUIRE(backend.calls >= 2);
+    REQUIRE(text->width() == Catch::Approx(42.0F));
+    REQUIRE(text->height() == Catch::Approx(18.0F));
+    REQUIRE(text->layout_result().lines.front().visible_text == "backend");
+    REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts.front().text == "backend");
+    REQUIRE(dev.texts.front().position.get_y() == Catch::Approx(0.0F));
 }
 
 TEST_CASE("Text exposes a layout result shared by measure and draw", "[widget][text][layout]") {
