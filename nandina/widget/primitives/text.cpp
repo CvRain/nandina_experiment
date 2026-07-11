@@ -102,12 +102,25 @@ namespace nandina::widget::primitives
         return *backend_;
     }
 
+    void Text::set_layout_renderer(ITextLayoutRenderer* renderer) {
+        renderer_ = renderer;
+    }
+
+    auto Text::layout_renderer() const -> ITextLayoutRenderer* {
+        return renderer_;
+    }
+
     void Text::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
         if (layout_.lines.empty() || style_.color.alpha() <= 0.0F) {
             return;
         }
 
         const auto color = style_.color.with_alpha(style_.color.alpha() * ctx.opacity());
+        if (renderer_ != nullptr) {
+            renderer_->draw(layout_, ctx, position, color);
+            return;
+        }
+
         float y = position.get_y();
         for (const auto& line: layout_.lines) {
             if (!line.visible_text.empty()) {

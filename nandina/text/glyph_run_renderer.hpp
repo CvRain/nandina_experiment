@@ -6,14 +6,22 @@
 #define NANDINA_EXPERIMENT_TEXT_GLYPH_RUN_RENDERER_HPP
 
 #include "../widget/primitives/text_layout.hpp"
+#include "../widget/primitives/text_layout_backend.hpp"
 #include "glyph_atlas.hpp"
 
 namespace nandina::text
 {
 
-    class GlyphRunRenderer {
+    class GlyphRunRenderer final: public widget::primitives::ITextLayoutRenderer {
     public:
         GlyphRunRenderer(GlyphAtlas& atlas, GlyphAtlasTexture& texture);
+
+        void draw(
+            const widget::primitives::TextLayoutResult& layout,
+            render::DrawContext& context,
+            foundation::NanPoint position,
+            foundation::NanColor color
+        ) override;
 
         void draw_line(
             const widget::primitives::TextLayoutLine& line,

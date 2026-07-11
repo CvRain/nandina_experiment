@@ -6,6 +6,8 @@
 #include "text/glyph_atlas.hpp"
 #include "text/glyph_run_renderer.hpp"
 #include "text/harfbuzz_text_backend.hpp"
+#include "scene/scene_tree.hpp"
+#include "widget/primitives/text.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -26,6 +28,7 @@ namespace
         int updates = 0;
         int destroys = 0;
         int draws = 0;
+        int text_draws = 0;
         foundation::NanRect last_source;
         foundation::NanRect last_destination;
 
@@ -60,7 +63,9 @@ namespace
             const foundation::NanPoint&,
             float,
             const foundation::NanColor&
-        ) override {}
+        ) override {
+            ++text_draws;
+        }
 
         [[nodiscard]] auto supports_alpha_textures() const -> bool override {
             return true;
@@ -259,4 +264,26 @@ TEST_CASE("HarfBuzz backend honors explicit line limits", "[text][harfbuzz]") {
     REQUIRE(layout.lines[0].text_offset == 0);
     REQUIRE(layout.lines[1].text_offset == 2);
     REQUIRE(layout.overflowed);
+}
+
+TEST_CASE("Text draws HarfBuzz layouts through the glyph atlas renderer", "[text][harfbuzz][widget]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+    text::GlyphAtlas atlas(face, 64, 64);
+    TextureRecordingDevice device;
+    text::GlyphAtlasTexture texture(device, atlas);
+    text::GlyphRunRenderer renderer(atlas, texture);
+
+    auto value = std::make_shared<widget::primitives::Text>("ab", backend);
+    value->set_font_size(24.0F);
+    value->set_layout_renderer(&renderer);
+
+    scene::NanSceneTree tree;
+    tree.set_root(value);
+    tree.draw(device);
+
+    REQUIRE(value->layout_renderer() == &renderer);
+    REQUIRE(value->layout_result().lines.front().glyphs.size() == 2);
+    REQUIRE(device.draws == 2);
+    REQUIRE(device.text_draws == 0);
 }

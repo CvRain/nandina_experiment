@@ -45,6 +45,8 @@ namespace nandina::widget::primitives
         /// The referenced backend must outlive this Text instance.
         void set_layout_backend(const ITextLayoutBackend& backend);
         [[nodiscard]] auto layout_backend() const -> const ITextLayoutBackend&;
+        void set_layout_renderer(ITextLayoutRenderer* renderer);
+        [[nodiscard]] auto layout_renderer() const -> ITextLayoutRenderer*;
 
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
         auto on_draw(render::DrawContext& ctx) -> void override;
@@ -59,6 +61,7 @@ namespace nandina::widget::primitives
         TextStyle style_ {};
         TextLayoutResult layout_ {};
         const ITextLayoutBackend* backend_ = nullptr;
+        ITextLayoutRenderer* renderer_ = nullptr;
     };
 
 } // namespace nandina::widget::primitives

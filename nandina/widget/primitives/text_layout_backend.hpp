@@ -7,6 +7,11 @@
 
 #include "text_layout.hpp"
 
+namespace nandina::render
+{
+    class DrawContext;
+}
+
 namespace nandina::widget::primitives
 {
 
@@ -15,6 +20,18 @@ namespace nandina::widget::primitives
         virtual ~ITextLayoutBackend() = default;
 
         [[nodiscard]] virtual auto layout(TextLayoutInput input) const -> TextLayoutResult = 0;
+    };
+
+    class ITextLayoutRenderer {
+    public:
+        virtual ~ITextLayoutRenderer() = default;
+
+        virtual void draw(
+            const TextLayoutResult& layout,
+            render::DrawContext& context,
+            foundation::NanPoint position,
+            foundation::NanColor color
+        ) = 0;
     };
 
     /// Process-lifetime fallback used until a shaping backend is installed.

@@ -4,6 +4,8 @@
 
 #include "glyph_run_renderer.hpp"
 
+#include "../render/draw_context.hpp"
+
 #include <vector>
 
 namespace nandina::text
@@ -12,6 +14,25 @@ namespace nandina::text
     GlyphRunRenderer::GlyphRunRenderer(GlyphAtlas& atlas, GlyphAtlasTexture& texture):
         atlas_(atlas),
         texture_(texture) {}
+
+    void GlyphRunRenderer::draw(
+        const widget::primitives::TextLayoutResult& layout,
+        render::DrawContext& context,
+        foundation::NanPoint position,
+        foundation::NanColor color
+    ) {
+        (void)context;
+        float line_top = position.get_y();
+        for (const auto& line: layout.lines) {
+            draw_line(
+                line,
+                foundation::NanPoint(position.get_x(), line_top + line.baseline),
+                color,
+                layout.font_size
+            );
+            line_top += line.size.get_height();
+        }
+    }
 
     void GlyphRunRenderer::draw_line(
         const widget::primitives::TextLayoutLine& line,
