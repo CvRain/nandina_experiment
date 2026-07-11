@@ -4,6 +4,8 @@
 
 #include "text/font_face.hpp"
 #include "text/glyph_atlas.hpp"
+#include "text/glyph_run_renderer.hpp"
+#include "text/harfbuzz_text_backend.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -188,4 +190,73 @@ TEST_CASE("GlyphAtlasTexture uploads revisions and positions glyphs", "[text][at
         REQUIRE(device.updates == 1);
     }
     REQUIRE(device.destroys == 1);
+}
+
+TEST_CASE("HarfBuzz backend produces glyph runs with source clusters", "[text][harfbuzz]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+
+    const auto layout = backend.layout(widget::primitives::TextLayoutInput {
+        .text = "ab",
+        .style = widget::primitives::TextStyle {
+            .font_size = 24.0F,
+            .overflow = widget::primitives::TextOverflow::clip,
+            .max_lines = 1,
+        },
+        .constraints = scene::LayoutConstraints::loose(),
+    });
+
+    REQUIRE(layout.lines.size() == 1);
+    REQUIRE(layout.lines.front().glyphs.size() == 2);
+    REQUIRE(layout.lines.front().glyphs[0].cluster == 0);
+    REQUIRE(layout.lines.front().glyphs[1].cluster == 1);
+    REQUIRE(layout.lines.front().glyphs[0].glyph_index == face->glyph_index(U'a'));
+    REQUIRE(layout.lines.front().glyphs[1].glyph_index == face->glyph_index(U'b'));
+    REQUIRE(layout.lines.front().size.get_width() > 0.0F);
+    REQUIRE(layout.baseline > 0.0F);
+}
+
+TEST_CASE("HarfBuzz glyph runs draw through the atlas texture", "[text][harfbuzz][render]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+    const auto layout = backend.layout(widget::primitives::TextLayoutInput {
+        .text = "ab",
+        .style = widget::primitives::TextStyle {.font_size = 24.0F},
+        .constraints = scene::LayoutConstraints::loose(),
+    });
+
+    text::GlyphAtlas atlas(face, 64, 64);
+    TextureRecordingDevice device;
+    text::GlyphAtlasTexture texture(device, atlas);
+    text::GlyphRunRenderer renderer(atlas, texture);
+    renderer.draw_line(
+        layout.lines.front(),
+        foundation::NanPoint(10.0F, 30.0F),
+        foundation::NanColor::from(foundation::NanOklch {}),
+        layout.font_size
+    );
+
+    REQUIRE(device.draws == static_cast<int>(layout.lines.front().glyphs.size()));
+    REQUIRE(device.updates >= 1);
+    REQUIRE(texture.uploaded_revision() == atlas.revision());
+}
+
+TEST_CASE("HarfBuzz backend honors explicit line limits", "[text][harfbuzz]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+
+    const auto layout = backend.layout(widget::primitives::TextLayoutInput {
+        .text = "a\nb\na",
+        .style = widget::primitives::TextStyle {
+            .font_size = 24.0F,
+            .overflow = widget::primitives::TextOverflow::wrap,
+            .max_lines = 2,
+        },
+        .constraints = scene::LayoutConstraints::loose(),
+    });
+
+    REQUIRE(layout.lines.size() == 2);
+    REQUIRE(layout.lines[0].text_offset == 0);
+    REQUIRE(layout.lines[1].text_offset == 2);
+    REQUIRE(layout.overflowed);
 }

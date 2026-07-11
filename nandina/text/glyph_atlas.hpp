@@ -36,7 +36,11 @@ namespace nandina::text
         );
 
         [[nodiscard]] auto cache(char32_t codepoint, float pixel_size) -> const GlyphAtlasEntry&;
+        [[nodiscard]] auto cache_glyph(std::uint32_t glyph_index, float pixel_size)
+            -> const GlyphAtlasEntry&;
         [[nodiscard]] auto find(char32_t codepoint, float pixel_size) const
+            -> const GlyphAtlasEntry*;
+        [[nodiscard]] auto find_glyph(std::uint32_t glyph_index, float pixel_size) const
             -> const GlyphAtlasEntry*;
 
         [[nodiscard]] auto width() const -> int;
@@ -47,7 +51,7 @@ namespace nandina::text
 
     private:
         struct Key {
-            char32_t codepoint = 0;
+            std::uint32_t glyph_index = 0;
             std::uint32_t pixel_size = 0;
 
             auto operator==(const Key&) const -> bool = default;
@@ -57,7 +61,7 @@ namespace nandina::text
             [[nodiscard]] auto operator()(const Key& key) const noexcept -> std::size_t;
         };
 
-        [[nodiscard]] static auto key_for(char32_t codepoint, float pixel_size) -> Key;
+        [[nodiscard]] static auto key_for(std::uint32_t glyph_index, float pixel_size) -> Key;
         [[nodiscard]] auto allocate(int width, int height) -> foundation::NanRect;
 
         std::shared_ptr<FreeTypeFontFace> face_;

@@ -27,12 +27,34 @@ freetype_subproj = subproject(
     'freetype',
     default_options: ['tests=disabled', 'harfbuzz=disabled'],
 )
+harfbuzz_subproj = subproject(
+    'harfbuzz',
+    default_options: [
+        'tests=disabled',
+        'docs=disabled',
+        'utilities=disabled',
+        'introspection=disabled',
+        'glib=disabled',
+        'gobject=disabled',
+        'cairo=disabled',
+        'chafa=disabled',
+        'png=disabled',
+        'icu=disabled',
+        'graphite2=disabled',
+        'raster=disabled',
+        'vector=disabled',
+        'gpu=disabled',
+        'subset=disabled',
+        'freetype=enabled',
+    ],
+)
 
 # 获取依赖（静态库）
 sdl_dep = sdl_subproj.dependency('SDL3-static')
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 raylib_dep = raylib_subproj.dependency('raylib')
 freetype_dep = freetype_subproj.get_variable('freetype_dep')
+harfbuzz_dep = harfbuzz_subproj.get_variable('libharfbuzz_dep')
 
 # Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
 # catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。

@@ -65,11 +65,10 @@ namespace nandina::text
             }
         }
 
-        [[nodiscard]] auto load_glyph(char32_t codepoint, float pixel_size, FT_Int32 flags) const
+        [[nodiscard]] auto load_glyph(std::uint32_t glyph_index, float pixel_size, FT_Int32 flags) const
             -> FT_GlyphSlot {
             set_pixel_size(pixel_size);
-            const auto index = FT_Get_Char_Index(face, static_cast<FT_ULong>(codepoint));
-            if (const auto error = FT_Load_Glyph(face, index, flags); error != 0) {
+            if (const auto error = FT_Load_Glyph(face, glyph_index, flags); error != 0) {
                 throw_freetype_error("FT_Load_Glyph", error);
             }
             return face->glyph;
@@ -111,9 +110,14 @@ namespace nandina::text
     }
 
     auto FreeTypeFontFace::glyph_metrics(char32_t codepoint, float pixel_size) const -> GlyphMetrics {
-        const auto glyph = impl_->load_glyph(codepoint, pixel_size, FT_LOAD_DEFAULT);
+        return glyph_metrics_by_index(glyph_index(codepoint), pixel_size);
+    }
+
+    auto FreeTypeFontFace::glyph_metrics_by_index(std::uint32_t index, float pixel_size) const
+        -> GlyphMetrics {
+        const auto glyph = impl_->load_glyph(index, pixel_size, FT_LOAD_DEFAULT);
         return {
-            .glyph_index = glyph_index(codepoint),
+            .glyph_index = index,
             .advance_x = pixels(glyph->advance.x),
             .bearing_x = pixels(glyph->metrics.horiBearingX),
             .bearing_y = pixels(glyph->metrics.horiBearingY),
@@ -123,7 +127,12 @@ namespace nandina::text
     }
 
     auto FreeTypeFontFace::rasterize(char32_t codepoint, float pixel_size) const -> GlyphBitmap {
-        const auto glyph = impl_->load_glyph(codepoint, pixel_size, FT_LOAD_RENDER);
+        return rasterize_glyph(glyph_index(codepoint), pixel_size);
+    }
+
+    auto FreeTypeFontFace::rasterize_glyph(std::uint32_t index, float pixel_size) const
+        -> GlyphBitmap {
+        const auto glyph = impl_->load_glyph(index, pixel_size, FT_LOAD_RENDER);
         const auto& bitmap = glyph->bitmap;
         if (bitmap.pixel_mode != FT_PIXEL_MODE_GRAY && bitmap.width > 0 && bitmap.rows > 0) {
             throw std::runtime_error("FreeType glyph bitmap is not 8-bit grayscale");
@@ -131,7 +140,7 @@ namespace nandina::text
 
         GlyphBitmap result {
             .metrics = GlyphMetrics {
-                .glyph_index = glyph_index(codepoint),
+                .glyph_index = index,
                 .advance_x = pixels(glyph->advance.x),
                 .bearing_x = pixels(glyph->metrics.horiBearingX),
                 .bearing_y = pixels(glyph->metrics.horiBearingY),
@@ -152,6 +161,10 @@ namespace nandina::text
             std::copy_n(source, result.width, result.alpha.begin() + row * result.width);
         }
         return result;
+    }
+
+    auto FreeTypeFontFace::native_face_handle() const -> void* {
+        return impl_->face;
     }
 
 } // namespace nandina::text

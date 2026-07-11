@@ -28,12 +28,25 @@ namespace nandina::text
     }
 
     auto GlyphAtlas::cache(char32_t codepoint, float pixel_size) -> const GlyphAtlasEntry& {
-        const auto key = key_for(codepoint, pixel_size);
+        const auto glyph_index = face_->glyph_index(codepoint);
+        const auto key = key_for(glyph_index, pixel_size);
         if (const auto found = entries_.find(key); found != entries_.end()) {
             return found->second;
         }
 
-        const auto bitmap = face_->rasterize(codepoint, static_cast<float>(key.pixel_size));
+        const auto& entry = cache_glyph(glyph_index, pixel_size);
+        entries_.find(key)->second.codepoint = codepoint;
+        return entry;
+    }
+
+    auto GlyphAtlas::cache_glyph(std::uint32_t glyph_index, float pixel_size)
+        -> const GlyphAtlasEntry& {
+        const auto key = key_for(glyph_index, pixel_size);
+        if (const auto found = entries_.find(key); found != entries_.end()) {
+            return found->second;
+        }
+
+        const auto bitmap = face_->rasterize_glyph(glyph_index, static_cast<float>(key.pixel_size));
         auto bounds = foundation::NanRect::empty();
         if (bitmap.width > 0 && bitmap.height > 0) {
             bounds = allocate(bitmap.width, bitmap.height);
@@ -53,7 +66,7 @@ namespace nandina::text
         auto [inserted, created] = entries_.emplace(
             key,
             GlyphAtlasEntry {
-                .codepoint = codepoint,
+                .codepoint = 0,
                 .pixel_size = static_cast<float>(key.pixel_size),
                 .metrics = bitmap.metrics,
                 .pixel_bounds = bounds,
@@ -65,7 +78,12 @@ namespace nandina::text
     }
 
     auto GlyphAtlas::find(char32_t codepoint, float pixel_size) const -> const GlyphAtlasEntry* {
-        const auto found = entries_.find(key_for(codepoint, pixel_size));
+        return find_glyph(face_->glyph_index(codepoint), pixel_size);
+    }
+
+    auto GlyphAtlas::find_glyph(std::uint32_t glyph_index, float pixel_size) const
+        -> const GlyphAtlasEntry* {
+        const auto found = entries_.find(key_for(glyph_index, pixel_size));
         return found != entries_.end() ? &found->second : nullptr;
     }
 
@@ -90,15 +108,14 @@ namespace nandina::text
     }
 
     auto GlyphAtlas::KeyHash::operator()(const Key& key) const noexcept -> std::size_t {
-        const auto codepoint = static_cast<std::uint32_t>(key.codepoint);
-        const auto first = std::hash<std::uint32_t> {}(codepoint);
+        const auto first = std::hash<std::uint32_t> {}(key.glyph_index);
         const auto second = std::hash<std::uint32_t> {}(key.pixel_size);
         return first ^ (second + 0x9E3779B9U + (first << 6U) + (first >> 2U));
     }
 
-    auto GlyphAtlas::key_for(char32_t codepoint, float pixel_size) -> Key {
+    auto GlyphAtlas::key_for(std::uint32_t glyph_index, float pixel_size) -> Key {
         return {
-            .codepoint = codepoint,
+            .glyph_index = glyph_index,
             .pixel_size = static_cast<std::uint32_t>(std::max(1.0F, std::round(pixel_size))),
         };
     }

@@ -52,7 +52,14 @@ namespace nandina::text
         [[nodiscard]] auto glyph_index(char32_t codepoint) const -> std::uint32_t;
         [[nodiscard]] auto metrics(float pixel_size) const -> FontMetrics;
         [[nodiscard]] auto glyph_metrics(char32_t codepoint, float pixel_size) const -> GlyphMetrics;
+        [[nodiscard]] auto glyph_metrics_by_index(std::uint32_t glyph_index, float pixel_size) const
+            -> GlyphMetrics;
         [[nodiscard]] auto rasterize(char32_t codepoint, float pixel_size) const -> GlyphBitmap;
+        [[nodiscard]] auto rasterize_glyph(std::uint32_t glyph_index, float pixel_size) const
+            -> GlyphBitmap;
+
+        /// Internal integration handle for shaping backends. The pointer is an FT_Face.
+        [[nodiscard]] auto native_face_handle() const -> void*;
 
     private:
         class Impl;

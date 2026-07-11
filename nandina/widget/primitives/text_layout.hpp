@@ -9,6 +9,7 @@
 #include "../../scene/control.hpp"
 
 #include <cstddef>
+#include <cstdint>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -39,9 +40,19 @@ namespace nandina::widget::primitives
     };
 
     struct TextLayoutLine {
+        struct Glyph {
+            std::uint32_t glyph_index = 0;
+            std::size_t cluster = 0;
+            float x_advance = 0.0F;
+            float y_advance = 0.0F;
+            float x_offset = 0.0F;
+            float y_offset = 0.0F;
+        };
+
         std::size_t text_offset = 0;
         std::size_t text_length = 0;
         std::string visible_text;
+        std::vector<Glyph> glyphs;
         foundation::NanSize size {};
         float baseline = 0.0F;
     };
