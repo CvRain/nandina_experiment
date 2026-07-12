@@ -4,6 +4,8 @@
 
 #include "utf8.hpp"
 
+#include <utf8proc.h>
+
 #include <algorithm>
 
 namespace nandina::foundation::utf8
@@ -137,6 +139,73 @@ namespace nandina::foundation::utf8
             --count;
         }
         return offset;
+    }
+
+    auto decode(std::string_view text) -> std::vector<DecodedCodepoint> {
+        std::vector<DecodedCodepoint> result;
+        result.reserve(codepoint_count(text));
+
+        std::size_t offset = 0;
+        while (offset < text.size()) {
+            const auto length = valid_sequence_length(text, offset);
+            const auto first = byte_at(text, offset);
+            char32_t value = replacement_character;
+            if (length == 1 && first <= 0x7FU) {
+                value = first;
+            }
+            else if (length == 2) {
+                value = static_cast<char32_t>(first & 0x1FU) << 6U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 1) & 0x3FU);
+            }
+            else if (length == 3) {
+                value = static_cast<char32_t>(first & 0x0FU) << 12U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 1) & 0x3FU) << 6U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 2) & 0x3FU);
+            }
+            else if (length == 4) {
+                value = static_cast<char32_t>(first & 0x07U) << 18U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 1) & 0x3FU) << 12U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 2) & 0x3FU) << 6U;
+                value |= static_cast<char32_t>(byte_at(text, offset + 3) & 0x3FU);
+            }
+
+            result.push_back(DecodedCodepoint {
+                .value = value,
+                .byte_offset = offset,
+                .byte_length = length,
+            });
+            offset += length;
+        }
+        return result;
+    }
+
+    auto grapheme_ranges(std::string_view text) -> std::vector<ByteRange> {
+        const auto decoded = decode(text);
+        if (decoded.empty()) {
+            return {};
+        }
+
+        std::vector<ByteRange> result;
+        result.reserve(decoded.size());
+        std::size_t cluster_offset = decoded.front().byte_offset;
+        utf8proc_int32_t state = 0;
+        for (std::size_t index = 1; index < decoded.size(); ++index) {
+            const auto previous = static_cast<utf8proc_int32_t>(decoded[index - 1].value);
+            const auto current = static_cast<utf8proc_int32_t>(decoded[index].value);
+            if (utf8proc_grapheme_break_stateful(previous, current, &state)) {
+                result.push_back(ByteRange {
+                    .offset = cluster_offset,
+                    .length = decoded[index].byte_offset - cluster_offset,
+                });
+                cluster_offset = decoded[index].byte_offset;
+                state = 0;
+            }
+        }
+        result.push_back(ByteRange {
+            .offset = cluster_offset,
+            .length = text.size() - cluster_offset,
+        });
+        return result;
     }
 
 } // namespace nandina::foundation::utf8

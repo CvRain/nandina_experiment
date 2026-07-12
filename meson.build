@@ -19,10 +19,19 @@ spdlog_options.add_cmake_defines({})
 raylib_options = cmake.subproject_options()
 raylib_options.add_cmake_defines({})
 
+# 配置 utf8proc 的 CMake 选项
+utf8proc_options = cmake.subproject_options()
+utf8proc_options.add_cmake_defines({
+    'BUILD_SHARED_LIBS': 'OFF',
+    'UTF8PROC_INSTALL': 'OFF',
+    'UTF8PROC_ENABLE_TESTING': 'OFF',
+})
+
 # 配置 subproject
 sdl_subproj = cmake.subproject('SDL', options: sdl_options)
 spdlog_subproj = cmake.subproject('spdlog', options: spdlog_options)
 raylib_subproj = cmake.subproject('raylib', options: raylib_options)
+utf8proc_subproj = cmake.subproject('utf8proc', options: utf8proc_options)
 freetype_subproj = subproject(
     'freetype',
     default_options: ['tests=disabled', 'harfbuzz=disabled'],
@@ -48,13 +57,25 @@ harfbuzz_subproj = subproject(
         'freetype=enabled',
     ],
 )
+fribidi_subproj = subproject(
+    'fribidi',
+    default_options: [
+        'default_library=static',
+        'deprecated=false',
+        'docs=false',
+        'bin=false',
+        'tests=false',
+    ],
+)
 
 # 获取依赖（静态库）
 sdl_dep = sdl_subproj.dependency('SDL3-static')
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 raylib_dep = raylib_subproj.dependency('raylib')
+utf8proc_dep = utf8proc_subproj.dependency('utf8proc')
 freetype_dep = freetype_subproj.get_variable('freetype_dep')
 harfbuzz_dep = harfbuzz_subproj.get_variable('libharfbuzz_dep')
+fribidi_dep = fribidi_subproj.get_variable('libfribidi_dep')
 
 # Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
 # catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。

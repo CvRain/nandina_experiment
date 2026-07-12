@@ -94,6 +94,7 @@ namespace nandina::text
 
         [[nodiscard]] auto handle() const -> render::TextureHandle;
         [[nodiscard]] auto uploaded_revision() const -> std::uint64_t;
+        [[nodiscard]] auto atlas() const -> const GlyphAtlas&;
 
     private:
         render::IRenderDevice& device_;

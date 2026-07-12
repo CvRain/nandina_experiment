@@ -192,4 +192,8 @@ namespace nandina::text
         return uploaded_revision_;
     }
 
+    auto GlyphAtlasTexture::atlas() const -> const GlyphAtlas& {
+        return atlas_;
+    }
+
 } // namespace nandina::text

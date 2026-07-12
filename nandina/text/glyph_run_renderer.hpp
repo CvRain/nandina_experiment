@@ -8,13 +8,26 @@
 #include "../widget/primitives/text_layout.hpp"
 #include "../widget/primitives/text_layout_backend.hpp"
 #include "glyph_atlas.hpp"
+#include "harfbuzz_text_backend.hpp"
+
+#include <span>
+#include <vector>
 
 namespace nandina::text
 {
 
+    struct GlyphAtlasBinding {
+        GlyphAtlas* atlas = nullptr;
+        GlyphAtlasTexture* texture = nullptr;
+    };
+
     class GlyphRunRenderer final: public widget::primitives::ITextLayoutRenderer {
     public:
         GlyphRunRenderer(GlyphAtlas& atlas, GlyphAtlasTexture& texture);
+        GlyphRunRenderer(
+            const HarfBuzzTextLayoutBackend& backend,
+            std::span<const GlyphAtlasBinding> bindings
+        );
 
         void draw(
             const widget::primitives::TextLayoutResult& layout,
@@ -31,8 +44,7 @@ namespace nandina::text
         );
 
     private:
-        GlyphAtlas& atlas_;
-        GlyphAtlasTexture& texture_;
+        std::vector<GlyphAtlasBinding> bindings_;
     };
 
 } // namespace nandina::text

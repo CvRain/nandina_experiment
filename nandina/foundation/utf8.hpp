@@ -8,11 +8,23 @@
 #include <cstddef>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace nandina::foundation::utf8
 {
 
     inline constexpr char32_t replacement_character = U'\uFFFD';
+
+    struct DecodedCodepoint {
+        char32_t value = replacement_character;
+        std::size_t byte_offset = 0;
+        std::size_t byte_length = 0;
+    };
+
+    struct ByteRange {
+        std::size_t offset = 0;
+        std::size_t length = 0;
+    };
 
     /**
      * 检查传入的 codepoint 是否是有效的 UTF-8 codepoint。
@@ -74,6 +86,12 @@ namespace nandina::foundation::utf8
      */
     [[nodiscard]] auto byte_offset_for_codepoints(const std::string_view text, std::size_t count)
         -> std::size_t;
+
+    /** 解码文本并保留每个 codepoint 对应的源字节范围。 */
+    [[nodiscard]] auto decode(std::string_view text) -> std::vector<DecodedCodepoint>;
+
+    /** 按 UAX #29 扩展 grapheme cluster 返回源 UTF-8 字节范围。 */
+    [[nodiscard]] auto grapheme_ranges(std::string_view text) -> std::vector<ByteRange>;
 
 } // namespace nandina::foundation::utf8
 

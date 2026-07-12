@@ -42,6 +42,7 @@ namespace nandina::widget::primitives
     struct TextLayoutLine {
         struct Glyph {
             std::uint32_t glyph_index = 0;
+            std::size_t font_index = 0;
             std::size_t cluster = 0;
             float x_advance = 0.0F;
             float y_advance = 0.0F;
@@ -55,6 +56,8 @@ namespace nandina::widget::primitives
         std::vector<Glyph> glyphs;
         foundation::NanSize size {};
         float baseline = 0.0F;
+        bool right_to_left = false;
+        bool missing_glyphs = false;
     };
 
     struct TextLayoutResult {
@@ -63,6 +66,7 @@ namespace nandina::widget::primitives
         float font_size = 16.0F;
         float baseline = 0.0F;
         bool overflowed = false;
+        bool missing_glyphs = false;
     };
 
 } // namespace nandina::widget::primitives
