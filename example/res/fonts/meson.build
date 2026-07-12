@@ -1,4 +1,5 @@
 bundled_font_targets = []
+bundled_font_path = ''
 
 if get_option('bundled_fonts').enabled()
     caskaydia_regular_source = (
@@ -30,4 +31,5 @@ if get_option('bundled_fonts').enabled()
         build_by_default: true,
     )
     bundled_font_targets += [caskaydia_font_target, caskaydia_license_target]
+    bundled_font_path = meson.current_build_dir() / 'CaskaydiaCove-Regular.ttf'
 endif

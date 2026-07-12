@@ -75,6 +75,12 @@ namespace nandina::app
             return config_;
         }
 
+        /// Access the active render device for advanced window-owned resources.
+        /// Returns null before open() and after close().
+        [[nodiscard]] auto render_device() -> render::IRenderDevice* {
+            return device_.get();
+        }
+
         // ── 由 NanApplication::run 驱动 ─────────────────────────────────────────────
 
         /// 打开 raylib 窗口 + 创建渲染设备。run 开始时调用一次。
@@ -95,6 +101,9 @@ namespace nandina::app
 
         /// 每帧 process(dt) 之后、绘制之前调用。子类覆写以驱动动画等。
         virtual void on_frame(float /*dt*/) {}
+
+        /// Called during close() before the render device and native window are released.
+        virtual void on_teardown() {}
 
     private:
         void poll_and_dispatch_input();

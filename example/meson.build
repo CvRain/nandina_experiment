@@ -6,8 +6,14 @@ example_sources = files(
 
 subdir('res/fonts')
 
+example_cpp_args = []
+if get_option('bundled_fonts').enabled()
+    example_cpp_args += ['-DNANDINA_EXAMPLE_FONT_PATH="' + bundled_font_path + '"']
+endif
+
 executable('nandina_example',
     example_sources,
+    cpp_args : example_cpp_args,
     dependencies : [nandina_dep,raylib_dep],
     install : true
 )

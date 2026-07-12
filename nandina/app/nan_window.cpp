@@ -226,6 +226,7 @@ namespace nandina::app
             return;
         }
         // 释放场景树 (触发 widget 卸载, 回访 graph) 后再释放设备、关窗口。
+        on_teardown();
         device_.reset();
         CloseWindow();
         opened_ = false;

@@ -175,6 +175,8 @@ The FreeType foundation loads font faces and exposes pixel font metrics, glyph m
 
 The first bundled-font build path uses the OFL-licensed Caskaydia Cove Regular from a pinned submodule. Meson option `bundled_fonts` copies the TTF and license into `example/res/fonts`, and integration tests load, shape, and rasterize the copied font. Sarasa Gothic SC remains the intended CJK default candidate, but its current regional release packages are large 7z archives; it should enter through a later font profile/download-cache design rather than slowing every initial configure.
 
+The Todo example now creates its Caskaydia FreeType face, HarfBuzz backend, glyph atlas, atlas texture, and renderer after the window render device opens. `NanWindow::on_teardown()` releases page references and font GPU resources before the device closes. When `bundled_fonts` is disabled, the example keeps the deterministic/render-device fallback path. The build-directory font path is still injected directly into the example; a general resource locator is intentionally deferred.
+
 Tasks:
 
 1. Introduce `TextLayoutInput` and `TextLayoutResult`.
