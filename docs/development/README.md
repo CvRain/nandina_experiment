@@ -173,6 +173,8 @@ Status: the deterministic layout contract now produces independent UTF-8-safe li
 
 The FreeType foundation loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. A CPU glyph atlas packs and caches those bitmaps, while `IRenderDevice` and the Raylib backend support alpha texture upload, revision updates, and tinted region drawing. `HarfBuzzTextLayoutBackend` emits glyph IDs, source clusters, advances, and offsets, and `GlyphRunRenderer` draws those runs through the atlas. `Text` can now consume an injected glyph renderer end to end, while its default path remains the deterministic backend plus render-device text fallback. Cluster-aware wrapping/ellipsis, fallback fonts, resource paths, and application-level font selection remain future work.
 
+The first bundled-font build path uses the OFL-licensed Caskaydia Cove Regular from a pinned submodule. Meson option `bundled_fonts` copies the TTF and license into `example/res/fonts`, and integration tests load, shape, and rasterize the copied font. Sarasa Gothic SC remains the intended CJK default candidate, but its current regional release packages are large 7z archives; it should enter through a later font profile/download-cache design rather than slowing every initial configure.
+
 Tasks:
 
 1. Introduce `TextLayoutInput` and `TextLayoutResult`.

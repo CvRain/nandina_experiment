@@ -1,0 +1,6 @@
+option(
+    'bundled_fonts',
+    type: 'feature',
+    value: 'enabled',
+    description: 'Copy Nandina default fonts into application resource directories',
+)

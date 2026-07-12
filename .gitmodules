@@ -16,3 +16,6 @@
 [submodule "subprojects/freetype"]
 	path = subprojects/freetype
 	url = https://gitlab.freedesktop.org/freetype/freetype.git
+[submodule "subprojects/caskaydia-cove"]
+	path = subprojects/caskaydia-cove
+	url = https://github.com/eliheuer/caskaydia-cove.git

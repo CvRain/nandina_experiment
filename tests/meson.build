@@ -16,6 +16,23 @@ font_tests = executable(
 )
 test('font', font_tests)
 
+if get_option('bundled_fonts').enabled()
+    bundled_font_path = (
+        meson.project_build_root()
+        / 'example'
+        / 'res'
+        / 'fonts'
+        / 'CaskaydiaCove-Regular.ttf'
+    )
+    bundled_font_tests = executable(
+        'bundled_font_tests',
+        files('bundled_font_tests.cpp'),
+        cpp_args : ['-DNANDINA_BUNDLED_FONT_PATH="' + bundled_font_path + '"'],
+        dependencies : [nandina_dep, catch2_with_main_dep],
+    )
+    test('bundled-font', bundled_font_tests, depends: bundled_font_targets)
+endif
+
 scene_tests = executable(
     'scene_tests',
     files('scene_tests.cpp'),
