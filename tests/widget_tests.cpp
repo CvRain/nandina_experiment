@@ -23,6 +23,7 @@
 #include "widget/text_field.hpp"
 
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -96,6 +97,20 @@ public:
             .baseline = 12.0F,
             .overflowed = false,
         };
+    }
+};
+
+class FixedTextLayoutRenderer final: public widget::primitives::ITextLayoutRenderer {
+public:
+    int draws = 0;
+
+    void draw(
+        const widget::primitives::TextLayoutResult&,
+        render::DrawContext&,
+        foundation::NanPoint,
+        foundation::NanColor
+    ) override {
+        ++draws;
     }
 };
 
@@ -421,6 +436,76 @@ TEST_CASE("Text layout backend controls measurement and draw output", "[widget][
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts.front().text == "backend");
     REQUIRE(dev.texts.front().position.get_y() == Catch::Approx(0.0F));
+}
+
+TEST_CASE("Text consumers forward one shared text pipeline", "[widget][text][pipeline]") {
+    FixedTextLayoutBackend backend;
+    FixedTextLayoutRenderer renderer;
+    const widget::primitives::TextPipeline pipeline {
+        .backend = &backend,
+        .renderer = &renderer,
+    };
+
+    reactive::Graph graph;
+    auto label = widget::Label::create(graph, "label");
+    auto button = widget::Button::create("button");
+    widget::primitives::EditableText editable("value");
+    widget::TextField field("", "placeholder");
+
+    label->set_text_pipeline(pipeline);
+    button->set_text_pipeline(pipeline);
+    editable.set_text_pipeline(pipeline);
+    field.set_text_pipeline(pipeline);
+
+    REQUIRE(label->text_pipeline().backend == &backend);
+    REQUIRE(label->text_pipeline().renderer == &renderer);
+    REQUIRE(button->text_pipeline().backend == &backend);
+    REQUIRE(button->text_node().text_pipeline().renderer == &renderer);
+    REQUIRE(editable.text_pipeline().backend == &backend);
+    REQUIRE(editable.text_node().text_pipeline().renderer == &renderer);
+    REQUIRE(field.text_pipeline().backend == &backend);
+    REQUIRE(field.editable_text().text_node().text_pipeline().renderer == &renderer);
+    REQUIRE(field.placeholder_text().text_pipeline().backend == &backend);
+    REQUIRE(field.placeholder_text().text_pipeline().renderer == &renderer);
+
+    REQUIRE_THROWS_AS(
+        label->set_text_pipeline(widget::primitives::TextPipeline {.backend = nullptr}),
+        std::invalid_argument
+    );
+}
+
+TEST_CASE("Button draws through its forwarded text renderer", "[widget][button][text][pipeline]") {
+    FixedTextLayoutBackend backend;
+    FixedTextLayoutRenderer renderer;
+    auto button = widget::Button::create("button");
+    button->set_text_pipeline({.backend = &backend, .renderer = &renderer});
+
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    tree.set_root(button);
+    tree.draw(dev);
+
+    REQUIRE(renderer.draws == 1);
+    REQUIRE(dev.texts.empty());
+}
+
+TEST_CASE("TextField draws placeholder and value through one text pipeline", "[widget][text-field][pipeline]") {
+    FixedTextLayoutBackend backend;
+    FixedTextLayoutRenderer renderer;
+    auto field = std::make_shared<widget::TextField>("", "placeholder");
+    field->set_text_pipeline({.backend = &backend, .renderer = &renderer});
+
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    tree.set_root(field);
+    tree.draw(dev);
+    REQUIRE(renderer.draws == 1);
+    REQUIRE(dev.texts.empty());
+
+    field->set_value("value");
+    tree.draw(dev);
+    REQUIRE(renderer.draws == 2);
+    REQUIRE(dev.texts.empty());
 }
 
 TEST_CASE("Text exposes a layout result shared by measure and draw", "[widget][text][layout]") {

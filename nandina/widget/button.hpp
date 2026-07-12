@@ -29,6 +29,9 @@ namespace nandina::widget
         [[nodiscard]] auto text_node() -> primitives::Text&;
         [[nodiscard]] auto text_node() const -> const primitives::Text&;
 
+        void set_text_pipeline(primitives::TextPipeline pipeline);
+        [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
+
         void set_text_overflow(primitives::TextOverflow overflow);
         [[nodiscard]] auto text_overflow() const -> primitives::TextOverflow;
 

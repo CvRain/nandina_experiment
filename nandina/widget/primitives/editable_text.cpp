@@ -60,6 +60,17 @@ namespace nandina::widget::primitives
         return text_;
     }
 
+    void EditableText::set_text_pipeline(TextPipeline pipeline) {
+        text_.set_text_pipeline(pipeline);
+        mark_layout_dirty();
+        (void)text_.measure_layout(last_layout_constraints());
+        set_size(text_.size());
+    }
+
+    auto EditableText::text_pipeline() const -> TextPipeline {
+        return text_.text_pipeline();
+    }
+
     void EditableText::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
         text_.draw_at(ctx, position);
 

@@ -45,6 +45,11 @@ namespace nandina::widget
 
         [[nodiscard]] auto editable_text() -> primitives::EditableText&;
         [[nodiscard]] auto editable_text() const -> const primitives::EditableText&;
+        [[nodiscard]] auto placeholder_text() -> primitives::Text&;
+        [[nodiscard]] auto placeholder_text() const -> const primitives::Text&;
+
+        void set_text_pipeline(primitives::TextPipeline pipeline);
+        [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
 
         [[nodiscard]] auto is_focusable() const -> bool override;
         auto on_input(scene::InputEvent& event) -> bool override;

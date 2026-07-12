@@ -147,6 +147,8 @@ Goal: make text a reusable primitive capability instead of logic copied into eac
 
 Status: initial foundation landed. `TextStyle` is now the shared style value for `Text`, `Label` still layers on top of `Text`, and `Button` measures/draws through an internal `primitives::Text` instead of maintaining its own text measurement path.
 
+`TextPipeline` now carries the shared layout backend and optional glyph renderer. `Text`, `Label`, `Button`, `EditableText`, and `TextField` expose the same `set_text_pipeline()` / `text_pipeline()` protocol. Button forwards it to its internal text node, EditableText forwards it to its value text, and TextField applies it to both editable value and placeholder text. Existing text-node accessors remain available as low-level escape hatches.
+
 Tasks:
 
 1. Introduce `TextStyle` as a shared value object for text visual/layout inputs.

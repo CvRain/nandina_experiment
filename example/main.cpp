@@ -27,8 +27,7 @@
 using namespace nandina;
 
 struct TodoPageParams {
-    widget::primitives::ITextLayoutBackend* backend = nullptr;
-    widget::primitives::ITextLayoutRenderer* renderer = nullptr;
+    widget::primitives::TextPipeline text_pipeline;
 };
 
 class TodoPage final: public app::NanPageT<TodoPageParams> {
@@ -69,11 +68,8 @@ public:
         );
         todo_item_3->set_font_size(18);
 
-        const auto apply_text_pipeline = [this](const std::shared_ptr<widget::Label>& label) {
-            if (params().backend != nullptr) {
-                label->set_layout_backend(*params().backend);
-            }
-            label->set_layout_renderer(params().renderer);
+        const auto apply_text_pipeline = [this](const auto& control) {
+            control->set_text_pipeline(params().text_pipeline);
         };
         apply_text_pipeline(todo_label);
         apply_text_pipeline(todo_item_1);
@@ -90,6 +86,8 @@ public:
         const auto add_item_button = widget::Button::create("add", app_theme);
         add_item_button->set_tone(theme::ButtonTone::secondary);
         add_item_button->set_treatment(theme::ButtonTreatment::filled);
+        apply_text_pipeline(remove_item_button);
+        apply_text_pipeline(add_item_button);
 
         const auto button_group = widget::Row::create();
         button_group->set_cross_alignment(widget::LayoutAlignment::space_between);
@@ -118,6 +116,7 @@ public:
 
 protected:
     void on_setup() override {
+        auto pipeline = widget::primitives::TextPipeline {};
 #ifdef NANDINA_EXAMPLE_FONT_PATH
         auto* device = render_device();
         if (device == nullptr) {
@@ -129,11 +128,14 @@ protected:
         glyph_atlas_ = std::make_unique<text::GlyphAtlas>(font_face_, 1024, 1024);
         atlas_texture_ = std::make_unique<text::GlyphAtlasTexture>(*device, *glyph_atlas_);
         text_renderer_ = std::make_unique<text::GlyphRunRenderer>(*glyph_atlas_, *atlas_texture_);
+        pipeline = {
+            .backend = text_backend_.get(),
+            .renderer = text_renderer_.get(),
+        };
 #endif
 
         use_router().push<TodoPage>(TodoPageParams {
-            .backend = text_backend_.get(),
-            .renderer = text_renderer_.get(),
+            .text_pipeline = pipeline,
         });
     }
 

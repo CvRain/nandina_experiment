@@ -72,6 +72,25 @@ namespace nandina::widget
         return edit_;
     }
 
+    auto TextField::placeholder_text() -> primitives::Text& {
+        return placeholder_;
+    }
+
+    auto TextField::placeholder_text() const -> const primitives::Text& {
+        return placeholder_;
+    }
+
+    void TextField::set_text_pipeline(primitives::TextPipeline pipeline) {
+        edit_.set_text_pipeline(pipeline);
+        placeholder_.set_text_pipeline(pipeline);
+        mark_layout_dirty();
+        (void)measure_layout(last_layout_constraints());
+    }
+
+    auto TextField::text_pipeline() const -> primitives::TextPipeline {
+        return edit_.text_pipeline();
+    }
+
     auto TextField::is_focusable() const -> bool {
         return true;
     }

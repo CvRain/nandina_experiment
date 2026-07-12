@@ -6,6 +6,7 @@
 #include "../../render/draw_context.hpp"
 
 #include <algorithm>
+#include <stdexcept>
 #include <utility>
 
 namespace nandina::widget::primitives
@@ -90,6 +91,20 @@ namespace nandina::widget::primitives
 
     auto Text::layout_result() const -> const TextLayoutResult& {
         return layout_;
+    }
+
+    void Text::set_text_pipeline(TextPipeline pipeline) {
+        if (pipeline.backend == nullptr) {
+            throw std::invalid_argument("TextPipeline requires a layout backend");
+        }
+        backend_ = pipeline.backend;
+        renderer_ = pipeline.renderer;
+        mark_layout_dirty();
+        update_metrics(last_layout_constraints());
+    }
+
+    auto Text::text_pipeline() const -> TextPipeline {
+        return {.backend = backend_, .renderer = renderer_};
     }
 
     void Text::set_layout_backend(const ITextLayoutBackend& backend) {

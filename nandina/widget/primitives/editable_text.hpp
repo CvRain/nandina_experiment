@@ -33,6 +33,9 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto text_node() -> Text&;
         [[nodiscard]] auto text_node() const -> const Text&;
 
+        void set_text_pipeline(TextPipeline pipeline);
+        [[nodiscard]] auto text_pipeline() const -> TextPipeline;
+
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
 
         [[nodiscard]] auto is_focusable() const -> bool override;

@@ -42,6 +42,9 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto laid_out_font_size() const -> float;
         [[nodiscard]] auto layout_result() const -> const TextLayoutResult&;
 
+        void set_text_pipeline(TextPipeline pipeline);
+        [[nodiscard]] auto text_pipeline() const -> TextPipeline;
+
         /// The referenced backend must outlive this Text instance.
         void set_layout_backend(const ITextLayoutBackend& backend);
         [[nodiscard]] auto layout_backend() const -> const ITextLayoutBackend&;

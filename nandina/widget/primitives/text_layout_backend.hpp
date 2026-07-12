@@ -37,6 +37,11 @@ namespace nandina::widget::primitives
     /// Process-lifetime fallback used until a shaping backend is installed.
     [[nodiscard]] auto deterministic_text_layout_backend() -> const ITextLayoutBackend&;
 
+    struct TextPipeline {
+        const ITextLayoutBackend* backend = &deterministic_text_layout_backend();
+        ITextLayoutRenderer* renderer = nullptr;
+    };
+
 } // namespace nandina::widget::primitives
 
 #endif // NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_LAYOUT_BACKEND_HPP

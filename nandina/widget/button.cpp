@@ -60,6 +60,16 @@ namespace nandina::widget
         return text_;
     }
 
+    void Button::set_text_pipeline(primitives::TextPipeline pipeline) {
+        text_.set_text_pipeline(pipeline);
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    auto Button::text_pipeline() const -> primitives::TextPipeline {
+        return text_.text_pipeline();
+    }
+
     void Button::set_text_overflow(primitives::TextOverflow overflow) {
         text_overflow_ = overflow;
         mark_layout_dirty();
