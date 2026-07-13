@@ -251,6 +251,18 @@ Tasks:
 4. Decide whether Grid, Anchor, or Scroll viewport enters the low-level widget set next. Completed: `ScrollView` entered; Grid and Anchor are deferred.
 5. Keep Yoga or any third-party solver behind a backend boundary; it should not define the public widget API.
 
+#### M6. Todo Workflow Validation
+
+Goal: validate M4 editing and M5 layout under a real mouse, keyboard, reactive-update, scrolling, and window-resize workflow.
+
+Status: interactive validation page landed in the Todo example. The page owns a scoped `Signal<std::vector<TodoItem>>`, keeps its `TextField` and `ScrollView` stable, and rebuilds only the rendered task-list snapshot after reactive changes. Enter or the Add button submits non-empty tasks, completion and removal callbacks address stable item IDs, and the input remains focused across submission. Empty submissions expose the field's invalid state.
+
+The list rebuild is staged by a page-scoped effect and applied from `on_process()` rather than synchronously inside button callbacks. This avoids destroying a pressed control while its callback is still executing. New-item scrolling is applied one frame after replacement so `ScrollView` has completed layout and exposes the new maximum offset.
+
+The responsive page uses `Expanded`, `FlexItem` grow/shrink/min-width policy, clipped labels, and a vertical `ScrollView`. Window resize continues through the normal tight root measure/layout pass. All text-bearing controls, including dynamically created task rows and buttons, reuse the window-owned bundled-font `TextPipeline`.
+
+M6 is an application validation milestone, not a new widget abstraction. Its next purpose is collecting real interaction feedback on selection, focus, narrow-window behavior, nested clipping, and dynamic scroll updates before starting native input integration or advanced layout work.
+
 ### Side Tracks
 
 These are useful, but should not interrupt the main text/layout/clip line unless a feature directly requires them.
