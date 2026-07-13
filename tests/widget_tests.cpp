@@ -48,13 +48,19 @@ public:
     int line_count = 0;
     int outline_count = 0;
     int rounded_count = 0;
+    int clip_clears = 0;
     std::vector<RectCall> rects;
     std::vector<TextCall> texts;
+    std::vector<foundation::NanRect> clips;
 
     void begin_frame() override {}
     void end_frame() override {}
-    void set_clip(const foundation::NanRect&) override {}
-    void clear_clip() override {}
+    void set_clip(const foundation::NanRect& rect) override {
+        clips.push_back(rect);
+    }
+    void clear_clip() override {
+        ++clip_clears;
+    }
     void draw_rect(const foundation::NanRect& r, const foundation::NanColor& c) override {
         rects.push_back({r, c.alpha()});
     }
@@ -414,8 +420,50 @@ TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text
     REQUIRE(text->font_size() == Catch::Approx(20.0F));
     REQUIRE(text->overflow() == widget::primitives::TextOverflow::clip);
     REQUIRE(text->width() <= 40.0F);
+    REQUIRE(text->layout_result().lines.front().text_length == text->text().size());
+    REQUIRE(text->layout_result().lines.front().visible_text == text->text());
+    REQUIRE(text->layout_result().lines.front().size.get_width() > text->width());
     REQUIRE(dev.texts.size() == 1);
+    REQUIRE(dev.texts.front().text == text->text());
     REQUIRE(dev.texts[0].alpha == Catch::Approx(0.5F));
+    REQUIRE(dev.clips.size() == 1);
+    REQUIRE(dev.clips.front().get_width() == Catch::Approx(40.0F));
+    REQUIRE(dev.clip_clears == 1);
+}
+
+TEST_CASE("Text clip intersects and restores an ancestor clip", "[widget][text][clip]") {
+    RecordingDevice dev;
+    render::DrawContext context(dev);
+    widget::primitives::Text text("abcdef");
+    text.set_style(widget::primitives::TextStyle {
+        .font_size = 20.0F,
+        .overflow = widget::primitives::TextOverflow::clip,
+        .max_lines = 1,
+    });
+    (void)text.measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 40.0F,
+        .min_height = 0.0F,
+        .max_height = 80.0F,
+    });
+
+    {
+        auto ancestor = context.clip().push(
+            foundation::NanRect::from_xywh(10.0F, 10.0F, 25.0F, 30.0F)
+        );
+        text.draw_at(context, foundation::NanPoint(20.0F, 5.0F));
+
+        REQUIRE(context.clip().depth() == 1);
+        REQUIRE(dev.clips.size() == 3);
+        REQUIRE(dev.clips[1].get_left() == Catch::Approx(20.0F));
+        REQUIRE(dev.clips[1].get_top() == Catch::Approx(10.0F));
+        REQUIRE(dev.clips[1].get_width() == Catch::Approx(15.0F));
+        REQUIRE(dev.clips[2].get_left() == Catch::Approx(10.0F));
+        REQUIRE(dev.clips[2].get_width() == Catch::Approx(25.0F));
+    }
+
+    REQUIRE(context.clip().depth() == 0);
+    REQUIRE(dev.clip_clears == 1);
 }
 
 TEST_CASE("Text layout backend controls measurement and draw output", "[widget][text][backend]") {
@@ -557,6 +605,43 @@ TEST_CASE("Text overflow preserves UTF-8 codepoint boundaries", "[widget][text][
     REQUIRE(text->layout_result().overflowed);
     REQUIRE(line.text_length == std::string("中").size());
     REQUIRE(line.visible_text == "中...");
+}
+
+TEST_CASE("deterministic caret geometry follows grapheme boundaries", "[widget][text][caret]") {
+    constexpr std::string_view source = "a\xCC\x81" "b";
+    widget::primitives::Text text {std::string(source)};
+    text.set_style(widget::primitives::TextStyle {
+        .font_size = 10.0F,
+        .overflow = widget::primitives::TextOverflow::clip,
+        .max_lines = 1,
+    });
+    (void)text.measure_layout(scene::LayoutConstraints {
+        .min_width = 0.0F,
+        .max_width = 6.0F,
+        .min_height = 0.0F,
+        .max_height = 40.0F,
+    });
+
+    const auto& layout = text.layout_result();
+    const auto& line = layout.lines.front();
+    REQUIRE(line.caret_stops.size() == 3);
+    REQUIRE(line.caret_stops[0].source_offset == 0);
+    REQUIRE(line.caret_stops[1].source_offset == 3);
+    REQUIRE(line.caret_stops[2].source_offset == source.size());
+    REQUIRE(line.caret_for_source(1).source_offset == 0);
+    REQUIRE(line.caret_for_source(3).x == Catch::Approx(5.6F));
+    REQUIRE(line.caret_stops.back().x > layout.size.get_width());
+    REQUIRE(line.caret_for_x(-100.0F).source_offset == 0);
+    REQUIRE(line.caret_for_x(100.0F).source_offset == source.size());
+    REQUIRE(layout.caret_for_point(foundation::NanPoint(5.7F, 0.0F)).source_offset == 3);
+}
+
+TEST_CASE("empty text layout exposes one caret stop", "[widget][text][caret]") {
+    widget::primitives::Text text;
+    const auto& line = text.layout_result().lines.front();
+    REQUIRE(line.caret_stops.size() == 1);
+    REQUIRE(line.caret_stops.front().source_offset == 0);
+    REQUIRE(line.caret_stops.front().x == Catch::Approx(0.0F));
 }
 
 TEST_CASE("Text wrap produces and draws actual UTF-8 lines", "[widget][text][wrap]") {

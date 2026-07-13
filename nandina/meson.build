@@ -70,6 +70,7 @@ module_widget = files(
     'widget/primitives/pressable.hpp',
     'widget/primitives/pressable.cpp',
     'widget/primitives/text_layout.hpp',
+    'widget/primitives/text_layout.cpp',
     'widget/primitives/text_layout_backend.hpp',
     'widget/primitives/text_layout_backend.cpp',
     'widget/primitives/text.hpp',

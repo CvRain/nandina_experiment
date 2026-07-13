@@ -524,6 +524,82 @@ namespace nandina::text
             return result;
         }
 
+        static void append_run_caret_stops(
+            widget::primitives::TextLayoutLine& line,
+            const widget::primitives::TextLayoutLine& shaped,
+            const std::size_t source_begin,
+            const std::size_t source_end,
+            const bool right_to_left,
+            const float visual_origin
+        ) {
+            std::vector<std::size_t> cluster_starts;
+            for (const auto& glyph: shaped.glyphs) {
+                if (glyph.cluster >= source_begin && glyph.cluster < source_end) {
+                    cluster_starts.push_back(glyph.cluster);
+                }
+            }
+            std::ranges::sort(cluster_starts);
+            const auto unique_end = std::ranges::unique(cluster_starts).begin();
+            cluster_starts.erase(unique_end, cluster_starts.end());
+
+            float pen = visual_origin;
+            std::size_t glyph_index = 0;
+            while (glyph_index < shaped.glyphs.size()) {
+                const auto cluster = shaped.glyphs[glyph_index].cluster;
+                const float cluster_start_x = pen;
+                do {
+                    pen += shaped.glyphs[glyph_index].x_advance;
+                    ++glyph_index;
+                } while (glyph_index < shaped.glyphs.size()
+                         && shaped.glyphs[glyph_index].cluster == cluster);
+
+                if (cluster < source_begin || cluster >= source_end) {
+                    continue;
+                }
+                const auto next = std::ranges::upper_bound(cluster_starts, cluster);
+                const auto cluster_end = next == cluster_starts.end() ? source_end : *next;
+                const float cluster_end_x = pen;
+                line.caret_stops.push_back(widget::primitives::TextCaretStop {
+                    .source_offset = cluster,
+                    .x = right_to_left ? cluster_end_x : cluster_start_x,
+                    .affinity = widget::primitives::TextAffinity::downstream,
+                });
+                line.caret_stops.push_back(widget::primitives::TextCaretStop {
+                    .source_offset = cluster_end,
+                    .x = right_to_left ? cluster_start_x : cluster_end_x,
+                    .affinity = widget::primitives::TextAffinity::upstream,
+                });
+            }
+        }
+
+        static void normalize_caret_stops(widget::primitives::TextLayoutLine& line) {
+            if (line.caret_stops.empty()) {
+                line.caret_stops.push_back(widget::primitives::TextCaretStop {
+                    .source_offset = line.text_offset,
+                });
+                return;
+            }
+
+            std::ranges::stable_sort(line.caret_stops, [](const auto& left, const auto& right) {
+                return left.x < right.x;
+            });
+            std::vector<widget::primitives::TextCaretStop> normalized;
+            normalized.reserve(line.caret_stops.size());
+            constexpr float epsilon = 0.001F;
+            for (const auto& stop: line.caret_stops) {
+                const auto duplicate = std::ranges::find_if(normalized, [&](const auto& existing) {
+                    return existing.source_offset == stop.source_offset
+                        && std::abs(existing.x - stop.x) <= epsilon;
+                });
+                if (duplicate == normalized.end()) {
+                    normalized.push_back(stop);
+                } else if (stop.affinity == widget::primitives::TextAffinity::downstream) {
+                    duplicate->affinity = stop.affinity;
+                }
+            }
+            line.caret_stops = std::move(normalized);
+        }
+
         [[nodiscard]] auto shape_analyzed_line(
             std::string_view paragraph_text,
             const BidiParagraph& paragraph,
@@ -555,6 +631,17 @@ namespace nandina::text
                     baseline,
                     run.right_to_left()
                 );
+                append_run_caret_stops(
+                    line,
+                    shaped,
+                    paragraph_source_offset + run.offset,
+                    std::min(
+                        paragraph_source_offset + run.offset + run.length,
+                        output_offset + output_source_length
+                    ),
+                    run.right_to_left(),
+                    width
+                );
                 for (auto& glyph: shaped.glyphs) {
                     glyph.cluster = std::min(
                         glyph.cluster,
@@ -565,6 +652,7 @@ namespace nandina::text
                 line.missing_glyphs = line.missing_glyphs || shaped.missing_glyphs;
                 width += shaped.size.get_width();
             }
+            normalize_caret_stops(line);
             line.size = foundation::NanSize(width, line_height);
             return line;
         }
@@ -823,21 +911,7 @@ namespace nandina::text
             } else {
                 if (has_width_limit && shaped.size.get_width() > width_limit) {
                     result.overflowed = true;
-                    if (input.style.overflow == widget::primitives::TextOverflow::clip) {
-                        const auto length = impl_->fitted_source_length(shaped, end, width_limit);
-                        shaped = impl_->shape_analyzed_line(
-                            paragraph,
-                            bidi_paragraph,
-                            0,
-                            length,
-                            offset,
-                            length,
-                            font_size,
-                            line_height,
-                            baseline
-                        );
-                    } else if (input.style.overflow
-                               == widget::primitives::TextOverflow::ellipsis)
+                    if (input.style.overflow == widget::primitives::TextOverflow::ellipsis)
                     {
                         const auto dots = impl_->shape_source_line(
                             "...",

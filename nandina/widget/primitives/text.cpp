@@ -130,6 +130,15 @@ namespace nandina::widget::primitives
             return;
         }
 
+        auto clip = style_.overflow == TextOverflow::clip
+            ? ctx.clip().push(foundation::NanRect::from_xywh(
+                  position.get_x(),
+                  position.get_y(),
+                  layout_.size.get_width(),
+                  layout_.size.get_height()
+              ))
+            : render::ClipStack::Guard {nullptr, false};
+
         const auto color = style_.color.with_alpha(style_.color.alpha() * ctx.opacity());
         if (renderer_ != nullptr) {
             renderer_->draw(layout_, ctx, position, color);

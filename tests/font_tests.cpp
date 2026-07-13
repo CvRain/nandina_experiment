@@ -230,6 +230,25 @@ TEST_CASE("HarfBuzz backend produces glyph runs with source clusters", "[text][h
     REQUIRE(layout.baseline > 0.0F);
 }
 
+TEST_CASE("HarfBuzz caret geometry follows shaped graphemes", "[text][harfbuzz][caret]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+    constexpr std::string_view source = "a\xCC\x81" "b";
+    const auto layout = backend.layout(widget::primitives::TextLayoutInput {
+        .text = source,
+        .style = widget::primitives::TextStyle {.font_size = 24.0F},
+        .constraints = scene::LayoutConstraints::loose(),
+    });
+
+    const auto& line = layout.lines.front();
+    REQUIRE(line.caret_stops.size() == 3);
+    REQUIRE(line.caret_stops[0].source_offset == 0);
+    REQUIRE(line.caret_stops[1].source_offset == 3);
+    REQUIRE(line.caret_stops[2].source_offset == source.size());
+    REQUIRE(line.caret_for_source(2).source_offset == 0);
+    REQUIRE(line.caret_for_source(source.size()).x == Catch::Approx(line.size.get_width()));
+}
+
 TEST_CASE("HarfBuzz glyph runs draw through the atlas texture", "[text][harfbuzz][render]") {
     auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
     text::HarfBuzzTextLayoutBackend backend(face);
@@ -311,6 +330,22 @@ TEST_CASE("FriBidi orders pure RTL and mixed-direction glyph runs", "[text][harf
                 > mixed.lines.front().glyphs[index].cluster;
     }
     REQUIRE(has_visual_cluster_inversion);
+
+    const auto& rtl_line = rtl.lines.front();
+    REQUIRE(rtl_line.caret_for_source(0).x == Catch::Approx(rtl_line.size.get_width()));
+    REQUIRE(rtl_line.caret_for_source(std::string_view("لسان").size()).x
+            == Catch::Approx(0.0F));
+
+    bool has_split_bidi_boundary = false;
+    const auto& mixed_stops = mixed.lines.front().caret_stops;
+    for (std::size_t left = 0; left < mixed_stops.size(); ++left) {
+        for (std::size_t right = left + 1; right < mixed_stops.size(); ++right) {
+            has_split_bidi_boundary = has_split_bidi_boundary
+                || (mixed_stops[left].source_offset == mixed_stops[right].source_offset
+                    && std::abs(mixed_stops[left].x - mixed_stops[right].x) > 0.01F);
+        }
+    }
+    REQUIRE(has_split_bidi_boundary);
 }
 
 TEST_CASE("FriBidi reshapes RTL overflow at logical cluster boundaries", "[text][harfbuzz][bidi][overflow]") {
@@ -362,8 +397,10 @@ TEST_CASE("FriBidi reshapes RTL overflow at logical cluster boundaries", "[text]
     });
     REQUIRE(clipped.overflowed);
     REQUIRE(clipped.lines.front().right_to_left);
-    REQUIRE(clipped.lines.front().text_length < source.size());
-    REQUIRE(clipped.lines.front().size.get_width() <= width_limit + 0.01F);
+    REQUIRE(clipped.lines.front().text_length == source.size());
+    REQUIRE(clipped.lines.front().visible_text == source);
+    REQUIRE(clipped.lines.front().size.get_width() > width_limit);
+    REQUIRE(clipped.size.get_width() <= width_limit + 0.01F);
 
     const auto ellipsis = backend.layout(widget::primitives::TextLayoutInput {
         .text = source,

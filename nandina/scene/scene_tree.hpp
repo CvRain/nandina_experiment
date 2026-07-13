@@ -114,6 +114,7 @@ namespace nandina::scene
         /**
          * Find the deepest visible node that contains `world_point`.
          * Walks children front-to-back (higher z_index first), recursively.
+         * A clipped control prunes descendants outside its world-space clip bounds.
          */
         [[nodiscard]] auto hit_test(foundation::NanPoint world_point) const -> NanNode2D*;
 

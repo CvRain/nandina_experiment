@@ -77,33 +77,36 @@ Current layout limitations:
 
 ## Text And Label
 
-The current text stack is intentionally minimal:
+The current text stack is a shared capability used by semantic text controls:
 
-- `Text` supports text, color, font size, estimated measurement, `TextOverflow`, and `max_lines`.
+- `TextStyle` carries the common color, font size, `TextOverflow`, and `max_lines` inputs.
+- `TextPipeline` carries a backend-neutral layout backend and optional glyph renderer.
+- `Text` measures and draws from one `TextLayoutResult`, including lines, source ranges, glyph runs, baseline, effective font size, overflow, fallback font slots, and missing-glyph state.
 - `Label` is the semantic text control and can bind to `Signal<std::string>` or `Computed<std::string>`.
 - `Button` measures and draws through an internal `Text` primitive.
+- `EditableText` and `TextField` forward the same pipeline to their value and placeholder text.
+- The production path supports FreeType metrics/rasterization, HarfBuzz shaping, FriBidi ordering, utf8proc grapheme segmentation, fallback faces, glyph atlases, and alpha-texture rendering.
 
 Text limitations:
 
-- Width is estimated from character count.
-- `ellipsis` uses ASCII `...`.
-- `clip` truncates by estimated character count, not render clipping.
-- `wrap` produces deterministic codepoint-based lines and draws them separately; word/grapheme-aware wrapping is not implemented yet.
-- No shaping, kerning, bidi, CJK, emoji, baseline model, glyph runs, or font cache yet.
+- The deterministic fallback backend still uses estimated codepoint widths; portable shaped output uses the bundled Caskaydia/FreeType/HarfBuzz pipeline.
+- `ellipsis` currently uses ASCII `...` rather than a configurable ellipsis glyph.
+- Wrapping is grapheme-safe but still lacks a richer UAX #14 line-break opportunity layer.
+- Layout results expose source-byte/grapheme caret stops, line-local visual positions, point-to-source lookup, and logical upstream/downstream affinity. `EditableText` does not yet consume this geometry for drawing and commands.
+- System font discovery and dynamically packaged CJK fallback profiles remain resource-system work.
 
-Text overflow should become a first-class layout result, not a late patch inside individual widgets.
+`TextOverflow::clip` preserves complete source and glyph geometry, constrains the reported layout size, and applies a real render clip around text drawing. This keeps glyph bearings, mark offsets, and shaped overhang inside the text box without discarding geometry needed by future editing.
 
 ## App Authoring State
 
-The current example is a standard counter page using:
+The current example is a Todo page using:
 
 - `NanApplication` with app-level `NanTheme`.
 - `NanWindow` and `NanRouter`.
-- `CounterPage : NanPageT<NoParams>`.
-- page-scoped `Signal<int>` plus `Computed<std::string>`.
-- `Label` bound to computed text.
-- `Button` controls for decrement/increment/reset.
-- explicit `Center -> Padding -> Column -> Flow` layout.
+- `TodoPage : NanPageT<TodoPageParams>` with page-scoped reactive state.
+- semantic `Label` and `Button` controls sharing one Caskaydia/HarfBuzz/glyph-atlas `TextPipeline`.
+- bundled font resources as the reproducible default instead of hard-coded system font paths.
+- explicit low-level layout composition for the application UI.
 
 Example code is not sacred. It can be refactored when it helps validate framework APIs, unless a task explicitly asks to preserve it.
 
@@ -171,9 +174,9 @@ Boundary:
 
 Goal: make measuring and drawing use the same computed layout data.
 
-Status: the deterministic layout contract now produces independent UTF-8-safe lines for width wrapping and explicit newlines, and measure/draw consume the same line results. `ITextLayoutBackend` separates `Text` from the fallback codepoint-width algorithm and provides the integration boundary for a future FreeType/HarfBuzz backend. UTF-8 codepoint encoding, counting, boundary-safe truncation, and editing deletion are available; grapheme clusters, word-aware wrapping, shaping, and a richer baseline policy remain future work.
+Status: the core layout, shaped-rendering, and initial editing-geometry foundation is complete. Deterministic and HarfBuzz backends produce the same backend-neutral result contract, and measurement and drawing consume that result. FreeType, HarfBuzz, FriBidi, utf8proc, fallback font slots, glyph atlases, multiline layout, grapheme-safe overflow, and baseline/line metrics are integrated. Each line now carries visual caret stops at represented shaping-cluster boundaries, preserving duplicate logical offsets at bidi boundaries through upstream/downstream affinity. Source-byte-to-caret and layout-point-to-source queries are backend-neutral. Richer Unicode line-break opportunities and OpenType ligature-internal caret positions remain future work.
 
-The FreeType foundation loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. A CPU glyph atlas packs and caches those bitmaps, while `IRenderDevice` and the Raylib backend support alpha texture upload, revision updates, and tinted region drawing. `HarfBuzzTextLayoutBackend` emits glyph IDs, source clusters, advances, and offsets, and `GlyphRunRenderer` draws those runs through the atlas. `Text` can now consume an injected glyph renderer end to end, while its default path remains the deterministic backend plus render-device text fallback. Cluster-aware wrapping/ellipsis, fallback fonts, resource paths, and application-level font selection remain future work.
+The FreeType foundation loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. A CPU glyph atlas packs and caches those bitmaps, while `IRenderDevice` and the Raylib backend support alpha texture upload, revision updates, and tinted region drawing. `HarfBuzzTextLayoutBackend` emits glyph IDs, source clusters, advances, offsets, bidi ordering, and fallback font indices, and `GlyphRunRenderer` routes runs through the matching atlases. `Text` consumes the injected renderer end to end, while its default path remains the deterministic backend plus render-device text fallback.
 
 The first bundled-font build path uses the OFL-licensed Caskaydia Cove Regular from a pinned submodule. Meson option `bundled_fonts` copies the TTF and license into `example/res/fonts`, and integration tests load, shape, and rasterize the copied font. Sarasa Gothic SC remains the intended CJK default candidate, but its current regional release packages are large 7z archives; it should enter through a later font profile/download-cache design rather than slowing every initial configure.
 
@@ -199,7 +202,7 @@ This is where the previous iterations failed hardest: text overflow must not be 
 
 Goal: make parent-declared clipping a tree/rendering contract, not a local widget trick.
 
-Status: initial tree-level contract landed. `NanControl` now exposes `ControlOverflow::{visible, clip}`, and draw traversal pushes a child clip through `ClipStack` when a control declares clipped overflow.
+Status: initial rendering and hit-test contract complete. `NanControl` exposes `ControlOverflow::{visible, clip}`, and draw traversal pushes an intersected child clip through `ClipStack`. `TextOverflow::clip` preserves complete layout geometry and installs an RAII render clip for both fallback and shaped glyph drawing; `ellipsis` remains a separate truncating and reshaping policy. Scene hit testing now prunes descendant branches outside every clipped ancestor, using the same world-space AABB semantics as the current render scissor implementation. Mouse hover and click-derived focus therefore cannot target clipped descendants.
 
 Note: `ControlOverflow` clips child scene nodes. Text-bearing semantic controls that draw composed internal text, such as `Button`, should expose their own text overflow API that forwards to `TextOverflow`.
 
@@ -208,8 +211,11 @@ Tasks:
 1. Add explicit overflow policy to controls or a focused container primitive.
 2. Support at least `visible` and `clip` first.
 3. Use the existing `ClipStack` in draw traversal so children are clipped by parent policy.
-4. Connect `TextOverflow::clip` to render clipping rather than string truncation only.
+4. Connect `TextOverflow::clip` to render clipping rather than string truncation only. Completed: layout retains complete source/glyph data while the constrained result box clips actual pixels.
 5. Keep the path open for `ScrollView`, `Card`, `Dialog`, and popover-like containers.
+6. Make ancestor `ControlOverflow::clip` intersections constrain descendant hit testing as well as drawing. Completed for direct hit tests, hover, and click-derived focus.
+
+The next main-line task moves into M4 consumption of this geometry: replace `EditableText::caret_x()` estimation, align caret/deletion to grapheme boundaries, and add visual movement and pointer placement incrementally. Exact polygon clipping for rotated controls, stale hover invalidation after geometry changes, and focus-navigation visibility policy remain later refinements rather than blockers for editable text.
 
 #### M4. EditableText / TextField
 

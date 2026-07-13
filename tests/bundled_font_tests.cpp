@@ -67,11 +67,10 @@ TEST_CASE("HarfBuzz overflow preserves shaping clusters", "[text][harfbuzz][over
         },
     });
     REQUIRE(clipped.overflowed);
-    REQUIRE(clipped.lines.front().text_length > 0);
-    REQUIRE(clipped.lines.front().text_length < source.size());
-    REQUIRE(clipped.lines.front().visible_text
-            == source.substr(0, clipped.lines.front().text_length));
-    REQUIRE(clipped.lines.front().size.get_width() <= width_limit);
+    REQUIRE(clipped.lines.front().text_length == source.size());
+    REQUIRE(clipped.lines.front().visible_text == source);
+    REQUIRE(clipped.lines.front().size.get_width() > width_limit);
+    REQUIRE(clipped.size.get_width() <= width_limit);
 
     const auto ellipsis = backend.layout(widget::primitives::TextLayoutInput {
         .text = source,
@@ -136,8 +135,8 @@ TEST_CASE("HarfBuzz overflow preserves shaping clusters", "[text][harfbuzz][over
             .max_height = 100.0F,
         },
     });
-    REQUIRE(combined_clip.lines.front().text_length != 1);
-    REQUIRE(combined_clip.lines.front().text_length != 2);
+    REQUIRE(combined_clip.lines.front().text_length == combined.size());
+    REQUIRE(combined_clip.lines.front().visible_text == combined);
 }
 
 TEST_CASE("HarfBuzz scale reshapes text at an effective font size", "[text][harfbuzz][scale]") {

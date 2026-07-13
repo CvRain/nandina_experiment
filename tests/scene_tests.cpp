@@ -5,6 +5,7 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include "scene/control.hpp"
 #include "scene/input_event.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
@@ -160,6 +161,110 @@ TEST_CASE("hover tracking sends one enter and one leave", "[scene][hover]") {
     tree.dispatch_mouse_move(scene::MouseMoveEvent(foundation::NanPoint(500, 500), foundation::NanPoint(0, 0)));
     REQUIRE(tree.hovered_node() == nullptr);
     REQUIRE(count(trace, "b:hover_leave") == 1);
+}
+
+TEST_CASE("control overflow constrains descendant hit testing", "[scene][hit-test][clip]") {
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto clip = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 40.0F));
+    auto child = std::make_shared<ProbeNode>(nullptr, "child");
+    clip->set_position(foundation::NanPoint(100.0F, 100.0F));
+    child->set_position(foundation::NanPoint(35.0F, 20.0F));
+    clip->add_child(child);
+    root->add_child(clip);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    const auto inside = foundation::NanPoint(130.0F, 120.0F);
+    const auto protruding = foundation::NanPoint(145.0F, 120.0F);
+    REQUIRE(tree.hit_test(inside) == child.get());
+    REQUIRE(tree.hit_test(protruding) == child.get());
+
+    clip->set_overflow(scene::ControlOverflow::clip);
+    REQUIRE(tree.hit_test(inside) == child.get());
+    REQUIRE(tree.hit_test(protruding) == nullptr);
+}
+
+TEST_CASE("nested control clips prune complete descendant branches", "[scene][hit-test][clip]") {
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto outer = std::make_shared<scene::NanControl>(foundation::NanSize(50.0F, 50.0F));
+    auto intermediary = std::make_shared<scene::NanNode2D>();
+    auto inner = std::make_shared<scene::NanControl>(foundation::NanSize(50.0F, 50.0F));
+    auto child = std::make_shared<ProbeNode>(nullptr, "child");
+    outer->set_position(foundation::NanPoint(100.0F, 100.0F));
+    outer->set_overflow(scene::ControlOverflow::clip);
+    intermediary->set_position(foundation::NanPoint(30.0F, 0.0F));
+    inner->set_overflow(scene::ControlOverflow::clip);
+    child->set_position(foundation::NanPoint(30.0F, 20.0F));
+    inner->add_child(child);
+    intermediary->add_child(inner);
+    outer->add_child(intermediary);
+    root->add_child(outer);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    REQUIRE(tree.hit_test(foundation::NanPoint(150.0F, 120.0F)) == child.get());
+    REQUIRE(tree.hit_test(foundation::NanPoint(160.0F, 120.0F)) == nullptr);
+}
+
+TEST_CASE("transformed control clips use rendering world bounds", "[scene][hit-test][clip][transform]") {
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto clip = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    auto child = std::make_shared<ProbeNode>(nullptr, "child");
+    clip->set_position(foundation::NanPoint(100.0F, 100.0F));
+    clip->set_rotation(0.5F);
+    clip->set_scale(1.5F, 0.75F);
+    clip->set_overflow(scene::ControlOverflow::clip);
+    child->set_position(foundation::NanPoint(20.0F, 10.0F));
+    clip->add_child(child);
+    root->add_child(clip);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    const auto child_center = child->to_global(foundation::NanPoint::zero());
+    REQUIRE(clip->global_bounds().contains_point(child_center));
+    REQUIRE(tree.hit_test(child_center) == child.get());
+
+    const auto outside = foundation::NanPoint(
+        clip->global_bounds().get_right() + 1.0F,
+        clip->global_bounds().get_top()
+    );
+    child->set_position(clip->to_local(outside));
+    REQUIRE(tree.hit_test(outside) == nullptr);
+}
+
+TEST_CASE("clipped descendants lose hover and cannot receive click focus", "[scene][input][clip]") {
+    std::vector<std::string> trace;
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto clip = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 40.0F));
+    auto child = std::make_shared<ProbeNode>(&trace, "child", true);
+    clip->set_position(foundation::NanPoint(100.0F, 100.0F));
+    clip->set_overflow(scene::ControlOverflow::clip);
+    child->set_position(foundation::NanPoint(35.0F, 20.0F));
+    clip->add_child(child);
+    root->add_child(clip);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(
+        foundation::NanPoint(130.0F, 120.0F), foundation::NanPoint::zero()
+    ));
+    REQUIRE(tree.hovered_node() == child.get());
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(
+        foundation::NanPoint(145.0F, 120.0F), foundation::NanPoint(15.0F, 0.0F)
+    ));
+    REQUIRE(tree.hovered_node() == nullptr);
+    REQUIRE(count(trace, "child:hover_leave") == 1);
+
+    tree.dispatch_mouse_button(scene::MouseButtonEvent(
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        foundation::NanPoint(145.0F, 120.0F)
+    ));
+    REQUIRE(tree.focused_node() == nullptr);
 }
 
 TEST_CASE("focus traversal skips non-focusable and wraps", "[scene][focus]") {

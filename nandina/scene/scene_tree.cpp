@@ -4,6 +4,7 @@
 
 #include "scene_tree.hpp"
 #include "../render/draw_context.hpp"
+#include "control.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -256,8 +257,16 @@ namespace nandina::scene
             return nullptr;
         }
 
+        bool visit_children = true;
+        if (const auto* control = node->as_control();
+            control != nullptr && control->overflow() == ControlOverflow::clip)
+        {
+            const auto clip_bounds = control->global_bounds();
+            visit_children = clip_bounds.is_valid() && clip_bounds.contains_point(world_point);
+        }
+
         const auto count = node->child_count();
-        if (count > 0) {
+        if (visit_children && count > 0) {
             std::vector<size_t> indices(count);
             std::iota(indices.begin(), indices.end(), static_cast<size_t>(0));
 
