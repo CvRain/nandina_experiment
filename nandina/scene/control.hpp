@@ -46,6 +46,13 @@ namespace nandina::scene
         [[nodiscard]] auto deflated(foundation::NanInsets insets) const -> LayoutConstraints;
     };
 
+    struct LayoutFlexPolicy {
+        std::optional<float> basis;
+        float grow = 0.0F;
+        float shrink = 0.0F;
+        LayoutConstraints limits {};
+    };
+
     /// 带尺寸的 2D 控件基类。局部矩形为 [0,0,size.w,size.h] (原点左上角)。
     class NanControl: public NanNode2D {
     public:
@@ -71,6 +78,7 @@ namespace nandina::scene
         auto mark_layout_dirty() -> void;
         auto clear_layout_dirty() -> void;
         [[nodiscard]] virtual auto layout_flex_factor() const -> int;
+        [[nodiscard]] virtual auto layout_flex_policy() const -> LayoutFlexPolicy;
 
         [[nodiscard]] auto measure_layout(LayoutConstraints constraints) -> foundation::NanSize;
         auto layout_to(foundation::NanRect rect) -> void;

@@ -111,6 +111,13 @@ namespace nandina::scene
         return 0;
     }
 
+    auto NanControl::layout_flex_policy() const -> LayoutFlexPolicy {
+        const auto factor = layout_flex_factor();
+        return factor > 0
+            ? LayoutFlexPolicy {.basis = 0.0F, .grow = static_cast<float>(factor)}
+            : LayoutFlexPolicy {};
+    }
+
     auto NanControl::measure_layout(LayoutConstraints constraints) -> foundation::NanSize {
         last_layout_constraints_ = constraints;
         measured_size_ = constraints.constrain(on_measure(constraints));
@@ -136,7 +143,7 @@ namespace nandina::scene
         return background_;
     }
 
-    void NanControl::set_overflow(ControlOverflow overflow) {
+    void NanControl::set_overflow(const ControlOverflow overflow) {
         overflow_ = overflow;
     }
 

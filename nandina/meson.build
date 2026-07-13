@@ -81,6 +81,8 @@ module_widget = files(
     'widget/label.cpp',
     'widget/layout.hpp',
     'widget/layout.cpp',
+    'widget/scroll_view.hpp',
+    'widget/scroll_view.cpp',
     'widget/button.hpp',
     'widget/button.cpp',
     'widget/text_field.hpp',

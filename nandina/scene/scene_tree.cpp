@@ -142,12 +142,7 @@ namespace nandina::scene
     }
 
     auto NanSceneTree::dispatch_mouse_wheel(const MouseWheelEvent& event) -> void {
-        // Prefer the current hover target; fall back to a hit-test at the wheel
-        // position so scrolling works even if no move event set hover yet.
-        auto* target = hovered_node_.lock().get();
-        if (!target) {
-            target = hit_test(event.screen_pos());
-        }
+        auto* target = hit_test(event.screen_pos());
         if (!target) {
             return;
         }

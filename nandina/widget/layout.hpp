@@ -9,6 +9,8 @@
 #include "../scene/control.hpp"
 
 #include <memory>
+#include <optional>
+#include <unordered_map>
 #include <vector>
 
 namespace nandina::widget
@@ -65,6 +67,14 @@ namespace nandina::widget
         [[nodiscard]] static auto create(LayoutAxis axis = LayoutAxis::horizontal) -> std::shared_ptr<Wrap>;
 
         auto add(std::shared_ptr<scene::NanControl> child) -> Wrap&;
+        auto add(
+            std::shared_ptr<scene::NanControl> child,
+            std::optional<LayoutAlignment> cross_alignment
+        ) -> Wrap&;
+        auto set_child_cross_alignment(
+            scene::NanControl& child,
+            std::optional<LayoutAlignment> alignment
+        ) -> Wrap&;
         auto set_axis(LayoutAxis axis) -> Wrap&;
         auto set_gap(float gap) -> Wrap&;
         auto set_run_gap(float gap) -> Wrap&;
@@ -93,6 +103,7 @@ namespace nandina::widget
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
         LayoutAlignment run_alignment_ = LayoutAlignment::start;
         std::vector<std::weak_ptr<scene::NanControl>> items_;
+        std::unordered_map<scene::NanControl*, LayoutAlignment> child_cross_alignments_;
     };
 
     using Flow = Wrap;
@@ -209,6 +220,27 @@ namespace nandina::widget
 
     private:
         int flex_ = 1;
+        std::weak_ptr<scene::NanControl> child_;
+    };
+
+    class FlexItem: public scene::NanControl {
+    public:
+        explicit FlexItem(scene::LayoutFlexPolicy policy = {});
+        [[nodiscard]] static auto create(scene::LayoutFlexPolicy policy = {})
+            -> std::shared_ptr<FlexItem>;
+
+        auto set_child(std::shared_ptr<scene::NanControl> child) -> FlexItem&;
+        auto set_policy(scene::LayoutFlexPolicy policy) -> FlexItem&;
+        [[nodiscard]] auto policy() const -> scene::LayoutFlexPolicy;
+        [[nodiscard]] auto layout_flex_policy() const -> scene::LayoutFlexPolicy override;
+
+    protected:
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
+        auto on_layout() -> void override;
+
+    private:
+        scene::LayoutFlexPolicy policy_;
         std::weak_ptr<scene::NanControl> child_;
     };
 

@@ -67,10 +67,9 @@ Current layout capabilities:
 
 Current layout limitations:
 
-- No basis/shrink/min-max policy comparable to full CSS flexbox.
-- No `space-around` main-axis strategy yet; `space_between` currently targets fixed Flex/Row/Column children.
-- No run stretch or per-child alignment in `Wrap` / `Flow`.
-- No grid, anchors, or scroll viewport yet; controls now support child-subtree clipping.
+- Flex sizing intentionally covers basis/grow/shrink/min-max redistribution, not the complete CSS flexbox specification.
+- No `space-around` or baseline alignment strategy yet; `space_between` supports linear children and per-run Wrap/Flow distribution.
+- Grid and anchors are deferred; `ScrollView` is the selected low-level viewport and currently omits scrollbar chrome and kinetic scrolling.
 - `Padding` does not model full content-box / border-box semantics.
 - Layout dirty/cache invalidation is still coarse.
 - Default `NanControl::on_layout()` direct-child behavior is transitional.
@@ -238,14 +237,18 @@ Tasks:
 
 Goal: refine the existing layout primitives after text and clip semantics are stable.
 
-Status: first refinement in progress. Flex/Row/Column now support `LayoutAlignment::space_between` for fixed-size children; flex basis/shrink and grid/scroll primitives remain future work.
+Status: initial refinement complete. Flex/Row/Column share one axis-neutral allocator. `LayoutFlexPolicy` is a zero-RTTI capability and `FlexItem` owns explicit basis, grow, shrink, and physical min/max limits; grow and scaled-basis shrink redistribute remaining space after items hit limits. Existing `Expanded` remains compatible through `layout_flex_factor()` and maps to zero basis plus weighted grow.
+
+Wrap/Flow distribute main-axis space independently inside each run, honor `space_between` for run alignment, support stretched runs, and allow per-child cross-axis alignment overrides. Explicit gaps remain the minimum spacing used for intrinsic measurement and wrapping decisions.
+
+`ScrollView` is the selected low-level viewport. It measures one child with an unbounded scroll axis, clamps programmatic and wheel-driven offsets, translates content locally, and relies on `ControlOverflow::clip` for rendering and hit testing. Wheel events hit-test their current screen position and bubble, allowing nested scroll views to hand off input at their limits. Grid and Anchor are explicitly deferred until real controls require track/span or edge-constraint contracts.
 
 Tasks:
 
-1. Add flex basis/shrink/min-max policy where needed.
-2. Add main-axis spacing strategies such as `space_between` only when a real page/control needs them.
-3. Add run stretch and per-child alignment to `Wrap` / `Flow`.
-4. Decide whether Grid, Anchor, or Scroll viewport enters the low-level widget set next.
+1. Add flex basis/shrink/min-max policy where needed. Completed through `LayoutFlexPolicy` and `FlexItem`.
+2. Add main-axis spacing strategies such as `space_between` only when a real page/control needs them. Completed for linear layouts and Wrap runs.
+3. Add run stretch and per-child alignment to `Wrap` / `Flow`. Completed.
+4. Decide whether Grid, Anchor, or Scroll viewport enters the low-level widget set next. Completed: `ScrollView` entered; Grid and Anchor are deferred.
 5. Keep Yoga or any third-party solver behind a backend boundary; it should not define the public widget API.
 
 ### Side Tracks

@@ -73,8 +73,7 @@ namespace nandina::scene
         /// Dispatch mouse movement, maintaining hover target enter/leave/move semantics.
         auto dispatch_mouse_move(const MouseMoveEvent& event) -> void;
 
-        /// Dispatch a scroll-wheel event to the hovered node and bubble toward root.
-        /// If nothing is hovered, hit-tests at the event position first.
+        /// Hit-test at the wheel position and bubble the event toward the root.
         auto dispatch_mouse_wheel(const MouseWheelEvent& event) -> void;
 
         /// Current deepest hovered node, or nullptr if none.

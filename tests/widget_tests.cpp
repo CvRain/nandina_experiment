@@ -20,6 +20,7 @@
 #include "widget/layout.hpp"
 #include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
+#include "widget/scroll_view.hpp"
 #include "widget/text_field.hpp"
 
 #include <memory>
@@ -1183,6 +1184,52 @@ TEST_CASE("Flex distributes main-axis space between fixed children", "[widget][l
     REQUIRE(c->position().get_x() == Catch::Approx(100.0F));
 }
 
+TEST_CASE("FlexItem grows and redistributes at max limits", "[widget][layout][flex]") {
+    auto a_child = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 10.0F));
+    auto b_child = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 10.0F));
+    auto a = widget::FlexItem::create(scene::LayoutFlexPolicy {
+        .basis = 20.0F,
+        .grow = 1.0F,
+        .limits = {.max_width = 30.0F},
+    });
+    auto b = widget::FlexItem::create(scene::LayoutFlexPolicy {.basis = 20.0F, .grow = 1.0F});
+    a->set_child(a_child);
+    b->set_child(b_child);
+    auto row = widget::Row::create();
+    row->add(a).add(b);
+
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(90.0F, 20.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 90.0F, 20.0F));
+
+    REQUIRE(a->width() == Catch::Approx(30.0F));
+    REQUIRE(b->width() == Catch::Approx(60.0F));
+    REQUIRE(a_child->size() == a->size());
+    REQUIRE(b_child->size() == b->size());
+}
+
+TEST_CASE("FlexItem shrinks by scaled basis and respects minima", "[widget][layout][flex]") {
+    auto a = widget::FlexItem::create(scene::LayoutFlexPolicy {
+        .basis = 100.0F,
+        .shrink = 1.0F,
+        .limits = {.min_width = 70.0F},
+    });
+    auto b = widget::FlexItem::create(scene::LayoutFlexPolicy {
+        .basis = 100.0F,
+        .shrink = 1.0F,
+        .limits = {.min_width = 20.0F},
+    });
+    a->set_child(std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 10.0F)));
+    b->set_child(std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 10.0F)));
+    auto row = widget::Row::create();
+    row->add(a).add(b);
+
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(120.0F, 20.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 120.0F, 20.0F));
+
+    REQUIRE(a->width() == Catch::Approx(70.0F));
+    REQUIRE(b->width() == Catch::Approx(50.0F));
+}
+
 TEST_CASE("Wrap flows horizontal children into multiple runs", "[widget][layout][wrap]") {
     auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
     auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 20.0F));
@@ -1203,6 +1250,103 @@ TEST_CASE("Wrap flows horizontal children into multiple runs", "[widget][layout]
     REQUIRE(c->position().get_y() == Catch::Approx(27.0F));
     REQUIRE(d->position().get_x() == Catch::Approx(55.0F));
     REQUIRE(d->position().get_y() == Catch::Approx(27.0F));
+}
+
+TEST_CASE("Wrap distributes space independently inside each run", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 20.0F));
+    auto c = std::make_shared<scene::NanControl>(foundation::NanSize(50.0F, 12.0F));
+    auto d = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 8.0F));
+
+    auto wrap = widget::Wrap::create();
+    wrap->set_gap(5.0F)
+        .set_run_gap(7.0F)
+        .set_main_alignment(widget::LayoutAlignment::space_between)
+        .add(a)
+        .add(b)
+        .add(c)
+        .add(d);
+
+    (void)wrap->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(80.0F, 64.0F)));
+    wrap->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 80.0F, 64.0F));
+
+    REQUIRE(a->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_x() == Catch::Approx(50.0F));
+    REQUIRE(c->position().get_x() == Catch::Approx(0.0F));
+    REQUIRE(d->position().get_x() == Catch::Approx(60.0F));
+    REQUIRE(c->position().get_y() == Catch::Approx(27.0F));
+}
+
+TEST_CASE("Wrap distributes spare cross-axis space between runs", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+
+    auto wrap = widget::Wrap::create();
+    wrap->set_run_gap(5.0F)
+        .set_run_alignment(widget::LayoutAlignment::space_between)
+        .add(a)
+        .add(b);
+
+    (void)wrap->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(40.0F, 80.0F)));
+    wrap->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 40.0F, 80.0F));
+
+    REQUIRE(a->position().get_y() == Catch::Approx(0.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(60.0F));
+}
+
+TEST_CASE("Wrap stretches runs and honors child cross alignment", "[widget][layout][wrap]") {
+    auto a = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 10.0F));
+    auto b = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    auto wrap = widget::Wrap::create();
+    wrap->set_run_gap(5.0F)
+        .set_run_alignment(widget::LayoutAlignment::stretch)
+        .add(a, widget::LayoutAlignment::end)
+        .add(b, widget::LayoutAlignment::stretch);
+
+    (void)wrap->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(40.0F, 80.0F)));
+    wrap->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 40.0F, 80.0F));
+
+    REQUIRE(a->position().get_y() == Catch::Approx(22.5F));
+    REQUIRE(a->height() == Catch::Approx(10.0F));
+    REQUIRE(b->position().get_y() == Catch::Approx(37.5F));
+    REQUIRE(b->height() == Catch::Approx(42.5F));
+}
+
+TEST_CASE("ScrollView clamps offsets and translates content", "[widget][scroll]") {
+    auto content = std::make_shared<scene::NanControl>(foundation::NanSize(50.0F, 200.0F));
+    auto scroll = widget::ScrollView::create(widget::ScrollAxis::vertical);
+    scroll->set_child(content);
+    (void)scroll->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(100.0F, 80.0F)));
+    scroll->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 100.0F, 80.0F));
+
+    REQUIRE(scroll->overflow() == scene::ControlOverflow::clip);
+    REQUIRE(scroll->content_size() == foundation::NanSize(100.0F, 200.0F));
+    REQUIRE(scroll->maximum_scroll_offset() == foundation::NanPoint(0.0F, 120.0F));
+    scroll->set_scroll_offset(foundation::NanPoint(20.0F, 500.0F));
+    REQUIRE(scroll->scroll_offset() == foundation::NanPoint(0.0F, 120.0F));
+    REQUIRE(content->position() == foundation::NanPoint(0.0F, -120.0F));
+}
+
+TEST_CASE("ScrollView consumes wheel only when offset changes", "[widget][scroll][input]") {
+    auto content = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 200.0F));
+    auto scroll = widget::ScrollView::create();
+    scroll->set_child(content).set_wheel_step(25.0F);
+    (void)scroll->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(100.0F, 80.0F)));
+    scroll->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 100.0F, 80.0F));
+
+    scene::MouseWheelEvent down(
+        foundation::NanPoint(10.0F, 10.0F), foundation::NanPoint(0.0F, -1.0F)
+    );
+    REQUIRE(scroll->on_input(down));
+    REQUIRE(down.is_accepted());
+    REQUIRE(scroll->scroll_offset().get_y() == Catch::Approx(25.0F));
+
+    scroll->set_scroll_offset(scroll->maximum_scroll_offset());
+    scene::MouseWheelEvent at_end(
+        foundation::NanPoint(10.0F, 10.0F), foundation::NanPoint(0.0F, -1.0F)
+    );
+    REQUIRE_FALSE(scroll->on_input(at_end));
+    REQUIRE_FALSE(at_end.is_accepted());
 }
 
 TEST_CASE("Flow wraps again when assigned bounds shrink", "[widget][layout][wrap]") {
