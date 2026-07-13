@@ -7,6 +7,7 @@
 #include "text/glyph_run_renderer.hpp"
 #include "text/harfbuzz_text_backend.hpp"
 #include "scene/scene_tree.hpp"
+#include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
 
 #include <catch2/catch_approx.hpp>
@@ -346,6 +347,26 @@ TEST_CASE("FriBidi orders pure RTL and mixed-direction glyph runs", "[text][harf
         }
     }
     REQUIRE(has_split_bidi_boundary);
+}
+
+TEST_CASE("EditableText moves visually through RTL caret stops", "[text][harfbuzz][caret][bidi]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(rtl_test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+    constexpr std::string_view source = "لسان";
+    auto edit = std::make_shared<widget::primitives::EditableText>(std::string(source));
+    edit->set_text_pipeline({.backend = &backend});
+
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    edit->set_caret(0);
+    tree.dispatch_key(scene::KeyEvent(263, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() > 0);
+
+    edit->set_caret(source.size());
+    tree.dispatch_key(scene::KeyEvent(262, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() < source.size());
 }
 
 TEST_CASE("FriBidi reshapes RTL overflow at logical cluster boundaries", "[text][harfbuzz][bidi][overflow]") {

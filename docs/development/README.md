@@ -221,7 +221,11 @@ The next main-line task moves into M4 consumption of this geometry: replace `Edi
 
 Goal: build input on top of the text layout contract, not beside it.
 
-Status: initial `EditableText` primitive landed, and a thin semantic `TextField` shell is in progress. `EditableText` owns editable value/caret/focus handling and reuses `Text` for layout and drawing; `TextField` composes surface, placeholder, and editable text behavior.
+Status: the initial single-line editing milestone is complete. `EditableText` owns value, caret affinity, selection, read-only behavior, and IME-ready preedit state while reusing `Text` for layout and drawing. Caret drawing and pointer lookup consume backend-produced visual geometry. Caret clamping, Backspace, and Delete operate on UAX #29 grapheme boundaries; typing and deletion replace active selections. Left/Right traverse visual caret stops for LTR, RTL, and mixed-bidi layouts, Shift extends selection, Home/End select visual edges, and Ctrl+A selects all.
+
+`TextField` composes the surface, placeholder, editable primitive, focus ring, and semantic state. It supports pointer placement and drag selection through SceneTree pointer capture, a clipped horizontal viewport that keeps the active caret visible, line-metric vertical centering, read-only/disabled/invalid states, `on_change`, and `on_submit`. The value uses `TextOverflow::clip` with complete off-screen geometry rather than ellipsis.
+
+The current raylib adapter exposes committed UTF-8 input through `GetCharPressed()` but does not expose portable native composition updates or candidate-window placement. `TextComposition` therefore provides the backend-neutral preedit state contract for future SDL/native adapters; native IME acquisition remains platform integration work rather than widget-state work. Clipboard, undo/redo, word movement, password masking, multiline editing, caret blinking, and accessibility bridges are later features, not blockers for the initial M4 contract.
 
 Tasks:
 

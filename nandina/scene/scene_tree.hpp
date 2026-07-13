@@ -86,6 +86,10 @@ namespace nandina::scene
         /// Dispatch committed text input to the focused node and bubble toward root.
         auto dispatch_text_input(const TextInputEvent& event) -> void;
 
+        void set_pointer_capture(NanNode2D* node);
+        void release_pointer_capture(NanNode2D* node = nullptr);
+        [[nodiscard]] auto pointer_capture() const -> NanNode2D*;
+
         /// Focused node, or nullptr if none.
         [[nodiscard]] auto focused_node() const -> NanNode2D*;
 
@@ -140,6 +144,7 @@ namespace nandina::scene
         std::vector<std::weak_ptr<NanNode>> delete_queue_;
         std::weak_ptr<NanNode2D> hovered_node_;
         std::weak_ptr<NanNode2D> focused_node_;
+        std::weak_ptr<NanNode2D> pointer_capture_;
         foundation::NanPoint last_mouse_pos_ {};
         bool has_mouse_pos_ = false;
     };

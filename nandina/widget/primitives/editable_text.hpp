@@ -9,11 +9,24 @@
 #include "text.hpp"
 
 #include <functional>
+#include <optional>
 #include <string>
 #include <string_view>
 
 namespace nandina::widget::primitives
 {
+    struct TextSelection {
+        std::size_t anchor = 0;
+        TextAffinity anchor_affinity = TextAffinity::downstream;
+        std::size_t focus = 0;
+        TextAffinity focus_affinity = TextAffinity::downstream;
+    };
+
+    struct TextComposition {
+        std::string text;
+        std::size_t selection_start = 0;
+        std::size_t selection_end = 0;
+    };
 
     class EditableText: public scene::NanControl {
     public:
@@ -25,8 +38,26 @@ namespace nandina::widget::primitives
         void set_style(TextStyle style);
         [[nodiscard]] auto style() const -> const TextStyle&;
 
-        void set_caret(std::size_t offset);
+        void set_caret(
+            std::size_t offset,
+            TextAffinity affinity = TextAffinity::downstream
+        );
         [[nodiscard]] auto caret() const -> std::size_t;
+        [[nodiscard]] auto caret_affinity() const -> TextAffinity;
+
+        void set_selection(TextSelection selection);
+        [[nodiscard]] auto selection() const -> TextSelection;
+        [[nodiscard]] auto has_selection() const -> bool;
+        void select_all();
+        void clear_selection();
+
+        void set_read_only(bool value);
+        [[nodiscard]] auto read_only() const -> bool;
+        void set_selection_color(foundation::NanColor color);
+
+        void set_composition(TextComposition composition);
+        void clear_composition();
+        [[nodiscard]] auto composition() const -> const std::optional<TextComposition>&;
 
         void set_on_change(std::function<void(std::string_view)> callback);
 
@@ -48,13 +79,25 @@ namespace nandina::widget::primitives
     private:
         void insert_text(std::string_view text);
         void erase_before_caret();
+        void erase_after_caret();
+        void erase_selection();
+        void move_caret_visual(int direction, bool extend);
+        void move_caret_to_visual_edge(bool end, bool extend);
+        void update_selection_focus(TextCaretStop stop, bool extend);
         void sync_text();
         void emit_change();
         [[nodiscard]] auto caret_x() const -> float;
 
         std::string value_;
         std::size_t caret_ = 0;
+        TextAffinity caret_affinity_ = TextAffinity::downstream;
+        TextSelection selection_ {};
+        bool read_only_ = false;
         bool focused_ = false;
+        foundation::NanColor selection_color_ = foundation::NanColor::from(
+            foundation::NanHexRgb {.red = 80, .green = 130, .blue = 220, .alpha = 96}
+        );
+        std::optional<TextComposition> composition_;
         Text text_;
         std::function<void(std::string_view)> on_change_;
     };

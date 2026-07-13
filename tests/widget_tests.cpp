@@ -45,12 +45,17 @@ public:
         float alpha;
         foundation::NanPoint position;
     };
+    struct LineCall {
+        foundation::NanPoint start;
+        foundation::NanPoint end;
+    };
     int line_count = 0;
     int outline_count = 0;
     int rounded_count = 0;
     int clip_clears = 0;
     std::vector<RectCall> rects;
     std::vector<TextCall> texts;
+    std::vector<LineCall> lines;
     std::vector<foundation::NanRect> clips;
 
     void begin_frame() override {}
@@ -70,9 +75,10 @@ public:
     void draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {
         ++rounded_count;
     }
-    void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float,
+    void draw_line(const foundation::NanPoint& start, const foundation::NanPoint& end, float,
                    const foundation::NanColor&) override {
         ++line_count;
+        lines.push_back({.start = start, .end = end});
     }
     void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
     void draw_text(std::string_view text, const foundation::NanPoint& position, float,
@@ -95,6 +101,21 @@ public:
                     .text_offset = 0,
                     .text_length = input.text.size(),
                     .visible_text = "backend",
+                    .caret_stops = {
+                        widget::primitives::TextCaretStop {
+                            .source_offset = 0,
+                            .x = 0.0F,
+                        },
+                        widget::primitives::TextCaretStop {
+                            .source_offset = std::min<std::size_t>(1, input.text.size()),
+                            .x = 5.0F,
+                        },
+                        widget::primitives::TextCaretStop {
+                            .source_offset = input.text.size(),
+                            .x = 42.0F,
+                            .affinity = widget::primitives::TextAffinity::upstream,
+                        },
+                    },
                     .size = foundation::NanSize(42.0F, 18.0F),
                     .baseline = 12.0F,
                 },
@@ -741,6 +762,113 @@ TEST_CASE("EditableText caret and backspace preserve UTF-8 boundaries", "[widget
     REQUIRE(edit->caret() == 1);
 }
 
+TEST_CASE("EditableText deletes complete grapheme clusters", "[widget][editable-text][grapheme]") {
+    constexpr std::string_view combined = "a\xCC\x81" "b";
+    auto edit = std::make_shared<widget::primitives::EditableText>(std::string(combined));
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    edit->set_caret(2);
+    REQUIRE(edit->caret() == 0);
+    edit->set_caret(edit->value().size());
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "a\xCC\x81");
+    REQUIRE(edit->caret() == 3);
+
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value().empty());
+    REQUIRE(edit->caret() == 0);
+
+    edit->set_value(std::string(combined));
+    edit->set_caret(0);
+    tree.dispatch_key(scene::KeyEvent(261, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "b");
+    REQUIRE(edit->caret() == 0);
+}
+
+TEST_CASE("EditableText moves through visual caret stops", "[widget][editable-text][caret]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("abc");
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    tree.dispatch_key(scene::KeyEvent(263, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() == 2);
+    tree.dispatch_key(scene::KeyEvent(263, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() == 1);
+    tree.dispatch_key(scene::KeyEvent(262, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() == 2);
+    tree.dispatch_key(scene::KeyEvent(268, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() == 0);
+    tree.dispatch_key(scene::KeyEvent(269, scene::KeyEvent::Action::press));
+    REQUIRE(edit->caret() == 3);
+}
+
+TEST_CASE("EditableText draws caret from layout geometry", "[widget][editable-text][caret]") {
+    FixedTextLayoutBackend backend;
+    auto edit = std::make_shared<widget::primitives::EditableText>("abc");
+    edit->set_text_pipeline({.backend = &backend});
+    edit->set_caret(1);
+
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+    tree.draw(dev);
+
+    REQUIRE(dev.lines.size() == 1);
+    REQUIRE(dev.lines.front().start.get_x() == Catch::Approx(5.0F));
+    REQUIRE(dev.lines.front().end.get_x() == Catch::Approx(5.0F));
+}
+
+TEST_CASE("EditableText selection replaces and deletes once", "[widget][editable-text][selection]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("abc");
+    std::vector<std::string> changes;
+    edit->set_on_change([&](std::string_view value) { changes.emplace_back(value); });
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    scene::KeyModifiers shift {.shift = true};
+    tree.dispatch_key(scene::KeyEvent(263, scene::KeyEvent::Action::press, shift));
+    REQUIRE(edit->has_selection());
+    REQUIRE(edit->selection().anchor == 3);
+    REQUIRE(edit->selection().focus == 2);
+    tree.dispatch_text_input(scene::TextInputEvent("X"));
+    REQUIRE(edit->value() == "abX");
+    REQUIRE(changes.size() == 1);
+
+    scene::KeyModifiers ctrl {.ctrl = true};
+    tree.dispatch_key(scene::KeyEvent(65, scene::KeyEvent::Action::press, ctrl));
+    REQUIRE(edit->selection().anchor == 0);
+    REQUIRE(edit->selection().focus == 3);
+    tree.dispatch_key(scene::KeyEvent(261, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value().empty());
+    REQUIRE(changes.size() == 2);
+}
+
+TEST_CASE("EditableText read-only and composition state preserve value", "[widget][editable-text][state]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("value");
+    edit->set_read_only(true);
+    edit->set_composition(widget::primitives::TextComposition {
+        .text = "preedit",
+        .selection_start = 2,
+        .selection_end = 4,
+    });
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    tree.dispatch_text_input(scene::TextInputEvent("x"));
+    tree.dispatch_key(scene::KeyEvent(259, scene::KeyEvent::Action::press));
+    REQUIRE(edit->value() == "value");
+    REQUIRE(edit->composition().has_value());
+    REQUIRE(edit->composition()->selection_end == 4);
+    edit->clear_composition();
+    REQUIRE_FALSE(edit->composition().has_value());
+}
+
 TEST_CASE("EditableText draws text and focused caret", "[widget][editable-text]") {
     RecordingDevice dev;
     scene::NanSceneTree tree;
@@ -795,6 +923,58 @@ TEST_CASE("TextField forwards text editing and change callback", "[widget][text-
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts.front().text == "A");
     REQUIRE(dev.line_count == 1);
+}
+
+TEST_CASE("TextField pointer selection uses capture outside bounds", "[widget][text-field][selection]") {
+    auto field = std::make_shared<widget::TextField>("abcdef", "");
+    field->layout_to(foundation::NanRect::from_xywh(20.0F, 20.0F, 100.0F, 40.0F));
+    scene::NanSceneTree tree;
+    tree.set_root(field);
+
+    tree.dispatch_mouse_button(scene::MouseButtonEvent(
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        foundation::NanPoint(34.0F, 40.0F)
+    ));
+    REQUIRE(tree.pointer_capture() == field.get());
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(
+        foundation::NanPoint(200.0F, 40.0F), foundation::NanPoint(166.0F, 0.0F)
+    ));
+    REQUIRE(field->editable_text().has_selection());
+    REQUIRE(field->editable_text().selection().focus == field->value().size());
+    tree.dispatch_mouse_button(scene::MouseButtonEvent(
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        foundation::NanPoint(200.0F, 40.0F)
+    ));
+    REQUIRE(tree.pointer_capture() == nullptr);
+}
+
+TEST_CASE("TextField exposes semantic states and submit", "[widget][text-field][state]") {
+    auto field = std::make_shared<widget::TextField>("value", "");
+    std::vector<std::string> submissions;
+    field->set_on_submit([&](std::string_view value) { submissions.emplace_back(value); });
+    field->set_read_only(true);
+    field->set_invalid(true);
+    REQUIRE(field->read_only());
+    REQUIRE(field->invalid());
+
+    scene::NanSceneTree tree;
+    tree.set_root(field);
+    tree.set_focus(field.get());
+    tree.dispatch_key(scene::KeyEvent(257, scene::KeyEvent::Action::press));
+    REQUIRE(submissions == std::vector<std::string> {"value"});
+
+    field->set_disabled(true);
+    REQUIRE(field->disabled());
+    REQUIRE_FALSE(field->is_focusable());
+    REQUIRE(tree.focused_node() == nullptr);
+    tree.dispatch_text_input(scene::TextInputEvent("x"));
+    REQUIRE(field->value() == "value");
+
+    RecordingDevice dev;
+    tree.draw(dev);
+    REQUIRE(dev.line_count == 0);
 }
 
 TEST_CASE("Row alignment positions children inside assigned bounds", "[widget][layout][alignment]") {

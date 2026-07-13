@@ -38,6 +38,7 @@ namespace nandina::scene
     NanSceneTree::NanSceneTree() = default;
 
     NanSceneTree::~NanSceneTree() {
+        pointer_capture_.reset();
         _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
         _transition_focus(nullptr);
         _flush_deletes();
@@ -51,6 +52,7 @@ namespace nandina::scene
     }
 
     auto NanSceneTree::set_root(std::shared_ptr<NanNode2D> root) -> void {
+        pointer_capture_.reset();
         _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
         _transition_focus(nullptr);
 
@@ -91,13 +93,19 @@ namespace nandina::scene
 
     auto NanSceneTree::dispatch_mouse_button(const MouseButtonEvent& event) -> void {
         auto copy = event;
-        auto* hit = hit_test(copy.screen_pos());
+        auto* captured = pointer_capture_.lock().get();
+        auto* hit = !copy.is_pressed() && captured != nullptr
+            ? captured
+            : hit_test(copy.screen_pos());
         if (!hit) {
             return;
         }
 
         set_focus(_find_focus_target(hit));
         _bubble_input(hit, copy);
+        if (!copy.is_pressed() && captured != nullptr) {
+            pointer_capture_.reset();
+        }
     }
 
     auto NanSceneTree::dispatch_mouse_move(const MouseMoveEvent& event) -> void {
@@ -107,13 +115,16 @@ namespace nandina::scene
         auto* hit = hit_test(event.screen_pos());
         _transition_hover(hit, event.screen_pos());
 
-        auto* hovered = hovered_node_.lock().get();
-        if (!hovered) {
+        auto* target = pointer_capture_.lock().get();
+        if (target == nullptr) {
+            target = hovered_node_.lock().get();
+        }
+        if (!target) {
             return;
         }
 
         auto copy = event;
-        _bubble_input(hovered, copy);
+        _bubble_input(target, copy);
     }
 
     auto NanSceneTree::hovered_node() const -> NanNode2D* {
@@ -157,6 +168,24 @@ namespace nandina::scene
 
     auto NanSceneTree::focused_node() const -> NanNode2D* {
         return focused_node_.lock().get();
+    }
+
+    void NanSceneTree::set_pointer_capture(NanNode2D* node) {
+        if (node == nullptr || !node->is_inside_tree() || node->get_tree() != this) {
+            return;
+        }
+        pointer_capture_ = weak_2d(node);
+    }
+
+    void NanSceneTree::release_pointer_capture(NanNode2D* node) {
+        auto* captured = pointer_capture_.lock().get();
+        if (node == nullptr || captured == node) {
+            pointer_capture_.reset();
+        }
+    }
+
+    auto NanSceneTree::pointer_capture() const -> NanNode2D* {
+        return pointer_capture_.lock().get();
     }
 
     auto NanSceneTree::set_focus(NanNode2D* node) -> void {

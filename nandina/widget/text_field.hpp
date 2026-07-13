@@ -42,6 +42,14 @@ namespace nandina::widget
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
 
         void set_on_change(std::function<void(std::string_view)> callback);
+        void set_on_submit(std::function<void(std::string_view)> callback);
+
+        void set_read_only(bool value);
+        [[nodiscard]] auto read_only() const -> bool;
+        void set_disabled(bool value);
+        [[nodiscard]] auto disabled() const -> bool;
+        void set_invalid(bool value);
+        [[nodiscard]] auto invalid() const -> bool;
 
         [[nodiscard]] auto editable_text() -> primitives::EditableText&;
         [[nodiscard]] auto editable_text() const -> const primitives::EditableText&;
@@ -60,9 +68,15 @@ namespace nandina::widget
 
     private:
         void apply_theme();
+        void place_caret(foundation::NanPoint screen_point, bool extend);
+        void update_scroll(float viewport_width);
         [[nodiscard]] auto content_constraints(scene::LayoutConstraints constraints) const
             -> scene::LayoutConstraints;
-        [[nodiscard]] auto content_origin(foundation::NanRect world) const -> foundation::NanPoint;
+        [[nodiscard]] auto line_origin(
+            foundation::NanRect world,
+            const primitives::TextLayoutResult& layout,
+            float x
+        ) const -> foundation::NanPoint;
 
         primitives::Surface surface_;
         primitives::EditableText edit_;
@@ -70,7 +84,14 @@ namespace nandina::widget
         theme::NanTheme theme_;
         float padding_x_ = 0.0F;
         float height_ = 0.0F;
+        float scroll_x_ = 0.0F;
+        bool focused_ = false;
+        bool dragging_ = false;
+        bool read_only_ = false;
+        bool disabled_ = false;
+        bool invalid_ = false;
         std::function<void(std::string_view)> on_change_;
+        std::function<void(std::string_view)> on_submit_;
     };
 
 } // namespace nandina::widget
