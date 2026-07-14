@@ -8,7 +8,7 @@ subdir('res/fonts')
 
 example_cpp_args = []
 if get_option('bundled_fonts').enabled()
-    example_cpp_args += ['-DNANDINA_EXAMPLE_FONT_PATH="' + bundled_font_path + '"']
+    example_cpp_args += ['-DNANDINA_EXAMPLE_RESOURCE_DIR="' + bundled_font_dir + '"']
 endif
 
 executable('nandina_example',

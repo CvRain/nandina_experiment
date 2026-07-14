@@ -11,6 +11,7 @@
 #include <cmath>
 #include <stdexcept>
 #include <string>
+#include <limits>
 #include <utility>
 
 namespace nandina::text
@@ -50,6 +51,30 @@ namespace nandina::text
             }
         }
 
+        explicit Impl(resource::ResourceHandle source, long face_index): resource(std::move(source)) {
+            if (!resource || resource->bytes().empty()
+                || resource->size() > static_cast<std::size_t>(std::numeric_limits<FT_Long>::max()))
+            {
+                throw std::invalid_argument("FreeType memory face requires non-empty bounded resource bytes");
+            }
+            if (const auto error = FT_Init_FreeType(&library); error != 0) {
+                throw_freetype_error("FT_Init_FreeType", error);
+            }
+            const auto bytes = resource->bytes();
+            if (const auto error = FT_New_Memory_Face(
+                    library,
+                    reinterpret_cast<const FT_Byte*>(bytes.data()),
+                    static_cast<FT_Long>(bytes.size()),
+                    face_index,
+                    &face
+                ); error != 0)
+            {
+                FT_Done_FreeType(library);
+                library = nullptr;
+                throw_freetype_error("FT_New_Memory_Face", error);
+            }
+        }
+
         ~Impl() {
             if (face != nullptr) {
                 FT_Done_Face(face);
@@ -76,10 +101,14 @@ namespace nandina::text
 
         FT_Library library = nullptr;
         FT_Face face = nullptr;
+        resource::ResourceHandle resource;
     };
 
     FreeTypeFontFace::FreeTypeFontFace(const std::filesystem::path& path, long face_index):
         impl_(std::make_unique<Impl>(path, face_index)) {}
+
+    FreeTypeFontFace::FreeTypeFontFace(resource::ResourceHandle resource, long face_index):
+        impl_(std::make_unique<Impl>(std::move(resource), face_index)) {}
 
     FreeTypeFontFace::~FreeTypeFontFace() = default;
     FreeTypeFontFace::FreeTypeFontFace(FreeTypeFontFace&&) noexcept = default;

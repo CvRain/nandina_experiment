@@ -263,6 +263,24 @@ The responsive page uses `Expanded`, `FlexItem` grow/shrink/min-width policy, cl
 
 M6 is an application validation milestone, not a new widget abstraction. Its next purpose is collecting real interaction feedback on selection, focus, narrow-window behavior, nested clipping, and dynamic scroll updates before starting native input integration or advanced layout work.
 
+#### Resource Foundation
+
+Status: initial storage-neutral resource contract landed. `ResourceId` is a stable binary UUID, `ResourceKey` is a validated human-readable logical name, and immutable `ResourceHandle` snapshots own their bytes independently of backend lifetime. `ResourceManager` mounts ordered backends with deterministic priority overrides and stops on backend errors rather than silently exposing a lower layer.
+
+`MemoryBackend` supports registration, replacement, aliases, and test/runtime overrides. `DirectoryBackend` uses an explicit manifest so IDs remain stable across file moves and returns owned file snapshots. `SQLiteBackend` is a read-only runtime package backend supporting canonical key/UUID lookup, aliases, embedded BLOBs, and relative external files with declared-size validation. SQLite details remain private to its implementation; package creation and migrations are intentionally separate tooling concerns.
+
+SQLite uses Meson's dependency fallback model. A compatible system SQLite is preferred, while a pinned WrapDB amalgamation is downloaded and checksum-verified when the host has no development package, including normal Windows source/subproject builds. This keeps `<sqlite3.h>` private to `sqlite_backend.cpp` without making SQLite installation a framework consumer prerequisite. Fully offline builds must pre-populate Meson's package cache or vendor the wrap source archive alongside the wrap metadata.
+
+The schema is identified by SQLite `application_id` plus `user_version`. Components must consume logical resource or font-family IDs rather than paths, UUID literals, SQLite rows, or backend handles.
+
+Resource-backed font loading is now available. `FreeTypeFontFace` retains an immutable `ResourceHandle` and creates an `FT_New_Memory_Face`, so shaping and rasterization remain valid after manager unmount, backend destruction, or source-file removal. `FontLoader` resolves logical keys through `ResourceManager` and weakly caches faces by `(ResourceId, face_index)`; aliases deduplicate naturally, while same-ID hot replacement requires explicit invalidation for subsequent loads.
+
+`FontFamilyRegistry` provides application-defined family IDs, aliases, weight/slant matching, family-specific fallback order, global default fallback, cycle detection, and ordered resolution into shared faces for `HarfBuzzTextLayoutBackend`. ResourceManager and FontLoader remain CPU-only.
+
+`FontPipeline` is the render-device-scoped owner for the HarfBuzz backend, one CPU atlas and device texture per resolved face, ordered renderer bindings, and the non-owning `TextPipeline` view consumed by widgets. `FontPipelineCache` weakly reuses that complete owner by family request and atlas configuration; clearing widgets and pipeline handles before device teardown preserves the existing GPU lifetime contract.
+
+The Todo example now mounts its bundled resource directory, resolves `fonts/default` through `families/ui`, and obtains its shared pipeline from `FontPipelineCache`. The former compile-time absolute font-face construction and manual backend/atlas/texture/renderer ownership have been removed. Packaged CJK fallback profiles, SQLite package generation, and color emoji rendering remain the next milestones.
+
 ### Side Tracks
 
 These are useful, but should not interrupt the main text/layout/clip line unless a feature directly requires them.

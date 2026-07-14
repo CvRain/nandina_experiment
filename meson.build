@@ -76,6 +76,12 @@ utf8proc_dep = utf8proc_subproj.dependency('utf8proc')
 freetype_dep = freetype_subproj.get_variable('freetype_dep')
 harfbuzz_dep = harfbuzz_subproj.get_variable('libharfbuzz_dep')
 fribidi_dep = fribidi_subproj.get_variable('libfribidi_dep')
+sqlite3_dep = dependency(
+    'sqlite3',
+    version: '>=3.37',
+    fallback: ['sqlite3', 'sqlite3_dep'],
+    default_options: ['default_library=static'],
+)
 
 # Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
 # catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。

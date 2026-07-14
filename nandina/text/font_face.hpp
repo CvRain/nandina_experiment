@@ -5,6 +5,8 @@
 #ifndef NANDINA_EXPERIMENT_TEXT_FONT_FACE_HPP
 #define NANDINA_EXPERIMENT_TEXT_FONT_FACE_HPP
 
+#include "../resource/resource.hpp"
+
 #include <cstdint>
 #include <filesystem>
 #include <memory>
@@ -40,6 +42,7 @@ namespace nandina::text
     class FreeTypeFontFace {
     public:
         explicit FreeTypeFontFace(const std::filesystem::path& path, long face_index = 0);
+        explicit FreeTypeFontFace(resource::ResourceHandle resource, long face_index = 0);
         ~FreeTypeFontFace();
 
         FreeTypeFontFace(const FreeTypeFontFace&) = delete;

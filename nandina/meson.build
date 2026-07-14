@@ -24,6 +24,20 @@ module_reactive = files(
     'reactive/reactive.hpp',
 )
 
+module_resource = files(
+    'resource/resource.hpp',
+    'resource/resource.cpp',
+    'resource/resource_backend.hpp',
+    'resource/resource_manager.hpp',
+    'resource/resource_manager.cpp',
+    'resource/backends/memory_backend.hpp',
+    'resource/backends/memory_backend.cpp',
+    'resource/backends/directory_backend.hpp',
+    'resource/backends/directory_backend.cpp',
+    'resource/backends/sqlite_backend.hpp',
+    'resource/backends/sqlite_backend.cpp',
+)
+
 module_scene = files(
     'scene/input_event.hpp',
     'scene/node.hpp',
@@ -54,6 +68,12 @@ module_theme = files(
 module_text = files(
     'text/font_face.hpp',
     'text/freetype_font_face.cpp',
+    'text/font_loader.hpp',
+    'text/font_loader.cpp',
+    'text/font_family.hpp',
+    'text/font_family.cpp',
+    'text/font_pipeline.hpp',
+    'text/font_pipeline.cpp',
     'text/glyph_atlas.hpp',
     'text/glyph_atlas.cpp',
     'text/harfbuzz_text_backend.hpp',
@@ -104,8 +124,8 @@ module_app = files(
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_scene, module_render, module_theme, module_text, module_widget, module_app],
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep],
+    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app],
+    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep],
     install : true,
 )
 
@@ -113,5 +133,5 @@ nandina_lib = static_library(
 nandina_dep = declare_dependency(
     link_with : nandina_lib,
     include_directories : include_directories('.'),
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep],
+    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep],
 )

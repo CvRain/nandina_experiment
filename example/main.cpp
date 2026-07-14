@@ -9,11 +9,10 @@
 #include "reactive/computed.hpp"
 #include "reactive/scope.hpp"
 #include "reactive/signal.hpp"
+#include "resource/backends/directory_backend.hpp"
+#include "resource/resource_manager.hpp"
 #include "scene/control.hpp"
-#include "text/font_face.hpp"
-#include "text/glyph_atlas.hpp"
-#include "text/glyph_run_renderer.hpp"
-#include "text/harfbuzz_text_backend.hpp"
+#include "text/font_pipeline.hpp"
 #include "theme/theme.hpp"
 #include "widget/button.hpp"
 #include "widget/label.hpp"
@@ -52,7 +51,10 @@ public:
         theme::NanTheme theme,
         widget::primitives::TextPipeline pipeline
     ):
-        graph_(&graph), todos_(&todos), theme_(theme), pipeline_(pipeline) {
+        graph_(&graph),
+        todos_(&todos),
+        theme_(theme),
+        pipeline_(pipeline) {
         set_background(theme_.palette.surface);
 
         title_ = widget::Label::create(graph, "Todo workspace", theme_);
@@ -104,16 +106,23 @@ public:
         rebuild_pending_ = true;
     }
 
-    [[nodiscard]] auto input_field() const -> widget::TextField* { return input_.get(); }
-    [[nodiscard]] auto list_view() const -> widget::ScrollView* { return list_view_.get(); }
-    [[nodiscard]] auto rendered_item_count() const -> std::size_t { return rendered_item_count_; }
+    [[nodiscard]] auto input_field() const -> widget::TextField* {
+        return input_.get();
+    }
+    [[nodiscard]] auto list_view() const -> widget::ScrollView* {
+        return list_view_.get();
+    }
+    [[nodiscard]] auto rendered_item_count() const -> std::size_t {
+        return rendered_item_count_;
+    }
 
     void on_process(float dt) override {
         scene::NanControl::on_process(dt);
         if (rebuild_pending_) {
             rebuild_pending_ = false;
             rebuild_list();
-        } else {
+        }
+        else {
             apply_deferred_scroll();
         }
     }
@@ -124,7 +133,9 @@ public:
     }
 
     void apply_deferred_scroll() {
-        if (!scroll_after_layout_pending_) { return; }
+        if (!scroll_after_layout_pending_) {
+            return;
+        }
         scroll_after_layout_pending_ = false;
         list_view_->set_scroll_offset(list_view_->maximum_scroll_offset());
     }
@@ -153,7 +164,9 @@ private:
     void toggle(std::uint64_t id) {
         todos_->update([id](auto& items) {
             const auto item = std::ranges::find(items, id, &TodoItem::id);
-            if (item != items.end()) { item->completed = !item->completed; }
+            if (item != items.end()) {
+                item->completed = !item->completed;
+            }
         });
     }
 
@@ -167,9 +180,9 @@ private:
         auto column = widget::Column::create();
         column->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
         rendered_item_count_ = pending_items_.size();
-        const auto completed = static_cast<std::size_t>(std::ranges::count(
-            pending_items_, true, &TodoItem::completed
-        ));
+        const auto completed = static_cast<std::size_t>(
+            std::ranges::count(pending_items_, true, &TodoItem::completed)
+        );
         status_->set_text(
             std::to_string(pending_items_.size()) + " tasks, " + std::to_string(completed)
             + " completed"
@@ -183,11 +196,13 @@ private:
         }
         for (const auto& item: pending_items_) {
             auto label = widget::Label::create(
-                *graph_, (item.completed ? "[done] " : "[todo] ") + item.title, theme_
+                *graph_,
+                (item.completed ? "[done] " : "[todo] ") + item.title,
+                theme_
             );
-            label->set_color(item.completed
-                ? theme_.palette.on_surface_variant
-                : theme_.palette.on_surface);
+            label->set_color(
+                item.completed ? theme_.palette.on_surface_variant : theme_.palette.on_surface
+            );
             label->set_overflow(widget::primitives::TextOverflow::clip);
             label->set_text_pipeline(pipeline_);
 
@@ -202,11 +217,13 @@ private:
             remove_button->set_text_pipeline(pipeline_);
             remove_button->set_on_click([this, id = item.id] { remove(id); });
 
-            auto label_item = widget::FlexItem::create(scene::LayoutFlexPolicy {
-                .grow = 1.0F,
-                .shrink = 1.0F,
-                .limits = {.min_width = 80.0F},
-            });
+            auto label_item = widget::FlexItem::create(
+                scene::LayoutFlexPolicy {
+                    .grow = 1.0F,
+                    .shrink = 1.0F,
+                    .limits = {.min_width = 80.0F},
+                }
+            );
             label_item->set_child(label);
             auto row = widget::Row::create();
             row->set_gap(8.0F)
@@ -251,16 +268,23 @@ public:
 
     [[nodiscard]] auto build(app::PageContext& context)
         -> std::shared_ptr<scene::NanNode2D> override {
-        auto& todos = context.scope().signal_value(std::vector<TodoItem> {
-            {.id = 1, .title = "Build the unified text pipeline", .completed = true},
-            {.id = 2, .title = "Exercise mouse, keyboard, resize, and bidi editing"},
-            {.id = 3, .title = "Validate scrolling with a dynamic task list"},
-        });
+        auto& todos = context.scope().signal_value(
+            std::vector<TodoItem> {
+                {.id = 1, .title = "Build the unified text pipeline", .completed = true},
+                {.id = 2, .title = "Exercise mouse, keyboard, resize, and bidi editing"},
+                {.id = 3, .title = "Validate scrolling with a dynamic task list"},
+            }
+        );
         auto root = std::make_shared<TodoPageRoot>(
-            context.graph(), todos, context.theme(), params().text_pipeline
+            context.graph(),
+            todos,
+            context.theme(),
+            params().text_pipeline
         );
         context.scope().effect([weak = std::weak_ptr<TodoPageRoot>(root), &todos] {
-            if (auto current = weak.lock()) { current->stage_items(todos.get()); }
+            if (auto current = weak.lock()) {
+                current->stage_items(todos.get());
+            }
         });
         return root;
     }
@@ -273,21 +297,54 @@ public:
 protected:
     void on_setup() override {
         auto pipeline = widget::primitives::TextPipeline {};
-#ifdef NANDINA_EXAMPLE_FONT_PATH
+#ifdef NANDINA_EXAMPLE_RESOURCE_DIR
         auto* device = render_device();
         if (device == nullptr) {
             throw std::runtime_error("TodoWindow requires an active render device");
         }
-
-        font_face_ = std::make_shared<text::FreeTypeFontFace>(NANDINA_EXAMPLE_FONT_PATH);
-        text_backend_ = std::make_unique<text::HarfBuzzTextLayoutBackend>(font_face_);
-        glyph_atlas_ = std::make_unique<text::GlyphAtlas>(font_face_, 1024, 1024);
-        atlas_texture_ = std::make_unique<text::GlyphAtlasTexture>(*device, *glyph_atlas_);
-        text_renderer_ = std::make_unique<text::GlyphRunRenderer>(*glyph_atlas_, *atlas_texture_);
-        pipeline = {
-            .backend = text_backend_.get(),
-            .renderer = text_renderer_.get(),
-        };
+        const auto font_id = resource::ResourceId::parse(
+            "737980c0-0000-4000-8000-000000000001"
+        );
+        if (!font_id) {
+            throw std::runtime_error("TodoWindow default font resource id is invalid");
+        }
+        auto directory = resource::DirectoryBackend::open({
+            .name = "example-resources",
+            .root = NANDINA_EXAMPLE_RESOURCE_DIR,
+            .resources = {{
+                .id = *font_id,
+                .key = resource::ResourceKey("fonts/default"),
+                .relative_path = "CaskaydiaCove-Regular.ttf",
+                .media_type = "font/ttf",
+                .aliases = {resource::ResourceKey("fonts/caskaydia-cove/regular")},
+            }},
+        });
+        if (!directory) {
+            throw std::runtime_error("TodoWindow failed to mount bundled font resources");
+        }
+        resource_backend_ = *directory;
+        (void)resources_.mount(resource_backend_);
+        font_loader_ = std::make_unique<text::FontLoader>(resources_);
+        if (!font_families_.register_family(resource::ResourceKey("families/ui"), {{
+                .resource = resource::ResourceKey("fonts/default"),
+            }}))
+        {
+            throw std::runtime_error("TodoWindow failed to register the UI font family");
+        }
+        if (!font_families_.set_default_family(resource::ResourceKey("families/ui"))) {
+            throw std::runtime_error("TodoWindow failed to set the default UI font family");
+        }
+        pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
+            *device, *font_loader_, font_families_
+        );
+        auto loaded_pipeline = pipeline_cache_->get({
+            .family = resource::ResourceKey("families/ui"),
+        });
+        if (!loaded_pipeline) {
+            throw std::runtime_error("TodoWindow failed to create the default text pipeline");
+        }
+        font_pipeline_ = *loaded_pipeline;
+        pipeline = font_pipeline_->pipeline();
 #endif
 
         use_router().push<TodoPage>(TodoPageParams {
@@ -299,19 +356,20 @@ protected:
         if (auto* active_router = router(); active_router != nullptr) {
             active_router->clear();
         }
-        text_renderer_.reset();
-        atlas_texture_.reset();
-        glyph_atlas_.reset();
-        text_backend_.reset();
-        font_face_.reset();
+        font_pipeline_.reset();
+        pipeline_cache_.reset();
+        font_loader_.reset();
+        resources_.clear();
+        resource_backend_.reset();
     }
 
 private:
-    std::shared_ptr<text::FreeTypeFontFace> font_face_;
-    std::unique_ptr<text::HarfBuzzTextLayoutBackend> text_backend_;
-    std::unique_ptr<text::GlyphAtlas> glyph_atlas_;
-    std::unique_ptr<text::GlyphAtlasTexture> atlas_texture_;
-    std::unique_ptr<text::GlyphRunRenderer> text_renderer_;
+    resource::ResourceManager resources_;
+    std::shared_ptr<resource::IResourceBackend> resource_backend_;
+    std::unique_ptr<text::FontLoader> font_loader_;
+    text::FontFamilyRegistry font_families_;
+    std::unique_ptr<text::FontPipelineCache> pipeline_cache_;
+    std::shared_ptr<text::FontPipeline> font_pipeline_;
 };
 
 auto main() -> int {

@@ -80,3 +80,18 @@ button_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('button', button_tests)
+
+resource_tests = executable(
+    'resource_tests',
+    files('resource_tests.cpp'),
+    dependencies : [nandina_dep, sqlite3_dep, catch2_with_main_dep],
+)
+test('resource', resource_tests)
+
+font_resource_tests = executable(
+    'font_resource_tests',
+    files('font_resource_tests.cpp'),
+    cpp_args : ['-DNANDINA_TEST_FONT_PATH="' + font_test_path + '"'],
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('font-resource', font_resource_tests)
