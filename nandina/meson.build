@@ -1,5 +1,22 @@
 # nandina 库
 
+builtin_font_source = files('assets/default_font/default-ui.ttf')
+builtin_font_license_source = files('assets/default_font/default-ui-license.txt')
+builtin_font_data = custom_target(
+    'nandina-builtin-default-font',
+    input : builtin_font_source,
+    output : 'builtin_default_font_data.cpp',
+    command : [embed_binary, '@INPUT@', '@OUTPUT@', 'builtin_default_font_bytes'],
+)
+builtin_font_license_data = custom_target(
+    'nandina-builtin-default-font-license',
+    input : builtin_font_license_source,
+    output : 'builtin_default_font_license_data.cpp',
+    command : [embed_binary, '@INPUT@', '@OUTPUT@', 'builtin_default_font_license_bytes'],
+)
+builtin_font_size = fs.size(builtin_font_source)
+builtin_font_license_size = fs.size(builtin_font_license_source)
+
 module_fundation = files(
     'foundation/nandina_color.hpp',
     'foundation/nandina_color.cpp',
@@ -28,10 +45,23 @@ module_resource = files(
     'resource/resource.hpp',
     'resource/resource.cpp',
     'resource/resource_backend.hpp',
+    'resource/resource_backend.cpp',
+    'resource/resource_stream.hpp',
+    'resource/resource_stream.cpp',
+    'resource/file_resource_stream.hpp',
+    'resource/file_resource_stream.cpp',
     'resource/resource_manager.hpp',
     'resource/resource_manager.cpp',
+    'resource/resource_uri.hpp',
+    'resource/resource_uri.cpp',
+    'resource/resource_scanner.hpp',
+    'resource/resource_scanner.cpp',
+    'resource/platform_resource_locator.hpp',
+    'resource/platform_resource_locator.cpp',
     'resource/backends/memory_backend.hpp',
     'resource/backends/memory_backend.cpp',
+    'resource/backends/builtin_backend.hpp',
+    'resource/backends/builtin_backend.cpp',
     'resource/backends/directory_backend.hpp',
     'resource/backends/directory_backend.cpp',
     'resource/backends/sqlite_backend.hpp',
@@ -110,6 +140,8 @@ module_widget = files(
 )
 
 module_app = files(
+    'app/application_config.hpp',
+    'app/application_config.cpp',
     'app/window_config.hpp',
     'app/nan_store.hpp',
     'app/nan_page.hpp',
@@ -124,7 +156,11 @@ module_app = files(
 # 创建静态库
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app],
+    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app, builtin_font_data, builtin_font_license_data],
+    cpp_args : [
+        '-DNANDINA_BUILTIN_DEFAULT_FONT_SIZE=' + builtin_font_size.to_string(),
+        '-DNANDINA_BUILTIN_DEFAULT_FONT_LICENSE_SIZE=' + builtin_font_license_size.to_string(),
+    ],
     dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep],
     install : true,
 )

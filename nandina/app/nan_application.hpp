@@ -19,7 +19,11 @@
 #define NANDINA_EXPERIMENT_APP_NAN_APPLICATION_HPP
 
 #include "../reactive/graph.hpp"
+#include "../resource/resource_manager.hpp"
+#include "../text/font_family.hpp"
+#include "../text/font_loader.hpp"
 #include "../theme/theme.hpp"
+#include "application_config.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
 
@@ -36,6 +40,7 @@ namespace nandina::app
     class NanApplication {
     public:
         NanApplication();
+        explicit NanApplication(NanApplicationConfig config);
         ~NanApplication();
 
         NanApplication(const NanApplication&) = delete;
@@ -48,6 +53,11 @@ namespace nandina::app
 
         void set_theme(theme::NanTheme theme);
         [[nodiscard]] auto theme() const -> const theme::NanTheme&;
+        [[nodiscard]] auto resources() -> resource::ResourceManager&;
+        [[nodiscard]] auto resources() const -> const resource::ResourceManager&;
+        [[nodiscard]] auto font_loader() -> text::FontLoader&;
+        [[nodiscard]] auto font_families() -> text::FontFamilyRegistry&;
+        [[nodiscard]] auto application_id() const noexcept -> std::string_view;
 
         template<typename StoreT, typename... Args>
             requires std::derived_from<StoreT, NanStore>
@@ -77,6 +87,11 @@ namespace nandina::app
     private:
         reactive::Graph graph_;
         theme::NanTheme theme_;
+        std::string application_id_;
+        resource::ResourceManager resources_;
+        std::unique_ptr<text::FontLoader> font_loader_;
+        text::FontFamilyRegistry font_families_;
+        std::vector<std::shared_ptr<resource::IResourceBackend>> resource_backends_;
         std::unique_ptr<NanStore> store_;
         NanTypeKey store_key_ = nullptr;
     };

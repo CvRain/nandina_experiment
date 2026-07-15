@@ -17,8 +17,8 @@
 #include <iterator>
 #include <limits>
 #include <map>
-#include <optional>
 #include <numeric>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <string_view>
@@ -104,9 +104,8 @@ namespace nandina::text
         }
 
         void add_font(std::shared_ptr<FreeTypeFontFace> face) {
-            auto* font = hb_ft_font_create_referenced(
-                static_cast<FT_Face>(face->native_face_handle())
-            );
+            auto* font =
+                hb_ft_font_create_referenced(static_cast<FT_Face>(face->native_face_handle()));
             if (font == nullptr) {
                 throw std::runtime_error("Failed to create HarfBuzz font from FreeType face");
             }
@@ -121,10 +120,7 @@ namespace nandina::text
                 result.descender = std::min(result.descender, current.descender);
                 result.line_height = std::max(result.line_height, current.line_height);
             }
-            result.line_height = std::max(
-                result.line_height,
-                result.ascender - result.descender
-            );
+            result.line_height = std::max(result.line_height, result.ascender - result.descender);
             return result;
         }
 
@@ -157,10 +153,7 @@ namespace nandina::text
                 0,
                 static_cast<int>(text.size())
             );
-            hb_buffer_set_cluster_level(
-                buffer.get(),
-                HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES
-            );
+            hb_buffer_set_cluster_level(buffer.get(), HB_BUFFER_CLUSTER_LEVEL_MONOTONE_GRAPHEMES);
             if (right_to_left.has_value()) {
                 hb_buffer_set_direction(
                     buffer.get(),
@@ -188,18 +181,18 @@ namespace nandina::text
             float width = 0.0F;
             for (unsigned int index = 0; index < glyph_count; ++index) {
                 const float advance = pixels(positions[index].x_advance);
-                line.glyphs.push_back(widget::primitives::TextLayoutLine::Glyph {
-                    .glyph_index = infos[index].codepoint,
-                    .font_index = font_index,
-                    .cluster = source_offset + std::min<std::size_t>(
-                        infos[index].cluster,
-                        source_length
-                    ),
-                    .x_advance = advance,
-                    .y_advance = pixels(positions[index].y_advance),
-                    .x_offset = pixels(positions[index].x_offset),
-                    .y_offset = pixels(positions[index].y_offset),
-                });
+                line.glyphs.push_back(
+                    widget::primitives::TextLayoutLine::Glyph {
+                        .glyph_index = infos[index].codepoint,
+                        .font_index = font_index,
+                        .cluster = source_offset
+                            + std::min<std::size_t>(infos[index].cluster, source_length),
+                        .x_advance = advance,
+                        .y_advance = pixels(positions[index].y_advance),
+                        .x_offset = pixels(positions[index].x_offset),
+                        .y_offset = pixels(positions[index].y_offset),
+                    }
+                );
                 width += advance;
             }
             line.missing_glyphs = std::ranges::any_of(line.glyphs, [](const auto& glyph) {
@@ -222,7 +215,8 @@ namespace nandina::text
                 return result;
             }
             if (result.decoded.size()
-                > static_cast<std::size_t>(std::numeric_limits<FriBidiStrIndex>::max())) {
+                > static_cast<std::size_t>(std::numeric_limits<FriBidiStrIndex>::max()))
+            {
                 throw std::length_error("Text line is too large for FriBidi");
             }
 
@@ -249,7 +243,8 @@ namespace nandina::text
                     length,
                     &result.base_direction,
                     result.levels.data()
-                ) == 0)
+                )
+                == 0)
             {
                 throw std::runtime_error("FriBidi failed to resolve paragraph embedding levels");
             }
@@ -281,12 +276,10 @@ namespace nandina::text
                 {},
                 &foundation::utf8::DecodedCodepoint::byte_offset
             );
-            const auto first_index = static_cast<std::size_t>(
-                first_codepoint - paragraph.decoded.begin()
-            );
-            const auto last_index = static_cast<std::size_t>(
-                last_codepoint - paragraph.decoded.begin()
-            );
+            const auto first_index =
+                static_cast<std::size_t>(first_codepoint - paragraph.decoded.begin());
+            const auto last_index =
+                static_cast<std::size_t>(last_codepoint - paragraph.decoded.begin());
             const auto line_codepoints = last_index - first_index;
             if (line_codepoints == 0) {
                 return {
@@ -307,7 +300,8 @@ namespace nandina::text
                     levels.data(),
                     nullptr,
                     visual_to_logical.data()
-                ) == 0)
+                )
+                == 0)
             {
                 throw std::runtime_error("FriBidi failed to reorder paragraph line");
             }
@@ -327,11 +321,13 @@ namespace nandina::text
                 const auto byte_end = end < paragraph.decoded.size()
                     ? paragraph.decoded[end].byte_offset
                     : text.size();
-                logical.push_back(BidiRun {
-                    .offset = byte_begin,
-                    .length = byte_end - byte_begin,
-                    .level = levels[begin],
-                });
+                logical.push_back(
+                    BidiRun {
+                        .offset = byte_begin,
+                        .length = byte_end - byte_begin,
+                        .level = levels[begin],
+                    }
+                );
                 begin = end;
             }
 
@@ -350,9 +346,8 @@ namespace nandina::text
                 );
                 std::size_t result = paragraph.decoded.size();
                 for (auto current = first; current != last; ++current) {
-                    const auto index = static_cast<std::size_t>(
-                        current - paragraph.decoded.begin()
-                    );
+                    const auto index =
+                        static_cast<std::size_t>(current - paragraph.decoded.begin());
                     result = std::min(result, logical_to_visual[index]);
                 }
                 return result;
@@ -375,11 +370,9 @@ namespace nandina::text
             return bidi_runs(paragraph, text, 0, text.size());
         }
 
-        [[nodiscard]] auto font_for_text(
-            std::string_view text,
-            float pixel_size,
-            bool right_to_left
-        ) const -> FontChoice {
+        [[nodiscard]] auto
+        font_for_text(std::string_view text, float pixel_size, bool right_to_left) const
+            -> FontChoice {
             const auto decoded = foundation::utf8::decode(text);
             const bool has_zwj = std::ranges::any_of(decoded, [](const auto& codepoint) {
                 return codepoint.value == U'\u200D';
@@ -393,23 +386,23 @@ namespace nandina::text
                     const bool default_ignorable = codepoint.value == U'\u200C'
                         || codepoint.value == U'\u200D'
                         || (codepoint.value >= U'\uFE00' && codepoint.value <= U'\uFE0F')
-                        || (codepoint.value >= U'\U000E0100'
-                            && codepoint.value <= U'\U000E01EF');
-                    supported = supported && (default_ignorable
-                        || fonts[font_index].face->glyph_index(codepoint.value) != 0);
+                        || (codepoint.value >= U'\U000E0100' && codepoint.value <= U'\U000E01EF');
+                    supported = supported
+                        && (default_ignorable
+                            || fonts[font_index].face->glyph_index(codepoint.value) != 0);
 
-                    const bool variation_selector = (codepoint.value >= U'\uFE00'
-                        && codepoint.value <= U'\uFE0F')
-                        || (codepoint.value >= U'\U000E0100'
-                            && codepoint.value <= U'\U000E01EF');
+                    const bool variation_selector =
+                        (codepoint.value >= U'\uFE00' && codepoint.value <= U'\uFE0F')
+                        || (codepoint.value >= U'\U000E0100' && codepoint.value <= U'\U000E01EF');
                     if (supported && variation_selector && index > 0) {
                         hb_codepoint_t variation_glyph = 0;
                         supported = hb_font_get_variation_glyph(
-                            fonts[font_index].font,
-                            static_cast<hb_codepoint_t>(decoded[index - 1].value),
-                            static_cast<hb_codepoint_t>(codepoint.value),
-                            &variation_glyph
-                        ) != 0;
+                                        fonts[font_index].font,
+                                        static_cast<hb_codepoint_t>(decoded[index - 1].value),
+                                        static_cast<hb_codepoint_t>(codepoint.value),
+                                        &variation_glyph
+                                    )
+                            != 0;
                     }
                 }
                 if (!supported) {
@@ -440,9 +433,8 @@ namespace nandina::text
                     best_glyph_count = shaped.glyphs.size();
                 }
             }
-            return best_font.has_value()
-                ? FontChoice {.index = *best_font, .supported = true}
-                : FontChoice {.index = 0, .supported = false};
+            return best_font.has_value() ? FontChoice {.index = *best_font, .supported = true}
+                                         : FontChoice {.index = 0, .supported = false};
         }
 
         [[nodiscard]] auto shape_fallback_run(
@@ -479,13 +471,16 @@ namespace nandina::text
                     && ranges.back().offset + ranges.back().length == absolute_offset)
                 {
                     ranges.back().length += grapheme.length;
-                } else {
-                    ranges.push_back(FontRange {
-                        .offset = absolute_offset,
-                        .length = grapheme.length,
-                        .font_index = choice.index,
-                        .supported = choice.supported,
-                    });
+                }
+                else {
+                    ranges.push_back(
+                        FontRange {
+                            .offset = absolute_offset,
+                            .length = grapheme.length,
+                            .font_index = choice.index,
+                            .supported = choice.supported,
+                        }
+                    );
                 }
             }
             if (right_to_left) {
@@ -514,8 +509,8 @@ namespace nandina::text
                     range.font_index
                 );
                 width += shaped.size.get_width();
-                result.missing_glyphs = result.missing_glyphs
-                    || !range.supported || shaped.missing_glyphs;
+                result.missing_glyphs =
+                    result.missing_glyphs || !range.supported || shaped.missing_glyphs;
                 for (auto& glyph: shaped.glyphs) {
                     result.glyphs.push_back(std::move(glyph));
                 }
@@ -559,24 +554,30 @@ namespace nandina::text
                 const auto next = std::ranges::upper_bound(cluster_starts, cluster);
                 const auto cluster_end = next == cluster_starts.end() ? source_end : *next;
                 const float cluster_end_x = pen;
-                line.caret_stops.push_back(widget::primitives::TextCaretStop {
-                    .source_offset = cluster,
-                    .x = right_to_left ? cluster_end_x : cluster_start_x,
-                    .affinity = widget::primitives::TextAffinity::downstream,
-                });
-                line.caret_stops.push_back(widget::primitives::TextCaretStop {
-                    .source_offset = cluster_end,
-                    .x = right_to_left ? cluster_start_x : cluster_end_x,
-                    .affinity = widget::primitives::TextAffinity::upstream,
-                });
+                line.caret_stops.push_back(
+                    widget::primitives::TextCaretStop {
+                        .source_offset = cluster,
+                        .x = right_to_left ? cluster_end_x : cluster_start_x,
+                        .affinity = widget::primitives::TextAffinity::downstream,
+                    }
+                );
+                line.caret_stops.push_back(
+                    widget::primitives::TextCaretStop {
+                        .source_offset = cluster_end,
+                        .x = right_to_left ? cluster_start_x : cluster_end_x,
+                        .affinity = widget::primitives::TextAffinity::upstream,
+                    }
+                );
             }
         }
 
         static void normalize_caret_stops(widget::primitives::TextLayoutLine& line) {
             if (line.caret_stops.empty()) {
-                line.caret_stops.push_back(widget::primitives::TextCaretStop {
-                    .source_offset = line.text_offset,
-                });
+                line.caret_stops.push_back(
+                    widget::primitives::TextCaretStop {
+                        .source_offset = line.text_offset,
+                    }
+                );
                 return;
             }
 
@@ -593,7 +594,8 @@ namespace nandina::text
                 });
                 if (duplicate == normalized.end()) {
                     normalized.push_back(stop);
-                } else if (stop.affinity == widget::primitives::TextAffinity::downstream) {
+                }
+                else if (stop.affinity == widget::primitives::TextAffinity::downstream) {
                     duplicate->affinity = stop.affinity;
                 }
             }
@@ -643,10 +645,7 @@ namespace nandina::text
                     width
                 );
                 for (auto& glyph: shaped.glyphs) {
-                    glyph.cluster = std::min(
-                        glyph.cluster,
-                        output_offset + output_source_length
-                    );
+                    glyph.cluster = std::min(glyph.cluster, output_offset + output_source_length);
                     line.glyphs.push_back(std::move(glyph));
                 }
                 line.missing_glyphs = line.missing_glyphs || shaped.missing_glyphs;
@@ -700,9 +699,8 @@ namespace nandina::text
         [[nodiscard]] auto max_shaped_width(std::string_view text, float pixel_size) const
             -> float {
             const auto font_metrics = combined_metrics(pixel_size);
-            const float line_height = font_metrics.line_height > 0.0F
-                ? font_metrics.line_height
-                : pixel_size * 1.2F;
+            const float line_height =
+                font_metrics.line_height > 0.0F ? font_metrics.line_height : pixel_size * 1.2F;
             float width = 0.0F;
             std::size_t offset = 0;
             bool pending_empty_line = text.empty();
@@ -727,10 +725,9 @@ namespace nandina::text
             return width;
         }
 
-        [[nodiscard]] auto clusters(
-            const widget::primitives::TextLayoutLine& line,
-            std::size_t paragraph_end
-        ) const -> std::vector<ClusterRange> {
+        [[nodiscard]] auto
+        clusters(const widget::primitives::TextLayoutLine& line, std::size_t paragraph_end) const
+            -> std::vector<ClusterRange> {
             std::vector<ClusterRange> result;
             if (line.glyphs.empty()) {
                 return result;
@@ -740,16 +737,18 @@ namespace nandina::text
             for (const auto& glyph: line.glyphs) {
                 cluster_widths[glyph.cluster] += glyph.x_advance;
             }
-            for (auto current = cluster_widths.begin(); current != cluster_widths.end(); ++current) {
+            for (auto current = cluster_widths.begin(); current != cluster_widths.end(); ++current)
+            {
                 const auto next_entry = std::next(current);
-                const auto next = next_entry != cluster_widths.end()
-                    ? next_entry->first
-                    : paragraph_end;
-                result.push_back(ClusterRange {
-                    .offset = current->first,
-                    .length = next - current->first,
-                    .width = std::abs(current->second),
-                });
+                const auto next =
+                    next_entry != cluster_widths.end() ? next_entry->first : paragraph_end;
+                result.push_back(
+                    ClusterRange {
+                        .offset = current->first,
+                        .length = next - current->first,
+                        .width = std::abs(current->second),
+                    }
+                );
             }
             return result;
         }
@@ -778,7 +777,11 @@ namespace nandina::text
         ) const -> std::vector<ClusterRange> {
             const auto shaped_clusters = clusters(line, paragraph_end);
             if (shaped_clusters.empty()) {
-                return {{.offset = line.text_offset, .length = line.text_length, .width = line.size.get_width()}};
+                return {
+                    {.offset = line.text_offset,
+                     .length = line.text_length,
+                     .width = line.size.get_width()}
+                };
             }
 
             std::vector<ClusterRange> result;
@@ -787,22 +790,26 @@ namespace nandina::text
             float line_width = 0.0F;
             for (const auto& cluster: shaped_clusters) {
                 if (line_width > 0.0F && line_width + cluster.width > width_limit) {
-                    result.push_back(ClusterRange {
-                        .offset = line_offset,
-                        .length = line_end - line_offset,
-                        .width = line_width,
-                    });
+                    result.push_back(
+                        ClusterRange {
+                            .offset = line_offset,
+                            .length = line_end - line_offset,
+                            .width = line_width,
+                        }
+                    );
                     line_offset = cluster.offset;
                     line_width = 0.0F;
                 }
                 line_width += cluster.width;
                 line_end = cluster.offset + cluster.length;
             }
-            result.push_back(ClusterRange {
-                .offset = line_offset,
-                .length = line_end - line_offset,
-                .width = line_width,
-            });
+            result.push_back(
+                ClusterRange {
+                    .offset = line_offset,
+                    .length = line_end - line_offset,
+                    .width = line_width,
+                }
+            );
             return result;
         }
 
@@ -822,16 +829,13 @@ namespace nandina::text
 
     auto HarfBuzzTextLayoutBackend::layout(widget::primitives::TextLayoutInput input) const
         -> widget::primitives::TextLayoutResult {
-        const bool has_width_limit = std::isfinite(input.constraints.max_width)
-            && input.constraints.max_width >= 0.0F;
-        const float width_limit = has_width_limit
-            ? input.constraints.max_width
-            : std::numeric_limits<float>::infinity();
+        const bool has_width_limit =
+            std::isfinite(input.constraints.max_width) && input.constraints.max_width >= 0.0F;
+        const float width_limit =
+            has_width_limit ? input.constraints.max_width : std::numeric_limits<float>::infinity();
 
         float font_size = std::max(1.0F, input.style.font_size);
-        if (input.style.overflow == widget::primitives::TextOverflow::scale
-            && has_width_limit)
-        {
+        if (input.style.overflow == widget::primitives::TextOverflow::scale && has_width_limit) {
             const float natural_width = impl_->max_shaped_width(input.text, font_size);
             if (natural_width > width_limit) {
                 float lower = 1.0F;
@@ -841,7 +845,8 @@ namespace nandina::text
                         const float candidate = (lower + upper) * 0.5F;
                         if (impl_->max_shaped_width(input.text, candidate) <= width_limit) {
                             lower = candidate;
-                        } else {
+                        }
+                        else {
                             upper = candidate;
                         }
                     }
@@ -851,9 +856,8 @@ namespace nandina::text
         }
 
         const auto metrics = impl_->combined_metrics(font_size);
-        const float line_height = metrics.line_height > 0.0F
-            ? metrics.line_height
-            : font_size * 1.2F;
+        const float line_height =
+            metrics.line_height > 0.0F ? metrics.line_height : font_size * 1.2F;
         const float baseline = metrics.ascender;
         const auto max_lines = static_cast<std::size_t>(std::max(1, input.style.max_lines));
 
@@ -863,7 +867,9 @@ namespace nandina::text
 
         std::size_t offset = 0;
         bool pending_empty_line = input.text.empty();
-        while ((offset < input.text.size() || pending_empty_line) && result.lines.size() < max_lines) {
+        while ((offset < input.text.size() || pending_empty_line)
+               && result.lines.size() < max_lines)
+        {
             const auto newline = input.text.find('\n', offset);
             const auto end = newline != std::string_view::npos ? newline : input.text.size();
             const auto paragraph = input.text.substr(offset, end - offset);
@@ -880,9 +886,9 @@ namespace nandina::text
                 baseline
             );
 
-            if (input.style.overflow == widget::primitives::TextOverflow::wrap
-                && has_width_limit && shaped.size.get_width() > width_limit
-            ) {
+            if (input.style.overflow == widget::primitives::TextOverflow::wrap && has_width_limit
+                && shaped.size.get_width() > width_limit)
+            {
                 const auto ranges = impl_->wrapped_ranges(shaped, end, width_limit);
                 for (std::size_t range_index = 0;
                      range_index < ranges.size() && result.lines.size() < max_lines;
@@ -901,18 +907,17 @@ namespace nandina::text
                         line_height,
                         baseline
                     );
-                    result.overflowed = result.overflowed
-                        || line.size.get_width() > width_limit;
+                    result.overflowed = result.overflowed || line.size.get_width() > width_limit;
                     result.lines.push_back(std::move(line));
                     if (range_index + 1 < ranges.size() && result.lines.size() == max_lines) {
                         result.overflowed = true;
                     }
                 }
-            } else {
+            }
+            else {
                 if (has_width_limit && shaped.size.get_width() > width_limit) {
                     result.overflowed = true;
-                    if (input.style.overflow == widget::primitives::TextOverflow::ellipsis)
-                    {
+                    if (input.style.overflow == widget::primitives::TextOverflow::ellipsis) {
                         const auto dots = impl_->shape_source_line(
                             "...",
                             offset,
@@ -938,7 +943,8 @@ namespace nandina::text
                                 baseline,
                                 paragraph_right_to_left
                             );
-                        } else {
+                        }
+                        else {
                             const bool paragraph_right_to_left = shaped.right_to_left;
                             shaped = impl_->shape_bidi_line(
                                 {},
@@ -966,22 +972,19 @@ namespace nandina::text
         float width = 0.0F;
         for (const auto& line: result.lines) {
             width = std::max(width, line.size.get_width());
-            result.missing_glyphs = result.missing_glyphs
-                || line.missing_glyphs;
+            result.missing_glyphs = result.missing_glyphs || line.missing_glyphs;
         }
         if (has_width_limit && width > width_limit) {
             result.overflowed = true;
         }
         result.overflowed = result.overflowed || offset < input.text.size() || pending_empty_line;
-        result.size = input.constraints.constrain(foundation::NanSize(
-            width,
-            line_height * static_cast<float>(result.lines.size())
-        ));
+        result.size = input.constraints.constrain(
+            foundation::NanSize(width, line_height * static_cast<float>(result.lines.size()))
+        );
         return result;
     }
 
-    auto HarfBuzzTextLayoutBackend::font_face() const
-        -> const std::shared_ptr<FreeTypeFontFace>& {
+    auto HarfBuzzTextLayoutBackend::font_face() const -> const std::shared_ptr<FreeTypeFontFace>& {
         return impl_->fonts.front().face;
     }
 

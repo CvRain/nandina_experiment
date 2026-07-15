@@ -20,7 +20,7 @@ namespace nandina::widget
         constexpr int key_enter = 257;
         constexpr int key_kp_enter = 335;
         constexpr float caret_width = 1.0F;
-    }
+    } // namespace
 
     TextField::TextField(std::string value, std::string placeholder, theme::NanTheme theme):
         edit_(std::move(value)),
@@ -80,7 +80,9 @@ namespace nandina::widget
         read_only_ = value;
         edit_.set_read_only(value);
     }
-    auto TextField::read_only() const -> bool { return read_only_; }
+    auto TextField::read_only() const -> bool {
+        return read_only_;
+    }
 
     void TextField::set_disabled(const bool value) {
         disabled_ = value;
@@ -90,10 +92,16 @@ namespace nandina::widget
         }
         apply_theme();
     }
-    auto TextField::disabled() const -> bool { return disabled_; }
+    auto TextField::disabled() const -> bool {
+        return disabled_;
+    }
 
-    void TextField::set_invalid(const bool value) { invalid_ = value; }
-    auto TextField::invalid() const -> bool { return invalid_; }
+    void TextField::set_invalid(const bool value) {
+        invalid_ = value;
+    }
+    auto TextField::invalid() const -> bool {
+        return invalid_;
+    }
 
     auto TextField::editable_text() -> primitives::EditableText& {
         return edit_;
@@ -122,6 +130,12 @@ namespace nandina::widget
         return edit_.text_pipeline();
     }
 
+    void TextField::apply_default_text_pipeline(const primitives::TextPipeline& pipeline) {
+        edit_.apply_default_text_pipeline(pipeline);
+        placeholder_.apply_default_text_pipeline(pipeline);
+        mark_layout_dirty();
+    }
+
     auto TextField::is_focusable() const -> bool {
         return !disabled_;
     }
@@ -130,7 +144,8 @@ namespace nandina::widget
         if (event.type() == scene::EventType::focus_enter) {
             focused_ = !disabled_;
             return edit_.on_input(event);
-        } else if (event.type() == scene::EventType::focus_leave) {
+        }
+        else if (event.type() == scene::EventType::focus_leave) {
             focused_ = false;
             dragging_ = false;
             edit_.clear_composition();
@@ -163,7 +178,9 @@ namespace nandina::widget
         if (event.type() == scene::EventType::key) {
             const auto& key = static_cast<scene::KeyEvent&>(event);
             if (key.is_pressed() && (key.keycode() == key_enter || key.keycode() == key_kp_enter)) {
-                if (on_submit_) { on_submit_(value()); }
+                if (on_submit_) {
+                    on_submit_(value());
+                }
                 event.accept();
                 return true;
             }
@@ -181,8 +198,7 @@ namespace nandina::widget
             ctx.device().draw_rect_outline(
                 world.expanded(theme_.tokens.border.focus_ring),
                 theme_.tokens.border.focus_ring,
-                (invalid_ ? theme_.palette.error : theme_.palette.primary)
-                    .with_alpha(ctx.opacity())
+                (invalid_ ? theme_.palette.error : theme_.palette.primary).with_alpha(ctx.opacity())
             );
         }
         surface_.set_size(size());
@@ -191,11 +207,17 @@ namespace nandina::widget
         const float viewport_width = std::max(0.0F, world.get_width() - padding_x_ * 2.0F);
         update_scroll(viewport_width);
         const auto viewport = foundation::NanRect::from_xywh(
-            world.get_left() + padding_x_, world.get_top(), viewport_width, world.get_height()
+            world.get_left() + padding_x_,
+            world.get_top(),
+            viewport_width,
+            world.get_height()
         );
         auto clip = ctx.clip().push(viewport);
         if (edit_.value().empty() && !placeholder_.text().empty()) {
-            placeholder_.draw_at(ctx, line_origin(world, placeholder_.layout_result(), viewport.get_left()));
+            placeholder_.draw_at(
+                ctx,
+                line_origin(world, placeholder_.layout_result(), viewport.get_left())
+            );
             return;
         }
         edit_.draw_at(
@@ -206,15 +228,17 @@ namespace nandina::widget
 
     auto TextField::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
         const auto content = content_constraints(constraints);
-        const auto edit_size = edit_.measure_layout(scene::LayoutConstraints {
-            .min_width = 0.0F,
-            .max_width = std::numeric_limits<float>::infinity(),
-            .min_height = 0.0F,
-            .max_height = height_,
-        });
+        const auto edit_size = edit_.measure_layout(
+            scene::LayoutConstraints {
+                .min_width = 0.0F,
+                .max_width = std::numeric_limits<float>::infinity(),
+                .min_height = 0.0F,
+                .max_height = height_,
+            }
+        );
         const auto placeholder_size = placeholder_.measure_layout(content);
-        const float natural_width = std::max(edit_size.get_width(), placeholder_size.get_width())
-            + padding_x_ * 2.0F;
+        const float natural_width =
+            std::max(edit_size.get_width(), placeholder_size.get_width()) + padding_x_ * 2.0F;
         const auto measured = constraints.constrain(foundation::NanSize(natural_width, height_));
         set_size(measured);
         return measured;
@@ -260,31 +284,36 @@ namespace nandina::widget
 
     void TextField::place_caret(const foundation::NanPoint screen_point, const bool extend) {
         const auto local = to_local(screen_point);
-        const auto stop = edit_.text_node().layout_result().caret_for_point(foundation::NanPoint(
-            local.get_x() - padding_x_ + scroll_x_,
-            0.0F
-        ));
+        const auto stop = edit_.text_node().layout_result().caret_for_point(
+            foundation::NanPoint(local.get_x() - padding_x_ + scroll_x_, 0.0F)
+        );
         if (extend) {
             auto selection = edit_.selection();
             selection.focus = stop.source_offset;
             selection.focus_affinity = stop.affinity;
             edit_.set_selection(selection);
-        } else {
+        }
+        else {
             edit_.set_caret(stop.source_offset, stop.affinity);
         }
     }
 
     void TextField::update_scroll(const float viewport_width) {
         const auto& layout = edit_.text_node().layout_result();
-        if (layout.lines.empty()) { scroll_x_ = 0.0F; return; }
-        const auto caret = layout.lines.front().caret_for_source(
-            edit_.caret(), edit_.caret_affinity()
-        );
-        if (caret.x < scroll_x_) { scroll_x_ = caret.x; }
+        if (layout.lines.empty()) {
+            scroll_x_ = 0.0F;
+            return;
+        }
+        const auto caret =
+            layout.lines.front().caret_for_source(edit_.caret(), edit_.caret_affinity());
+        if (caret.x < scroll_x_) {
+            scroll_x_ = caret.x;
+        }
         if (caret.x > scroll_x_ + viewport_width - caret_width) {
             scroll_x_ = caret.x - viewport_width + caret_width;
         }
-        const float max_scroll = std::max(0.0F, layout.lines.front().size.get_width() - viewport_width);
+        const float max_scroll =
+            std::max(0.0F, layout.lines.front().size.get_width() - viewport_width);
         scroll_x_ = std::clamp(scroll_x_, 0.0F, max_scroll);
     }
 
@@ -293,7 +322,8 @@ namespace nandina::widget
         const primitives::TextLayoutResult& layout,
         const float x
     ) const -> foundation::NanPoint {
-        const float line_height = layout.lines.empty() ? layout.font_size : layout.lines.front().size.get_height();
+        const float line_height =
+            layout.lines.empty() ? layout.font_size : layout.lines.front().size.get_height();
         return foundation::NanPoint(
             x,
             world.get_top() + std::max(0.0F, (world.get_height() - line_height) * 0.5F)

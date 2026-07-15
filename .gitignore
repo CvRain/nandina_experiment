@@ -105,3 +105,4 @@ dev-docs-*
 /subprojects/packagecache/
 /subprojects/libpng-*/
 /subprojects/libpng.wrap
+/subprojects/tomlplusplus-*/

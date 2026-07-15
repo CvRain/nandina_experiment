@@ -26,10 +26,9 @@ namespace nandina::widget::primitives
         constexpr int key_a = 65;
         constexpr float caret_width = 1.0F;
 
-        [[nodiscard]] auto clamp_grapheme_boundary(
-            const std::string_view text,
-            const std::size_t offset
-        ) -> std::size_t {
+        [[nodiscard]] auto
+        clamp_grapheme_boundary(const std::string_view text, const std::size_t offset)
+            -> std::size_t {
             const auto requested = std::min(offset, text.size());
             for (const auto& grapheme: foundation::utf8::grapheme_ranges(text)) {
                 const auto end = grapheme.offset + grapheme.length;
@@ -40,10 +39,9 @@ namespace nandina::widget::primitives
             return text.size();
         }
 
-        [[nodiscard]] auto next_grapheme_boundary(
-            const std::string_view text,
-            const std::size_t offset
-        ) -> std::size_t {
+        [[nodiscard]] auto
+        next_grapheme_boundary(const std::string_view text, const std::size_t offset)
+            -> std::size_t {
             const auto requested = std::min(offset, text.size());
             for (const auto& grapheme: foundation::utf8::grapheme_ranges(text)) {
                 const auto end = grapheme.offset + grapheme.length;
@@ -56,9 +54,12 @@ namespace nandina::widget::primitives
             }
             return text.size();
         }
-    }
+    } // namespace
 
-    EditableText::EditableText(std::string value): value_(std::move(value)), caret_(value_.size()), text_(value_) {
+    EditableText::EditableText(std::string value):
+        value_(std::move(value)),
+        caret_(value_.size()),
+        text_(value_) {
         clear_selection();
     }
 
@@ -106,7 +107,9 @@ namespace nandina::widget::primitives
         caret_affinity_ = selection.focus_affinity;
     }
 
-    auto EditableText::selection() const -> TextSelection { return selection_; }
+    auto EditableText::selection() const -> TextSelection {
+        return selection_;
+    }
 
     auto EditableText::has_selection() const -> bool {
         return selection_.anchor != selection_.focus;
@@ -132,18 +135,25 @@ namespace nandina::widget::primitives
         };
     }
 
-    void EditableText::set_read_only(const bool value) { read_only_ = value; }
-    auto EditableText::read_only() const -> bool { return read_only_; }
+    void EditableText::set_read_only(const bool value) {
+        read_only_ = value;
+    }
+    auto EditableText::read_only() const -> bool {
+        return read_only_;
+    }
     void EditableText::set_selection_color(const foundation::NanColor color) {
         selection_color_ = color;
     }
 
     void EditableText::set_composition(TextComposition composition) {
-        composition.selection_start = std::min(composition.selection_start, composition.text.size());
+        composition.selection_start =
+            std::min(composition.selection_start, composition.text.size());
         composition.selection_end = std::min(composition.selection_end, composition.text.size());
         composition_ = std::move(composition);
     }
-    void EditableText::clear_composition() { composition_.reset(); }
+    void EditableText::clear_composition() {
+        composition_.reset();
+    }
     auto EditableText::composition() const -> const std::optional<TextComposition>& {
         return composition_;
     }
@@ -171,6 +181,11 @@ namespace nandina::widget::primitives
         return text_.text_pipeline();
     }
 
+    void EditableText::apply_default_text_pipeline(const TextPipeline& pipeline) {
+        text_.apply_default_text_pipeline(pipeline);
+        mark_layout_dirty();
+    }
+
     void EditableText::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
         if (has_selection()) {
             const auto& layout = text_.layout_result();
@@ -178,9 +193,8 @@ namespace nandina::widget::primitives
                 const auto& line = layout.lines.front();
                 const auto lower = std::min(selection_.anchor, selection_.focus);
                 const auto upper = std::max(selection_.anchor, selection_.focus);
-                const auto color = selection_color_.with_alpha(
-                    selection_color_.alpha() * ctx.opacity()
-                );
+                const auto color =
+                    selection_color_.with_alpha(selection_color_.alpha() * ctx.opacity());
                 for (std::size_t index = 1; index < line.caret_stops.size(); ++index) {
                     const auto& left = line.caret_stops[index - 1];
                     const auto& right = line.caret_stops[index];
@@ -263,13 +277,24 @@ namespace nandina::widget::primitives
                 const bool extend = key_event.modifiers().shift;
                 switch (key_event.keycode()) {
                     case key_delete:
-                        if (!read_only_) { has_selection() ? erase_selection() : erase_after_caret(); }
+                        if (!read_only_) {
+                            has_selection() ? erase_selection() : erase_after_caret();
+                        }
                         break;
-                    case key_left: move_caret_visual(-1, extend); break;
-                    case key_right: move_caret_visual(1, extend); break;
-                    case key_home: move_caret_to_visual_edge(false, extend); break;
-                    case key_end: move_caret_to_visual_edge(true, extend); break;
-                    default: return false;
+                    case key_left:
+                        move_caret_visual(-1, extend);
+                        break;
+                    case key_right:
+                        move_caret_visual(1, extend);
+                        break;
+                    case key_home:
+                        move_caret_to_visual_edge(false, extend);
+                        break;
+                    case key_end:
+                        move_caret_to_visual_edge(true, extend);
+                        break;
+                    default:
+                        return false;
                 }
                 event.accept();
                 return true;
@@ -355,7 +380,9 @@ namespace nandina::widget::primitives
     }
 
     void EditableText::erase_selection() {
-        if (!has_selection()) { return; }
+        if (!has_selection()) {
+            return;
+        }
         const auto lower = std::min(selection_.anchor, selection_.focus);
         const auto upper = std::max(selection_.anchor, selection_.focus);
         value_.erase(lower, upper - lower);
@@ -388,11 +415,14 @@ namespace nandina::widget::primitives
             }
         }
         if (has_selection() && !extend) {
-            const auto anchor = line.caret_for_source(selection_.anchor, selection_.anchor_affinity);
+            const auto anchor =
+                line.caret_for_source(selection_.anchor, selection_.anchor_affinity);
             const auto focus = line.caret_for_source(selection_.focus, selection_.focus_affinity);
-            update_selection_focus(direction < 0
-                ? (anchor.x <= focus.x ? anchor : focus)
-                : (anchor.x >= focus.x ? anchor : focus), false);
+            update_selection_focus(
+                direction < 0 ? (anchor.x <= focus.x ? anchor : focus)
+                              : (anchor.x >= focus.x ? anchor : focus),
+                false
+            );
             return;
         }
         const auto target_index = direction < 0

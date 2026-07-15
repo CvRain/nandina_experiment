@@ -140,6 +140,10 @@ namespace nandina::scene
         return p == nullptr || p->is_visible_in_tree();
     }
 
+    void NanNode::apply_default_text_pipeline(
+        const widget::primitives::TextPipeline& /*pipeline*/
+    ) {}
+
     void NanNode::_set_tree(NanSceneTree* tree) {
         tree_ = tree;
     }
@@ -152,6 +156,9 @@ namespace nandina::scene
             return;
         }
         tree_ = tree;
+        if (const auto* pipeline = tree->default_text_pipeline(); pipeline != nullptr) {
+            apply_default_text_pipeline(*pipeline);
+        }
         on_enter_tree();
         for (auto& child: children_) {
             child->_propagate_enter_tree(tree);

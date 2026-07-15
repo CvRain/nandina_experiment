@@ -22,8 +22,12 @@ namespace nandina::widget
     }
 
     auto ScrollView::set_child(std::shared_ptr<scene::NanControl> child) -> ScrollView& {
-        if (!child) { throw std::runtime_error("ScrollView::set_child: child is null"); }
-        if (auto current = child_.lock()) { remove_child(*current); }
+        if (!child) {
+            throw std::runtime_error("ScrollView::set_child: child is null");
+        }
+        if (auto current = child_.lock()) {
+            remove_child(*current);
+        }
         child_ = child;
         add_child(std::move(child));
         mark_layout_dirty();
@@ -56,28 +60,48 @@ namespace nandina::widget
         return *this;
     }
 
-    auto ScrollView::child() const -> scene::NanControl* { return child_.lock().get(); }
-    auto ScrollView::axis() const -> ScrollAxis { return axis_; }
-    auto ScrollView::scroll_offset() const -> foundation::NanPoint { return offset_; }
-    auto ScrollView::content_size() const -> foundation::NanSize { return content_size_; }
-    auto ScrollView::wheel_step() const -> float { return wheel_step_; }
+    auto ScrollView::child() const -> scene::NanControl* {
+        return child_.lock().get();
+    }
+    auto ScrollView::axis() const -> ScrollAxis {
+        return axis_;
+    }
+    auto ScrollView::scroll_offset() const -> foundation::NanPoint {
+        return offset_;
+    }
+    auto ScrollView::content_size() const -> foundation::NanSize {
+        return content_size_;
+    }
+    auto ScrollView::wheel_step() const -> float {
+        return wheel_step_;
+    }
 
     auto ScrollView::maximum_scroll_offset() const -> foundation::NanPoint {
         return foundation::NanPoint(
-            axis_ == ScrollAxis::vertical ? 0.0F : std::max(0.0F, content_size_.get_width() - width()),
-            axis_ == ScrollAxis::horizontal ? 0.0F : std::max(0.0F, content_size_.get_height() - height())
+            axis_ == ScrollAxis::vertical ? 0.0F
+                                          : std::max(0.0F, content_size_.get_width() - width()),
+            axis_ == ScrollAxis::horizontal ? 0.0F
+                                            : std::max(0.0F, content_size_.get_height() - height())
         );
     }
 
     auto ScrollView::on_input(scene::InputEvent& event) -> bool {
-        if (event.type() != scene::EventType::mouse_wheel) { return false; }
+        if (event.type() != scene::EventType::mouse_wheel) {
+            return false;
+        }
         const auto& wheel = static_cast<const scene::MouseWheelEvent&>(event);
         auto delta = wheel.delta();
         float dx = -delta.get_x() * wheel_step_;
         float dy = -delta.get_y() * wheel_step_;
-        if (axis_ == ScrollAxis::horizontal && dx == 0.0F) { dx = dy; }
-        if (axis_ == ScrollAxis::vertical) { dx = 0.0F; }
-        if (axis_ == ScrollAxis::horizontal) { dy = 0.0F; }
+        if (axis_ == ScrollAxis::horizontal && dx == 0.0F) {
+            dx = dy;
+        }
+        if (axis_ == ScrollAxis::vertical) {
+            dx = 0.0F;
+        }
+        if (axis_ == ScrollAxis::horizontal) {
+            dy = 0.0F;
+        }
         const auto before = offset_;
         scroll_by(foundation::NanPoint(dx, dy));
         if (offset_ != before) {
@@ -89,10 +113,16 @@ namespace nandina::widget
 
     auto ScrollView::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
         auto current = child_.lock();
-        if (!current) { return constraints.constrain(foundation::NanSize {}); }
+        if (!current) {
+            return constraints.constrain(foundation::NanSize {});
+        }
         auto child_limits = scene::LayoutConstraints::loose();
-        if (axis_ != ScrollAxis::horizontal) { child_limits.max_width = constraints.max_width; }
-        if (axis_ != ScrollAxis::vertical) { child_limits.max_height = constraints.max_height; }
+        if (axis_ != ScrollAxis::horizontal) {
+            child_limits.max_width = constraints.max_width;
+        }
+        if (axis_ != ScrollAxis::vertical) {
+            child_limits.max_height = constraints.max_height;
+        }
         content_size_ = current->measure_layout(child_limits);
         return constraints.constrain(content_size_);
     }
@@ -115,10 +145,14 @@ namespace nandina::widget
         }
         content_size_ = current->measure_layout(limits);
         clamp_offset();
-        current->layout_to(foundation::NanRect::from_xywh(
-            -offset_.get_x(), -offset_.get_y(),
-            content_size_.get_width(), content_size_.get_height()
-        ));
+        current->layout_to(
+            foundation::NanRect::from_xywh(
+                -offset_.get_x(),
+                -offset_.get_y(),
+                content_size_.get_width(),
+                content_size_.get_height()
+            )
+        );
     }
 
     void ScrollView::clamp_offset() {

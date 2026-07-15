@@ -138,11 +138,9 @@ namespace nandina::render
             return true;
         }
 
-        [[nodiscard]] auto create_alpha_texture(
-            int width,
-            int height,
-            std::span<const std::uint8_t> alpha
-        ) -> TextureHandle override {
+        [[nodiscard]] auto
+        create_alpha_texture(int width, int height, std::span<const std::uint8_t> alpha)
+            -> TextureHandle override {
             if (width <= 0 || height <= 0
                 || alpha.size() != static_cast<std::size_t>(width * height))
             {

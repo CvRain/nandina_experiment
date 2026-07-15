@@ -28,7 +28,8 @@ namespace nandina::text
         std::string message;
         std::optional<resource::ResourceError> cause;
     };
-    template<typename T> using FontResult = std::expected<T, FontError>;
+    template<typename T>
+    using FontResult = std::expected<T, FontError>;
 
     struct FontFaceKey {
         resource::ResourceId resource_id;
@@ -40,18 +41,12 @@ namespace nandina::text
     public:
         explicit FontLoader(const resource::ResourceManager& resources): resources_(&resources) {}
 
-        [[nodiscard]] auto load(
-            const resource::ResourceKey& key,
-            std::uint32_t face_index = 0
-        ) -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
-        [[nodiscard]] auto load(
-            resource::ResourceId id,
-            std::uint32_t face_index = 0
-        ) -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
-        [[nodiscard]] auto load(
-            resource::ResourceHandle resource,
-            std::uint32_t face_index = 0
-        ) -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
+        [[nodiscard]] auto load(const resource::ResourceKey& key, std::uint32_t face_index = 0)
+            -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
+        [[nodiscard]] auto load(resource::ResourceId id, std::uint32_t face_index = 0)
+            -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
+        [[nodiscard]] auto load(resource::ResourceHandle resource, std::uint32_t face_index = 0)
+            -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
 
         void invalidate(resource::ResourceId id);
         void clear();

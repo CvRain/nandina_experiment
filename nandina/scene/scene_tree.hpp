@@ -5,10 +5,12 @@
 #ifndef NANDINA_EXPERIMENT_SCENE_TREE_HPP
 #define NANDINA_EXPERIMENT_SCENE_TREE_HPP
 
+#include "../widget/primitives/text_layout_backend.hpp"
 #include "input_event.hpp"
 #include "node2d.hpp"
 
 #include <memory>
+#include <optional>
 #include <vector>
 
 namespace nandina::render
@@ -47,6 +49,9 @@ namespace nandina::scene
          * The previous root (and all its descendants) is destroyed.
          */
         auto set_root(std::shared_ptr<NanNode2D> root) -> void;
+        void set_default_text_pipeline(widget::primitives::TextPipeline pipeline);
+        void clear_default_text_pipeline();
+        [[nodiscard]] auto default_text_pipeline() const -> const widget::primitives::TextPipeline*;
 
         // ---- per-frame traversal ----
 
@@ -146,6 +151,7 @@ namespace nandina::scene
         std::weak_ptr<NanNode2D> pointer_capture_;
         foundation::NanPoint last_mouse_pos_ {};
         bool has_mouse_pos_ = false;
+        std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
     };
 
 } // namespace nandina::scene

@@ -1,4 +1,5 @@
 #include "sqlite_backend.hpp"
+#include "../file_resource_stream.hpp"
 #include <sqlite3.h>
 
 #include <cstring>
@@ -183,6 +184,119 @@ namespace nandina::resource
             }
             return materialize(statement.value);
         }
+
+        [[nodiscard]] auto stream_from_row(sqlite3_stmt* row) const -> ResourceStreamLookup {
+            const auto* raw_id = static_cast<const std::uint8_t*>(sqlite3_column_blob(row, 0));
+            if (!raw_id || sqlite3_column_bytes(row, 0) != 16) {
+                return std::unexpected(error("sqlite.stream", "invalid resource id"));
+            }
+            ResourceId::Bytes id {};
+            std::memcpy(id.data(), raw_id, id.size());
+            const auto* raw_key = reinterpret_cast<const char*>(sqlite3_column_text(row, 1));
+            const auto key = raw_key ? ResourceKey::parse(raw_key) : std::nullopt;
+            if (!key) {
+                return std::unexpected(error("sqlite.stream", "invalid resource key"));
+            }
+            const auto* raw_media = reinterpret_cast<const char*>(sqlite3_column_text(row, 2));
+            const std::string media = raw_media ? raw_media : "";
+            const int storage = sqlite3_column_int(row, 3);
+            const auto raw_size = sqlite3_column_int64(row, 6);
+            if (raw_size < 0 || static_cast<std::uint64_t>(raw_size) > options.max_stream_size) {
+                return std::unexpected(
+                    ResourceError {
+                        ResourceErrorCode::size_limit_exceeded,
+                        "sqlite.stream",
+                        "resource exceeds configured stream size limit",
+                    }
+                );
+            }
+            const auto size = static_cast<std::uint64_t>(raw_size);
+            if (storage == 0) {
+                const auto* blob = static_cast<const std::uint8_t*>(sqlite3_column_blob(row, 4));
+                const int count = sqlite3_column_bytes(row, 4);
+                if (count < 0 || static_cast<std::uint64_t>(count) != size || (count > 0 && !blob))
+                {
+                    return std::unexpected(
+                        ResourceError {
+                            ResourceErrorCode::integrity_error,
+                            "sqlite.stream",
+                            "embedded resource size mismatch",
+                        }
+                    );
+                }
+                std::vector<std::uint8_t> bytes;
+                if (count > 0) {
+                    bytes.assign(blob, blob + count);
+                }
+                auto resource = std::make_shared<const Resource>(
+                    ResourceId(id),
+                    *key,
+                    media,
+                    ResourceStorage::embedded_blob,
+                    std::move(bytes)
+                );
+                return std::optional<ResourceStreamHandle> {
+                    make_memory_resource_stream(std::move(resource))
+                };
+            }
+            if (storage != 1) {
+                return std::unexpected(error("sqlite.stream", "unknown resource storage"));
+            }
+            const auto* raw_path = reinterpret_cast<const char*>(sqlite3_column_text(row, 5));
+            const std::filesystem::path relative = raw_path ? raw_path : "";
+            if (relative.empty() || relative.is_absolute()) {
+                return std::unexpected(error("sqlite.stream", "invalid external resource path"));
+            }
+            for (const auto& part: relative) {
+                if (part == "." || part == "..") {
+                    return std::unexpected(
+                        error("sqlite.stream", "invalid external resource path")
+                    );
+                }
+            }
+            const auto root = options.external_root.value_or(options.database.parent_path());
+            auto opened = open_file_resource_stream({
+                .id = ResourceId(id),
+                .key = *key,
+                .media_type = media,
+                .path = root / relative,
+                .declared_size = size,
+            });
+            if (!opened) {
+                return std::unexpected(opened.error());
+            }
+            return std::optional<ResourceStreamHandle> {*opened};
+        }
+
+        [[nodiscard]] auto
+        stream_query(const char* sql, const void* value, int size, bool text) const
+            -> ResourceStreamLookup {
+            std::lock_guard lock(mutex);
+            Statement statement;
+            if (sqlite3_prepare_v2(db, sql, -1, &statement.value, nullptr) != SQLITE_OK) {
+                return std::unexpected(error("sqlite.prepare", "stream query preparation failed"));
+            }
+            const int rc = text
+                ? sqlite3_bind_text(
+                      statement.value,
+                      1,
+                      static_cast<const char*>(value),
+                      size,
+                      SQLITE_TRANSIENT
+                  )
+                : sqlite3_bind_blob(statement.value, 1, value, size, SQLITE_TRANSIENT);
+            if (rc != SQLITE_OK) {
+                return std::unexpected(error("sqlite.bind", "stream query binding failed"));
+            }
+            const int step = sqlite3_step(statement.value);
+            if (step == SQLITE_DONE) {
+                return std::optional<ResourceStreamHandle> {};
+            }
+            if (step != SQLITE_ROW) {
+                return std::unexpected(error("sqlite.step", "stream query failed"));
+            }
+            return stream_from_row(statement.value);
+        }
     };
 
     SQLiteBackend::SQLiteBackend(std::unique_ptr<Impl> impl): impl_(std::move(impl)) {}
@@ -190,7 +304,7 @@ namespace nandina::resource
     auto SQLiteBackend::open(SQLiteBackendOptions options)
         -> ResourceResult<std::shared_ptr<SQLiteBackend>> {
         if (options.database.empty() || options.max_resource_size == 0
-            || options.busy_timeout_ms < 0)
+            || options.max_stream_size == 0 || options.busy_timeout_ms < 0)
         {
             return std::unexpected(
                 ResourceError {
@@ -268,5 +382,21 @@ namespace nandina::resource
             "FROM resources "
             "WHERE id=?1";
         return impl_->query(sql, id.bytes().data(), static_cast<int>(id.bytes().size()), false);
+    }
+    auto SQLiteBackend::open_stream(const ResourceKey& key) const -> ResourceStreamLookup {
+        constexpr auto sql =
+            "SELECT r.id,r.resource_key,r.media_type,r.storage,r.data,r.external_path,r.size "
+            "FROM resources r "
+            "WHERE r.resource_key=?1 OR r.id=(SELECT resource_id FROM aliases WHERE alias=?1) "
+            "ORDER BY (r.resource_key=?1) DESC LIMIT 1";
+        const auto value = key.value();
+        return impl_->stream_query(sql, value.data(), static_cast<int>(value.size()), true);
+    }
+    auto SQLiteBackend::open_stream(const ResourceId id) const -> ResourceStreamLookup {
+        constexpr auto sql =
+            "SELECT id,resource_key,media_type,storage,data,external_path,size "
+            "FROM resources WHERE id=?1";
+        return impl_
+            ->stream_query(sql, id.bytes().data(), static_cast<int>(id.bytes().size()), false);
     }
 } // namespace nandina::resource

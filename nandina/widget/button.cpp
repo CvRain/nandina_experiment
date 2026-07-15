@@ -25,10 +25,9 @@ namespace nandina::widget
                 && near(a.alpha, b.alpha);
         }
 
-        [[nodiscard]] auto same_text_style(
-            const primitives::TextStyle& lhs,
-            const primitives::TextStyle& rhs
-        ) -> bool {
+        [[nodiscard]] auto
+        same_text_style(const primitives::TextStyle& lhs, const primitives::TextStyle& rhs)
+            -> bool {
             return same_color(lhs.color, rhs.color) && near(lhs.font_size, rhs.font_size)
                 && lhs.overflow == rhs.overflow && lhs.max_lines == rhs.max_lines;
         }
@@ -68,6 +67,11 @@ namespace nandina::widget
 
     auto Button::text_pipeline() const -> primitives::TextPipeline {
         return text_.text_pipeline();
+    }
+
+    void Button::apply_default_text_pipeline(const primitives::TextPipeline& pipeline) {
+        text_.apply_default_text_pipeline(pipeline);
+        mark_layout_dirty();
     }
 
     void Button::set_text_overflow(primitives::TextOverflow overflow) {
@@ -160,12 +164,14 @@ namespace nandina::widget
 
         apply_text_style(visual_state());
         const float content_width = std::max(0.0F, world.get_width() - style.padding_x * 2.0F);
-        (void)text_.measure_layout(scene::LayoutConstraints {
-            .min_width = 0.0F,
-            .max_width = content_width,
-            .min_height = 0.0F,
-            .max_height = style.height,
-        });
+        (void)text_.measure_layout(
+            scene::LayoutConstraints {
+                .min_width = 0.0F,
+                .max_width = content_width,
+                .min_height = 0.0F,
+                .max_height = style.height,
+            }
+        );
         const float text_width = text_.measured_text_width();
         const auto text_pos = foundation::NanPoint(
             world.get_left() + (world.get_width() - text_width) * 0.5F,
@@ -193,16 +199,20 @@ namespace nandina::widget
             size_,
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
-        apply_text_style(disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal);
+        apply_text_style(
+            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
+        );
         const float max_text_width = std::isfinite(constraints.max_width)
             ? std::max(0.0F, constraints.max_width - style.padding_x * 2.0F)
             : constraints.max_width;
-        (void)text_.measure_layout(scene::LayoutConstraints {
-            .min_width = 0.0F,
-            .max_width = max_text_width,
-            .min_height = 0.0F,
-            .max_height = style.height,
-        });
+        (void)text_.measure_layout(
+            scene::LayoutConstraints {
+                .min_width = 0.0F,
+                .max_width = max_text_width,
+                .min_height = 0.0F,
+                .max_height = style.height,
+            }
+        );
         return constraints.constrain(
             foundation::NanSize(text_.width() + style.padding_x * 2.0F, style.height)
         );
@@ -216,7 +226,9 @@ namespace nandina::widget
             size_,
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
-        apply_text_style(disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal);
+        apply_text_style(
+            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
+        );
         (void)text_.measure_layout(scene::LayoutConstraints::loose());
         set_size(foundation::NanSize(text_.width() + style.padding_x * 2.0F, style.height));
     }

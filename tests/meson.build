@@ -22,23 +22,6 @@ font_tests = executable(
 )
 test('font', font_tests)
 
-if get_option('bundled_fonts').enabled()
-    bundled_font_path = (
-        meson.project_build_root()
-        / 'example'
-        / 'res'
-        / 'fonts'
-        / 'CaskaydiaCove-Regular.ttf'
-    )
-    bundled_font_tests = executable(
-        'bundled_font_tests',
-        files('bundled_font_tests.cpp'),
-        cpp_args : ['-DNANDINA_BUNDLED_FONT_PATH="' + bundled_font_path + '"'],
-        dependencies : [nandina_dep, catch2_with_main_dep],
-    )
-    test('bundled-font', bundled_font_tests, depends: bundled_font_targets)
-endif
-
 scene_tests = executable(
     'scene_tests',
     files('scene_tests.cpp'),
@@ -88,6 +71,44 @@ resource_tests = executable(
 )
 test('resource', resource_tests)
 
+nanres_cli_test = find_program('nanres_cli_test.py')
+nanres_package_probe = executable(
+    'nanres_package_probe',
+    files('nanres_package_probe.cpp'),
+    dependencies: [nandina_dep, sqlite3_dep],
+)
+test(
+    'nanres-cli',
+    nanres_cli_test,
+    args: [nanres, nanres_package_probe],
+)
+nanres_install_test = find_program('nanres_install_test.py')
+test(
+    'nanres-install',
+    nanres_install_test,
+    args: [meson.project_source_root() / 'tools' / 'nanres_install.py'],
+)
+test(
+    'nanres-meson-package',
+    nanres_package_probe,
+    args: [
+        meson.project_build_root() / 'example' / 'resources' / 'resources.db',
+        'embedded-font',
+        'fonts/caskaydia-cove/regular',
+    ],
+    depends: nanres_package,
+)
+test(
+    'nanres-chinese-font-package',
+    nanres_package_probe,
+    args: [
+        meson.project_build_root() / 'example' / 'resources' / 'resources.db',
+        'external-font',
+        'fonts/fallback/zh-cn',
+    ],
+    depends: nanres_package,
+)
+
 font_resource_tests = executable(
     'font_resource_tests',
     files('font_resource_tests.cpp'),
@@ -95,3 +116,35 @@ font_resource_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('font-resource', font_resource_tests)
+
+application_resource_tests = executable(
+    'application_resource_tests',
+    files('application_resource_tests.cpp'),
+    cpp_args: [
+        '-DNANDINA_TEST_PACKAGE_EXECUTABLE="'
+        + (meson.project_build_root() / 'example' / 'nandina_example') + '"',
+    ],
+    dependencies: [nandina_dep, catch2_with_main_dep],
+)
+test(
+    'application-resource',
+    application_resource_tests,
+    depends: nanres_package,
+)
+
+application_bootstrap_probe = executable(
+    'application_bootstrap_probe',
+    files('application_bootstrap_probe.cpp'),
+    dependencies: [nandina_dep],
+)
+r10_layout_test = find_program('r10_layout_test.py')
+test(
+    'r10-layout',
+    r10_layout_test,
+    args: [
+        application_bootstrap_probe,
+        meson.project_build_root() / 'example' / 'resources',
+        meson.project_source_root() / 'tools' / 'nanres_install.py',
+    ],
+    depends: nanres_package,
+)

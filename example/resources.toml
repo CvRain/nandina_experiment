@@ -1,0 +1,42 @@
+package_id = "org.nandina.todo"
+package_directory = "package"
+embed_threshold = 1048576
+
+[aliases]
+"fonts/default" = "fonts/default-ui.ttf"
+"fonts/caskaydia-cove/regular" = "fonts/default-ui.ttf"
+"fonts/fallback/zh-cn" = "fonts/fallback/sarasa-fixed-sc-regular.ttf"
+
+[[roots]]
+path = "../nandina/assets/default_font"
+key_prefix = "fonts"
+
+[[rules]]
+glob = "fonts/default-ui.ttf"
+media_type = "font/ttf"
+storage = "embedded"
+
+[[rules]]
+glob = "fonts/default-ui-license.txt"
+media_type = "text/plain"
+storage = "embedded"
+
+[[roots]]
+path = "res/fonts/zh-cn"
+key_prefix = "fonts/fallback"
+
+[[rules]]
+glob = "fonts/fallback/sarasa-fixed-sc-regular.ttf"
+media_type = "font/ttf"
+storage = "external"
+streaming = false
+
+[[rules]]
+glob = "fonts/fallback/ofl-sarasa-gothic.txt"
+media_type = "text/plain"
+storage = "embedded"
+
+[[rules]]
+glob = "fonts/fallback/source.toml"
+media_type = "application/toml"
+storage = "embedded"

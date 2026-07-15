@@ -9,10 +9,7 @@
 #include "reactive/computed.hpp"
 #include "reactive/scope.hpp"
 #include "reactive/signal.hpp"
-#include "resource/backends/directory_backend.hpp"
-#include "resource/resource_manager.hpp"
 #include "scene/control.hpp"
-#include "text/font_pipeline.hpp"
 #include "theme/theme.hpp"
 #include "widget/button.hpp"
 #include "widget/label.hpp"
@@ -24,16 +21,11 @@
 #include <cctype>
 #include <cstdint>
 #include <memory>
-#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
 
 using namespace nandina;
-
-struct TodoPageParams {
-    widget::primitives::TextPipeline text_pipeline;
-};
 
 struct TodoItem {
     std::uint64_t id = 0;
@@ -48,30 +40,24 @@ public:
     TodoPageRoot(
         reactive::Graph& graph,
         reactive::Signal<std::vector<TodoItem>>& todos,
-        theme::NanTheme theme,
-        widget::primitives::TextPipeline pipeline
+        theme::NanTheme theme
     ):
         graph_(&graph),
         todos_(&todos),
-        theme_(theme),
-        pipeline_(pipeline) {
+        theme_(theme) {
         set_background(theme_.palette.surface);
 
-        title_ = widget::Label::create(graph, "Todo workspace", theme_);
+        title_ = widget::Label::create(graph, "待办事项 / Todo workspace", theme_);
         title_->set_font_size(24.0F);
-        title_->set_text_pipeline(pipeline_);
 
         status_ = widget::Label::create(graph, "", theme_);
         status_->set_color(theme_.palette.on_surface_variant);
-        status_->set_text_pipeline(pipeline_);
 
-        input_ = std::make_shared<widget::TextField>("", "Add a task", theme_);
-        input_->set_text_pipeline(pipeline_);
+        input_ = std::make_shared<widget::TextField>("", "添加一个任务", theme_);
         input_->set_on_submit([this](std::string_view value) { submit(value); });
 
-        add_button_ = widget::Button::create("Add", theme_);
+        add_button_ = widget::Button::create("添加", theme_);
         add_button_->set_tone(theme::ButtonTone::secondary);
-        add_button_->set_text_pipeline(pipeline_);
         add_button_->set_on_click([this] { submit(input_->value()); });
 
         const auto input_expanded = widget::Expanded::create();
@@ -185,36 +171,32 @@ private:
         );
         status_->set_text(
             std::to_string(pending_items_.size()) + " tasks, " + std::to_string(completed)
-            + " completed"
+            + " completed / 已完成"
         );
 
         if (pending_items_.empty()) {
-            auto empty = widget::Label::create(*graph_, "No tasks yet", theme_);
+            auto empty = widget::Label::create(*graph_, "暂无任务", theme_);
             empty->set_color(theme_.palette.on_surface_variant);
-            empty->set_text_pipeline(pipeline_);
             column->add(empty);
         }
         for (const auto& item: pending_items_) {
             auto label = widget::Label::create(
                 *graph_,
-                (item.completed ? "[done] " : "[todo] ") + item.title,
+                (item.completed ? "[已完成] " : "[待办] ") + item.title,
                 theme_
             );
             label->set_color(
                 item.completed ? theme_.palette.on_surface_variant : theme_.palette.on_surface
             );
             label->set_overflow(widget::primitives::TextOverflow::clip);
-            label->set_text_pipeline(pipeline_);
 
-            auto toggle_button = widget::Button::create(item.completed ? "Undo" : "Done", theme_);
+            auto toggle_button = widget::Button::create(item.completed ? "撤销" : "完成", theme_);
             toggle_button->set_treatment(theme::ButtonTreatment::outlined);
-            toggle_button->set_text_pipeline(pipeline_);
             toggle_button->set_on_click([this, id = item.id] { toggle(id); });
 
-            auto remove_button = widget::Button::create("Remove", theme_);
+            auto remove_button = widget::Button::create("删除", theme_);
             remove_button->set_tone(theme::ButtonTone::secondary);
             remove_button->set_treatment(theme::ButtonTreatment::outlined);
-            remove_button->set_text_pipeline(pipeline_);
             remove_button->set_on_click([this, id = item.id] { remove(id); });
 
             auto label_item = widget::FlexItem::create(
@@ -244,7 +226,6 @@ private:
     reactive::Graph* graph_;
     reactive::Signal<std::vector<TodoItem>>* todos_;
     theme::NanTheme theme_;
-    widget::primitives::TextPipeline pipeline_;
     std::shared_ptr<widget::Label> title_;
     std::shared_ptr<widget::Label> status_;
     std::shared_ptr<widget::TextField> input_;
@@ -258,9 +239,9 @@ private:
     bool scroll_after_layout_pending_ = false;
 };
 
-class TodoPage final: public app::NanPageT<TodoPageParams> {
+class TodoPage final: public app::NanPageT<app::NoParams> {
 public:
-    explicit TodoPage(TodoPageParams params): NanPageT(std::move(params)) {}
+    TodoPage() = default;
 
     [[nodiscard]] auto route_key() const -> std::string_view override {
         return "todo";
@@ -270,16 +251,15 @@ public:
         -> std::shared_ptr<scene::NanNode2D> override {
         auto& todos = context.scope().signal_value(
             std::vector<TodoItem> {
-                {.id = 1, .title = "Build the unified text pipeline", .completed = true},
-                {.id = 2, .title = "Exercise mouse, keyboard, resize, and bidi editing"},
-                {.id = 3, .title = "Validate scrolling with a dynamic task list"},
+                {.id = 1, .title = "完成统一文本渲染管线", .completed = true},
+                {.id = 2, .title = "验证中文输入、鼠标和窗口缩放"},
+                {.id = 3, .title = "检查动态任务列表的滚动效果"},
             }
         );
         auto root = std::make_shared<TodoPageRoot>(
             context.graph(),
             todos,
-            context.theme(),
-            params().text_pipeline
+            context.theme()
         );
         context.scope().effect([weak = std::weak_ptr<TodoPageRoot>(root), &todos] {
             if (auto current = weak.lock()) {
@@ -296,84 +276,21 @@ public:
 
 protected:
     void on_setup() override {
-        auto pipeline = widget::primitives::TextPipeline {};
-#ifdef NANDINA_EXAMPLE_RESOURCE_DIR
-        auto* device = render_device();
-        if (device == nullptr) {
-            throw std::runtime_error("TodoWindow requires an active render device");
-        }
-        const auto font_id = resource::ResourceId::parse(
-            "737980c0-0000-4000-8000-000000000001"
-        );
-        if (!font_id) {
-            throw std::runtime_error("TodoWindow default font resource id is invalid");
-        }
-        auto directory = resource::DirectoryBackend::open({
-            .name = "example-resources",
-            .root = NANDINA_EXAMPLE_RESOURCE_DIR,
-            .resources = {{
-                .id = *font_id,
-                .key = resource::ResourceKey("fonts/default"),
-                .relative_path = "CaskaydiaCove-Regular.ttf",
-                .media_type = "font/ttf",
-                .aliases = {resource::ResourceKey("fonts/caskaydia-cove/regular")},
-            }},
-        });
-        if (!directory) {
-            throw std::runtime_error("TodoWindow failed to mount bundled font resources");
-        }
-        resource_backend_ = *directory;
-        (void)resources_.mount(resource_backend_);
-        font_loader_ = std::make_unique<text::FontLoader>(resources_);
-        if (!font_families_.register_family(resource::ResourceKey("families/ui"), {{
-                .resource = resource::ResourceKey("fonts/default"),
-            }}))
-        {
-            throw std::runtime_error("TodoWindow failed to register the UI font family");
-        }
-        if (!font_families_.set_default_family(resource::ResourceKey("families/ui"))) {
-            throw std::runtime_error("TodoWindow failed to set the default UI font family");
-        }
-        pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
-            *device, *font_loader_, font_families_
-        );
-        auto loaded_pipeline = pipeline_cache_->get({
-            .family = resource::ResourceKey("families/ui"),
-        });
-        if (!loaded_pipeline) {
-            throw std::runtime_error("TodoWindow failed to create the default text pipeline");
-        }
-        font_pipeline_ = *loaded_pipeline;
-        pipeline = font_pipeline_->pipeline();
-#endif
-
-        use_router().push<TodoPage>(TodoPageParams {
-            .text_pipeline = pipeline,
-        });
+        use_router().push<TodoPage>();
     }
-
-    void on_teardown() override {
-        if (auto* active_router = router(); active_router != nullptr) {
-            active_router->clear();
-        }
-        font_pipeline_.reset();
-        pipeline_cache_.reset();
-        font_loader_.reset();
-        resources_.clear();
-        resource_backend_.reset();
-    }
-
-private:
-    resource::ResourceManager resources_;
-    std::shared_ptr<resource::IResourceBackend> resource_backend_;
-    std::unique_ptr<text::FontLoader> font_loader_;
-    text::FontFamilyRegistry font_families_;
-    std::unique_ptr<text::FontPipelineCache> pipeline_cache_;
-    std::shared_ptr<text::FontPipeline> font_pipeline_;
 };
 
 auto main() -> int {
-    app::NanApplication application;
+    app::NanApplication application(
+        app::NanApplicationConfig::for_process("org.nandina.todo")
+    );
+    auto chinese_fallback = text::register_optional_font_fallback(
+        application.font_families(),
+        application.resources(),
+        resource::ResourceKey("families/zh-cn"),
+        resource::ResourceKey("fonts/fallback/zh-cn")
+    );
+    if (!chinese_fallback) { return 2; }
     application.set_theme(theme::default_theme());
 
     TodoWindow window {

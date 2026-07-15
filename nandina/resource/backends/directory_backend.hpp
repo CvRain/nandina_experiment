@@ -22,6 +22,7 @@ namespace nandina::resource
         std::filesystem::path root;
         std::vector<DirectoryResource> resources;
         std::uint64_t max_resource_size = 64U * 1024U * 1024U;
+        std::uint64_t max_stream_size = 4ULL * 1024ULL * 1024ULL * 1024ULL;
         bool allow_symlinks = false;
     };
 
@@ -33,6 +34,9 @@ namespace nandina::resource
         [[nodiscard]] auto name() const noexcept -> std::string_view override;
         [[nodiscard]] auto find(const ResourceKey& key) const -> ResourceLookup override;
         [[nodiscard]] auto find(ResourceId id) const -> ResourceLookup override;
+        [[nodiscard]] auto open_stream(const ResourceKey& key) const
+            -> ResourceStreamLookup override;
+        [[nodiscard]] auto open_stream(ResourceId id) const -> ResourceStreamLookup override;
 
     private:
         class Impl;

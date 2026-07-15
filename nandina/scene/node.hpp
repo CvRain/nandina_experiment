@@ -27,6 +27,11 @@ namespace nandina::render
     class DrawContext;
 } // namespace nandina::render
 
+namespace nandina::widget::primitives
+{
+    struct TextPipeline;
+}
+
 namespace nandina::scene
 {
 
@@ -166,6 +171,8 @@ namespace nandina::scene
         [[nodiscard]] virtual auto as_control() const -> const NanControl* {
             return nullptr;
         }
+
+        virtual void apply_default_text_pipeline(const widget::primitives::TextPipeline& pipeline);
 
     protected:
         /// Internal: set the owning scene tree (called by NanSceneTree).

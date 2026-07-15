@@ -1,6 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
 #include "resource/backends/memory_backend.hpp"
+#include "resource/backends/builtin_backend.hpp"
 #include "resource/resource_manager.hpp"
 #include "text/font_family.hpp"
 #include "text/font_pipeline.hpp"
@@ -166,4 +167,27 @@ TEST_CASE("FontPipelineCache owns ordered render resources", "[resource][font][p
     REQUIRE((*first)->pipeline().backend != nullptr);
     REQUIRE((*first)->pipeline().renderer != nullptr);
     REQUIRE(device.next_texture == 2);
+}
+
+TEST_CASE("builtin default family creates a portable text pipeline", "[resource][font][builtin]") {
+    resource::ResourceManager resources;
+    (void)resources.mount(resource::BuiltinBackend::create(), -1000);
+    text::FontLoader loader(resources);
+    text::FontFamilyRegistry families;
+    REQUIRE(text::register_builtin_default_font_family(families).has_value());
+
+    auto resolved = families.resolve({}, loader);
+    REQUIRE(resolved.has_value());
+    REQUIRE(resolved->faces.size() == 1);
+    REQUIRE(resolved->specs.front().resource.value() == "fonts/default");
+    REQUIRE_FALSE(resolved->faces.front()->family_name().empty());
+
+    TextureDevice device;
+    text::FontPipelineCache cache(device, loader, families);
+    auto pipeline = cache.get({
+        .family = resource::ResourceKey("families/default-ui"),
+    });
+    REQUIRE(pipeline.has_value());
+    REQUIRE((*pipeline)->pipeline().backend != nullptr);
+    REQUIRE((*pipeline)->pipeline().renderer != nullptr);
 }

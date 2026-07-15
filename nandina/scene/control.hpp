@@ -23,8 +23,8 @@
 #include "../foundation/nandina_color.hpp"
 #include "node2d.hpp"
 
-#include <optional>
 #include <limits>
+#include <optional>
 
 namespace nandina::scene
 {

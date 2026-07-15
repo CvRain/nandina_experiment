@@ -44,6 +44,7 @@ namespace nandina::widget::primitives
 
         void set_text_pipeline(TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> TextPipeline;
+        void apply_default_text_pipeline(const TextPipeline& pipeline) override;
 
         /// The referenced backend must outlive this Text instance.
         void set_layout_backend(const ITextLayoutBackend& backend);
@@ -55,16 +56,19 @@ namespace nandina::widget::primitives
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
 
     private:
-        void update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
+        void
+        update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
 
         std::string text_;
         TextStyle style_ {};
         TextLayoutResult layout_ {};
         const ITextLayoutBackend* backend_ = nullptr;
         ITextLayoutRenderer* renderer_ = nullptr;
+        bool pipeline_explicit_ = false;
     };
 
 } // namespace nandina::widget::primitives

@@ -24,7 +24,10 @@ namespace nandina::text
         bindings_.reserve(faces_.size());
         for (const auto& face: faces_) {
             auto atlas = std::make_unique<GlyphAtlas>(
-                face, options.atlas_width, options.atlas_height, options.atlas_padding
+                face,
+                options.atlas_width,
+                options.atlas_height,
+                options.atlas_padding
             );
             auto texture = std::make_unique<GlyphAtlasTexture>(device, *atlas);
             bindings_.push_back({.atlas = atlas.get(), .texture = texture.get()});
@@ -37,15 +40,21 @@ namespace nandina::text
     auto FontPipeline::pipeline() const -> widget::primitives::TextPipeline {
         return {.backend = backend_.get(), .renderer = renderer_.get()};
     }
-    auto FontPipeline::backend() const -> const HarfBuzzTextLayoutBackend& { return *backend_; }
-    auto FontPipeline::font_count() const -> std::size_t { return faces_.size(); }
+    auto FontPipeline::backend() const -> const HarfBuzzTextLayoutBackend& {
+        return *backend_;
+    }
+    auto FontPipeline::font_count() const -> std::size_t {
+        return faces_.size();
+    }
 
     FontPipelineCache::FontPipelineCache(
         render::IRenderDevice& device,
         FontLoader& loader,
         const FontFamilyRegistry& families
     ):
-        device_(&device), loader_(&loader), families_(&families) {}
+        device_(&device),
+        loader_(&loader),
+        families_(&families) {}
 
     auto FontPipelineCache::get(FontRequest request, const FontPipelineOptions options)
         -> FontResult<std::shared_ptr<FontPipeline>> {
@@ -57,21 +66,31 @@ namespace nandina::text
         };
         std::lock_guard lock(mutex_);
         if (const auto found = cache_.find(key); found != cache_.end()) {
-            if (auto cached = found->second.lock()) { return cached; }
+            if (auto cached = found->second.lock()) {
+                return cached;
+            }
         }
         auto family = families_->resolve(request, *loader_);
-        if (!family) { return std::unexpected(family.error()); }
+        if (!family) {
+            return std::unexpected(family.error());
+        }
         try {
             auto pipeline = std::make_shared<FontPipeline>(*device_, std::move(*family), options);
             cache_[key] = pipeline;
             return pipeline;
-        } catch (const std::exception& exception) {
-            return std::unexpected(FontError {
-                .code = FontErrorCode::pipeline_failure,
-                .operation = "font.pipeline",
-                .message = exception.what(),
-            });
+        }
+        catch (const std::exception& exception) {
+            return std::unexpected(
+                FontError {
+                    .code = FontErrorCode::pipeline_failure,
+                    .operation = "font.pipeline",
+                    .message = exception.what(),
+                }
+            );
         }
     }
-    void FontPipelineCache::clear() { std::lock_guard lock(mutex_); cache_.clear(); }
+    void FontPipelineCache::clear() {
+        std::lock_guard lock(mutex_);
+        cache_.clear();
+    }
 } // namespace nandina::text

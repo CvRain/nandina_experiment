@@ -33,7 +33,8 @@ namespace nandina::widget
     public:
         explicit Flex(LayoutAxis axis = LayoutAxis::horizontal);
 
-        [[nodiscard]] static auto create(LayoutAxis axis = LayoutAxis::horizontal) -> std::shared_ptr<Flex>;
+        [[nodiscard]] static auto create(LayoutAxis axis = LayoutAxis::horizontal)
+            -> std::shared_ptr<Flex>;
 
         auto add(std::shared_ptr<scene::NanControl> child) -> Flex&;
         auto set_axis(LayoutAxis axis) -> Flex&;
@@ -48,7 +49,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -64,13 +66,13 @@ namespace nandina::widget
     public:
         explicit Wrap(LayoutAxis axis = LayoutAxis::horizontal);
 
-        [[nodiscard]] static auto create(LayoutAxis axis = LayoutAxis::horizontal) -> std::shared_ptr<Wrap>;
+        [[nodiscard]] static auto create(LayoutAxis axis = LayoutAxis::horizontal)
+            -> std::shared_ptr<Wrap>;
 
         auto add(std::shared_ptr<scene::NanControl> child) -> Wrap&;
-        auto add(
-            std::shared_ptr<scene::NanControl> child,
-            std::optional<LayoutAlignment> cross_alignment
-        ) -> Wrap&;
+        auto
+        add(std::shared_ptr<scene::NanControl> child,
+            std::optional<LayoutAlignment> cross_alignment) -> Wrap&;
         auto set_child_cross_alignment(
             scene::NanControl& child,
             std::optional<LayoutAlignment> alignment
@@ -91,7 +93,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -123,7 +126,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -149,7 +153,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -175,7 +180,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -192,7 +198,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 
@@ -214,7 +221,8 @@ namespace nandina::widget
         void relayout();
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         auto on_layout() -> void override;
         void on_ready() override;
 

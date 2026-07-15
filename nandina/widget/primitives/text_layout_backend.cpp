@@ -17,14 +17,13 @@ namespace nandina::widget::primitives
         constexpr float text_layout_epsilon = 0.01F;
 
         [[nodiscard]] auto estimated_text_width(std::string_view text, float font_size) -> float {
-            return static_cast<float>(foundation::utf8::grapheme_ranges(text).size())
-                * font_size * 0.56F;
+            return static_cast<float>(foundation::utf8::grapheme_ranges(text).size()) * font_size
+                * 0.56F;
         }
 
-        [[nodiscard]] auto next_grapheme_boundary(
-            const std::string_view text,
-            const std::size_t offset
-        ) -> std::size_t {
+        [[nodiscard]] auto
+        next_grapheme_boundary(const std::string_view text, const std::size_t offset)
+            -> std::size_t {
             const auto ranges = foundation::utf8::grapheme_ranges(text.substr(offset));
             return ranges.empty() ? text.size() : offset + ranges.front().length;
         }
@@ -35,19 +34,23 @@ namespace nandina::widget::primitives
             const float grapheme_width
         ) -> std::vector<TextCaretStop> {
             std::vector<TextCaretStop> stops;
-            stops.push_back(TextCaretStop {
-                .source_offset = source_offset,
-                .x = 0.0F,
-                .affinity = TextAffinity::downstream,
-            });
+            stops.push_back(
+                TextCaretStop {
+                    .source_offset = source_offset,
+                    .x = 0.0F,
+                    .affinity = TextAffinity::downstream,
+                }
+            );
             float x = 0.0F;
             for (const auto& grapheme: foundation::utf8::grapheme_ranges(source)) {
                 x += grapheme_width;
-                stops.push_back(TextCaretStop {
-                    .source_offset = source_offset + grapheme.offset + grapheme.length,
-                    .x = x,
-                    .affinity = TextAffinity::upstream,
-                });
+                stops.push_back(
+                    TextCaretStop {
+                        .source_offset = source_offset + grapheme.offset + grapheme.length,
+                        .x = x,
+                        .affinity = TextAffinity::upstream,
+                    }
+                );
             }
             return stops;
         }
@@ -75,7 +78,8 @@ namespace nandina::widget::primitives
                               1,
                               foundation::utf8::grapheme_ranges(input.text).size()
                           );
-                    const auto max_lines = static_cast<std::size_t>(std::max(1, input.style.max_lines));
+                    const auto max_lines =
+                        static_cast<std::size_t>(std::max(1, input.style.max_lines));
 
                     std::size_t offset = 0;
                     bool pending_empty_line = input.text.empty();
@@ -94,21 +98,24 @@ namespace nandina::widget::primitives
                             ++graphemes;
                         }
 
-                        const auto line_text = input.text.substr(line_offset, line_end - line_offset);
+                        const auto line_text =
+                            input.text.substr(line_offset, line_end - line_offset);
                         const float line_width = has_width_constraint
                             ? std::min(
                                   estimated_text_width(line_text, result.font_size),
                                   input.constraints.max_width
                               )
                             : estimated_text_width(line_text, result.font_size);
-                        result.lines.push_back(TextLayoutLine {
-                            .text_offset = line_offset,
-                            .text_length = line_end - line_offset,
-                            .visible_text = std::string(line_text),
-                            .caret_stops = caret_stops_for(line_text, line_offset, char_width),
-                            .size = foundation::NanSize(line_width, line_height),
-                            .baseline = result.baseline,
-                        });
+                        result.lines.push_back(
+                            TextLayoutLine {
+                                .text_offset = line_offset,
+                                .text_length = line_end - line_offset,
+                                .visible_text = std::string(line_text),
+                                .caret_stops = caret_stops_for(line_text, line_offset, char_width),
+                                .size = foundation::NanSize(line_width, line_height),
+                                .baseline = result.baseline,
+                            }
+                        );
 
                         offset = line_end;
                         if (offset < input.text.size() && input.text[offset] == '\n') {
@@ -131,7 +138,8 @@ namespace nandina::widget::primitives
 
                 std::string laid_out_text {input.text};
                 std::size_t source_text_length = input.text.size();
-                const float unconstrained_width = estimated_text_width(input.text, input.style.font_size);
+                const float unconstrained_width =
+                    estimated_text_width(input.text, input.style.font_size);
 
                 if (has_width_constraint && input.constraints.max_width >= 0.0F
                     && unconstrained_width > input.constraints.max_width + text_layout_epsilon)
@@ -141,17 +149,19 @@ namespace nandina::widget::primitives
                     if (input.style.overflow == TextOverflow::scale && unconstrained_width > 0.0F) {
                         result.font_size = std::max(
                             1.0F,
-                            input.style.font_size * (input.constraints.max_width / unconstrained_width)
+                            input.style.font_size
+                                * (input.constraints.max_width / unconstrained_width)
                         );
-                    } else if (input.style.overflow == TextOverflow::ellipsis) {
+                    }
+                    else if (input.style.overflow == TextOverflow::ellipsis) {
                         constexpr std::string_view dots = "...";
                         const float dots_width = estimated_text_width(dots, input.style.font_size);
-                        const float budget = std::max(0.0F, input.constraints.max_width - dots_width);
+                        const float budget =
+                            std::max(0.0F, input.constraints.max_width - dots_width);
                         const auto keep = static_cast<std::size_t>(std::floor(budget / char_width));
                         const auto graphemes = foundation::utf8::grapheme_ranges(input.text);
-                        source_text_length = keep >= graphemes.size()
-                            ? input.text.size()
-                            : graphemes[keep].offset;
+                        source_text_length =
+                            keep >= graphemes.size() ? input.text.size() : graphemes[keep].offset;
                         laid_out_text = std::string(input.text.substr(0, source_text_length))
                             + std::string(dots);
                     }
@@ -161,21 +171,22 @@ namespace nandina::widget::primitives
                 const float line_height = result.font_size * 1.2F;
                 result.baseline = result.font_size;
 
-                result.size = input.constraints.constrain(
-                    foundation::NanSize(line_width, line_height)
+                result.size =
+                    input.constraints.constrain(foundation::NanSize(line_width, line_height));
+                result.lines.push_back(
+                    TextLayoutLine {
+                        .text_offset = 0,
+                        .text_length = source_text_length,
+                        .visible_text = std::move(laid_out_text),
+                        .caret_stops = caret_stops_for(
+                            input.text.substr(0, source_text_length),
+                            0,
+                            result.font_size * 0.56F
+                        ),
+                        .size = foundation::NanSize(line_width, line_height),
+                        .baseline = result.baseline,
+                    }
                 );
-                result.lines.push_back(TextLayoutLine {
-                    .text_offset = 0,
-                    .text_length = source_text_length,
-                    .visible_text = std::move(laid_out_text),
-                    .caret_stops = caret_stops_for(
-                        input.text.substr(0, source_text_length),
-                        0,
-                        result.font_size * 0.56F
-                    ),
-                    .size = foundation::NanSize(line_width, line_height),
-                    .baseline = result.baseline,
-                });
                 return result;
             }
         };

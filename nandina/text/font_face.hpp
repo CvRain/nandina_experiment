@@ -54,7 +54,8 @@ namespace nandina::text
         [[nodiscard]] auto style_name() const -> std::string_view;
         [[nodiscard]] auto glyph_index(char32_t codepoint) const -> std::uint32_t;
         [[nodiscard]] auto metrics(float pixel_size) const -> FontMetrics;
-        [[nodiscard]] auto glyph_metrics(char32_t codepoint, float pixel_size) const -> GlyphMetrics;
+        [[nodiscard]] auto glyph_metrics(char32_t codepoint, float pixel_size) const
+            -> GlyphMetrics;
         [[nodiscard]] auto glyph_metrics_by_index(std::uint32_t glyph_index, float pixel_size) const
             -> GlyphMetrics;
         [[nodiscard]] auto rasterize(char32_t codepoint, float pixel_size) const -> GlyphBitmap;

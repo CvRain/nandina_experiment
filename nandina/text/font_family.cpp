@@ -11,33 +11,45 @@ namespace nandina::text
         [[nodiscard]] auto font_error(FontErrorCode code, std::string message) -> FontError {
             return {.code = code, .operation = "font.family", .message = std::move(message)};
         }
-    }
+    } // namespace
 
     auto FontFamilyRegistry::register_family(
         resource::ResourceKey family,
         std::vector<FontFaceSpec> faces
     ) -> FontResult<void> {
-        if (faces.empty() || std::ranges::any_of(faces, [](const auto& face) {
-                return face.weight < 1 || face.weight > 1000;
-            }))
+        if (faces.empty()
+            || std::ranges::any_of(
+                faces,
+                [](const auto& face) { return face.weight < 1 || face.weight > 1000; }
+            ))
         {
-            return std::unexpected(font_error(FontErrorCode::no_matching_face, "family requires valid faces"));
+            return std::unexpected(
+                font_error(FontErrorCode::no_matching_face, "family requires valid faces")
+            );
         }
         std::unique_lock lock(mutex_);
         if (families_.contains(family) || aliases_.contains(family)) {
-            return std::unexpected(font_error(FontErrorCode::duplicate_family, "font family already exists"));
+            return std::unexpected(
+                font_error(FontErrorCode::duplicate_family, "font family already exists")
+            );
         }
         families_.emplace(std::move(family), Family {.faces = std::move(faces)});
         return {};
     }
 
-    auto FontFamilyRegistry::add_alias(
-        resource::ResourceKey alias,
-        resource::ResourceKey family
-    ) -> FontResult<void> {
+    auto FontFamilyRegistry::add_alias(resource::ResourceKey alias, resource::ResourceKey family)
+        -> FontResult<void> {
         std::unique_lock lock(mutex_);
-        if (!families_.contains(family)) { return std::unexpected(font_error(FontErrorCode::unknown_family, "alias target family does not exist")); }
-        if (families_.contains(alias) || aliases_.contains(alias)) { return std::unexpected(font_error(FontErrorCode::duplicate_alias, "font family alias already exists")); }
+        if (!families_.contains(family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::unknown_family, "alias target family does not exist")
+            );
+        }
+        if (families_.contains(alias) || aliases_.contains(alias)) {
+            return std::unexpected(
+                font_error(FontErrorCode::duplicate_alias, "font family alias already exists")
+            );
+        }
         aliases_.emplace(std::move(alias), std::move(family));
         return {};
     }
@@ -48,9 +60,17 @@ namespace nandina::text
     ) -> FontResult<void> {
         std::unique_lock lock(mutex_);
         auto found = families_.find(family);
-        if (found == families_.end()) { return std::unexpected(font_error(FontErrorCode::unknown_family, "font family does not exist")); }
+        if (found == families_.end()) {
+            return std::unexpected(
+                font_error(FontErrorCode::unknown_family, "font family does not exist")
+            );
+        }
         for (const auto& fallback: fallbacks) {
-            if (!families_.contains(fallback) || fallback == family) { return std::unexpected(font_error(FontErrorCode::invalid_fallback, "invalid font fallback")); }
+            if (!families_.contains(fallback) || fallback == family) {
+                return std::unexpected(
+                    font_error(FontErrorCode::invalid_fallback, "invalid font fallback")
+                );
+            }
         }
         found->second.fallbacks = std::move(fallbacks);
         return {};
@@ -58,7 +78,11 @@ namespace nandina::text
 
     auto FontFamilyRegistry::set_default_family(resource::ResourceKey family) -> FontResult<void> {
         std::unique_lock lock(mutex_);
-        if (!families_.contains(family)) { return std::unexpected(font_error(FontErrorCode::unknown_family, "default font family does not exist")); }
+        if (!families_.contains(family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::unknown_family, "default font family does not exist")
+            );
+        }
         default_family_ = std::move(family);
         return {};
     }
@@ -67,7 +91,12 @@ namespace nandina::text
         -> FontResult<void> {
         std::unique_lock lock(mutex_);
         for (const auto& family: families) {
-            if (!families_.contains(family)) { return std::unexpected(font_error(FontErrorCode::invalid_fallback, "default fallback family does not exist")); }
+            if (!families_.contains(family)) {
+                return std::unexpected(font_error(
+                    FontErrorCode::invalid_fallback,
+                    "default fallback family does not exist"
+                ));
+            }
         }
         default_fallbacks_ = std::move(families);
         return {};
@@ -86,24 +115,42 @@ namespace nandina::text
             default_family = default_family_;
             default_fallbacks = default_fallbacks_;
         }
-        auto family = request.family ? *request.family : default_family.value_or(resource::ResourceKey("font/default"));
-        if (const auto alias = aliases.find(family); alias != aliases.end()) { family = alias->second; }
-        if (!families.contains(family)) { return std::unexpected(font_error(FontErrorCode::unknown_family, "requested font family does not exist")); }
+        auto family = request.family
+            ? *request.family
+            : default_family.value_or(resource::ResourceKey("font/default"));
+        if (const auto alias = aliases.find(family); alias != aliases.end()) {
+            family = alias->second;
+        }
+        if (!families.contains(family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::unknown_family, "requested font family does not exist")
+            );
+        }
 
         std::vector<resource::ResourceKey> order;
         std::set<resource::ResourceKey> visited;
         const auto append = [&](const auto& self, const resource::ResourceKey& current) -> bool {
-            if (!visited.insert(current).second) { return false; }
+            if (!visited.insert(current).second) {
+                return false;
+            }
             order.push_back(current);
             for (const auto& fallback: families.at(current).fallbacks) {
-                if (!self(self, fallback)) { return false; }
+                if (!self(self, fallback)) {
+                    return false;
+                }
             }
             return true;
         };
-        if (!append(append, family)) { return std::unexpected(font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected")); }
+        if (!append(append, family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected")
+            );
+        }
         for (const auto& fallback: default_fallbacks) {
             if (!visited.contains(fallback) && !append(append, fallback)) {
-                return std::unexpected(font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected"));
+                return std::unexpected(
+                    font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected")
+                );
             }
         }
 
@@ -117,23 +164,82 @@ namespace nandina::text
             for (const auto& candidate: candidates) {
                 const int slant_score = candidate.slant == request.slant
                     ? 0
-                    : ((candidate.slant != FontSlant::normal && request.slant != FontSlant::normal) ? 1 : 2);
+                    : ((candidate.slant != FontSlant::normal && request.slant != FontSlant::normal)
+                           ? 1
+                           : 2);
                 const int weight_score = std::abs(candidate.weight - request.weight);
-                if (!best || std::pair(slant_score, weight_score) < std::pair(best_slant, best_weight)) {
+                if (!best
+                    || std::pair(slant_score, weight_score) < std::pair(best_slant, best_weight))
+                {
                     best = &candidate;
                     best_slant = slant_score;
                     best_weight = weight_score;
                 }
             }
-            if (!best) { continue; }
+            if (!best) {
+                continue;
+            }
             const auto identity = std::pair(std::string(best->resource.value()), best->face_index);
-            if (!loaded.insert(identity).second) { continue; }
+            if (!loaded.insert(identity).second) {
+                continue;
+            }
             auto face = loader.load(best->resource, best->face_index);
-            if (!face) { return std::unexpected(face.error()); }
+            if (!face) {
+                return std::unexpected(face.error());
+            }
             result.specs.push_back(*best);
             result.faces.push_back(*face);
         }
-        if (result.faces.empty()) { return std::unexpected(font_error(FontErrorCode::no_matching_face, "font family resolved no faces")); }
+        if (result.faces.empty()) {
+            return std::unexpected(
+                font_error(FontErrorCode::no_matching_face, "font family resolved no faces")
+            );
+        }
         return result;
+    }
+
+    auto register_builtin_default_font_family(FontFamilyRegistry& registry) -> FontResult<void> {
+        const auto family = resource::ResourceKey(std::string(builtin_default_font_family_key));
+        auto registered = registry.register_family(
+            family,
+            {{
+                .resource = resource::ResourceKey(std::string(resource::builtin_default_font_key)),
+            }}
+        );
+        if (!registered) {
+            return registered;
+        }
+        return registry.set_default_family(family);
+    }
+
+    auto register_optional_font_fallback(
+        FontFamilyRegistry& registry,
+        resource::ResourceManager& resources,
+        resource::ResourceKey family,
+        resource::ResourceKey font
+    ) -> FontResult<bool> {
+        auto found = resources.find(font);
+        if (!found) {
+            return std::unexpected(
+                FontError {
+                    .code = FontErrorCode::resource_failure,
+                    .operation = "font.family.optional",
+                    .message = found.error().message,
+                    .cause = found.error(),
+                }
+            );
+        }
+        if (!*found) {
+            return false;
+        }
+        auto registered = registry.register_family(family, {{.resource = std::move(font)}});
+        if (!registered) {
+            return std::unexpected(registered.error());
+        }
+        auto fallbacks = registry.set_default_fallbacks({std::move(family)});
+        if (!fallbacks) {
+            return std::unexpected(fallbacks.error());
+        }
+        return true;
     }
 } // namespace nandina::text

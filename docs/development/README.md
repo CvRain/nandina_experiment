@@ -30,8 +30,10 @@ The current authority is the code under `nandina/` plus tests under `tests/`. Ol
 | `scene` | `NanNode`, `NanNode2D`, `NanSceneTree`, input events, focus/hover, deferred delete, `NanControl`. |
 | `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend factory. |
 | `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, `ReactiveScope`, batching. |
+| `resource` | Stable UUID/key identities, immutable handles, bounded streams, resource URIs/platform locations, prioritized manager, builtin/memory/directory/SQLite backends. |
+| `text` | FreeType/HarfBuzz/FriBidi/utf8proc layout, fallback families, atlases, resource font loading, pipeline cache. |
 | `theme` | `NanTheme`, palette/tokens, button style resolver. |
-| `widget` | Text/Label/Button primitives and low-level layout controls. |
+| `widget` | Text, Label, Button, EditableText, TextField, ScrollView, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
 
 ## Layout System
@@ -50,10 +52,12 @@ Implemented layout controls:
 - `Row` and `Column`: convenience linear layouts.
 - `Flex`: generic horizontal/vertical linear layout.
 - `Expanded`: single-child flex wrapper; direct `Expanded` children receive remaining main-axis space.
+- `FlexItem`: explicit basis/grow/shrink/min-max policy wrapper.
 - `Padding`: single-child padding wrapper.
 - `Center`: single-child centering wrapper.
 - `Wrap`: automatic run-based wrapping layout.
 - `Flow`: alias of `Wrap` for semantic flow layout use.
+- `ScrollView`: clipped single-child horizontal/vertical viewport.
 
 Current layout capabilities:
 
@@ -91,7 +95,7 @@ Text limitations:
 - The deterministic fallback backend still uses estimated codepoint widths; portable shaped output uses the bundled Caskaydia/FreeType/HarfBuzz pipeline.
 - `ellipsis` currently uses ASCII `...` rather than a configurable ellipsis glyph.
 - Wrapping is grapheme-safe but still lacks a richer UAX #14 line-break opportunity layer.
-- Layout results expose source-byte/grapheme caret stops, line-local visual positions, point-to-source lookup, and logical upstream/downstream affinity. `EditableText` does not yet consume this geometry for drawing and commands.
+- Layout results expose source-byte/grapheme caret stops, line-local visual positions, point-to-source lookup, and logical upstream/downstream affinity. `EditableText` consumes this geometry for drawing, visual movement, pointer placement, selection, and grapheme-safe editing.
 - System font discovery and dynamically packaged CJK fallback profiles remain resource-system work.
 
 `TextOverflow::clip` preserves complete source and glyph geometry, constrains the reported layout size, and applies a real render clip around text drawing. This keeps glyph bearings, mark offsets, and shaped overhang inside the text box without discarding geometry needed by future editing.
@@ -102,10 +106,13 @@ The current example is a Todo page using:
 
 - `NanApplication` with app-level `NanTheme`.
 - `NanWindow` and `NanRouter`.
-- `TodoPage : NanPageT<TodoPageParams>` with page-scoped reactive state.
-- semantic `Label` and `Button` controls sharing one Caskaydia/HarfBuzz/glyph-atlas `TextPipeline`.
-- bundled font resources as the reproducible default instead of hard-coded system font paths.
+- `TodoPage : NanPageT<NoParams>` with page-scoped reactive state.
+- semantic `Label`, `Button`, and `TextField` controls sharing one resource-backed text pipeline.
+- interactive add/complete/remove actions, a dynamic ScrollView list, and resize-sensitive Flex layout.
+- automatic SQLite/builtin resource discovery and window-owned default font pipeline inheritance.
 - explicit low-level layout composition for the application UI.
+
+The Todo application configures only `org.nandina.todo`. Meson builds its SQLite package beside the executable, `NanApplication` discovers and mounts it, and `NanWindow` supplies the inherited default text pipeline. The page and widgets contain no backend paths, resource-service assembly, or per-control pipeline wiring.
 
 Example code is not sacred. It can be refactored when it helps validate framework APIs, unless a task explicitly asks to preserve it.
 
@@ -126,164 +133,142 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-This roadmap merges the current code state, the useful parts of `dev-docs-*`, and the recent implementation decisions.
-The main line should stay narrow: finish text/layout/clip foundations before adding many new semantic controls.
+The text, clipping, editing, layout, and interactive-example foundations are complete. The active main line is resource delivery: make the existing runtime backends and font pipeline automatic, portable, packageable, and low-boilerplate for application authors.
 
-### Completed Foundation
+### Completed Milestones
 
-The current baseline is:
+| Milestone | Status | Delivered contract |
+| --- | --- | --- |
+| M1 Text capability | Complete through `65f3c81`. | Shared `TextStyle`/`TextPipeline` across Text, Label, Button, EditableText, and TextField. |
+| M2 Text layout | Complete through `65f3c81`. | UTF-8/grapheme layout, FreeType/HarfBuzz, bidi, fallback runs, atlases, overflow, caret geometry. |
+| M3 Clipping | Complete through `65f3c81`. | Control subtree render/hit-test clipping and real text pixel clipping. |
+| M4 Single-line editing | Complete through `65f3c81`. | Selection, grapheme editing, visual bidi movement, pointer capture, states, submit, IME-ready state. |
+| M5 Layout refinement | Complete through `65f3c81`. | Flex basis/grow/shrink/min-max, Wrap distribution/alignment, ScrollView. |
+| M6 Todo validation | Complete through `65f3c81`. | Real keyboard/mouse editing, reactive list mutation, dynamic scrolling, resize-sensitive layout. |
+| R0 Resource/font foundation | Complete in `65f3c81`. | Resource identities/handles/backends, SQLite runtime, FontLoader/families, render-device pipeline cache. |
+| R1 Builtin/default font | Complete in the current worktree. | Read-only BuiltinBackend, embedded Caskaydia Cove font/OFL license, `fonts/default`, and `families/default-ui`. |
+| R2 Resource URI/locator | Complete in the current worktree. | Strict `res`/`builtin`/`user`/`cache`/`file` URIs and deterministic Linux executable/XDG resource locations. |
+| R3 Resource streams | Complete in the current worktree. | Bounded read/seek streams with stable metadata, independent ownership, snapshot/file implementations, and backend overlay lookup. |
+| R4 `nanres` scan/validate | Complete in the current worktree. | Deterministic recursive scanner, ordered media detection, exclusions, unsafe-path diagnostics, and functional `init`/`scan`/`validate` CLI. |
+| R5 Policy/lock manifest | Complete in the current worktree. | toml++ policy parsing, SHA-256 inventory, stable UUID move/change rules, revisions, stale validation, and atomic generated lock updates. |
+| R6 SQLite package/sidecars | Complete in the current worktree. | Runtime-compatible SQLite packages, alias rows, policy/size-based BLOB selection, UUID-named external sidecars, atomic rebuilds, and fingerprint skips. |
+| R7 Meson build/install | Complete in the current worktree. | Manifest/source-aware validate/package targets, build-tree executable-relative output, datadir install helper, and user/system prefix layout tests. |
+| R8 Application bootstrap | Complete in the current worktree. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
+| R9 Window text pipeline | Complete in the current worktree. | Render-device-scoped default FontPipelineCache, scene-context inheritance, explicit override preservation, and ordered scene/GPU teardown. |
+| R10 Cleanup/verification | Complete in the current worktree. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
 
-1. `reactive::ReactiveScope` owns page-local `Signal`, `Computed`, and `Effect` lifetimes.
-2. `PageContext::scope()` exposes the page frame scope.
-3. `NanRouter` owns one scope per keep-alive page frame and clears it when the frame is popped or cleared.
-4. `CounterPage` uses page scope and no longer manually disposes `Computed`.
-5. Router/reactive tests cover scope teardown and page-frame cleanup.
+Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line breaking, OpenType ligature-internal carets, native IME acquisition, clipboard/undo, scrollbar chrome, kinetic scrolling, Grid/Anchor, exact transformed polygon clipping, and accessibility bridges.
 
-This closes the first lifecycle risk. New work should not reintroduce page-local reactive objects that outlive their page scope.
+### Current Resource Runtime
 
-### Main Line
+`ResourceId` is a stable binary UUID, `ResourceKey` is a validated logical name, and immutable `ResourceHandle` snapshots own bytes independently of backend lifetime. `ResourceManager` mounts deterministic priority overlays and stops on backend errors rather than silently exposing a lower layer.
 
-#### M1. Text Capability Contract
+`BuiltinBackend` is a read-only process-shared lowest-priority source for framework resources. It embeds the Caskaydia Cove default font and its OFL license in `libnandina`, exposes stable `fonts/default` and license resources, and supports the `families/default-ui` registration contract without filesystem or system-font dependencies. `MemoryBackend` supports runtime/test overrides. `DirectoryBackend` consumes explicit caller-provided entries and returns owned file snapshots. Read-only `SQLiteBackend` supports canonical key/UUID lookup, aliases, BLOBs, relative external files, size checks, and schema identification through `application_id`/`user_version`. SQLite remains a private C API implementation; Meson prefers a compatible system package and provides a pinned checksum-verified static amalgamation fallback.
 
-Goal: make text a reusable primitive capability instead of logic copied into each text-bearing component.
+`FreeTypeFontFace` can retain a resource-backed memory face. `FontLoader` caches by `(ResourceId, face_index)`, `FontFamilyRegistry` resolves aliases/weight/slant/fallback order, and render-device-scoped `FontPipelineCache` owns HarfBuzz, per-face atlases/textures, and renderer bindings. The Todo example exercises this stack entirely through application/window bootstrap and scene inheritance.
 
-Status: initial foundation landed. `TextStyle` is now the shared style value for `Text`, `Label` still layers on top of `Text`, and `Button` measures/draws through an internal `primitives::Text` instead of maintaining its own text measurement path.
+### Active Resource Delivery Sequence
 
-`TextPipeline` now carries the shared layout backend and optional glyph renderer. `Text`, `Label`, `Button`, `EditableText`, and `TextField` expose the same `set_text_pipeline()` / `text_pipeline()` protocol. Button forwards it to its internal text node, EditableText forwards it to its value text, and TextField applies it to both editable value and placeholder text. Existing text-node accessors remain available as low-level escape hatches.
+#### R1. BuiltinBackend And Default Font
 
-Tasks:
+Status: complete in the current worktree.
 
-1. Introduce `TextStyle` as a shared value object for text visual/layout inputs.
-   It should start small: font size, color, overflow, max lines, and later font family, weight, line height, alignment, and baseline policy.
-2. Move `Button` away from manual `text_.size() * font_size` measurement.
-   Button should consume `primitives::Text` or a small `TextSlot` internally.
-3. Keep `Label` as a semantic wrapper over `Text`, not a separate text system.
-4. Give text-bearing controls a shared text styling path.
-   Common setters such as `set_text(...)` can remain on semantic controls, but they should forward to their text primitive/slot.
-5. Keep low-level escape hatches possible, for example `button->text_node()` or `button->text_slot()`, but do not make that the only normal API.
+The licensed Caskaydia Cove regular font and OFL text are generated into `libnandina` at build time and exposed by the read-only process-shared `BuiltinBackend`. Stable `fonts/default` and `families/default-ui` contracts provide a portable default family while allowing higher-priority application mounts to override the logical font key. Automatic mounting and widget inheritance remain R8-R9 responsibilities.
 
-Boundary:
+#### R2. Resource URI And Platform Locator
 
-- `Text` owns UTF-8 text, style, measurement, layout result, and drawing.
-- `Label` owns label semantics.
-- `Button` owns press/click semantics and maps button state to a resolved text style.
-- `TextField` / `EditableText` will own editing state later; ordinary `Text` should not become an editor.
+Status: complete in the current worktree.
 
-#### M2. Text Layout Result
+Add URI schemes without weakening stable logical keys:
 
-Goal: make measuring and drawing use the same computed layout data.
+- `res://` for read-only application resources.
+- `builtin://` for forced framework resources.
+- `user://` for writable application data.
+- `cache://` for disposable data.
+- `file://` for explicit filesystem access.
 
-Status: the core layout, shaped-rendering, and initial editing-geometry foundation is complete. Deterministic and HarfBuzz backends produce the same backend-neutral result contract, and measurement and drawing consume that result. FreeType, HarfBuzz, FriBidi, utf8proc, fallback font slots, glyph atlases, multiline layout, grapheme-safe overflow, and baseline/line metrics are integrated. Each line now carries visual caret stops at represented shaping-cluster boundaries, preserving duplicate logical offsets at bidi boundaries through upstream/downstream affinity. Source-byte-to-caret and layout-point-to-source queries are backend-neutral. Richer Unicode line-break opportunities and OpenType ligature-internal caret positions remain future work.
+`ResourceUri` strictly parses canonical logical keys for `res`, `builtin`, `user`, and `cache`, while `file` requires an explicit absolute POSIX path. `PlatformResourceLocator` validates the application ID and executable path, then deterministically yields executable-relative, XDG user, XDG system, `/usr/local/share`, and `/usr/share` locations with duplicate removal. It also provides XDG user-data and cache write roots. macOS and Windows location providers remain required before those platforms are claimed as supported.
 
-The FreeType foundation loads font faces and exposes pixel font metrics, glyph metrics, and grayscale glyph bitmaps. A CPU glyph atlas packs and caches those bitmaps, while `IRenderDevice` and the Raylib backend support alpha texture upload, revision updates, and tinted region drawing. `HarfBuzzTextLayoutBackend` emits glyph IDs, source clusters, advances, offsets, bidi ordering, and fallback font indices, and `GlyphRunRenderer` routes runs through the matching atlases. `Text` consumes the injected renderer end to end, while its default path remains the deterministic backend plus render-device text fallback.
+Runtime discovery uses the executable path, application ID, install prefix conventions, and platform locations rather than compiled absolute paths. Linux search order is executable-relative resources, `$XDG_DATA_HOME/<app-id>`, `~/.local/share/<app-id>` when unset, `$XDG_DATA_DIRS/<app-id>`, `/usr/local/share/<app-id>`, `/usr/share/<app-id>`, then builtins. Installation mode follows Meson's prefix; do not branch on whether the installer is root.
 
-The first bundled-font build path uses the OFL-licensed Caskaydia Cove Regular from a pinned submodule. Meson option `bundled_fonts` copies the TTF and license into `example/res/fonts`, and integration tests load, shape, and rasterize the copied font. Sarasa Gothic SC remains the intended CJK default candidate, but its current regional release packages are large 7z archives; it should enter through a later font profile/download-cache design rather than slowing every initial configure.
+#### R3. Streamed Resources
 
-The Todo example now creates its Caskaydia FreeType face, HarfBuzz backend, glyph atlas, atlas texture, and renderer after the window render device opens. `NanWindow::on_teardown()` releases page references and font GPU resources before the device closes. When `bundled_fonts` is disabled, the example keeps the deterministic/render-device fallback path. The build-directory font path is still injected directly into the example; a general resource locator is intentionally deferred.
+Status: complete in the current worktree.
 
-The HarfBuzz backend applies width clipping, ellipsis, and wrapping at monotone grapheme cluster boundaries. Wrapped source ranges are reshaped per line so ligatures and contextual forms do not leak across line boundaries. FriBidi v1.0.16 resolves paragraph embedding levels once, then applies final line visual ordering, trailing whitespace, and mixed LTR/RTL runs to each wrapped line without losing paragraph context. RTL and mixed-bidi wrap/clip/ellipsis preserve logical UTF-8 source ranges while emitting glyphs in visual order. A richer Unicode line-break opportunity layer is still needed for word-aware wrapping.
+`ResourceStream` exposes stable ID/key/media/storage metadata, declared size, position, seekability, bounded read, and absolute seek. Memory, builtin, and SQLite BLOB streams retain immutable resource snapshots. Directory and SQLite external streams retain independent file handles, verify declared size when opened, stop reads at the declared boundary, and report premature EOF as an I/O error. Open streams remain valid after backend unmount/destruction. Snapshot and stream size limits are separate so explicitly large external resources can stream without weakening normal `find()` safeguards. Content-hash verification begins when R5 manifests provide authoritative hashes.
 
-`TextOverflow::scale` now measures the widest shaped paragraph, derives an effective pixel size, and reshapes the complete text with updated FreeType metrics, baseline, and line height. It does not scale a previously rasterized texture. A minimum one-pixel font size prevents zero-sized FreeType requests; content that still cannot fit at that size reports overflow.
+#### R4. `nanres` Scan And Validation CLI
 
-`HarfBuzzTextLayoutBackend` accepts an ordered fallback face list. utf8proc v2.11.3 provides font-independent UAX #29 grapheme ranges; each complete grapheme is assigned to the first face covering its required codepoints and producing a shaped run without glyph zero. Variation sequences require an explicit variation glyph, while ZWJ candidates prefer the face producing the most compact valid shaped sequence. Adjacent ranges assigned to the same face are reshaped together, and each output glyph records its `font_index`. Layout results expose `missing_glyphs` when no face supports a grapheme. `GlyphRunRenderer` binds its atlas list to a specific HarfBuzz backend, validates every atlas face and texture pair, and synchronizes each used atlas once per line. Combined line metrics cover both the maximum font line height and the fallback chain's full ascent-to-descent extent. System font discovery, dynamic CJK packages, and user-configured fallback chains remain outside this low-level contract.
+Status: complete in the current worktree.
 
-Tasks:
+The resource tool is named `nanres`. Initial commands are:
 
-1. Introduce `TextLayoutInput` and `TextLayoutResult`.
-2. Include measured size, laid-out lines, visible text ranges, effective font size, baseline information, and overflow result.
-3. Replace ad-hoc `laid_out_text_` / `laid_out_font_size_` state with the layout result.
-4. Keep the first backend simple and deterministic; exact shaping can come later.
-5. Ensure `Button`, `Label`, and future text consumers all measure through this contract.
+```sh
+nanres init
+nanres scan
+nanres validate
+nanres pack
+nanres watch
+```
 
-This is where the previous iterations failed hardest: text overflow must not be patched separately in Button, Label, Card, Field, and TextField.
+`nanres init` creates a minimal non-overwriting `resources.toml` starter. `nanres scan` emits a stable key-sorted line inventory and `nanres validate` runs the same checks without inventory output. The reusable scanner accepts arbitrary roots, key prefixes, glob excludes, explicit type rules, output paths, and hidden/symlink policy; it does not require fixed `fonts/images/video` directories. Type resolution applies explicit glob rules first, then file signatures, extensions, and finally `application/octet-stream`. Hidden/generated trees are excluded by default. Symlinks, case-normalization collisions, invalid logical keys, unavailable roots, filesystem failures, and output-package recursion produce deterministic diagnostics. `pack` and `watch` reserve their command names but fail explicitly until R5-R6 provide manifests and package output.
 
-#### M3. Container Clip / Overflow Contract
+#### R5. Config And Generated Lock Manifest
 
-Goal: make parent-declared clipping a tree/rendering contract, not a local widget trick.
+Status: complete in the current worktree.
 
-Status: initial rendering and hit-test contract complete. `NanControl` exposes `ControlOverflow::{visible, clip}`, and draw traversal pushes an intersected child clip through `ClipStack`. `TextOverflow::clip` preserves complete layout geometry and installs an RAII render clip for both fallback and shaped glyph drawing; `ellipsis` remains a separate truncating and reshaping policy. Scene hit testing now prunes descendant branches outside every clipped ancestor, using the same world-space AABB semantics as the current render scissor implementation. Mouse hover and click-derived focus therefore cannot target clipped descendants.
+Human policy is separate from generated inventory:
 
-Note: `ControlOverflow` clips child scene nodes. Text-bearing semantic controls that draw composed internal text, such as `Button`, should expose their own text overflow API that forwards to `TextOverflow`.
+- `resources.toml`: package ID, root directories/key prefixes, excludes, aliases, hidden/symlink policy, and ordered glob media/storage/streaming rules.
+- `resources.lock.toml`: tool-owned format/package header plus UUID, canonical key, policy-relative source path, media type, size, SHA-256, storage decision, streaming flag, and revision for each resource.
 
-Tasks:
+Developers do not manually enumerate ordinary resources. Without explicit R4 command-line scan overrides, `nanres scan` reads `resources.toml`, scans and hashes resources, preserves UUIDs by existing source and unique content-hash move detection, increments revision only when content changes, and atomically replaces `resources.lock.toml`. Only genuinely new resources receive IDs. `nanres validate` regenerates the inventory in memory and fails when the lock is missing or stale without modifying it. Ambiguous hash moves, duplicate identities, alias/canonical collisions, missing alias targets, package mismatches, and normalized path/key collisions fail instead of silently changing identity. toml++ prefers the compatible system package and retains a wrap fallback; SHA-256 uses OpenSSL EVP in the `nanres` target rather than adding TOML or crypto dependencies to `libnandina`.
 
-1. Add explicit overflow policy to controls or a focused container primitive.
-2. Support at least `visible` and `clip` first.
-3. Use the existing `ClipStack` in draw traversal so children are clipped by parent policy.
-4. Connect `TextOverflow::clip` to render clipping rather than string truncation only. Completed: layout retains complete source/glyph data while the constrained result box clips actual pixels.
-5. Keep the path open for `ScrollView`, `Card`, `Dialog`, and popover-like containers.
-6. Make ancestor `ControlOverflow::clip` intersections constrain descendant hit testing as well as drawing. Completed for direct hit tests, hover, and click-derived focus.
+#### R6. SQLite Packaging And External Sidecars
 
-The next main-line task moves into M4 consumption of this geometry: replace `EditableText::caret_x()` estimation, align caret/deletion to grapheme boundaries, and add visual movement and pointer placement incrementally. Exact polygon clipping for rotated controls, stale hover invalidation after geometry changes, and focus-navigation visibility policy remain later refinements rather than blockers for editable text.
+Status: complete in the current worktree.
 
-#### M4. EditableText / TextField
+`nanres pack` requires a current validated lock and generates `resources.db` plus an `external/` sidecar directory under the configured `package_directory` (default `package`). The database schema, `application_id`, `user_version`, aliases, BLOB rows, and external paths are consumed directly by `SQLiteBackend`. Explicit storage rules win; `auto` embeds non-streaming resources up to `embed_threshold` (default 1 MiB) and keeps streaming, audio/video, and larger files external. Streaming plus explicit embedded storage is rejected. External files use stable UUID filenames rather than source paths, and every source SHA-256 is rechecked before packaging. A package-policy/lock fingerprint skips unchanged complete output; otherwise a complete temporary tree is transactionally built and swapped into place so stale sidecars are removed. Raw R4 command-line scans cannot write release packages.
 
-Goal: build input on top of the text layout contract, not beside it.
+#### R7. Meson Build And Install Integration
 
-Status: the initial single-line editing milestone is complete. `EditableText` owns value, caret affinity, selection, read-only behavior, and IME-ready preedit state while reusing `Text` for layout and drawing. Caret drawing and pointer lookup consume backend-produced visual geometry. Caret clamping, Backspace, and Delete operate on UAX #29 grapheme boundaries; typing and deletion replace active selections. Left/Right traverse visual caret stops for LTR, RTL, and mixed-bidi layouts, Shift extends selection, Home/End select visual edges, and Ctrl+A selects all.
+Status: complete in the current worktree.
 
-`TextField` composes the surface, placeholder, editable primitive, focus ring, and semantic state. It supports pointer placement and drag selection through SceneTree pointer capture, a clipped horizontal viewport that keeps the active caret visible, line-metric vertical centering, read-only/disabled/invalid states, `on_change`, and `on_submit`. The value uses `TextOverflow::clip` with complete off-screen geometry rather than ellipsis.
+The example declares short Meson custom targets around the reusable `nanres_build_helper.py` and `nanres_install.py` scripts. Policy, generated lock, and explicitly enumerated source files are target inputs; `nanres validate` runs before `pack`, and the complete package is produced beside the executable at `buildDir/example/resources`. The source list is explicit because Meson cannot discover arbitrary TOML inventory dependencies at configure time; `nanres` still verifies every SHA-256 before packaging. The install script copies the complete database/sidecar tree to `get_option('datadir')/<app-id>`. On Linux, `--prefix=/usr` therefore installs under `/usr/share/<app-id>`, while `--prefix=$HOME/.local` installs under `~/.local/share/<app-id>` without checking whether the installer is root. Tests exercise both prefix layouts and open the Meson-generated package through `SQLiteBackend`.
 
-The current raylib adapter exposes committed UTF-8 input through `GetCharPressed()` but does not expose portable native composition updates or candidate-window placement. `TextComposition` therefore provides the backend-neutral preedit state contract for future SDL/native adapters; native IME acquisition remains platform integration work rather than widget-state work. Clipboard, undo/redo, word movement, password masking, multiline editing, caret blinking, and accessibility bridges are later features, not blockers for the initial M4 contract.
+Fully offline builds use compatible system dependencies or pre-populated Meson `subprojects/packagecache` archives for the pinned wraps. Configure/build never downloads Sarasa Gothic or other optional resource packs implicitly. Generated SQLite fallback source trees, build outputs, resource databases, package fingerprints, and lock-update temporaries remain outside source control; generated `resources.lock.toml` is the intentional exception and is committed as application inventory.
 
-Tasks:
+#### R8. NanApplication Resource Bootstrap
 
-1. Add an `EditableText` primitive or internal control for caret, selection, IME/text input, and editing commands.
-2. Build `TextField` as Surface + EditableText + placeholder Text + FocusRing + editing state machine.
-3. Keep `TextField` responsible for value, placeholder, focus, read-only, disabled, invalid, on_change, and on_submit.
-4. Keep Field/Form-level label/helper/error/required semantics outside `TextField`.
+Status: complete in the current worktree.
 
-#### M5. Layout Refinement
+`NanApplication` now owns `ResourceManager`, `FontLoader`, and `FontFamilyRegistry` for the process lifetime. It always mounts the process-shared built-in backend at priority -1000 and registers `families/default-ui`. `NanApplicationConfig` accepts an application ID, executable path, environment snapshot, and optional package filename; `for_process()` resolves `/proc/self/exe` and HOME/XDG variables on Linux. Configured startup uses `PlatformResourceLocator` order to mount each existing `<root>/resources.db` at descending priorities with sidecars rooted beside the database. Missing packages are skipped, while malformed discovered packages fail startup rather than exposing a lower overlay silently. `NanApplication`, application-created routers, and `PageContext` expose the same resource manager, font loader, and family registry. Direct low-level `NanRouter` construction remains valid without application services. The Todo example configures only `org.nandina.todo`.
 
-Goal: refine the existing layout primitives after text and clip semantics are stable.
+#### R9. NanWindow Default Text Pipeline
 
-Status: initial refinement complete. Flex/Row/Column share one axis-neutral allocator. `LayoutFlexPolicy` is a zero-RTTI capability and `FlexItem` owns explicit basis, grow, shrink, and physical min/max limits; grow and scaled-basis shrink redistribute remaining space after items hit limits. Existing `Expanded` remains compatible through `layout_flex_factor()` and maps to zero basis plus weighted grow.
+Status: complete in the current worktree.
 
-Wrap/Flow distribute main-axis space independently inside each run, honor `space_between` for run alignment, support stretched runs, and allow per-child cross-axis alignment overrides. Explicit gaps remain the minimum spacing used for intrinsic measurement and wrapping decisions.
+After render-device creation and before `on_setup()`, `NanWindow` resolves the application default family and owns the render-device-scoped `FontPipelineCache`, `FontPipeline`, and backend-neutral `TextPipeline`. `NanSceneTree` carries that default pipeline context. Nodes receive it when entering the tree through a zero-RTTI virtual capability; Text/Label, Button, EditableText, and TextField inherit it, including dynamically added subtrees and internal text primitives. An explicit `set_text_pipeline()`, layout backend, or renderer remains authoritative and is never overwritten by context inheritance. Close clears router frames and the scene root, removes the tree context, then releases FontPipeline, cache, and finally the render device, so no page/widget retains raw renderer pointers after GPU text resources are destroyed.
 
-`ScrollView` is the selected low-level viewport. It measures one child with an unbounded scroll axis, clamps programmatic and wheel-driven offsets, translates content locally, and relies on `ControlOverflow::clip` for rendering and hit testing. Wheel events hit-test their current screen position and bubble, allowing nested scroll views to hand off input at their limits. Grid and Anchor are explicitly deferred until real controls require track/span or edge-constraint contracts.
+#### R10. Example Cleanup And Install Validation
 
-Tasks:
+Status: complete in the current worktree.
 
-1. Add flex basis/shrink/min-max policy where needed. Completed through `LayoutFlexPolicy` and `FlexItem`.
-2. Add main-axis spacing strategies such as `space_between` only when a real page/control needs them. Completed for linear layouts and Wrap runs.
-3. Add run stretch and per-child alignment to `Wrap` / `Flow`. Completed.
-4. Decide whether Grid, Anchor, or Scroll viewport enters the low-level widget set next. Completed: `ScrollView` entered; Grid and Anchor are deferred.
-5. Keep Yoga or any third-party solver behind a backend boundary; it should not define the public widget API.
+The Todo example no longer contains `NANDINA_EXAMPLE_RESOURCE_DIR`, manual DirectoryBackend/resource/font services, `TodoPageParams::text_pipeline`, repetitive `set_text_pipeline()`, or manual resource teardown. The obsolete `bundled_fonts` Meson option, copy targets, and copy-specific font test are removed. R4 explicit scanning still covers loose development trees, while the application path uses the validated R7 SQLite package. Automated probes verify the generated package through `SQLiteBackend`, executable-relative portable layout, user/system datadir installation, and built-in font fallback when no optional/project package is present. Sarasa Gothic remains optional and is not downloaded or required for configure, build, startup, or tests.
 
-#### M6. Todo Workflow Validation
+### Simplified Chinese Example Fallback
 
-Goal: validate M4 editing and M5 layout under a real mouse, keyboard, reactive-update, scrolling, and window-resize workflow.
+The Todo example includes Sarasa Fixed SC Regular 1.0.40 under OFL 1.1. Only the 24.9 MB regular face is retained from the verified `SarasaFixedSC-TTF-1.0.40.7z` release archive; the archive and unused weights are not committed. `source.toml` records the upstream URL, version, archive SHA-256, extracted-font SHA-256, and license. The font is exposed as `fonts/fallback/zh-cn`, packaged as an external sidecar, and registered as `families/zh-cn` after `families/default-ui`. It is not marked streaming because current FreeType loading requires an immutable snapshot. The Todo interface and initial data contain mixed Simplified Chinese/Latin text, and tests verify actual `中`/`文` glyph coverage. Configure/build perform no network download; without the project package, optional registration is a no-op and the built-in default remains available.
 
-Status: interactive validation page landed in the Todo example. The page owns a scoped `Signal<std::vector<TodoItem>>`, keeps its `TextField` and `ScrollView` stable, and rebuilds only the rendered task-list snapshot after reactive changes. Enter or the Add button submits non-empty tasks, completion and removal callbacks address stable item IDs, and the input remains focused across submission. Empty submissions expose the field's invalid state.
+### Deferred Resource And Font Work
 
-The list rebuild is staged by a page-scoped effect and applied from `on_process()` rather than synchronously inside button callbacks. This avoids destroying a pressed control while its callback is still executing. New-item scrolling is applied one frame after replacement so `ScrollView` has completed layout and exposes the new maximum offset.
-
-The responsive page uses `Expanded`, `FlexItem` grow/shrink/min-width policy, clipped labels, and a vertical `ScrollView`. Window resize continues through the normal tight root measure/layout pass. All text-bearing controls, including dynamically created task rows and buttons, reuse the window-owned bundled-font `TextPipeline`.
-
-M6 is an application validation milestone, not a new widget abstraction. Its next purpose is collecting real interaction feedback on selection, focus, narrow-window behavior, nested clipping, and dynamic scroll updates before starting native input integration or advanced layout work.
-
-#### Resource Foundation
-
-Status: initial storage-neutral resource contract landed. `ResourceId` is a stable binary UUID, `ResourceKey` is a validated human-readable logical name, and immutable `ResourceHandle` snapshots own their bytes independently of backend lifetime. `ResourceManager` mounts ordered backends with deterministic priority overrides and stops on backend errors rather than silently exposing a lower layer.
-
-`MemoryBackend` supports registration, replacement, aliases, and test/runtime overrides. `DirectoryBackend` uses an explicit manifest so IDs remain stable across file moves and returns owned file snapshots. `SQLiteBackend` is a read-only runtime package backend supporting canonical key/UUID lookup, aliases, embedded BLOBs, and relative external files with declared-size validation. SQLite details remain private to its implementation; package creation and migrations are intentionally separate tooling concerns.
-
-SQLite uses Meson's dependency fallback model. A compatible system SQLite is preferred, while a pinned WrapDB amalgamation is downloaded and checksum-verified when the host has no development package, including normal Windows source/subproject builds. This keeps `<sqlite3.h>` private to `sqlite_backend.cpp` without making SQLite installation a framework consumer prerequisite. Fully offline builds must pre-populate Meson's package cache or vendor the wrap source archive alongside the wrap metadata.
-
-The schema is identified by SQLite `application_id` plus `user_version`. Components must consume logical resource or font-family IDs rather than paths, UUID literals, SQLite rows, or backend handles.
-
-Resource-backed font loading is now available. `FreeTypeFontFace` retains an immutable `ResourceHandle` and creates an `FT_New_Memory_Face`, so shaping and rasterization remain valid after manager unmount, backend destruction, or source-file removal. `FontLoader` resolves logical keys through `ResourceManager` and weakly caches faces by `(ResourceId, face_index)`; aliases deduplicate naturally, while same-ID hot replacement requires explicit invalidation for subsequent loads.
-
-`FontFamilyRegistry` provides application-defined family IDs, aliases, weight/slant matching, family-specific fallback order, global default fallback, cycle detection, and ordered resolution into shared faces for `HarfBuzzTextLayoutBackend`. ResourceManager and FontLoader remain CPU-only.
-
-`FontPipeline` is the render-device-scoped owner for the HarfBuzz backend, one CPU atlas and device texture per resolved face, ordered renderer bindings, and the non-owning `TextPipeline` view consumed by widgets. `FontPipelineCache` weakly reuses that complete owner by family request and atlas configuration; clearing widgets and pipeline handles before device teardown preserves the existing GPU lifetime contract.
-
-The Todo example now mounts its bundled resource directory, resolves `fonts/default` through `families/ui`, and obtains its shared pipeline from `FontPipelineCache`. The former compile-time absolute font-face construction and manual backend/atlas/texture/renderer ownership have been removed. Packaged CJK fallback profiles, SQLite package generation, and color emoji rendering remain the next milestones.
+- Define monochrome emoji fallback, then a separate color glyph/bitmap renderer path.
+- Add project hot reload after identity, lock manifest, and pipeline invalidation semantics are stable.
+- Add system font discovery only as an explicit developer/application feature; it is not part of default portability.
 
 ### Side Tracks
 
-These are useful, but should not interrupt the main text/layout/clip line unless a feature directly requires them.
+These are useful, but should not interrupt the active resource delivery sequence unless a feature directly requires them.
 
 #### Theme Context
 
@@ -333,3 +318,11 @@ meson compile -C buildDir nandina_example
 ```
 
 Before committing, inspect status and exclude unrelated generated files such as `firebase-debug.log`.
+
+For resource/font changes, also run the focused targets:
+
+```sh
+meson test -C buildDir resource font-resource --print-errorlogs
+```
+
+SQLite dependency changes must validate both the normal system-dependency path and an isolated configure using `--force-fallback-for=sqlite3`. Once R4-R7 land, CI should additionally run `nanres validate`, verify deterministic lock/pack regeneration, launch from an executable-relative package layout, and test Linux user-prefix and system-prefix install trees.

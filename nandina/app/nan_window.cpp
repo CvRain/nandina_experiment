@@ -7,9 +7,9 @@
 #include "nan_window.hpp"
 #include "nan_application.hpp"
 
+#include "../foundation/utf8.hpp"
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
-#include "../foundation/utf8.hpp"
 #include "../scene/control.hpp"
 #include "../scene/input_event.hpp"
 
@@ -74,7 +74,10 @@ namespace nandina::app
             app_.graph(),
             app_.theme(),
             app_.store_base(),
-            app_.store_type_key()
+            app_.store_type_key(),
+            &app_.resources(),
+            &app_.font_loader(),
+            &app_.font_families()
         );
         set_content(router_->host());
         return *router_;
@@ -86,6 +89,10 @@ namespace nandina::app
 
     auto NanWindow::theme() const -> const theme::NanTheme& {
         return app_.theme();
+    }
+
+    auto NanWindow::default_text_pipeline() const -> const widget::primitives::TextPipeline* {
+        return default_text_pipeline_ ? &*default_text_pipeline_ : nullptr;
     }
 
     void NanWindow::open() {
@@ -112,6 +119,23 @@ namespace nandina::app
         SetTargetFPS(config_.target_fps);
 
         device_ = render::make_raylib_device();
+        font_pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
+            *device_,
+            app_.font_loader(),
+            app_.font_families()
+        );
+        auto pipeline = font_pipeline_cache_->get({});
+        if (!pipeline) {
+            font_pipeline_cache_.reset();
+            device_.reset();
+            CloseWindow();
+            throw std::runtime_error(
+                "NanWindow: cannot create default text pipeline: " + pipeline.error().message
+            );
+        }
+        default_font_pipeline_ = *pipeline;
+        default_text_pipeline_ = default_font_pipeline_->pipeline();
+        tree_.set_default_text_pipeline(*default_text_pipeline_);
         opened_ = true;
 
         spdlog::info(
@@ -183,7 +207,9 @@ namespace nandina::app
         for (int codepoint = GetCharPressed(); codepoint != 0; codepoint = GetCharPressed()) {
             if (codepoint >= 32) {
                 tree_.dispatch_text_input(
-                    scene::TextInputEvent {foundation::utf8::encode(static_cast<char32_t>(codepoint))}
+                    scene::TextInputEvent {
+                        foundation::utf8::encode(static_cast<char32_t>(codepoint))
+                    }
                 );
             }
         }
@@ -203,12 +229,14 @@ namespace nandina::app
             );
             if (root->layout_dirty() || root->size() != window_size) {
                 (void)root->measure_layout(scene::LayoutConstraints::tight(window_size));
-                root->layout_to(foundation::NanRect::from_xywh(
-                    0.0F,
-                    0.0F,
-                    window_size.get_width(),
-                    window_size.get_height()
-                ));
+                root->layout_to(
+                    foundation::NanRect::from_xywh(
+                        0.0F,
+                        0.0F,
+                        window_size.get_width(),
+                        window_size.get_height()
+                    )
+                );
             }
         }
 
@@ -227,6 +255,15 @@ namespace nandina::app
         }
         // 释放场景树 (触发 widget 卸载, 回访 graph) 后再释放设备、关窗口。
         on_teardown();
+        if (router_) {
+            router_->clear();
+        }
+        tree_.set_root(nullptr);
+        tree_.clear_default_text_pipeline();
+        default_text_pipeline_.reset();
+        default_font_pipeline_.reset();
+        font_pipeline_cache_.reset();
+        router_.reset();
         device_.reset();
         CloseWindow();
         opened_ = false;

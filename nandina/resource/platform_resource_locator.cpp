@@ -1,0 +1,114 @@
+#include "platform_resource_locator.hpp"
+
+#include "resource.hpp"
+
+#include <algorithm>
+
+namespace nandina::resource
+{
+    namespace
+    {
+        [[nodiscard]] auto split_paths(std::string_view value)
+            -> std::vector<std::filesystem::path> {
+            std::vector<std::filesystem::path> result;
+            while (!value.empty()) {
+                const auto separator = value.find(':');
+                const auto item = value.substr(0, separator);
+                if (!item.empty()) {
+                    result.emplace_back(item);
+                }
+                if (separator == std::string_view::npos) {
+                    break;
+                }
+                value.remove_prefix(separator + 1);
+            }
+            return result;
+        }
+
+        void append_unique(
+            std::vector<ResourceLocation>& locations,
+            ResourceLocationKind kind,
+            std::filesystem::path root
+        ) {
+            root = root.lexically_normal();
+            if (std::ranges::none_of(
+                    locations,
+                    [&](const auto& location) { return location.root == root; }
+                ))
+            {
+                locations.push_back({kind, std::move(root)});
+            }
+        }
+    } // namespace
+
+    PlatformResourceLocator::PlatformResourceLocator(PlatformResourceLocatorOptions options):
+        application_id_(std::move(options.application_id)),
+        executable_path_(std::move(options.executable_path)),
+        environment_(std::move(options.environment)) {}
+
+    auto PlatformResourceLocator::create(PlatformResourceLocatorOptions options)
+        -> std::expected<PlatformResourceLocator, std::string> {
+        if (!ResourceKey::parse(options.application_id) || options.application_id.contains('/')) {
+            return std::unexpected(
+                "application id must be a canonical single resource-key segment"
+            );
+        }
+        if (options.executable_path.empty() || !options.executable_path.is_absolute()) {
+            return std::unexpected("executable path must be absolute");
+        }
+        return PlatformResourceLocator(std::move(options));
+    }
+
+    auto PlatformResourceLocator::environment(const std::string_view name) const
+        -> std::string_view {
+        const auto found = environment_.find(name);
+        return found == environment_.end() ? std::string_view {} : std::string_view(found->second);
+    }
+
+    auto PlatformResourceLocator::user_data_root() const -> std::filesystem::path {
+        if (const auto xdg = environment("XDG_DATA_HOME"); !xdg.empty()) {
+            return std::filesystem::path(xdg) / application_id_;
+        }
+        return std::filesystem::path(environment("HOME")) / ".local/share" / application_id_;
+    }
+
+    auto PlatformResourceLocator::cache_root() const -> std::filesystem::path {
+        if (const auto xdg = environment("XDG_CACHE_HOME"); !xdg.empty()) {
+            return std::filesystem::path(xdg) / application_id_;
+        }
+        return std::filesystem::path(environment("HOME")) / ".cache" / application_id_;
+    }
+
+    auto PlatformResourceLocator::resource_roots() const -> std::vector<ResourceLocation> {
+        std::vector<ResourceLocation> result;
+        append_unique(
+            result,
+            ResourceLocationKind::executable_relative,
+            executable_path_.parent_path() / "resources"
+        );
+        append_unique(result, ResourceLocationKind::user_data, user_data_root());
+
+        auto system_roots = split_paths(environment("XDG_DATA_DIRS"));
+        if (system_roots.empty()) {
+            system_roots = {"/usr/local/share", "/usr/share"};
+        }
+        for (auto& root: system_roots) {
+            append_unique(
+                result,
+                ResourceLocationKind::system_data,
+                std::move(root) / application_id_
+            );
+        }
+        append_unique(
+            result,
+            ResourceLocationKind::system_data,
+            std::filesystem::path("/usr/local/share") / application_id_
+        );
+        append_unique(
+            result,
+            ResourceLocationKind::system_data,
+            std::filesystem::path("/usr/share") / application_id_
+        );
+        return result;
+    }
+} // namespace nandina::resource

@@ -31,6 +31,7 @@ namespace nandina::widget
 
         void set_text_pipeline(primitives::TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
+        void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
 
         void set_text_overflow(primitives::TextOverflow overflow);
         [[nodiscard]] auto text_overflow() const -> primitives::TextOverflow;
@@ -53,7 +54,8 @@ namespace nandina::widget
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
         void on_pressable_state_changed() override;
 
     private:

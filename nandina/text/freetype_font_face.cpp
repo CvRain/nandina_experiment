@@ -9,9 +9,9 @@
 
 #include <algorithm>
 #include <cmath>
+#include <limits>
 #include <stdexcept>
 #include <string>
-#include <limits>
 #include <utility>
 
 namespace nandina::text
@@ -41,7 +41,9 @@ namespace nandina::text
             }
 
             const auto path_string = path.string();
-            if (const auto error = FT_New_Face(library, path_string.c_str(), face_index, &face); error != 0) {
+            if (const auto error = FT_New_Face(library, path_string.c_str(), face_index, &face);
+                error != 0)
+            {
                 FT_Done_FreeType(library);
                 library = nullptr;
                 throw std::runtime_error(
@@ -51,11 +53,14 @@ namespace nandina::text
             }
         }
 
-        explicit Impl(resource::ResourceHandle source, long face_index): resource(std::move(source)) {
+        explicit Impl(resource::ResourceHandle source, long face_index):
+            resource(std::move(source)) {
             if (!resource || resource->bytes().empty()
                 || resource->size() > static_cast<std::size_t>(std::numeric_limits<FT_Long>::max()))
             {
-                throw std::invalid_argument("FreeType memory face requires non-empty bounded resource bytes");
+                throw std::invalid_argument(
+                    "FreeType memory face requires non-empty bounded resource bytes"
+                );
             }
             if (const auto error = FT_Init_FreeType(&library); error != 0) {
                 throw_freetype_error("FT_Init_FreeType", error);
@@ -67,7 +72,8 @@ namespace nandina::text
                     static_cast<FT_Long>(bytes.size()),
                     face_index,
                     &face
-                ); error != 0)
+                );
+                error != 0)
             {
                 FT_Done_FreeType(library);
                 library = nullptr;
@@ -85,12 +91,15 @@ namespace nandina::text
         }
 
         void set_pixel_size(float pixel_size) const {
-            if (const auto error = FT_Set_Pixel_Sizes(face, 0, pixel_height(pixel_size)); error != 0) {
+            if (const auto error = FT_Set_Pixel_Sizes(face, 0, pixel_height(pixel_size));
+                error != 0)
+            {
                 throw_freetype_error("FT_Set_Pixel_Sizes", error);
             }
         }
 
-        [[nodiscard]] auto load_glyph(std::uint32_t glyph_index, float pixel_size, FT_Int32 flags) const
+        [[nodiscard]] auto
+        load_glyph(std::uint32_t glyph_index, float pixel_size, FT_Int32 flags) const
             -> FT_GlyphSlot {
             set_pixel_size(pixel_size);
             if (const auto error = FT_Load_Glyph(face, glyph_index, flags); error != 0) {
@@ -138,7 +147,8 @@ namespace nandina::text
         };
     }
 
-    auto FreeTypeFontFace::glyph_metrics(char32_t codepoint, float pixel_size) const -> GlyphMetrics {
+    auto FreeTypeFontFace::glyph_metrics(char32_t codepoint, float pixel_size) const
+        -> GlyphMetrics {
         return glyph_metrics_by_index(glyph_index(codepoint), pixel_size);
     }
 
@@ -168,14 +178,15 @@ namespace nandina::text
         }
 
         GlyphBitmap result {
-            .metrics = GlyphMetrics {
-                .glyph_index = index,
-                .advance_x = pixels(glyph->advance.x),
-                .bearing_x = pixels(glyph->metrics.horiBearingX),
-                .bearing_y = pixels(glyph->metrics.horiBearingY),
-                .width = pixels(glyph->metrics.width),
-                .height = pixels(glyph->metrics.height),
-            },
+            .metrics =
+                GlyphMetrics {
+                    .glyph_index = index,
+                    .advance_x = pixels(glyph->advance.x),
+                    .bearing_x = pixels(glyph->metrics.horiBearingX),
+                    .bearing_y = pixels(glyph->metrics.horiBearingY),
+                    .width = pixels(glyph->metrics.width),
+                    .height = pixels(glyph->metrics.height),
+                },
             .width = static_cast<int>(bitmap.width),
             .height = static_cast<int>(bitmap.rows),
             .pitch = static_cast<int>(bitmap.width),

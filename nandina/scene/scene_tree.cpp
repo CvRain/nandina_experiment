@@ -71,6 +71,21 @@ namespace nandina::scene
         _sync_hover_after_tree_change();
     }
 
+    void NanSceneTree::set_default_text_pipeline(widget::primitives::TextPipeline pipeline) {
+        if (pipeline.backend == nullptr) {
+            throw std::invalid_argument("default text pipeline requires a layout backend");
+        }
+        default_text_pipeline_ = pipeline;
+    }
+
+    void NanSceneTree::clear_default_text_pipeline() {
+        default_text_pipeline_.reset();
+    }
+
+    auto NanSceneTree::default_text_pipeline() const -> const widget::primitives::TextPipeline* {
+        return default_text_pipeline_ ? &*default_text_pipeline_ : nullptr;
+    }
+
     auto NanSceneTree::process(const float dt) -> void {
         _flush_deletes();
         if (root_) {
@@ -94,9 +109,8 @@ namespace nandina::scene
     auto NanSceneTree::dispatch_mouse_button(const MouseButtonEvent& event) -> void {
         auto copy = event;
         auto* captured = pointer_capture_.lock().get();
-        auto* hit = !copy.is_pressed() && captured != nullptr
-            ? captured
-            : hit_test(copy.screen_pos());
+        auto* hit =
+            !copy.is_pressed() && captured != nullptr ? captured : hit_test(copy.screen_pos());
         if (!hit) {
             return;
         }

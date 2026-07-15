@@ -14,7 +14,9 @@ namespace nandina::resource
         explicit MemoryBackend(std::string name = "memory");
         ~MemoryBackend() override;
         [[nodiscard]] auto insert(
-            ResourceId id, ResourceKey key, std::string media_type,
+            ResourceId id,
+            ResourceKey key,
+            std::string media_type,
             std::vector<std::uint8_t> bytes,
             InsertMode mode = InsertMode::fail_if_present
         ) -> ResourceResult<ResourceHandle>;

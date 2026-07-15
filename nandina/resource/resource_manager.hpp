@@ -25,6 +25,12 @@ namespace nandina::resource
         [[nodiscard]] auto find(ResourceId id) const -> ResourceLookup;
         [[nodiscard]] auto require(const ResourceKey& key) const -> ResourceResult<ResourceHandle>;
         [[nodiscard]] auto require(ResourceId id) const -> ResourceResult<ResourceHandle>;
+        [[nodiscard]] auto open_stream(const ResourceKey& key) const -> ResourceStreamLookup;
+        [[nodiscard]] auto open_stream(ResourceId id) const -> ResourceStreamLookup;
+        [[nodiscard]] auto require_stream(const ResourceKey& key) const
+            -> ResourceResult<ResourceStreamHandle>;
+        [[nodiscard]] auto require_stream(ResourceId id) const
+            -> ResourceResult<ResourceStreamHandle>;
 
     private:
         class Impl;

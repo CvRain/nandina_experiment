@@ -1,6 +1,7 @@
 #ifndef NANDINA_EXPERIMENT_TEXT_FONT_FAMILY_HPP
 #define NANDINA_EXPERIMENT_TEXT_FONT_FAMILY_HPP
 
+#include "../resource/backends/builtin_backend.hpp"
 #include "font_loader.hpp"
 
 #include <map>
@@ -9,6 +10,8 @@
 
 namespace nandina::text
 {
+    inline constexpr std::string_view builtin_default_font_family_key = "families/default-ui";
+
     enum class FontSlant { normal, italic, oblique };
 
     struct FontFaceSpec {
@@ -21,6 +24,7 @@ namespace nandina::text
     struct FontRequest {
         std::optional<resource::ResourceKey> family;
         int weight = 400;
+
         FontSlant slant = FontSlant::normal;
     };
 
@@ -31,18 +35,14 @@ namespace nandina::text
 
     class FontFamilyRegistry {
     public:
-        [[nodiscard]] auto register_family(
-            resource::ResourceKey family,
-            std::vector<FontFaceSpec> faces
-        ) -> FontResult<void>;
-        [[nodiscard]] auto add_alias(
-            resource::ResourceKey alias,
-            resource::ResourceKey family
-        ) -> FontResult<void>;
-        [[nodiscard]] auto set_fallbacks(
-            resource::ResourceKey family,
-            std::vector<resource::ResourceKey> fallbacks
-        ) -> FontResult<void>;
+        [[nodiscard]] auto
+        register_family(resource::ResourceKey family, std::vector<FontFaceSpec> faces)
+            -> FontResult<void>;
+        [[nodiscard]] auto add_alias(resource::ResourceKey alias, resource::ResourceKey family)
+            -> FontResult<void>;
+        [[nodiscard]] auto
+        set_fallbacks(resource::ResourceKey family, std::vector<resource::ResourceKey> fallbacks)
+            -> FontResult<void>;
         [[nodiscard]] auto set_default_family(resource::ResourceKey family) -> FontResult<void>;
         [[nodiscard]] auto set_default_fallbacks(std::vector<resource::ResourceKey> families)
             -> FontResult<void>;
@@ -60,5 +60,14 @@ namespace nandina::text
         std::optional<resource::ResourceKey> default_family_;
         std::vector<resource::ResourceKey> default_fallbacks_;
     };
+
+    [[nodiscard]] auto register_builtin_default_font_family(FontFamilyRegistry& registry)
+        -> FontResult<void>;
+    [[nodiscard]] auto register_optional_font_fallback(
+        FontFamilyRegistry& registry,
+        resource::ResourceManager& resources,
+        resource::ResourceKey family,
+        resource::ResourceKey font
+    ) -> FontResult<bool>;
 } // namespace nandina::text
 #endif

@@ -46,10 +46,8 @@ namespace nandina::text
             const FontFamilyRegistry& families
         );
 
-        [[nodiscard]] auto get(
-            FontRequest request,
-            FontPipelineOptions options = {}
-        ) -> FontResult<std::shared_ptr<FontPipeline>>;
+        [[nodiscard]] auto get(FontRequest request, FontPipelineOptions options = {})
+            -> FontResult<std::shared_ptr<FontPipeline>>;
         void clear();
 
     private:

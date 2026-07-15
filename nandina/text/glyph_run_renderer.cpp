@@ -28,7 +28,9 @@ namespace nandina::text
             throw std::invalid_argument("GlyphRunRenderer requires at least one atlas binding");
         }
         if (bindings_.size() != backend.font_count()) {
-            throw std::invalid_argument("GlyphRunRenderer bindings do not cover backend font slots");
+            throw std::invalid_argument(
+                "GlyphRunRenderer bindings do not cover backend font slots"
+            );
         }
         for (std::size_t index = 0; index < bindings_.size(); ++index) {
             const auto& binding = bindings_[index];
@@ -36,10 +38,14 @@ namespace nandina::text
                 throw std::invalid_argument("GlyphRunRenderer atlas binding is incomplete");
             }
             if (&binding.texture->atlas() != binding.atlas) {
-                throw std::invalid_argument("GlyphRunRenderer atlas binding does not match texture");
+                throw std::invalid_argument(
+                    "GlyphRunRenderer atlas binding does not match texture"
+                );
             }
             if (&binding.atlas->face() != backend.font_face(index).get()) {
-                throw std::invalid_argument("GlyphRunRenderer atlas face does not match backend slot");
+                throw std::invalid_argument(
+                    "GlyphRunRenderer atlas face does not match backend slot"
+                );
             }
         }
     }
@@ -82,10 +88,12 @@ namespace nandina::text
                 throw std::out_of_range("Glyph font index has no atlas binding");
             }
             auto& binding = bindings_[shaped.font_index];
-            glyphs.push_back(CachedGlyph {
-                .binding = shaped.font_index,
-                .entry = &binding.atlas->cache_glyph(shaped.glyph_index, pixel_size),
-            });
+            glyphs.push_back(
+                CachedGlyph {
+                    .binding = shaped.font_index,
+                    .entry = &binding.atlas->cache_glyph(shaped.glyph_index, pixel_size),
+                }
+            );
             used_bindings[shaped.font_index] = true;
         }
         for (std::size_t index = 0; index < bindings_.size(); ++index) {
@@ -101,10 +109,7 @@ namespace nandina::text
             const auto& cached = glyphs[index];
             bindings_[cached.binding].texture->draw(
                 *cached.entry,
-                foundation::NanPoint(
-                    pen_x + shaped.x_offset,
-                    pen_y - shaped.y_offset
-                ),
+                foundation::NanPoint(pen_x + shaped.x_offset, pen_y - shaped.y_offset),
                 color
             );
             pen_x += shaped.x_advance;

@@ -1,6 +1,7 @@
 //
+// nandina/foundation/geometry.hpp
+// 基础坐标类型定义
 // Created by cvrain on 2026/6/29.
-//
 
 #ifndef NANDINA_EXPERIMENT_GEOMETRY_HPP
 #define NANDINA_EXPERIMENT_GEOMETRY_HPP

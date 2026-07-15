@@ -12,6 +12,7 @@
 
 #include "../reactive/graph.hpp"
 #include "../reactive/scope.hpp"
+#include "../resource/resource_manager.hpp"
 #include "../scene/node2d.hpp"
 #include "../theme/theme.hpp"
 #include "nan_store.hpp"
@@ -22,6 +23,12 @@
 #include <string_view>
 #include <type_traits>
 #include <utility>
+
+namespace nandina::text
+{
+    class FontLoader;
+    class FontFamilyRegistry;
+} // namespace nandina::text
 
 namespace nandina::app
 {
@@ -46,14 +53,20 @@ namespace nandina::app
             reactive::ReactiveScope& scope,
             const theme::NanTheme& theme,
             NanStore* store,
-            NanTypeKey store_key
+            NanTypeKey store_key,
+            resource::ResourceManager* resources = nullptr,
+            text::FontLoader* font_loader = nullptr,
+            text::FontFamilyRegistry* font_families = nullptr
         ):
             router_(&router),
             graph_(&graph),
             scope_(&scope),
             theme_(&theme),
             store_(store),
-            store_key_(store_key) {}
+            store_key_(store_key),
+            resources_(resources),
+            font_loader_(font_loader),
+            font_families_(font_families) {}
 
         [[nodiscard]] auto router() -> NanRouter& {
             return *router_;
@@ -75,6 +88,31 @@ namespace nandina::app
             return store_ != nullptr;
         }
 
+        [[nodiscard]] auto has_resource_services() const -> bool {
+            return resources_ != nullptr && font_loader_ != nullptr && font_families_ != nullptr;
+        }
+
+        [[nodiscard]] auto resources() -> resource::ResourceManager& {
+            if (!resources_) {
+                throw std::runtime_error("PageContext::resources: services are unavailable");
+            }
+            return *resources_;
+        }
+
+        [[nodiscard]] auto font_loader() -> text::FontLoader& {
+            if (!font_loader_) {
+                throw std::runtime_error("PageContext::font_loader: services are unavailable");
+            }
+            return *font_loader_;
+        }
+
+        [[nodiscard]] auto font_families() -> text::FontFamilyRegistry& {
+            if (!font_families_) {
+                throw std::runtime_error("PageContext::font_families: services are unavailable");
+            }
+            return *font_families_;
+        }
+
         template<typename StoreT>
             requires std::derived_from<StoreT, NanStore>
         [[nodiscard]] auto store() -> StoreT& {
@@ -93,6 +131,9 @@ namespace nandina::app
         const theme::NanTheme* theme_;
         NanStore* store_;
         NanTypeKey store_key_ = nullptr;
+        resource::ResourceManager* resources_ = nullptr;
+        text::FontLoader* font_loader_ = nullptr;
+        text::FontFamilyRegistry* font_families_ = nullptr;
     };
 
     class NanPage {

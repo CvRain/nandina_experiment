@@ -26,7 +26,7 @@
 #include "computed.hpp"
 #include "effect.hpp"
 #include "graph.hpp"
-#include "signal.hpp"
 #include "scope.hpp"
+#include "signal.hpp"
 
 #endif // NANDINA_EXPERIMENT_REACTIVE_HPP

@@ -4,6 +4,15 @@ project(
     default_options: ['default_library=static', 'cpp_std=c++26'],
 )
 
+fs = import('fs')
+python = import('python').find_installation('python3')
+
+embed_binary = executable(
+    'nandina_embed_binary',
+    'tools/embed_binary.cpp',
+    native: true,
+)
+
 # 使用 cmake subproject 集成第三方库
 cmake = import('cmake')
 
@@ -82,6 +91,12 @@ sqlite3_dep = dependency(
     fallback: ['sqlite3', 'sqlite3_dep'],
     default_options: ['default_library=static'],
 )
+tomlplusplus_dep = dependency(
+    'tomlplusplus',
+    version: '>=3.4.0',
+    fallback: ['tomlplusplus', 'tomlplusplus_dep'],
+)
+openssl_dep = dependency('openssl', version: '>=3.0')
 
 # Catch2 是原生 meson 项目，直接作为 subproject 引入，用于单元测试。
 # catch2_with_main 自带 Catch2 默认 main，测试文件无需自己写 main。
@@ -90,5 +105,13 @@ catch2_with_main_dep = catch2_subproj.get_variable('catch2_with_main_dep')
 
 # 引入子项目
 subdir('nandina')
+nanres = executable(
+    'nanres',
+    ['tools/nanres_main.cpp', 'tools/resource_manifest.cpp', 'tools/resource_packager.cpp'],
+    dependencies: [nandina_dep, tomlplusplus_dep, openssl_dep],
+    install: true,
+)
+nanres_build_helper = [python, files('tools/nanres_build_helper.py')]
+nanres_install_helper = [python, files('tools/nanres_install.py')]
 subdir('example')
 subdir('tests')

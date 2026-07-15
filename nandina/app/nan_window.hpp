@@ -26,10 +26,12 @@
 
 #include "../render/render_device.hpp"
 #include "../scene/scene_tree.hpp"
+#include "../text/font_pipeline.hpp"
 #include "nan_router.hpp"
 #include "window_config.hpp"
 
 #include <memory>
+#include <optional>
 
 namespace nandina::reactive
 {
@@ -80,6 +82,7 @@ namespace nandina::app
         [[nodiscard]] auto render_device() -> render::IRenderDevice* {
             return device_.get();
         }
+        [[nodiscard]] auto default_text_pipeline() const -> const widget::primitives::TextPipeline*;
 
         // ── 由 NanApplication::run 驱动 ─────────────────────────────────────────────
 
@@ -113,6 +116,9 @@ namespace nandina::app
         scene::NanSceneTree tree_;
         std::unique_ptr<NanRouter> router_;
         std::unique_ptr<render::IRenderDevice> device_;
+        std::unique_ptr<text::FontPipelineCache> font_pipeline_cache_;
+        std::shared_ptr<text::FontPipeline> default_font_pipeline_;
+        std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         bool opened_ = false;
 
         // 上一帧鼠标位置 (用于计算 delta 与 move 事件)。

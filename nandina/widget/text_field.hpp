@@ -58,13 +58,15 @@ namespace nandina::widget
 
         void set_text_pipeline(primitives::TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
+        void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
 
         [[nodiscard]] auto is_focusable() const -> bool override;
         auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
 
     private:
         void apply_theme();

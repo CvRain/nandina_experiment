@@ -33,7 +33,10 @@ namespace nandina::app
             reactive::Graph& graph,
             const theme::NanTheme& theme,
             NanStore* store = nullptr,
-            NanTypeKey store_key = nullptr
+            NanTypeKey store_key = nullptr,
+            resource::ResourceManager* resources = nullptr,
+            text::FontLoader* font_loader = nullptr,
+            text::FontFamilyRegistry* font_families = nullptr
         );
         ~NanRouter() = default;
 
@@ -122,6 +125,9 @@ namespace nandina::app
         const theme::NanTheme* theme_;
         NanStore* store_ = nullptr;
         NanTypeKey store_key_ = nullptr;
+        resource::ResourceManager* resources_ = nullptr;
+        text::FontLoader* font_loader_ = nullptr;
+        text::FontFamilyRegistry* font_families_ = nullptr;
         std::shared_ptr<scene::NanControl> host_;
         std::vector<Frame> frames_;
     };

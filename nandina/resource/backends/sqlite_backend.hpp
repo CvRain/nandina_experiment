@@ -12,6 +12,7 @@ namespace nandina::resource
         std::filesystem::path database;
         std::optional<std::filesystem::path> external_root;
         std::uint64_t max_resource_size = 64U * 1024U * 1024U;
+        std::uint64_t max_stream_size = 4ULL * 1024ULL * 1024ULL * 1024ULL;
         int busy_timeout_ms = 1000;
     };
 
@@ -25,6 +26,9 @@ namespace nandina::resource
         [[nodiscard]] auto name() const noexcept -> std::string_view override;
         [[nodiscard]] auto find(const ResourceKey& key) const -> ResourceLookup override;
         [[nodiscard]] auto find(ResourceId id) const -> ResourceLookup override;
+        [[nodiscard]] auto open_stream(const ResourceKey& key) const
+            -> ResourceStreamLookup override;
+        [[nodiscard]] auto open_stream(ResourceId id) const -> ResourceStreamLookup override;
 
     private:
         class Impl;

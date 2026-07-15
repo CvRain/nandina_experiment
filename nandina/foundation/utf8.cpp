@@ -169,11 +169,13 @@ namespace nandina::foundation::utf8
                 value |= static_cast<char32_t>(byte_at(text, offset + 3) & 0x3FU);
             }
 
-            result.push_back(DecodedCodepoint {
-                .value = value,
-                .byte_offset = offset,
-                .byte_length = length,
-            });
+            result.push_back(
+                DecodedCodepoint {
+                    .value = value,
+                    .byte_offset = offset,
+                    .byte_length = length,
+                }
+            );
             offset += length;
         }
         return result;
@@ -193,18 +195,22 @@ namespace nandina::foundation::utf8
             const auto previous = static_cast<utf8proc_int32_t>(decoded[index - 1].value);
             const auto current = static_cast<utf8proc_int32_t>(decoded[index].value);
             if (utf8proc_grapheme_break_stateful(previous, current, &state)) {
-                result.push_back(ByteRange {
-                    .offset = cluster_offset,
-                    .length = decoded[index].byte_offset - cluster_offset,
-                });
+                result.push_back(
+                    ByteRange {
+                        .offset = cluster_offset,
+                        .length = decoded[index].byte_offset - cluster_offset,
+                    }
+                );
                 cluster_offset = decoded[index].byte_offset;
                 state = 0;
             }
         }
-        result.push_back(ByteRange {
-            .offset = cluster_offset,
-            .length = text.size() - cluster_offset,
-        });
+        result.push_back(
+            ByteRange {
+                .offset = cluster_offset,
+                .length = text.size() - cluster_offset,
+            }
+        );
         return result;
     }
 

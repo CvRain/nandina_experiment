@@ -32,12 +32,18 @@ namespace nandina::app
         reactive::Graph& graph,
         const theme::NanTheme& theme,
         NanStore* store,
-        NanTypeKey store_key
+        NanTypeKey store_key,
+        resource::ResourceManager* resources,
+        text::FontLoader* font_loader,
+        text::FontFamilyRegistry* font_families
     ):
         graph_(&graph),
         theme_(&theme),
         store_(store),
         store_key_(store_key),
+        resources_(resources),
+        font_loader_(font_loader),
+        font_families_(font_families),
         host_(std::make_shared<PageHost>()) {}
 
     auto NanRouter::host() -> std::shared_ptr<scene::NanControl> {
@@ -125,7 +131,17 @@ namespace nandina::app
         }
 
         auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
-        PageContext context {*this, *graph_, *scope, *theme_, store_, store_key_};
+        PageContext context {
+            *this,
+            *graph_,
+            *scope,
+            *theme_,
+            store_,
+            store_key_,
+            resources_,
+            font_loader_,
+            font_families_
+        };
         auto root = page->build(context);
         if (!root) {
             throw std::runtime_error("NanRouter::push_page: page build returned null root");

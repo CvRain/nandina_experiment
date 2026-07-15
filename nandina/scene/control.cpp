@@ -46,9 +46,11 @@ namespace nandina::scene
         const float vertical = insets.vertical_sum();
         return {
             .min_width = std::max(0.0F, min_width - horizontal),
-            .max_width = std::isfinite(max_width) ? std::max(0.0F, max_width - horizontal) : max_width,
+            .max_width =
+                std::isfinite(max_width) ? std::max(0.0F, max_width - horizontal) : max_width,
             .min_height = std::max(0.0F, min_height - vertical),
-            .max_height = std::isfinite(max_height) ? std::max(0.0F, max_height - vertical) : max_height,
+            .max_height =
+                std::isfinite(max_height) ? std::max(0.0F, max_height - vertical) : max_height,
         };
     }
 
@@ -113,9 +115,8 @@ namespace nandina::scene
 
     auto NanControl::layout_flex_policy() const -> LayoutFlexPolicy {
         const auto factor = layout_flex_factor();
-        return factor > 0
-            ? LayoutFlexPolicy {.basis = 0.0F, .grow = static_cast<float>(factor)}
-            : LayoutFlexPolicy {};
+        return factor > 0 ? LayoutFlexPolicy {.basis = 0.0F, .grow = static_cast<float>(factor)}
+                          : LayoutFlexPolicy {};
     }
 
     auto NanControl::measure_layout(LayoutConstraints constraints) -> foundation::NanSize {
@@ -190,7 +191,6 @@ namespace nandina::scene
         }
 
         for (auto* child: visible_children) {
-
             const auto measured = child->measure_layout(
                 LayoutConstraints {
                     .min_width = 0.0F,
@@ -207,7 +207,9 @@ namespace nandina::scene
         if (overflow_ != ControlOverflow::clip) {
             return {nullptr, false};
         }
-        return ctx.clip().push(render::world_bounds_from_local(ctx.world_transform(), local_rect()));
+        return ctx.clip().push(
+            render::world_bounds_from_local(ctx.world_transform(), local_rect())
+        );
     }
 
 } // namespace nandina::scene

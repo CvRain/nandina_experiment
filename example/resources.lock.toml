@@ -1,0 +1,57 @@
+format = 1
+package_id = "org.nandina.todo"
+
+[[resources]]
+id = "737980c0-0000-4000-8000-000000000002"
+key = "fonts/default-ui-license.txt"
+source = "../nandina/assets/default_font/default-ui-license.txt"
+media_type = "text/plain"
+size = 4397
+sha256 = "161aa2c4ca0622c1c798fe325f74a620a1d28162d0ab08c6fe69e2a2b67bf0d6"
+storage = "embedded"
+streaming = false
+revision = 2
+
+[[resources]]
+id = "737980c0-0000-4000-8000-000000000001"
+key = "fonts/default-ui.ttf"
+source = "../nandina/assets/default_font/default-ui.ttf"
+media_type = "font/ttf"
+size = 255460
+sha256 = "bcd3e575cb00682f914eb6ee7c6b21b557224081d6adacafb6b7134e5566c211"
+storage = "embedded"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "c13e74bf-59dc-451d-8c4a-10bf1c6ed82c"
+key = "fonts/fallback/ofl-sarasa-gothic.txt"
+source = "res/fonts/zh-cn/ofl-sarasa-gothic.txt"
+media_type = "text/plain"
+size = 4702
+sha256 = "32c932e0dbae4f6e6386964bbc2d04178707665a05ca65cf636241af13d50a53"
+storage = "embedded"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "3b6c6e7c-30e3-425e-9478-b6b957250228"
+key = "fonts/fallback/sarasa-fixed-sc-regular.ttf"
+source = "res/fonts/zh-cn/sarasa-fixed-sc-regular.ttf"
+media_type = "font/ttf"
+size = 24909420
+sha256 = "320afeda949aa047d189df29ec7e2caadf9a8eb7890c776b57828c4a2c0e87e6"
+storage = "external"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "df0ef1a3-2843-46ee-bae8-6f16a9aac643"
+key = "fonts/fallback/source.toml"
+source = "res/fonts/zh-cn/source.toml"
+media_type = "application/toml"
+size = 504
+sha256 = "4686948e9a7c95e412d0f0cd7c51e3ccc34d71cd19719305ecb8163ac685105e"
+storage = "embedded"
+streaming = false
+revision = 1

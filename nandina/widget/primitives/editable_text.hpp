@@ -38,10 +38,7 @@ namespace nandina::widget::primitives
         void set_style(TextStyle style);
         [[nodiscard]] auto style() const -> const TextStyle&;
 
-        void set_caret(
-            std::size_t offset,
-            TextAffinity affinity = TextAffinity::downstream
-        );
+        void set_caret(std::size_t offset, TextAffinity affinity = TextAffinity::downstream);
         [[nodiscard]] auto caret() const -> std::size_t;
         [[nodiscard]] auto caret_affinity() const -> TextAffinity;
 
@@ -66,6 +63,7 @@ namespace nandina::widget::primitives
 
         void set_text_pipeline(TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> TextPipeline;
+        void apply_default_text_pipeline(const TextPipeline& pipeline) override;
 
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
 
@@ -74,7 +72,8 @@ namespace nandina::widget::primitives
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
-        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize override;
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
 
     private:
         void insert_text(std::string_view text);

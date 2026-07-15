@@ -99,6 +99,7 @@ namespace nandina::widget::primitives
         }
         backend_ = pipeline.backend;
         renderer_ = pipeline.renderer;
+        pipeline_explicit_ = true;
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
@@ -107,8 +108,19 @@ namespace nandina::widget::primitives
         return {.backend = backend_, .renderer = renderer_};
     }
 
+    void Text::apply_default_text_pipeline(const TextPipeline& pipeline) {
+        if (pipeline_explicit_) {
+            return;
+        }
+        backend_ = pipeline.backend;
+        renderer_ = pipeline.renderer;
+        mark_layout_dirty();
+        update_metrics(last_layout_constraints());
+    }
+
     void Text::set_layout_backend(const ITextLayoutBackend& backend) {
         backend_ = &backend;
+        pipeline_explicit_ = true;
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
@@ -119,6 +131,7 @@ namespace nandina::widget::primitives
 
     void Text::set_layout_renderer(ITextLayoutRenderer* renderer) {
         renderer_ = renderer;
+        pipeline_explicit_ = true;
     }
 
     auto Text::layout_renderer() const -> ITextLayoutRenderer* {
@@ -131,12 +144,14 @@ namespace nandina::widget::primitives
         }
 
         auto clip = style_.overflow == TextOverflow::clip
-            ? ctx.clip().push(foundation::NanRect::from_xywh(
-                  position.get_x(),
-                  position.get_y(),
-                  layout_.size.get_width(),
-                  layout_.size.get_height()
-              ))
+            ? ctx.clip().push(
+                  foundation::NanRect::from_xywh(
+                      position.get_x(),
+                      position.get_y(),
+                      layout_.size.get_width(),
+                      layout_.size.get_height()
+                  )
+              )
             : render::ClipStack::Guard {nullptr, false};
 
         const auto color = style_.color.with_alpha(style_.color.alpha() * ctx.opacity());
@@ -170,11 +185,13 @@ namespace nandina::widget::primitives
     }
 
     void Text::update_metrics(scene::LayoutConstraints constraints) {
-        layout_ = backend_->layout(TextLayoutInput {
-            .text = text_,
-            .style = style_,
-            .constraints = constraints,
-        });
+        layout_ = backend_->layout(
+            TextLayoutInput {
+                .text = text_,
+                .style = style_,
+                .constraints = constraints,
+            }
+        );
         set_size(layout_.size);
     }
 

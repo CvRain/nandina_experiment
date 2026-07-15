@@ -18,10 +18,10 @@
 #include "widget/button.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
+#include "widget/text_field.hpp"
 #include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
 #include "widget/scroll_view.hpp"
-#include "widget/text_field.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -180,6 +180,47 @@ TEST_CASE("NanControl draws its background rect", "[widget][control][render]") {
     tree.draw(dev);
     REQUIRE(dev.rects.size() == 1);
     REQUIRE(dev.rects[0].rect.get_width() == Catch::Approx(10.0F));
+}
+
+TEST_CASE("scene text context is inherited without overriding explicit pipelines", "[widget][text][pipeline]") {
+    reactive::Graph graph;
+    FixedTextLayoutBackend inherited_backend;
+    FixedTextLayoutRenderer inherited_renderer;
+    FixedTextLayoutBackend explicit_backend;
+    FixedTextLayoutRenderer explicit_renderer;
+    scene::NanSceneTree tree;
+    tree.set_default_text_pipeline({
+        .backend = &inherited_backend,
+        .renderer = &inherited_renderer,
+    });
+
+    auto root = std::make_shared<scene::NanControl>();
+    auto label = widget::Label::create(graph, "label");
+    auto button = widget::Button::create("button");
+    auto field = widget::TextField::create("value", "placeholder");
+    auto explicit_text = std::make_shared<widget::primitives::Text>("explicit");
+    explicit_text->set_text_pipeline({
+        .backend = &explicit_backend,
+        .renderer = &explicit_renderer,
+    });
+    root->add_child(label);
+    root->add_child(button);
+    root->add_child(field);
+    root->add_child(explicit_text);
+    tree.set_root(root);
+
+    REQUIRE(label->text_pipeline().backend == &inherited_backend);
+    REQUIRE(label->text_pipeline().renderer == &inherited_renderer);
+    REQUIRE(button->text_pipeline().backend == &inherited_backend);
+    REQUIRE(button->text_pipeline().renderer == &inherited_renderer);
+    REQUIRE(field->text_pipeline().backend == &inherited_backend);
+    REQUIRE(field->placeholder_text().text_pipeline().renderer == &inherited_renderer);
+    REQUIRE(explicit_text->text_pipeline().backend == &explicit_backend);
+    REQUIRE(explicit_text->text_pipeline().renderer == &explicit_renderer);
+
+    auto dynamic = widget::Label::create(graph, "dynamic");
+    root->add_child(dynamic);
+    REQUIRE(dynamic->text_pipeline().backend == &inherited_backend);
 }
 
 TEST_CASE("BindableRect: signal drives visibility across frames", "[widget][reactive]") {

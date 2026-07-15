@@ -13,7 +13,12 @@
 namespace nandina::text
 {
 
-    GlyphAtlas::GlyphAtlas(std::shared_ptr<FreeTypeFontFace> face, int width, int height, int padding):
+    GlyphAtlas::GlyphAtlas(
+        std::shared_ptr<FreeTypeFontFace> face,
+        int width,
+        int height,
+        int padding
+    ):
         face_(std::move(face)),
         width_(width),
         height_(height),
@@ -54,7 +59,8 @@ namespace nandina::text
             const int target_y = static_cast<int>(bounds.get_top());
             for (int row = 0; row < bitmap.height; ++row) {
                 const auto source_offset = static_cast<std::size_t>(row * bitmap.pitch);
-                const auto target_offset = static_cast<std::size_t>((target_y + row) * width_ + target_x);
+                const auto target_offset =
+                    static_cast<std::size_t>((target_y + row) * width_ + target_x);
                 std::copy_n(
                     bitmap.alpha.begin() + static_cast<std::ptrdiff_t>(source_offset),
                     bitmap.width,
