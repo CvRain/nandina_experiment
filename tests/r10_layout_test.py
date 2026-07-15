@@ -37,7 +37,13 @@ def main() -> int:
         for prefix in (root / "system/usr", root / "user/home/test/.local"):
             environment = {"MESON_INSTALL_DESTDIR_PREFIX": str(prefix)}
             result = subprocess.run(
-                [sys.executable, str(install_script), str(package), "share/org.nandina.todo"],
+                [
+                    sys.executable,
+                    str(install_script),
+                    str(package),
+                    str(pathlib.Path(sys.argv[4]).resolve()),
+                    "share",
+                ],
                 check=False,
                 text=True,
                 capture_output=True,

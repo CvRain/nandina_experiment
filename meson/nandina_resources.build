@@ -1,42 +1,18 @@
-# Nandina resource build helper.
-#
-# Required variables from the including meson.build:
-#   nanres_resource_name, nanres_application_id, nanres_policy, nanres_lock,
-#   nanres_resource_sources, nanres_output_directory
-
-nanres_validate = custom_target(
-    nanres_resource_name + '-validate',
-    input: [nanres_policy, nanres_lock, nanres_resource_sources],
-    output: nanres_resource_name + '-validate.stamp',
-    command: [
-        nanres_build_helper,
-        'validate',
-        nanres,
-        nanres_policy,
-        nanres_lock,
-        '@OUTPUT@',
-    ],
-    build_by_default: true,
-)
+# Nandina resource build helper template.
+# Required variables: nanres_resource_name, nanres_policy, nanres_output_directory.
 
 nanres_package = custom_target(
-    nanres_resource_name + '-package',
-    input: [nanres_policy, nanres_lock, nanres_resource_sources],
+    nanres_resource_name,
+    input: nanres_policy,
     output: nanres_output_directory,
-    command: [
-        nanres_build_helper,
-        'pack',
-        nanres,
-        nanres_policy,
-        nanres_lock,
-        '@OUTPUT@',
-    ],
-    depends: nanres_validate,
+    command: [nanres_build_helper, 'build', nanres, nanres_policy, '@OUTPUT@'],
     build_by_default: true,
+    build_always_stale: true,
 )
 
 meson.add_install_script(
     nanres_install_helper,
     nanres_package,
-    get_option('datadir') / nanres_application_id,
+    nanres_policy,
+    get_option('datadir'),
 )

@@ -22,6 +22,36 @@ The current authority is the code under `nandina/` plus tests under `tests/`. Ol
 - Do not make root controls secretly behave like `Column`, `Center`, or another concrete layout. Use explicit controls such as `Center`, `Padding`, `Column`, `Row`, `Flex`, and `Flow`.
 - `NanControl` may keep transitional single-child fill behavior, but concrete page layout should be explicit.
 
+## Design Philosophy
+
+Nandina is deliberately layered rather than DSL-first. The imperative widget API is the runtime contract; higher-level authoring syntax must create, compose, bind, and return the same concrete widgets. A DSL must not introduce a second object model, renderer, state engine, or lifecycle. Developers must always be able to keep a widget reference, retrieve a node from the tree/router, call ordinary setters, or drop to primitives for custom behavior.
+
+The intended stack is:
+
+```text
+Authoring DSL / builders
+Declarative bindings, If, ForEach, keyed reconciliation
+Semantic widgets and application style rules
+Primitives + tokens
+NanControl / NanNode scene tree
+Layout, input, text, render device, platform window
+```
+
+Core principles:
+
+- Keep the low-level imperative path complete and testable; the DSL is a thin authoring layer over it.
+- Expose primitives for framework and advanced application work, semantic widgets for normal application work, and declarative composition for repetitive state/UI synchronization.
+- Prefer one source of truth. `resources.toml` is the only human resource inventory; generated lock/package data and Meson wiring derive from it.
+- Separate delivery from semantics: the resource layer knows font bytes, the font registry knows logical families/faces/fallbacks, and the style layer decides which family a component requests.
+- Use tokens for theme-dependent values and literals for deliberate fixed overrides. Never write resolved theme values back into local component style.
+- Inherit only properties whose semantics are naturally inherited, primarily typography, text color, direction, locale, and opacity. Background, border, padding, layout, shadow, and component variants remain local unless explicitly forced to inherit.
+- Theme changes recompute token-backed values; literal instance overrides remain unchanged. Child widgets with no local typography override follow the nearest inherited style, while non-inherited properties continue to use their own component defaults.
+- Application code should describe state, UI projection, and user intent. Tree mutation, subscription lifetime, keyed reuse, dirty propagation, and post-layout work belong to the framework.
+- Only the UI thread mutates widgets. Background work returns through a UI dispatcher and is cancelled with the owning scope.
+- Accessibility semantics are a parallel tree capability, not metadata added after widgets and DSL are complete.
+
+The DSL acceptance test is behavioral equivalence: an imperative page and its authored form expose the same concrete widget types, setters, binding lifetime, input/layout/semantics behavior, and teardown rules.
+
 ## Implemented Layers
 
 | Layer | Current state |
@@ -35,6 +65,27 @@ The current authority is the code under `nandina/` plus tests under `tests/`. Ol
 | `theme` | `NanTheme`, palette/tokens, button style resolver. |
 | `widget` | Text, Label, Button, EditableText, TextField, ScrollView, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
+
+## Framework Capability Map
+
+The framework is evaluated across twelve connected responsibilities. “Usable” means the current example and tests exercise the main path; it does not imply platform-complete behavior.
+
+| Responsibility | Current contract | Next gaps |
+| --- | --- | --- |
+| 1. Window/display surface | `NanWindow` creates a raylib-backed visible surface and render device. | Multi-window policy, DPI/display changes, offscreen surfaces. |
+| 2. Event loop | Window loop collects input, updates tree/layout, draws, and presents. | Formal tick phases, task draining, batched reactive flush, dirty-only paint. |
+| 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Capture contract, native IME, shortcuts, gestures, drag/drop. |
+| 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
+| 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle. | Keyed reconciliation and declarative region ownership. |
+| 6. Layout | Bottom-up measure/top-down layout with Flex/Row/Column/Wrap/Scroll primitives. | Finer invalidation, diagnostics, Grid/Anchor, richer intrinsic contracts. |
+| 7. Paint/composition | Tree draw traversal, clip stack, replaceable render device. | Dirty flags, damage tracking, retained layers/caches, animation phases. |
+| 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
+| 9. Style | `NanTheme`, tokens/palette, primitive and Button variants. | `NanStyle`, style context/cascade, ThemeManager, structured style files. |
+| 10. State binding | Signal/Computed/Effect/Scope and limited Label binding. | General properties, automatic bindings, `If`, keyed `ForEach`, no manual refresh. |
+| 11. Async | No complete application-facing model yet. | UI dispatcher, background tasks, cancellation, coroutine adapters, stale-result policy. |
+| 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
+
+The current Todo page is intentionally the pressure test for the next abstraction layer. It still manually rebuilds list children, wires effects, marks layout dirty, and coordinates post-layout scrolling. Those operations prove the underlying runtime but are not the desired application-authoring surface.
 
 ## Layout System
 
@@ -133,7 +184,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, and interactive-example foundations are complete. The active main line is resource delivery: make the existing runtime backends and font pipeline automatic, portable, packageable, and low-boilerplate for application authors.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. The active main line is application authoring: formalize runtime scheduling and invalidation, then add property binding, keyed reconciliation, async scope, style/theme context, accessibility, and finally a thin DSL over the same imperative widgets.
 
 ### Completed Milestones
 
@@ -146,16 +197,16 @@ The text, clipping, editing, layout, and interactive-example foundations are com
 | M5 Layout refinement | Complete through `65f3c81`. | Flex basis/grow/shrink/min-max, Wrap distribution/alignment, ScrollView. |
 | M6 Todo validation | Complete through `65f3c81`. | Real keyboard/mouse editing, reactive list mutation, dynamic scrolling, resize-sensitive layout. |
 | R0 Resource/font foundation | Complete in `65f3c81`. | Resource identities/handles/backends, SQLite runtime, FontLoader/families, render-device pipeline cache. |
-| R1 Builtin/default font | Complete in the current worktree. | Read-only BuiltinBackend, embedded Caskaydia Cove font/OFL license, `fonts/default`, and `families/default-ui`. |
-| R2 Resource URI/locator | Complete in the current worktree. | Strict `res`/`builtin`/`user`/`cache`/`file` URIs and deterministic Linux executable/XDG resource locations. |
-| R3 Resource streams | Complete in the current worktree. | Bounded read/seek streams with stable metadata, independent ownership, snapshot/file implementations, and backend overlay lookup. |
-| R4 `nanres` scan/validate | Complete in the current worktree. | Deterministic recursive scanner, ordered media detection, exclusions, unsafe-path diagnostics, and functional `init`/`scan`/`validate` CLI. |
-| R5 Policy/lock manifest | Complete in the current worktree. | toml++ policy parsing, SHA-256 inventory, stable UUID move/change rules, revisions, stale validation, and atomic generated lock updates. |
-| R6 SQLite package/sidecars | Complete in the current worktree. | Runtime-compatible SQLite packages, alias rows, policy/size-based BLOB selection, UUID-named external sidecars, atomic rebuilds, and fingerprint skips. |
-| R7 Meson build/install | Complete in the current worktree. | Manifest/source-aware validate/package targets, build-tree executable-relative output, datadir install helper, and user/system prefix layout tests. |
-| R8 Application bootstrap | Complete in the current worktree. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
-| R9 Window text pipeline | Complete in the current worktree. | Render-device-scoped default FontPipelineCache, scene-context inheritance, explicit override preservation, and ordered scene/GPU teardown. |
-| R10 Cleanup/verification | Complete in the current worktree. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
+| R1 Builtin/default font | Complete in `9b0933d`. | Read-only BuiltinBackend, embedded Caskaydia Cove font/OFL license, `fonts/default`, and `families/default-ui`. |
+| R2 Resource URI/locator | Complete in `9b0933d`. | Strict `res`/`builtin`/`user`/`cache`/`file` URIs and deterministic Linux executable/XDG resource locations. |
+| R3 Resource streams | Complete in `9b0933d`. | Bounded read/seek streams with stable metadata, independent ownership, snapshot/file implementations, and backend overlay lookup. |
+| R4 `nanres` scan/validate | Complete in `9b0933d`. | Deterministic recursive scanner, ordered media detection, exclusions, unsafe-path diagnostics, and functional `init`/`scan`/`validate` CLI. |
+| R5 Policy/lock manifest | Complete in `9b0933d`. | toml++ policy parsing, SHA-256 inventory, stable UUID move/change rules, revisions, stale validation, and atomic generated lock updates. |
+| R6 SQLite package/sidecars | Complete in `9b0933d`. | Runtime-compatible SQLite packages, alias rows, policy/size-based BLOB selection, UUID-named external sidecars, atomic rebuilds, and fingerprint skips. |
+| R7 Meson build/install | Complete in `9b0933d`, simplified after it. | Policy-only automatic scan/validate/package target, build-tree executable-relative output, datadir install helper, and user/system prefix layout tests. |
+| R8 Application bootstrap | Complete in `9b0933d`. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
+| R9 Window text pipeline | Complete in `9b0933d`. | Render-device-scoped default FontPipelineCache, scene-context inheritance, explicit override preservation, and ordered scene/GPU teardown. |
+| R10 Cleanup/verification | Complete in `9b0933d`. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
 
 Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line breaking, OpenType ligature-internal carets, native IME acquisition, clipboard/undo, scrollbar chrome, kinetic scrolling, Grid/Anchor, exact transformed polygon clipping, and accessibility bridges.
 
@@ -171,13 +222,13 @@ Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line break
 
 #### R1. BuiltinBackend And Default Font
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 The licensed Caskaydia Cove regular font and OFL text are generated into `libnandina` at build time and exposed by the read-only process-shared `BuiltinBackend`. Stable `fonts/default` and `families/default-ui` contracts provide a portable default family while allowing higher-priority application mounts to override the logical font key. Automatic mounting and widget inheritance remain R8-R9 responsibilities.
 
 #### R2. Resource URI And Platform Locator
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 Add URI schemes without weakening stable logical keys:
 
@@ -193,13 +244,13 @@ Runtime discovery uses the executable path, application ID, install prefix conve
 
 #### R3. Streamed Resources
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 `ResourceStream` exposes stable ID/key/media/storage metadata, declared size, position, seekability, bounded read, and absolute seek. Memory, builtin, and SQLite BLOB streams retain immutable resource snapshots. Directory and SQLite external streams retain independent file handles, verify declared size when opened, stop reads at the declared boundary, and report premature EOF as an I/O error. Open streams remain valid after backend unmount/destruction. Snapshot and stream size limits are separate so explicitly large external resources can stream without weakening normal `find()` safeguards. Content-hash verification begins when R5 manifests provide authoritative hashes.
 
 #### R4. `nanres` Scan And Validation CLI
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 The resource tool is named `nanres`. Initial commands are:
 
@@ -215,44 +266,44 @@ nanres watch
 
 #### R5. Config And Generated Lock Manifest
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 Human policy is separate from generated inventory:
 
 - `resources.toml`: package ID, root directories/key prefixes, excludes, aliases, hidden/symlink policy, and ordered glob media/storage/streaming rules.
 - `resources.lock.toml`: tool-owned format/package header plus UUID, canonical key, policy-relative source path, media type, size, SHA-256, storage decision, streaming flag, and revision for each resource.
 
-Developers do not manually enumerate ordinary resources. Without explicit R4 command-line scan overrides, `nanres scan` reads `resources.toml`, scans and hashes resources, preserves UUIDs by existing source and unique content-hash move detection, increments revision only when content changes, and atomically replaces `resources.lock.toml`. Only genuinely new resources receive IDs. `nanres validate` regenerates the inventory in memory and fails when the lock is missing or stale without modifying it. Ambiguous hash moves, duplicate identities, alias/canonical collisions, missing alias targets, package mismatches, and normalized path/key collisions fail instead of silently changing identity. toml++ prefers the compatible system package and retains a wrap fallback; SHA-256 uses OpenSSL EVP in the `nanres` target rather than adding TOML or crypto dependencies to `libnandina`.
+Developers do not manually enumerate ordinary resources. `resources.toml` is the only human-maintained resource inventory. `nanres scan` preserves UUIDs by existing source and unique content-hash move detection, increments revision only when content changes, and atomically replaces the tool-owned `resources.lock.toml`. The Meson build helper runs validate on every build, automatically scans when the lock is missing or stale, then packages from the current lock. Adding, deleting, moving, or changing a file under a configured root therefore requires no Meson edit and no separate scan command. CI can still run `nanres validate` directly to require a committed current lock. Ambiguous hash moves, duplicate identities, alias/canonical collisions, missing alias targets, package mismatches, and normalized path/key collisions fail instead of silently changing identity. toml++ prefers the compatible system package and retains a wrap fallback; SHA-256 uses OpenSSL EVP in the `nanres` target rather than adding TOML or crypto dependencies to `libnandina`.
 
 #### R6. SQLite Packaging And External Sidecars
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 `nanres pack` requires a current validated lock and generates `resources.db` plus an `external/` sidecar directory under the configured `package_directory` (default `package`). The database schema, `application_id`, `user_version`, aliases, BLOB rows, and external paths are consumed directly by `SQLiteBackend`. Explicit storage rules win; `auto` embeds non-streaming resources up to `embed_threshold` (default 1 MiB) and keeps streaming, audio/video, and larger files external. Streaming plus explicit embedded storage is rejected. External files use stable UUID filenames rather than source paths, and every source SHA-256 is rechecked before packaging. A package-policy/lock fingerprint skips unchanged complete output; otherwise a complete temporary tree is transactionally built and swapped into place so stale sidecars are removed. Raw R4 command-line scans cannot write release packages.
 
 #### R7. Meson Build And Install Integration
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`; Meson authoring simplified in the current change.
 
-The example declares short Meson custom targets around the reusable `nanres_build_helper.py` and `nanres_install.py` scripts. Policy, generated lock, and explicitly enumerated source files are target inputs; `nanres validate` runs before `pack`, and the complete package is produced beside the executable at `buildDir/example/resources`. The source list is explicit because Meson cannot discover arbitrary TOML inventory dependencies at configure time; `nanres` still verifies every SHA-256 before packaging. The install script copies the complete database/sidecar tree to `get_option('datadir')/<app-id>`. On Linux, `--prefix=/usr` therefore installs under `/usr/share/<app-id>`, while `--prefix=$HOME/.local` installs under `~/.local/share/<app-id>` without checking whether the installer is root. Tests exercise both prefix layouts and open the Meson-generated package through `SQLiteBackend`.
+The example declares one always-stale Meson custom target around `nanres_build_helper.py`. Its only source input is `resources.toml`; the helper discovers all resource files, maintains the lock, and uses the package fingerprint to make unchanged builds cheap. This avoids duplicating package ID, lock path, and every resource filename in `meson.build`. The complete package is produced beside the executable at `buildDir/example/resources`. `nanres_install.py` reads the package ID from the same policy and copies the database/sidecar tree to `get_option('datadir')/<app-id>`. On Linux, `--prefix=/usr` therefore installs under `/usr/share/<app-id>`, while `--prefix=$HOME/.local` installs under `~/.local/share/<app-id>` without checking whether the installer is root. Tests add a resource after initial packaging and verify that a second build updates both lock and SQLite package without any build-file change.
 
 Fully offline builds use compatible system dependencies or pre-populated Meson `subprojects/packagecache` archives for the pinned wraps. Configure/build never downloads Sarasa Gothic or other optional resource packs implicitly. Generated SQLite fallback source trees, build outputs, resource databases, package fingerprints, and lock-update temporaries remain outside source control; generated `resources.lock.toml` is the intentional exception and is committed as application inventory.
 
 #### R8. NanApplication Resource Bootstrap
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 `NanApplication` now owns `ResourceManager`, `FontLoader`, and `FontFamilyRegistry` for the process lifetime. It always mounts the process-shared built-in backend at priority -1000 and registers `families/default-ui`. `NanApplicationConfig` accepts an application ID, executable path, environment snapshot, and optional package filename; `for_process()` resolves `/proc/self/exe` and HOME/XDG variables on Linux. Configured startup uses `PlatformResourceLocator` order to mount each existing `<root>/resources.db` at descending priorities with sidecars rooted beside the database. Missing packages are skipped, while malformed discovered packages fail startup rather than exposing a lower overlay silently. `NanApplication`, application-created routers, and `PageContext` expose the same resource manager, font loader, and family registry. Direct low-level `NanRouter` construction remains valid without application services. The Todo example configures only `org.nandina.todo`.
 
 #### R9. NanWindow Default Text Pipeline
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 After render-device creation and before `on_setup()`, `NanWindow` resolves the application default family and owns the render-device-scoped `FontPipelineCache`, `FontPipeline`, and backend-neutral `TextPipeline`. `NanSceneTree` carries that default pipeline context. Nodes receive it when entering the tree through a zero-RTTI virtual capability; Text/Label, Button, EditableText, and TextField inherit it, including dynamically added subtrees and internal text primitives. An explicit `set_text_pipeline()`, layout backend, or renderer remains authoritative and is never overwritten by context inheritance. Close clears router frames and the scene root, removes the tree context, then releases FontPipeline, cache, and finally the render device, so no page/widget retains raw renderer pointers after GPU text resources are destroyed.
 
 #### R10. Example Cleanup And Install Validation
 
-Status: complete in the current worktree.
+Status: complete in `9b0933d`.
 
 The Todo example no longer contains `NANDINA_EXAMPLE_RESOURCE_DIR`, manual DirectoryBackend/resource/font services, `TodoPageParams::text_pipeline`, repetitive `set_text_pipeline()`, or manual resource teardown. The obsolete `bundled_fonts` Meson option, copy targets, and copy-specific font test are removed. R4 explicit scanning still covers loose development trees, while the application path uses the validated R7 SQLite package. Automated probes verify the generated package through `SQLiteBackend`, executable-relative portable layout, user/system datadir installation, and built-in font fallback when no optional/project package is present. Sarasa Gothic remains optional and is not downloaded or required for configure, build, startup, or tests.
 
@@ -266,47 +317,125 @@ The Todo example includes Sarasa Fixed SC Regular 1.0.40 under OFL 1.1. Only the
 - Add project hot reload after identity, lock manifest, and pipeline invalidation semantics are stable.
 - Add system font discovery only as an explicit developer/application feature; it is not part of default portability.
 
-### Side Tracks
+## Next Development Line: Application Authoring
 
-These are useful, but should not interrupt the active resource delivery sequence unless a feature directly requires them.
+Resource delivery is complete. The next main line raises the application-facing abstraction without hiding or replacing the imperative widget runtime. Implement in dependency order; do not start by designing attractive DSL syntax.
 
-#### Theme Context
+### A1. Runtime Tick And Dirty Contract
 
-Current `NanApplication` owns a `NanTheme` value. Runtime theme switching is not reactive yet.
+Formalize one UI tick:
 
-Possible direction:
+```text
+collect platform events
+dispatch input
+drain UI-thread tasks
+flush batched reactive updates
+reconcile declarative regions
+resolve styles
+measure/layout dirty roots
+run post-layout actions
+paint dirty regions
+present
+dispose deferred objects
+```
 
-- Add `ThemeContext` or `Signal<NanTheme>`.
-- Let widgets derive resolved styles through effects or scoped subscriptions.
-- Make window background and existing page widgets refresh when theme changes.
+Introduce typed dirty flags for style, measure, layout, paint, and semantics. Setters mark the minimum required flags; application code must not call `mark_layout_dirty()` to synchronize normal widget state. Tree mutation during layout/paint is deferred to a safe phase.
 
-#### Router Lifecycle
+### A2. Property And Binding Core
 
-Router currently supports keep-alive page stack and visibility switching.
+Add `Property<T>`, read-only observation, and events while preserving ordinary setters. Both paths must converge on the same mutation/dirty logic:
 
-Possible direction:
+```cpp
+label->set_text("ready");
+label->text_property().bind(scope, status);
+```
 
-- Add activate/deactivate hooks.
-- Add pop/replace lifecycle callbacks.
-- Add route history or deep-link serialization later.
-- Add page transition animation after animation primitives exist.
+Bindings activate/deactivate with the widget/page scope, batch updates within one tick, and cannot outlive captured application state. Add `Signal<T>::update(fn)` or an equivalent transaction API so state mutation does not require read-copy-set boilerplate.
 
-#### Animation And Impact Effects
+### A3. Declarative Regions And Keyed Reconciliation
 
-The long-term identity of v3 includes game-like interaction.
+Implement low-level imperative objects for `If` and keyed `ForEach` before adding DSL wrappers. `ForEach` owns a key-to-node map, reuses unchanged nodes, moves nodes without recreating them, destroys removed scopes, and preserves focus/edit state. First version need not virtualize.
 
-Possible direction:
+Todo success criteria: no `clear_children()` refresh, no hand-written synchronization effect, no explicit layout invalidation, and no recreated row for an unchanged key.
 
-- Add a small tween/animation primitive that can animate `NanNode2D` transform and control properties.
-- Let Button click spawn ripple/impact nodes or events.
-- Keep animation independent of Button so other components can reuse it.
+### A4. UI Dispatcher And Async Scope
 
-#### Authoring DSL
+Only the UI thread may mutate widgets. Add a UI dispatcher, background task execution, cancellation token, and page/widget-owned `AsyncScope`. Completion returns through the event-loop task phase and is discarded if the owner is gone or a newer generation superseded it. Coroutine syntax may wrap this model later; it is not the underlying contract.
 
-Do this after low-level widgets are stable.
+### A5. Font Requests And Style Context
 
-The low-level widget API remains valid. A DSL should sit above it, not replace it.
-Do not block framework progress on a final authoring syntax.
+Replace the scene-wide fixed default `TextPipeline` assumption with a window font-resolution context backed by `FontFamilyRegistry` and `FontPipelineCache`. Extend text style/request with logical family, weight, and slant. Add imperative controls such as `set_font_family()`, `set_font_weight()`, and `set_font()`; explicit low-level pipelines remain a supported override.
+
+Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, locale/direction, and opacity inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not.
+
+### A6. NanStyle And ThemeManager
+
+Keep the shadcn-like primitives + tokens + semantic variant model. `NanStyle` maps component type/variant/state to token references and can be subclassed for application-specific rule algorithms. `ThemeManager` owns named light/dark/high-contrast token sets and a revision; switching themes marks style roots dirty.
+
+Resolution order:
+
+```text
+framework primitive defaults
+current application theme tokens
+NanStyle component/variant rules
+nearest inherited StyleContext
+subtree overrides
+component instance overrides
+```
+
+Token references re-resolve on theme changes. Literal instance values remain fixed. A child with no typography override follows its nearest parent context; its background/layout continue to use its own component rule. A child may request `initial` to ignore inherited text style or `inherit` to force inheritance.
+
+Structured `styles.toml` is a data authoring form for tokens, named themes, font-family declarations, and ordinary component mappings. It must compile to the same `NanStyle`/ThemeManager objects used by C++ configuration, not create a separate style engine.
+
+### A7. Accessibility Semantics
+
+Add a semantics capability/tree with role, label, value, state, actions, focus, and bounds. Semantic widgets provide defaults; composition decides whether to expose, merge, or hide primitive children. Dirty semantics update in the formal tick. Platform AT-SPI/UI Automation/NSAccessibility adapters come after the internal contract is stable.
+
+### A8. Thin Authoring DSL
+
+Only after A1-A7 are usable, add builders/DSL for composition and binding. DSL expressions return or expose concrete widgets and call the same setters/properties/events as imperative code. No DSL-only node, lifecycle, renderer, style, or state path is allowed.
+
+Maintain paired tests/pages:
+
+- imperative construction;
+- authored construction;
+- equivalent concrete widget access and mutation;
+- equivalent binding lifetime, keyed reuse, layout, input, style, semantics, and teardown.
+
+### A9. Todo Refactor And Component Extraction
+
+Split Todo into semantic components (`TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, `TodoEmptyState`) and first rewrite it using the new imperative Property/ForEach/Style APIs. Then add a second DSL authoring form over the same components. The example becomes the acceptance test that normal application code describes state projection and intent rather than framework refresh mechanics.
+
+### Deferred After Authoring Core
+
+- Router activate/deactivate/replace lifecycle, history, deep links, and transitions.
+- Tween/animation primitives and reusable impact/ripple effects.
+- Virtualized lists, richer Grid/Anchor layout, retained composition layers.
+- Native IME, clipboard/undo, UAX #14, emoji and rich text.
+- System font discovery as an explicit application feature.
+
+## Development Workflow
+
+For each roadmap item:
+
+1. Write or update the low-level contract and invariants before authoring syntax.
+2. Implement the imperative API and focused tests first.
+3. Integrate lifecycle, dirty flags, teardown, and thread ownership explicitly.
+4. Exercise the API in Todo or a minimal fixture without DSL.
+5. Add declarative/DSL wrappers only when they are mechanical adapters over the tested imperative path.
+6. Add equivalence tests so convenience APIs cannot diverge into a second runtime.
+7. Update this document’s capability map, limitations, and active milestone in the same change.
+
+Review questions for every abstraction:
+
+- What concrete node/widget exists at runtime?
+- Who owns it and its subscriptions/tasks?
+- Which event-loop phase may mutate it?
+- Which dirty flags does each property change?
+- How does explicit imperative mutation interact with bindings and style cascade?
+- What is inherited, token-backed, literal, or initial?
+- What semantics node and actions does it expose?
+- Can an advanced developer retrieve and modify the concrete object directly?
 
 ## Verification
 

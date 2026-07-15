@@ -88,6 +88,15 @@ test(
     nanres_install_test,
     args: [meson.project_source_root() / 'tools' / 'nanres_install.py'],
 )
+nanres_build_workflow_test = find_program('nanres_build_workflow_test.py')
+test(
+    'nanres-build-workflow',
+    nanres_build_workflow_test,
+    args: [
+        meson.project_source_root() / 'tools' / 'nanres_build_helper.py',
+        nanres,
+    ],
+)
 test(
     'nanres-meson-package',
     nanres_package_probe,
@@ -145,6 +154,7 @@ test(
         application_bootstrap_probe,
         meson.project_build_root() / 'example' / 'resources',
         meson.project_source_root() / 'tools' / 'nanres_install.py',
+        meson.project_source_root() / 'example' / 'resources.toml',
     ],
     depends: nanres_package,
 )
