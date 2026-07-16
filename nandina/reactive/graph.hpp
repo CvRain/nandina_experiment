@@ -80,6 +80,21 @@ namespace nandina::reactive
     /// 响应式调度图。所有 signal / computed / effect 必须依附于一个 Graph 实例。
     class Graph {
     public:
+        class ReadScope {
+        public:
+            ReadScope(Graph& graph, Reactor* reactor):
+                graph_(&graph), previous_(graph.begin_read(reactor)) {}
+
+            ~ReadScope() { graph_->end_read(previous_); }
+
+            ReadScope(const ReadScope&) = delete;
+            auto operator=(const ReadScope&) -> ReadScope& = delete;
+
+        private:
+            Graph* graph_;
+            Reactor* previous_;
+        };
+
         Graph() = default;
         ~Graph();
 
@@ -105,6 +120,9 @@ namespace nandina::reactive
         /// 进入读取上下文, 返回先前的 reader (用于嵌套恢复)。
         [[nodiscard]] auto begin_read(Reactor* reactor) -> Reactor*;
         void end_read(Reactor* previous);
+        [[nodiscard]] auto enter_read(Reactor* reactor) -> ReadScope {
+            return ReadScope {*this, reactor};
+        }
 
         /// 清空 reactor 的所有依赖边 (双向)。在 reactor 即将重新执行时调用。
         void clear_reactor_deps(Reactor& reactor);

@@ -92,9 +92,8 @@ namespace nandina::reactive
         void recompute() {
             graph_->clear_reactor_deps(*this);
             state = ReactorState::clean;
-            auto* prev = graph_->begin_read(this);
+            auto read = graph_->enter_read(this);
             cached_ = compute_();
-            graph_->end_read(prev);
         }
 
         Graph* graph_;

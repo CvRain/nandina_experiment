@@ -49,6 +49,7 @@ Core principles:
 - Application code should describe state, UI projection, and user intent. Tree mutation, subscription lifetime, keyed reuse, dirty propagation, and post-layout work belong to the framework.
 - Only the UI thread mutates widgets. Background work returns through a UI dispatcher and is cancelled with the owning scope.
 - Accessibility semantics are a parallel tree capability, not metadata added after widgets and DSL are complete.
+- Keep scene composition concepts orthogonal: a page owns navigation lifetime, a canvas layer owns a coordinate/composition boundary, a Control owns layout behavior, a physics world owns simulation, z-index orders siblings inside one canvas, and collision layer/mask filters physics interactions.
 
 The DSL acceptance test is behavioral equivalence: an imperative page and its authored form expose the same concrete widget types, setters, binding lifetime, input/layout/semantics behavior, and teardown rules.
 
@@ -66,24 +67,79 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 | `widget` | Text, Label, Button, EditableText, TextField, ScrollView, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
 
+## Scene Composition And Physics Boundaries
+
+Nandina must support ordinary application pages and lightweight 2D game scenes without forcing either organization onto the other. A page remains one scene tree and one router/reactive lifetime. It may contain multiple canvas subtrees, but canvas layers do not create another node model, lifecycle, renderer, or page stack.
+
+The intended responsibilities are:
+
+| Concept | Responsibility | Must not become |
+| --- | --- | --- |
+| `NanPage` | Navigation, keep-alive, page state/scope, and ownership of one scene root. | A render layer or physics world. |
+| `CanvasLayer` | Independent canvas transform, visibility, layer-to-layer composition order, and input boundary. | A layout container, collision category, or entity store. |
+| `NanNode2D` | Local/world transform, visibility, drawing, hit geometry, and ordinary scene lifecycle. | Automatically layout-managed or automatically physical. |
+| `NanControl` | Measure/layout, focus, semantics, style, and UI interaction. | The mandatory base for sprites, bullets, particles, or rigid bodies. |
+| `PhysicsWorld2D` | Fixed-step simulation, bodies/shapes, spatial queries, and contact/sensor events. | The scene tree, renderer, or application state store. |
+| `z_index` | Stable draw and hit-test ordering among items in one canvas. | Cross-canvas order or collision filtering. |
+| collision layer/mask | Box2D category/mask filtering for shapes. | Canvas count, draw order, or UI input priority. |
+
+`CanvasLayer` follows the useful part of Godot's model: it is a non-spatial scene node that establishes a canvas boundary. Its child `NanNode2D` objects inherit the layer canvas transform instead of an arbitrary parent spatial transform. A layer may use world space (normally camera transformed), screen space (viewport coordinates, unaffected by the camera), or eventually a custom/offscreen viewport. Cross-layer `order` is separate from each child's `z_index`.
+
+Do not impose a fixed "16 canvas layers per page" contract. Most application pages need one implicit screen-space canvas; a game page normally needs three to five explicit layers. Store layers in a small stable ordered collection and use a broad signed order range. Bit-count limits belong to collision category/mask fields, not scene composition.
+
+Screen-space layers may declare a root `NanControl`; each such root is an explicit viewport layout boundary and receives tight viewport constraints. World-space layers are not walked by page layout. A Control intentionally placed in world space, such as a nameplate or health bar, uses explicit scene position/size or a dedicated world-UI adapter rather than becoming a page layout root.
+
+Input starts at the highest visible layer and proceeds downward. The initial layer policy is `pass`, `block_below`, or `disabled`. Inside a layer, existing reverse draw/hit order and event consumption apply. Pointer coordinates are transformed from screen space through the selected canvas before hit testing. A modal overlay blocks lower HUD/world layers; a sparse HUD passes events through when no Control accepts them. Physics picking remains a separate world-space query after UI input has not consumed the event.
+
+Visibility, processing, and input are separate switches. Hiding a layer removes it from paint and hit testing; pausing its process/physics work requires an explicit process mode. This allows a pause overlay to remain active while the game-world layer stops simulation.
+
+A representative mixed page is:
+
+```text
+SpaceBattlePage
+└── LayerStack
+    ├── CanvasLayer(background, world-space)
+    │   └── StarField
+    ├── CanvasLayer(world, world-space)
+    │   └── GameWorld
+    │       ├── PhysicsWorld2D
+    │       ├── PlayerShip
+    │       ├── Bullets
+    │       └── Asteroids
+    ├── CanvasLayer(effects, world-space)
+    │   └── Explosions
+    ├── CanvasLayer(hud, screen-space)
+    │   └── HudRoot : NanControl
+    │       ├── ScoreLabel
+    │       └── HealthBar
+    └── CanvasLayer(overlay, screen-space, block_below)
+        ├── PauseMenu
+        └── GameOverDialog
+```
+
+`SpaceBattleState` owns reactive score, lives, and pause state. `GameWorld` mutates that state in response to gameplay/contact events; `HudRoot` binds to it and does not own or parent the player/physics nodes. The physics body is authoritative for a dynamic actor's position/rotation, and the visual `NanNode2D` synchronizes from it after stepping. Layout must not continuously overwrite dynamic-body transforms.
+
+Box2D upstream is `https://github.com/erincatto/box2d.git`. Use the current Box2D 3.x C17 API through a small optional `physics2d` module. Keep MKS units internally, convert through a configured pixels-per-meter scale, step at a fixed frequency with an accumulator, read movement/contact/sensor events after `b2World_Step`, and defer world mutation requested during event delivery. Do not wrap the complete engine initially.
+
 ## Framework Capability Map
 
-The framework is evaluated across twelve connected responsibilities. “Usable” means the current example and tests exercise the main path; it does not imply platform-complete behavior.
+The application framework is evaluated across twelve connected responsibilities, with lightweight 2D simulation tracked as an optional supporting capability. “Usable” means the current example and tests exercise the main path; it does not imply platform-complete behavior.
 
 | Responsibility | Current contract | Next gaps |
 | --- | --- | --- |
 | 1. Window/display surface | `NanWindow` creates a raylib-backed visible surface and render device. | Multi-window policy, DPI/display changes, offscreen surfaces. |
 | 2. Event loop | A1a formalizes input/process/tree-commit/layout/post-layout/paint/dispose phases. | UI task draining, tick-level reactive batching, reconcile/style phases, dirty-only paint. |
-| 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Capture contract, native IME, shortcuts, gestures, drag/drop. |
+| 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Canvas-aware coordinate routing/input blocking, native IME, shortcuts, gestures, drag/drop. |
 | 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
 | 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle. | Keyed reconciliation and declarative region ownership. |
-| 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, and bounded post-layout relayout. | Explicit layout boundaries, diagnostics, Grid/Anchor, richer intrinsic contracts. |
-| 7. Paint/composition | Tree draw traversal, clip stack, typed paint dirtiness, replaceable render device. | Dirty-only paint, damage tracking, retained layers/caches, animation phases. |
+| 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, and bounded post-layout relayout. | Screen-canvas layout roots, diagnostics, Grid/Anchor, richer intrinsic contracts. |
+| 7. Paint/composition | Tree draw traversal, sibling z-order, clip stack, typed paint dirtiness, replaceable render device. | World/screen CanvasLayer boundaries, dirty-only paint, damage tracking, retained caches, animation phases. |
 | 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
 | 9. Style | `NanTheme`, tokens/palette, primitive and Button variants. | `NanStyle`, style context/cascade, ThemeManager, structured style files. |
 | 10. State binding | Signal/Computed/Effect/Scope and limited Label binding. | General properties, automatic bindings, `If`, keyed `ForEach`, no manual refresh. |
 | 11. Async | No complete application-facing model yet. | UI dispatcher, background tasks, cancellation, coroutine adapters, stale-result policy. |
 | 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
+| Supporting 2D simulation | Scene transforms/process are suitable for lightweight gameplay, but no physics world is integrated. | Optional Box2D 3.x bridge, fixed physics phase, collision events, and canvas/world isolation. |
 
 The current Todo page is intentionally the pressure test for the next abstraction layer. It still manually rebuilds list children, wires effects, marks layout dirty, and coordinates post-layout scrolling. Those operations prove the underlying runtime but are not the desired application-authoring surface.
 
@@ -184,7 +240,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. The active main line is application authoring: formalize runtime scheduling and invalidation, then add property binding, keyed reconciliation, async scope, style/theme context, accessibility, and finally a thin DSL over the same imperative widgets.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. The active main line is application authoring: formalize runtime scheduling and invalidation, add property binding, establish the minimal canvas/physics boundary needed by the scene model, then continue through keyed reconciliation, async scope, style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -369,6 +425,8 @@ The Todo example now uses the formal post-layout queue for scroll-to-end instead
 
 ### A2. Property And Binding Core
 
+Status: core implemented for `Property<T>`, read-only observation, disconnectable events, scoped one-way binding, and `Signal<T>::update(fn)`. `Text`/`Label` are the representative migrated path; broader widget property coverage and tick-level batching remain.
+
 Add `Property<T>`, read-only observation, and events while preserving ordinary setters. Both paths must converge on the same mutation/dirty logic:
 
 ```cpp
@@ -378,23 +436,53 @@ label->text_property().bind(scope, status);
 
 Bindings activate/deactivate with the widget/page scope, batch updates within one tick, and cannot outlive captured application state. Add `Signal<T>::update(fn)` or an equivalent transaction API so state mutation does not require read-copy-set boilerplate.
 
-### A3. Declarative Regions And Keyed Reconciliation
+Current A2 decisions:
+
+- `Property<T>` stores one authoritative value. Ordinary setters delegate to it, and property writes call the same apply callback, dirty propagation, and change event path.
+- `ReadProperty<T>` exposes value reads and observation without mutation. `Event<Args...>` supports multiple RAII subscriptions and safe disconnect during dispatch.
+- One-way bindings are owned by an `EffectScope`; replacing a binding disposes the previous effect, and leaving the tree disposes both the effect and its source-capturing binding description. A detached widget must be bound again when it is mounted again, so it cannot retain a dangling reference after page state is destroyed.
+- Binding sources are structural: any source exposing `get()` with a compatible value type works, including `Signal<T>` and `Computed<T>`. There is no parallel widget-specific binding engine.
+- Binding callbacks still follow the current Graph flush policy. Moving normal application mutations to one reactive wave per UI tick belongs to the pending A1 task-drain/reactive phase integration, not to `Property<T>` itself.
+
+### A3. Canvas Layers And Minimal Physics Bridge
+
+Add `LayerStack` and `CanvasLayer` as imperative scene objects before expanding rendering or physics features. Preserve one page tree and one lifecycle while allowing independent world/screen coordinate spaces:
+
+- Stable cross-layer ordering, visibility, and `pass`/`block_below`/`disabled` input policy.
+- Screen-to-canvas coordinate conversion for hit testing and world-space picking.
+- Screen-space root-Control layout boundaries; world-space layers never enter page layout automatically.
+- Layer-local child `z_index`; no fixed layer-count contract and no reuse of canvas order for physics filtering.
+- One default screen canvas keeps existing ordinary pages source-compatible.
+
+Add Box2D as an optional Meson dependency/subproject from `https://github.com/erincatto/box2d.git` and expose only a narrow `physics2d` bridge:
+
+- `PhysicsWorld2D` owns `b2WorldId`, fixed-step accumulation, pixels-per-meter conversion, and post-step event collection.
+- `PhysicsBody2D`/shape definitions wrap opaque Box2D 3.x IDs and bind simulation transforms to ordinary `NanNode2D` visuals by composition, not inheritance from Box2D types.
+- First shapes are box/polygon and circle, plus sensor/contact begin/end events and collision category/mask filtering.
+- Body/shape creation and destruction requested during stepping/event dispatch are committed at a physics safe point.
+- Dynamic bodies drive node transforms; static/kinematic bodies may be driven explicitly from scene state before a step. No two-way transform feedback loop is allowed.
+
+Integrate a `physics` phase after process/tree commit and before layout/paint. Physics uses a fixed timestep independent of render `dt`; movement/contact events update application state before reactive/layout work. A small headless fixture must prove deterministic stepping, deferred body destruction, sensor/contact delivery, unit conversion, and isolation from HUD layout.
+
+Acceptance scene: a minimal space-battle fixture has a world layer containing a movable body, bullets, and asteroid sensors plus a screen HUD layer bound to score/lives. Camera2D, offscreen viewports, interpolation polish, joints beyond immediate sample needs, editor tooling, particles, audio, navigation, and ECS remain deferred.
+
+### A4. Declarative Regions And Keyed Reconciliation
 
 Implement low-level imperative objects for `If` and keyed `ForEach` before adding DSL wrappers. `ForEach` owns a key-to-node map, reuses unchanged nodes, moves nodes without recreating them, destroys removed scopes, and preserves focus/edit state. First version need not virtualize.
 
 Todo success criteria: no `clear_children()` refresh, no hand-written synchronization effect, no explicit layout invalidation, and no recreated row for an unchanged key.
 
-### A4. UI Dispatcher And Async Scope
+### A5. UI Dispatcher And Async Scope
 
 Only the UI thread may mutate widgets. Add a UI dispatcher, background task execution, cancellation token, and page/widget-owned `AsyncScope`. Completion returns through the event-loop task phase and is discarded if the owner is gone or a newer generation superseded it. Coroutine syntax may wrap this model later; it is not the underlying contract.
 
-### A5. Font Requests And Style Context
+### A6. Font Requests And Style Context
 
 Replace the scene-wide fixed default `TextPipeline` assumption with a window font-resolution context backed by `FontFamilyRegistry` and `FontPipelineCache`. Extend text style/request with logical family, weight, and slant. Add imperative controls such as `set_font_family()`, `set_font_weight()`, and `set_font()`; explicit low-level pipelines remain a supported override.
 
 Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, locale/direction, and opacity inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not.
 
-### A6. NanStyle And ThemeManager
+### A7. NanStyle And ThemeManager
 
 Keep the shadcn-like primitives + tokens + semantic variant model. `NanStyle` maps component type/variant/state to token references and can be subclassed for application-specific rule algorithms. `ThemeManager` owns named light/dark/high-contrast token sets and a revision; switching themes marks style roots dirty.
 
@@ -413,13 +501,13 @@ Token references re-resolve on theme changes. Literal instance values remain fix
 
 Structured `styles.toml` is a data authoring form for tokens, named themes, font-family declarations, and ordinary component mappings. It must compile to the same `NanStyle`/ThemeManager objects used by C++ configuration, not create a separate style engine.
 
-### A7. Accessibility Semantics
+### A8. Accessibility Semantics
 
 Add a semantics capability/tree with role, label, value, state, actions, focus, and bounds. Semantic widgets provide defaults; composition decides whether to expose, merge, or hide primitive children. Dirty semantics update in the formal tick. Platform AT-SPI/UI Automation/NSAccessibility adapters come after the internal contract is stable.
 
-### A8. Thin Authoring DSL
+### A9. Thin Authoring DSL
 
-Only after A1-A7 are usable, add builders/DSL for composition and binding. DSL expressions return or expose concrete widgets and call the same setters/properties/events as imperative code. No DSL-only node, lifecycle, renderer, style, or state path is allowed.
+Only after A1-A8 are usable, add builders/DSL for composition and binding. DSL expressions return or expose concrete widgets and call the same setters/properties/events as imperative code. No DSL-only node, lifecycle, renderer, style, or state path is allowed. Layer and physics authoring helpers must also return the same concrete `CanvasLayer`, `PhysicsWorld2D`, body, and shape objects used imperatively.
 
 Maintain paired tests/pages:
 
@@ -428,7 +516,7 @@ Maintain paired tests/pages:
 - equivalent concrete widget access and mutation;
 - equivalent binding lifetime, keyed reuse, layout, input, style, semantics, and teardown.
 
-### A9. Todo Refactor And Component Extraction
+### A10. Todo Refactor And Component Extraction
 
 Split Todo into semantic components (`TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, `TodoEmptyState`) and first rewrite it using the new imperative Property/ForEach/Style APIs. Then add a second DSL authoring form over the same components. The example becomes the acceptance test that normal application code describes state projection and intent rather than framework refresh mechanics.
 
@@ -436,7 +524,9 @@ Split Todo into semantic components (`TodoHeader`, `TodoComposer`, `TodoList`, `
 
 - Router activate/deactivate/replace lifecycle, history, deep links, and transitions.
 - Tween/animation primitives and reusable impact/ripple effects.
-- Virtualized lists, richer Grid/Anchor layout, retained composition layers.
+- Camera2D, offscreen/custom viewports, physics interpolation polish, broader Box2D joints, and advanced spatial queries.
+- Sprite/shape convenience nodes, particles, audio, navigation, scene serialization, and ECS remain optional future game-facing work rather than requirements for the application framework.
+- Virtualized lists, richer Grid/Anchor layout, and retained render caches.
 - Native IME, clipboard/undo, UAX #14, emoji and rich text.
 - System font discovery as an explicit application feature.
 
@@ -457,7 +547,9 @@ Review questions for every abstraction:
 - What concrete node/widget exists at runtime?
 - Who owns it and its subscriptions/tasks?
 - Which event-loop phase may mutate it?
+- Which coordinate space/canvas owns it, and how are screen points transformed for input?
 - Which dirty flags does each property change?
+- If physics participates, is scene state or the physics body authoritative for each transform, and when is synchronization allowed?
 - How does explicit imperative mutation interact with bindings and style cascade?
 - What is inherited, token-backed, literal, or initial?
 - What semantics node and actions does it expose?

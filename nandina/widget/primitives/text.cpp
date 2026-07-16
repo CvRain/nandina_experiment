@@ -13,19 +13,30 @@ namespace nandina::widget::primitives
 {
 
     Text::Text(std::string text, const ITextLayoutBackend& backend):
-        text_(std::move(text)),
+        text_(std::move(text), [this](const std::string& value) { apply_text(value); }),
         backend_(&backend) {
         update_metrics();
     }
 
     void Text::set_text(std::string text) {
-        text_ = std::move(text);
+        (void)text_.set(std::move(text));
+    }
+
+    void Text::apply_text(const std::string&) {
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
 
     auto Text::text() const -> std::string_view {
+        return text_.get();
+    }
+
+    auto Text::text_property() -> reactive::Property<std::string>& {
         return text_;
+    }
+
+    auto Text::text_property() const -> reactive::ReadProperty<std::string> {
+        return text_.as_readonly();
     }
 
     void Text::set_style(TextStyle style) {
@@ -187,7 +198,7 @@ namespace nandina::widget::primitives
     void Text::update_metrics(scene::LayoutConstraints constraints) {
         layout_ = backend_->layout(
             TextLayoutInput {
-                .text = text_,
+                .text = text_.get(),
                 .style = style_,
                 .constraints = constraints,
             }

@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_HPP
 
 #include "text_layout_backend.hpp"
+#include "../../reactive/property.hpp"
 
 #include <string>
 #include <string_view>
@@ -22,6 +23,8 @@ namespace nandina::widget::primitives
 
         void set_text(std::string text);
         [[nodiscard]] auto text() const -> std::string_view;
+        [[nodiscard]] auto text_property() -> reactive::Property<std::string>&;
+        [[nodiscard]] auto text_property() const -> reactive::ReadProperty<std::string>;
 
         void set_style(TextStyle style);
         [[nodiscard]] auto style() const -> const TextStyle&;
@@ -60,10 +63,11 @@ namespace nandina::widget::primitives
             -> foundation::NanSize override;
 
     private:
+        void apply_text(const std::string& text);
         void
         update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
 
-        std::string text_;
+        reactive::Property<std::string> text_;
         TextStyle style_ {};
         TextLayoutResult layout_ {};
         const ITextLayoutBackend* backend_ = nullptr;

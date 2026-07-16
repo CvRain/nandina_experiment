@@ -25,7 +25,9 @@
 #include "batch.hpp"
 #include "computed.hpp"
 #include "effect.hpp"
+#include "event.hpp"
 #include "graph.hpp"
+#include "property.hpp"
 #include "scope.hpp"
 #include "signal.hpp"
 

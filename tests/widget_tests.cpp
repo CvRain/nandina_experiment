@@ -414,6 +414,53 @@ TEST_CASE("Label text follows computed state changed by buttons", "[widget][labe
     REQUIRE(dev.texts.front().text == "Count: 0");
 }
 
+TEST_CASE("Text setter and property share mutation and dirty behavior", "[widget][text][property]") {
+    auto text = std::make_shared<widget::primitives::Text>("initial");
+    text->clear_layout_dirty();
+    int changes = 0;
+    auto subscription = text->text_property().changed().subscribe(
+        [&changes](const std::string&) { ++changes; }
+    );
+
+    text->set_text("setter");
+    REQUIRE(text->text() == "setter");
+    REQUIRE(text->layout_dirty());
+    REQUIRE(changes == 1);
+
+    text->clear_layout_dirty();
+    REQUIRE(text->text_property().set("property"));
+    REQUIRE(text->text() == "property");
+    REQUIRE(text->layout_dirty());
+    REQUIRE(changes == 2);
+
+    REQUIRE_FALSE(text->text_property().set("property"));
+    REQUIRE(changes == 2);
+}
+
+TEST_CASE("Label binding follows tree lifetime and may be replaced", "[widget][label][property]") {
+    reactive::Graph graph;
+    reactive::Signal<std::string> first {graph, "first"};
+    reactive::Signal<std::string> second {graph, "second"};
+    auto label = widget::Label::create(graph);
+    label->bind_text(first);
+
+    scene::NanSceneTree tree;
+    tree.set_root(label);
+    REQUIRE(label->text() == "first");
+
+    first.set("mounted");
+    REQUIRE(label->text() == "mounted");
+
+    label->bind_text(second);
+    REQUIRE(label->text() == "second");
+    first.set("ignored");
+    REQUIRE(label->text() == "second");
+
+    tree.set_root(nullptr);
+    second.set("while detached");
+    REQUIRE(label->text() == "second");
+}
+
 TEST_CASE("Row Column and Padding arrange control children", "[widget][layout]") {
     auto a = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
     auto b = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 16.0F));

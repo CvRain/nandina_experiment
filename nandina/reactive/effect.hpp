@@ -53,9 +53,8 @@ namespace nandina::reactive
         void execute() {
             graph_->clear_reactor_deps(*this);
             state = ReactorState::clean;
-            auto* prev = graph_->begin_read(this);
+            auto read = graph_->enter_read(this);
             fn_();
-            graph_->end_read(prev);
         }
 
         // ── Reactor 接口 ──────────────────────────────────────────────────────────

@@ -36,6 +36,8 @@ module_reactive = files(
     'reactive/signal.hpp',
     'reactive/computed.hpp',
     'reactive/effect.hpp',
+    'reactive/event.hpp',
+    'reactive/property.hpp',
     'reactive/batch.hpp',
     'reactive/scope.hpp',
     'reactive/reactive.hpp',

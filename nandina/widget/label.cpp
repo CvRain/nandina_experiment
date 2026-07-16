@@ -21,28 +21,21 @@ namespace nandina::widget
         return std::make_shared<Label>(graph, std::move(text), theme);
     }
 
-    void Label::bind_text(reactive::Signal<std::string>& source) {
-        signal_text_ = &source;
-        computed_text_ = nullptr;
-    }
-
-    void Label::bind_text(reactive::Computed<std::string>& source) {
-        computed_text_ = &source;
-        signal_text_ = nullptr;
+    void Label::activate_binding() {
+        scope_.clear();
+        if (binding_) {
+            binding_(scope_, *this);
+        }
     }
 
     void Label::on_ready() {
         primitives::Text::on_ready();
-        if (signal_text_ != nullptr) {
-            scope_.add([this] { set_text(signal_text_->get()); });
-        }
-        if (computed_text_ != nullptr) {
-            scope_.add([this] { set_text(computed_text_->get()); });
-        }
+        activate_binding();
     }
 
     void Label::on_exit_tree() {
         scope_.clear();
+        binding_ = {};
         primitives::Text::on_exit_tree();
     }
 

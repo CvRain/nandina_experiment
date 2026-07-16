@@ -45,6 +45,75 @@ TEST_CASE("ReadSignal is a read-only view", "[reactive][signal]") {
     REQUIRE(ro.peek() == 8);
 }
 
+TEST_CASE("Property applies changes once and exposes read-only observation", "[reactive][property]") {
+    int applied = 0;
+    int observed = 0;
+    Property<int> property {1, [&applied](const int& value) { applied = value; }};
+    auto readonly = property.as_readonly();
+    auto subscription = readonly.observe([&observed](const int& value) { observed = value; });
+
+    REQUIRE_FALSE(property.set(1));
+    REQUIRE(applied == 0);
+    REQUIRE(observed == 0);
+
+    REQUIRE(property.set(2));
+    REQUIRE(readonly.get() == 2);
+    REQUIRE(applied == 2);
+    REQUIRE(observed == 2);
+
+    subscription.disconnect();
+    REQUIRE(property.set(3));
+    REQUIRE(applied == 3);
+    REQUIRE(observed == 2);
+}
+
+TEST_CASE("Event subscriptions may disconnect while emitting", "[reactive][event]") {
+    Event<int> event;
+    int first = 0;
+    int second = 0;
+    Subscription second_subscription;
+    auto first_subscription = event.subscribe([&](const int value) {
+        first += value;
+        second_subscription.disconnect();
+    });
+    second_subscription = event.subscribe([&](const int value) { second += value; });
+
+    event.emit(2);
+    event.emit(3);
+
+    REQUIRE(first == 5);
+    REQUIRE(second == 0);
+    REQUIRE(event.subscriber_count() == 1);
+}
+
+TEST_CASE("Subscription may outlive its event", "[reactive][event]") {
+    Subscription subscription;
+    {
+        Event<> event;
+        subscription = event.subscribe([] {});
+        REQUIRE(subscription.connected());
+    }
+    REQUIRE_NOTHROW(subscription.disconnect());
+}
+
+TEST_CASE("Property binding accepts signal and computed sources", "[reactive][property][binding]") {
+    Graph graph;
+    EffectScope scope {graph};
+    Signal<int> source {graph, 2};
+    auto* doubled = make_computed(graph, [&source] { return source.get() * 2; });
+    Property<int> property {0};
+
+    property.bind(scope, *doubled);
+    REQUIRE(property.get() == 4);
+
+    source.set(5);
+    REQUIRE(property.get() == 10);
+
+    scope.clear();
+    source.set(7);
+    REQUIRE(property.get() == 10);
+}
+
 TEST_CASE("Effect runs once on creation", "[reactive][effect]") {
     Graph g;
     int runs = 0;
@@ -283,6 +352,25 @@ TEST_CASE("effect failure restores graph scheduling state", "[reactive][effect][
 
     healthy.set(1);
     REQUIRE(healthy_runs == 2);
+}
+
+TEST_CASE("effect failure restores dependency tracking context", "[reactive][effect][scheduler]") {
+    Graph graph;
+    Signal<int> failing {graph, 0};
+    Signal<int> unrelated {graph, 0};
+    int runs = 0;
+
+    make_effect(graph, [&] {
+        ++runs;
+        if (failing.get() == 1) {
+            throw std::runtime_error("expected failure");
+        }
+    });
+
+    REQUIRE_THROWS_AS(failing.set(1), std::runtime_error);
+    (void)unrelated.get();
+    unrelated.set(1);
+    REQUIRE(runs == 2);
 }
 
 TEST_CASE("EffectScope clears all effects together", "[reactive][effect][scope]") {
