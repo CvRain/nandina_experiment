@@ -73,12 +73,12 @@ The framework is evaluated across twelve connected responsibilities. â€œUsableâ€
 | Responsibility | Current contract | Next gaps |
 | --- | --- | --- |
 | 1. Window/display surface | `NanWindow` creates a raylib-backed visible surface and render device. | Multi-window policy, DPI/display changes, offscreen surfaces. |
-| 2. Event loop | Window loop collects input, updates tree/layout, draws, and presents. | Formal tick phases, task draining, batched reactive flush, dirty-only paint. |
+| 2. Event loop | A1a formalizes input/process/tree-commit/layout/post-layout/paint/dispose phases. | UI task draining, tick-level reactive batching, reconcile/style phases, dirty-only paint. |
 | 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Capture contract, native IME, shortcuts, gestures, drag/drop. |
 | 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
 | 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle. | Keyed reconciliation and declarative region ownership. |
-| 6. Layout | Bottom-up measure/top-down layout with Flex/Row/Column/Wrap/Scroll primitives. | Finer invalidation, diagnostics, Grid/Anchor, richer intrinsic contracts. |
-| 7. Paint/composition | Tree draw traversal, clip stack, replaceable render device. | Dirty flags, damage tracking, retained layers/caches, animation phases. |
+| 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, and bounded post-layout relayout. | Explicit layout boundaries, diagnostics, Grid/Anchor, richer intrinsic contracts. |
+| 7. Paint/composition | Tree draw traversal, clip stack, typed paint dirtiness, replaceable render device. | Dirty-only paint, damage tracking, retained layers/caches, animation phases. |
 | 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
 | 9. Style | `NanTheme`, tokens/palette, primitive and Button variants. | `NanStyle`, style context/cascade, ThemeManager, structured style files. |
 | 10. State binding | Signal/Computed/Effect/Scope and limited Label binding. | General properties, automatic bindings, `If`, keyed `ForEach`, no manual refresh. |
@@ -323,6 +323,8 @@ Resource delivery is complete. The next main line raises the application-facing 
 
 ### A1. Runtime Tick And Dirty Contract
 
+Status: A1a runtime contract implemented; task draining, tick-level reactive batching, style/semantics consumers, local layout boundaries, and dirty-only paint remain.
+
 Formalize one UI tick:
 
 ```text
@@ -340,6 +342,30 @@ dispose deferred objects
 ```
 
 Introduce typed dirty flags for style, measure, layout, paint, and semantics. Setters mark the minimum required flags; application code must not call `mark_layout_dirty()` to synchronize normal widget state. Tree mutation during layout/paint is deferred to a safe phase.
+
+Current A1a decisions:
+
+- Scalar/property mutation is synchronous. Input callbacks and later callbacks in the same dispatch can read the new value; reactive work, layout, and paint later in the same tick observe it.
+- One reactive flush wave runs each effect at most once. Self-invalidation is retained for the next flush rather than looping in the current wave, and a flush has a hard cascade limit for diagnostics.
+- `add_child` and destructive removal requested during process/layout/post-layout/paint are queued until traversal completes. `remove_child`, whose contract returns ownership synchronously, rejects use during those phases; callers use `remove_and_delete` or `queue_delete` when ownership is not needed. Single-child widgets use one deferred `replace_child` transaction so replacing content never exposes an intermediate detached state. Deferred deletes flush at tree-commit and frame-end disposal safe points.
+- Post-layout actions are a formal queue. They may dirty layout and receive one additional root layout pass in the same tick; actions queued while draining and further invalidation remain for the next tick instead of creating an unbounded loop. Replacing the scene root discards callbacks owned by the previous frame/root.
+- A setter called during paint updates the stored value immediately. Work whose phase has already passed, including layout or already-painted content, is visible in the next tick; paint never restarts midway.
+- The window root is the current correctness-preserving layout boundary. Dirty measure/layout flags propagate through the full ancestor chain, including non-Control nodes, to prevent lost invalidation. Local layout roots are deferred until containers can declare stable constraint boundaries; replaying arbitrary subtrees with stale parent constraints is not valid.
+
+The A1a tick implemented by `NanWindow` is:
+
+```text
+input
+process / on_frame
+commit deferred tree mutations
+layout root
+post-layout actions
+optional second layout root pass
+paint / present
+commit paint-time tree mutations for the next tick
+```
+
+The Todo example now uses the formal post-layout queue for scroll-to-end instead of a hand-written extra-frame flag.
 
 ### A2. Property And Binding Core
 

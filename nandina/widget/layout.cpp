@@ -817,11 +817,9 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Padding::set_child: child is null");
         }
-        if (auto current = child_.lock()) {
-            remove_child(*current);
-        }
+        auto current = child_.lock();
         child_ = child;
-        add_child(std::move(child));
+        replace_child(current.get(), std::move(child));
         mark_layout_dirty();
         relayout();
         return *this;
@@ -892,11 +890,9 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Center::set_child: child is null");
         }
-        if (auto current = child_.lock()) {
-            remove_child(*current);
-        }
+        auto current = child_.lock();
         child_ = child;
-        add_child(std::move(child));
+        replace_child(current.get(), std::move(child));
         mark_layout_dirty();
         relayout();
         return *this;
@@ -951,11 +947,9 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Expanded::set_child: child is null");
         }
-        if (auto current = child_.lock()) {
-            remove_child(*current);
-        }
+        auto current = child_.lock();
         child_ = child;
-        add_child(std::move(child));
+        replace_child(current.get(), std::move(child));
         mark_layout_dirty();
         relayout();
         return *this;
@@ -1015,11 +1009,9 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("FlexItem::set_child: child is null");
         }
-        if (auto current = child_.lock()) {
-            remove_child(*current);
-        }
+        auto current = child_.lock();
         child_ = child;
-        add_child(std::move(child));
+        replace_child(current.get(), std::move(child));
         mark_layout_dirty();
         return *this;
     }

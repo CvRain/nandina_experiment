@@ -6,6 +6,7 @@
 
 #include <algorithm>
 #include <cassert>
+#include <stdexcept>
 
 namespace nandina::reactive
 {
@@ -35,6 +36,8 @@ namespace nandina::reactive
         clear_reactor_deps(*reactor);
         // 从 pending 移除, 避免 flush 时执行已释放对象。
         std::erase(pending_, reactor);
+        std::erase(next_pending_, reactor);
+        ran_in_flush_.erase(reactor);
         // 从持有列表移除 (触发析构)。
         std::erase_if(reactors_, [reactor](const std::unique_ptr<Reactor>& r) {
             return r.get() == reactor;
@@ -114,6 +117,11 @@ namespace nandina::reactive
         if (reactor.in_queue || reactor.disposed) {
             return;
         }
+        if (flushing_ && ran_in_flush_.contains(&reactor)) {
+            next_pending_.push_back(&reactor);
+            reactor.in_queue = true;
+            return;
+        }
         pending_.push_back(&reactor);
         reactor.in_queue = true;
     }
@@ -123,20 +131,80 @@ namespace nandina::reactive
             return;
         }
         flushing_ = true;
+        ran_in_flush_.clear();
 
-        // 执行过程中可能有新 reactor 入队, 故用索引遍历。
-        std::size_t idx = 0;
-        while (idx < pending_.size()) {
-            auto* reactor = pending_[idx];
-            ++idx;
-            reactor->in_queue = false;
-            if (reactor->disposed) {
-                continue;
+        try {
+            // 执行过程中可能有新 reactor 入队, 故用索引遍历。
+            std::size_t idx = 0;
+            constexpr std::size_t max_effects_per_flush = 10'000;
+            while (idx < pending_.size()) {
+                if (idx >= max_effects_per_flush) {
+                    pending_.erase(
+                        pending_.begin(), pending_.begin() + static_cast<std::ptrdiff_t>(idx)
+                    );
+                    throw std::runtime_error("reactive effect cascade exceeded flush limit");
+                }
+                auto* reactor = pending_[idx];
+                ++idx;
+                reactor->in_queue = false;
+                if (reactor->disposed) {
+                    continue;
+                }
+                ran_in_flush_.insert(reactor);
+                reactor->run(*this);
             }
-            reactor->run(*this);
+            pending_.clear();
+            pending_ = std::move(next_pending_);
+            next_pending_.clear();
         }
-        pending_.clear();
+        catch (...) {
+            for (auto* reactor: pending_) {
+                reactor->in_queue = false;
+            }
+            for (auto* reactor: next_pending_) {
+                reactor->in_queue = false;
+            }
+            pending_.clear();
+            next_pending_.clear();
+            ran_in_flush_.clear();
+            flushing_ = false;
+            throw;
+        }
+        ran_in_flush_.clear();
         flushing_ = false;
+    }
+
+    void Graph::run_effect_once(Reactor& reactor) {
+        const bool outer_flush = flushing_;
+        if (!outer_flush) {
+            flushing_ = true;
+            ran_in_flush_.clear();
+        }
+        ran_in_flush_.insert(&reactor);
+        try {
+            reactor.run(*this);
+        }
+        catch (...) {
+            if (!outer_flush) {
+                for (auto* pending: next_pending_) {
+                    pending->in_queue = false;
+                }
+                next_pending_.clear();
+                ran_in_flush_.clear();
+                flushing_ = false;
+            }
+            throw;
+        }
+        if (!outer_flush) {
+            pending_ = std::move(next_pending_);
+            next_pending_.clear();
+            ran_in_flush_.clear();
+            flushing_ = false;
+        }
+    }
+
+    auto Graph::has_pending_effects() const -> bool {
+        return !pending_.empty() || !next_pending_.empty();
     }
 
     // ── batch ───────────────────────────────────────────────────────────────────

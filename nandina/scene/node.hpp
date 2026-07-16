@@ -110,6 +110,10 @@ namespace nandina::scene
          */
         auto remove_child(NanNode& child) -> std::shared_ptr<NanNode>;
 
+        /// Replace an existing child without returning its ownership. During tree
+        /// traversal the complete replacement is deferred to the next safe commit.
+        auto replace_child(NanNode* current, std::shared_ptr<NanNode> replacement) -> NanNode&;
+
         /// Remove and immediately destroy a child.
         void remove_and_delete(NanNode& child);
 

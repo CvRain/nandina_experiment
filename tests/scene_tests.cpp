@@ -87,6 +87,23 @@ public:
     }
 };
 
+class ProcessMutationNode final: public ProbeNode {
+public:
+    using ProbeNode::ProbeNode;
+
+    void on_process(float) override {
+        if (mutated) {
+            return;
+        }
+        mutated = true;
+        added = std::make_shared<ProbeNode>(nullptr, "added");
+        add_child(added);
+    }
+
+    bool mutated = false;
+    std::shared_ptr<ProbeNode> added;
+};
+
 auto count(const std::vector<std::string>& trace, const std::string& what) -> int {
     int n = 0;
     for (const auto& s : trace) { if (s == what) { ++n; } }
@@ -324,6 +341,65 @@ TEST_CASE("queue_delete dedups descendants and never dangles", "[scene][delete]"
         REQUIRE_NOTHROW(tree.process(0.016F));  // expired weak_ptr must not crash
         REQUIRE(root->child_count() == 1);  // only 'parent' subtree remains
     }
+}
+
+TEST_CASE("tree mutation during process is committed after traversal", "[scene][scheduler]") {
+    auto root = std::make_shared<ProcessMutationNode>(nullptr, "root");
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::process);
+        tree.process(0.016F);
+        REQUIRE(root->child_count() == 0);
+        REQUIRE_FALSE(root->added->is_inside_tree());
+    }
+
+    tree.flush_tree_mutations();
+    REQUIRE(root->child_count() == 1);
+    REQUIRE(root->added->is_inside_tree());
+}
+
+TEST_CASE("ownership-returning removal is rejected during traversal", "[scene][scheduler]") {
+    auto root = std::make_shared<ProbeNode>(nullptr, "root");
+    auto child = std::make_shared<ProbeNode>(nullptr, "child");
+    root->add_child(child);
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::paint);
+        REQUIRE_THROWS_AS(root->remove_child(*child), std::logic_error);
+        REQUIRE_NOTHROW(root->remove_and_delete(*child));
+        REQUIRE(root->child_count() == 1);
+    }
+
+    tree.flush_tree_mutations();
+    REQUIRE(root->child_count() == 0);
+}
+
+TEST_CASE("replacing the scene root discards old frame queues", "[scene][scheduler]") {
+    auto old_root = std::make_shared<ProbeNode>(nullptr, "old");
+    auto queued_child = std::make_shared<ProbeNode>(nullptr, "queued");
+    auto new_root = std::make_shared<ProbeNode>(nullptr, "new");
+    scene::NanSceneTree tree;
+    tree.set_root(old_root);
+
+    bool post_layout_ran = false;
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::process);
+        old_root->add_child(queued_child);
+        tree.post_layout([&post_layout_ran] { post_layout_ran = true; });
+    }
+
+    tree.set_root(new_root);
+    tree.flush_tree_mutations();
+    (void)tree.flush_post_layout_actions();
+
+    REQUIRE(old_root->child_count() == 0);
+    REQUIRE_FALSE(queued_child->is_inside_tree());
+    REQUIRE_FALSE(post_layout_ran);
+    REQUIRE(tree.root() == new_root.get());
 }
 
 TEST_CASE("removed and re-added node readies again", "[scene][lifecycle]") {

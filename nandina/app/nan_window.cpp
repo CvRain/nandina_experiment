@@ -218,27 +218,28 @@ namespace nandina::app
     void NanWindow::tick() {
         const float dt = GetFrameTime();
 
-        poll_and_dispatch_input();
-        tree_.process(dt);
-        on_frame(dt);
-
-        if (auto* root = tree_.root() != nullptr ? tree_.root()->as_control() : nullptr) {
-            const auto window_size = foundation::NanSize(
-                static_cast<float>(GetScreenWidth()),
-                static_cast<float>(GetScreenHeight())
-            );
-            if (root->layout_dirty() || root->size() != window_size) {
-                (void)root->measure_layout(scene::LayoutConstraints::tight(window_size));
-                root->layout_to(
-                    foundation::NanRect::from_xywh(
-                        0.0F,
-                        0.0F,
-                        window_size.get_width(),
-                        window_size.get_height()
-                    )
-                );
-            }
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::input);
+            poll_and_dispatch_input();
         }
+
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::process);
+            tree_.process(dt);
+            on_frame(dt);
+        }
+
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::tree_commit);
+            tree_.flush_tree_mutations();
+            tree_.flush_deferred_deletes();
+        }
+
+        const auto window_size = foundation::NanSize(
+            static_cast<float>(GetScreenWidth()),
+            static_cast<float>(GetScreenHeight())
+        );
+        (void)tree_.layout_root(window_size);
 
         device_->begin_frame();
         device_->clear(config_.background);
@@ -247,6 +248,12 @@ namespace nandina::app
             tree_.render(ctx);
         }
         device_->end_frame();
+
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::dispose);
+            tree_.flush_tree_mutations();
+            tree_.flush_deferred_deletes();
+        }
     }
 
     void NanWindow::close() {

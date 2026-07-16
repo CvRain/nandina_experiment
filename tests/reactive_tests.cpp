@@ -7,6 +7,8 @@
 
 #include "reactive/reactive.hpp"
 
+#include <stdexcept>
+
 using namespace nandina::reactive;
 
 TEST_CASE("Signal basic get/set", "[reactive][signal]") {
@@ -232,6 +234,55 @@ TEST_CASE("nested batch flushes only at outermost exit", "[reactive][batch]") {
     });
 
     REQUIRE(runs == 2);
+}
+
+TEST_CASE("self-invalidating effect is deferred to the next flush", "[reactive][effect][scheduler]") {
+    Graph g;
+    Signal<int> value {g, 0};
+    int runs = 0;
+    make_effect(g, [&] {
+        const int current = value.get();
+        ++runs;
+        if (current < 2) {
+            value.set(current + 1);
+        }
+    });
+
+    REQUIRE(runs == 1);
+    REQUIRE(value.peek() == 1);
+    REQUIRE(g.has_pending_effects());
+
+    g.flush();
+    REQUIRE(runs == 2);
+    REQUIRE(value.peek() == 2);
+    REQUIRE(g.has_pending_effects());
+
+    g.flush();
+    REQUIRE(runs == 3);
+    REQUIRE_FALSE(g.has_pending_effects());
+}
+
+TEST_CASE("effect failure restores graph scheduling state", "[reactive][effect][scheduler]") {
+    Graph g;
+    Signal<int> failing {g, 0};
+    Signal<int> healthy {g, 0};
+    int healthy_runs = 0;
+
+    make_effect(g, [&] {
+        if (failing.get() == 1) {
+            throw std::runtime_error("expected failure");
+        }
+    });
+    make_effect(g, [&] {
+        (void)healthy.get();
+        ++healthy_runs;
+    });
+
+    REQUIRE_THROWS_AS(failing.set(1), std::runtime_error);
+    REQUIRE_FALSE(g.has_pending_effects());
+
+    healthy.set(1);
+    REQUIRE(healthy_runs == 2);
 }
 
 TEST_CASE("EffectScope clears all effects together", "[reactive][effect][scope]") {

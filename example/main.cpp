@@ -108,22 +108,11 @@ public:
             rebuild_pending_ = false;
             rebuild_list();
         }
-        else {
-            apply_deferred_scroll();
-        }
     }
 
     void on_ready() override {
         scene::NanControl::on_ready();
         get_tree()->set_focus(input_.get());
-    }
-
-    void apply_deferred_scroll() {
-        if (!scroll_after_layout_pending_) {
-            return;
-        }
-        scroll_after_layout_pending_ = false;
-        list_view_->set_scroll_offset(list_view_->maximum_scroll_offset());
     }
 
 private:
@@ -219,7 +208,11 @@ private:
         mark_layout_dirty();
         if (scroll_to_end_pending_) {
             scroll_to_end_pending_ = false;
-            scroll_after_layout_pending_ = true;
+            get_tree()->post_layout([weak = std::weak_ptr<widget::ScrollView>(list_view_)] {
+                if (auto list = weak.lock()) {
+                    list->set_scroll_offset(list->maximum_scroll_offset());
+                }
+            });
         }
     }
 
@@ -236,7 +229,6 @@ private:
     std::size_t rendered_item_count_ = 0;
     bool rebuild_pending_ = false;
     bool scroll_to_end_pending_ = false;
-    bool scroll_after_layout_pending_ = false;
 };
 
 class TodoPage final: public app::NanPageT<app::NoParams> {

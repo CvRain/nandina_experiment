@@ -13,8 +13,8 @@
 // EffectScope 把一组 effect 的生命周期捆绑, 析构时整体 dispose —— 对应组件卸载时
 // 自动清理订阅的场景。
 //
-// 重入保护: effect 在自身执行期间写自己依赖的 signal 不会无限递归 —— flush 进行时
-// 不会重入, 重新入队的执行留待当前 flush 循环处理。
+// 重入保护: 一次 flush 中每个 effect 最多执行一次。effect 在执行期间再次使自己
+// 失效时会进入下一次 flush，避免同一调度波次内自反馈锁死 UI 线程。
 //
 
 #ifndef NANDINA_EXPERIMENT_REACTIVE_EFFECT_HPP
@@ -82,7 +82,7 @@ namespace nandina::reactive
         auto owned = std::make_unique<Effect>(graph, std::function<void()>(std::forward<Fn>(fn)));
         auto* raw = owned.get();
         graph.adopt(std::move(owned));
-        raw->execute(); // 立即执行一次, 建立初始依赖。
+        graph.run_effect_once(*raw); // 立即执行一次, 建立初始依赖。
         return raw;
     }
 

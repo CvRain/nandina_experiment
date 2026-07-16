@@ -25,6 +25,7 @@
 
 #include <cstdint>
 #include <memory>
+#include <unordered_set>
 #include <vector>
 
 namespace nandina::reactive
@@ -124,6 +125,9 @@ namespace nandina::reactive
 
         /// 执行所有待处理 reactor。batch 退出、或 source 变化 (非 batch 中) 时自动调用。
         void flush();
+        void run_effect_once(Reactor& reactor);
+
+        [[nodiscard]] auto has_pending_effects() const -> bool;
 
         // ── batch ───────────────────────────────────────────────────────────────
         void begin_batch();
@@ -137,6 +141,8 @@ namespace nandina::reactive
         std::uint64_t next_id_ = 1;
         Reactor* current_reader_ = nullptr;
         std::vector<Reactor*> pending_;
+        std::vector<Reactor*> next_pending_;
+        std::unordered_set<Reactor*> ran_in_flush_;
         std::uint32_t batch_depth_ = 0;
         bool flushing_ = false;
         bool tearing_down_ = false;

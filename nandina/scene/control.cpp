@@ -4,6 +4,7 @@
 
 #include "control.hpp"
 #include "../render/draw_context.hpp"
+#include "scene_tree.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -92,21 +93,46 @@ namespace nandina::scene
     }
 
     auto NanControl::layout_dirty() const -> bool {
-        return layout_dirty_;
+        return has_any(dirty_flags_, layout_dirty_flags);
+    }
+
+    auto NanControl::dirty_flags() const -> DirtyFlags {
+        return dirty_flags_;
+    }
+
+    auto NanControl::is_dirty(const DirtyFlags flags) const -> bool {
+        return has_any(dirty_flags_, flags);
+    }
+
+    auto NanControl::mark_dirty(const DirtyFlags flags) -> void {
+        const auto newly_dirty = static_cast<DirtyFlags>(
+            static_cast<std::uint8_t>(flags)
+            & ~static_cast<std::uint8_t>(dirty_flags_)
+        );
+        dirty_flags_ |= flags;
+        if (!has_any(newly_dirty, layout_dirty_flags)) {
+            return;
+        }
+        for (auto* ancestor = parent(); ancestor != nullptr; ancestor = ancestor->parent()) {
+            if (auto* control = ancestor->as_control(); control != nullptr) {
+                control->dirty_flags_ |= layout_dirty_flags;
+            }
+        }
+    }
+
+    auto NanControl::clear_dirty(const DirtyFlags flags) -> void {
+        dirty_flags_ = static_cast<DirtyFlags>(
+            static_cast<std::uint8_t>(dirty_flags_)
+            & ~static_cast<std::uint8_t>(flags)
+        );
     }
 
     auto NanControl::mark_layout_dirty() -> void {
-        if (layout_dirty_) {
-            return;
-        }
-        layout_dirty_ = true;
-        if (auto* control_parent = parent() != nullptr ? parent()->as_control() : nullptr) {
-            control_parent->mark_layout_dirty();
-        }
+        mark_dirty(layout_dirty_flags | DirtyFlags::paint);
     }
 
     auto NanControl::clear_layout_dirty() -> void {
-        layout_dirty_ = false;
+        clear_dirty(layout_dirty_flags);
     }
 
     auto NanControl::layout_flex_factor() const -> int {
@@ -126,18 +152,24 @@ namespace nandina::scene
     }
 
     auto NanControl::layout_to(foundation::NanRect rect) -> void {
+        clear_dirty(layout_dirty_flags);
         set_position(rect.get_top_left());
         set_size(rect.get_size());
         on_layout();
-        clear_layout_dirty();
+        clear_dirty(DirtyFlags::paint);
     }
 
     void NanControl::set_background(foundation::NanColor color) {
         background_ = color;
+        mark_dirty(DirtyFlags::paint);
     }
 
     void NanControl::clear_background() {
+        if (!background_.has_value()) {
+            return;
+        }
         background_.reset();
+        mark_dirty(DirtyFlags::paint);
     }
 
     auto NanControl::background() const -> const std::optional<foundation::NanColor>& {
@@ -145,7 +177,11 @@ namespace nandina::scene
     }
 
     void NanControl::set_overflow(const ControlOverflow overflow) {
+        if (overflow_ == overflow) {
+            return;
+        }
         overflow_ = overflow;
+        mark_dirty(DirtyFlags::paint | DirtyFlags::semantics);
     }
 
     auto NanControl::overflow() const -> ControlOverflow {

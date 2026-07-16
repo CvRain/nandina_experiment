@@ -75,6 +75,17 @@ namespace nandina::scene
             );
         }
 
+        if (tree_ != nullptr && tree_->defers_tree_mutation()) {
+            auto* raw = child.get();
+            auto parent = shared_from_this();
+            tree_->defer_tree_mutation(
+                [parent = std::move(parent), child = std::move(child)]() mutable {
+                    parent->add_child(std::move(child));
+                }
+            );
+            return *raw;
+        }
+
         child->parent_ = weak_from_this();
         auto* raw = child.get();
         children_.push_back(std::move(child));
@@ -85,10 +96,20 @@ namespace nandina::scene
             raw->_propagate_ready();
         }
 
+        if (auto* control = as_control(); control != nullptr) {
+            control->mark_layout_dirty();
+        }
+
         return *raw;
     }
 
     auto NanNode::remove_child(NanNode& child) -> std::shared_ptr<NanNode> {
+        if (tree_ != nullptr && tree_->defers_tree_mutation()) {
+            throw std::logic_error(
+                "NanNode::remove_child cannot return ownership during tree traversal; "
+                "use remove_and_delete or queue_delete"
+            );
+        }
         for (auto it = children_.begin(); it != children_.end(); ++it) {
             if (it->get() == &child) {
                 // Exit tree before removing.
@@ -98,13 +119,55 @@ namespace nandina::scene
                 child.parent_.reset();
                 auto result = std::move(*it);
                 children_.erase(it);
+                if (auto* control = as_control(); control != nullptr) {
+                    control->mark_layout_dirty();
+                }
                 return result;
             }
         }
         return nullptr;
     }
 
+    auto NanNode::replace_child(NanNode* current, std::shared_ptr<NanNode> replacement) -> NanNode& {
+        if (!replacement) {
+            throw std::runtime_error("NanNode::replace_child: replacement is null");
+        }
+        if (current == replacement.get()) {
+            return *replacement;
+        }
+        if (tree_ != nullptr && tree_->defers_tree_mutation()) {
+            auto* raw = replacement.get();
+            auto parent = shared_from_this();
+            auto current_weak = current != nullptr ? current->weak_from_this() : std::weak_ptr<NanNode> {};
+            tree_->defer_tree_mutation(
+                [parent = std::move(parent), current_weak, replacement = std::move(replacement)](
+                ) mutable {
+                    auto current_shared = current_weak.lock();
+                    auto* attached = current_shared != nullptr && current_shared->parent() == parent.get()
+                        ? current_shared.get()
+                        : nullptr;
+                    parent->replace_child(attached, std::move(replacement));
+                }
+            );
+            return *raw;
+        }
+        if (current != nullptr && current->parent() == this) {
+            remove_and_delete(*current);
+        }
+        return add_child(std::move(replacement));
+    }
+
     void NanNode::remove_and_delete(NanNode& child) {
+        if (tree_ != nullptr && tree_->defers_tree_mutation()) {
+            auto parent = shared_from_this();
+            auto target = child.shared_from_this();
+            tree_->defer_tree_mutation([parent = std::move(parent), target = std::move(target)] {
+                if (target->parent() == parent.get()) {
+                    parent->remove_and_delete(*target);
+                }
+            });
+            return;
+        }
         remove_child(child); // unique_ptr goes out of scope, child is destroyed.
     }
 

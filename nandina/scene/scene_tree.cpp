@@ -37,6 +37,15 @@ namespace nandina::scene
 
     NanSceneTree::NanSceneTree() = default;
 
+    NanSceneTree::PhaseScope::PhaseScope(NanSceneTree& tree, const FramePhase phase):
+        tree_(&tree), previous_(tree.phase_) {
+        tree.phase_ = phase;
+    }
+
+    NanSceneTree::PhaseScope::~PhaseScope() {
+        tree_->phase_ = previous_;
+    }
+
     NanSceneTree::~NanSceneTree() {
         pointer_capture_.reset();
         _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
@@ -51,6 +60,56 @@ namespace nandina::scene
         return root_.get();
     }
 
+    auto NanSceneTree::phase() const -> FramePhase {
+        return phase_;
+    }
+
+    auto NanSceneTree::enter_phase(const FramePhase phase) -> PhaseScope {
+        return PhaseScope {*this, phase};
+    }
+
+    void NanSceneTree::begin_phase(const FramePhase phase) {
+        phase_ = phase;
+    }
+
+    void NanSceneTree::end_phase() {
+        phase_ = FramePhase::idle;
+    }
+
+    auto NanSceneTree::defers_tree_mutation() const -> bool {
+        return phase_ == FramePhase::process || phase_ == FramePhase::layout
+            || phase_ == FramePhase::post_layout || phase_ == FramePhase::paint;
+    }
+
+    void NanSceneTree::defer_tree_mutation(std::function<void()> mutation) {
+        tree_mutations_.push_back(std::move(mutation));
+    }
+
+    void NanSceneTree::flush_tree_mutations() {
+        auto pending = std::move(tree_mutations_);
+        tree_mutations_.clear();
+        for (auto& mutation: pending) {
+            mutation();
+        }
+        _sync_hover_after_tree_change();
+    }
+
+    void NanSceneTree::post_layout(std::function<void()> action) {
+        post_layout_actions_.push_back(std::move(action));
+    }
+
+    auto NanSceneTree::flush_post_layout_actions() -> bool {
+        if (post_layout_actions_.empty()) {
+            return false;
+        }
+        auto pending = std::move(post_layout_actions_);
+        post_layout_actions_.clear();
+        for (auto& action: pending) {
+            action();
+        }
+        return true;
+    }
+
     auto NanSceneTree::set_root(std::shared_ptr<NanNode2D> root) -> void {
         pointer_capture_.reset();
         _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
@@ -61,6 +120,8 @@ namespace nandina::scene
         }
 
         delete_queue_.clear();
+        tree_mutations_.clear();
+        post_layout_actions_.clear();
         root_ = std::move(root);
 
         if (root_) {
@@ -93,14 +154,57 @@ namespace nandina::scene
         }
     }
 
+    auto NanSceneTree::_layout_root_once(const foundation::NanSize viewport_size) -> bool {
+        auto* control = root_ != nullptr ? root_->as_control() : nullptr;
+        if (control == nullptr || (!control->layout_dirty() && control->size() == viewport_size)) {
+            return false;
+        }
+        (void)control->measure_layout(LayoutConstraints::tight(viewport_size));
+        control->layout_to(foundation::NanRect::from_origin_size(
+            foundation::NanPoint::zero(), viewport_size
+        ));
+        return true;
+    }
+
+    auto NanSceneTree::layout_root(const foundation::NanSize viewport_size) -> std::size_t {
+        std::size_t passes = 0;
+        {
+            auto phase = enter_phase(FramePhase::layout);
+            if (_layout_root_once(viewport_size)) {
+                ++passes;
+            }
+        }
+        flush_tree_mutations();
+
+        bool ran_actions = false;
+        {
+            auto phase = enter_phase(FramePhase::post_layout);
+            ran_actions = flush_post_layout_actions();
+        }
+        flush_tree_mutations();
+
+        if (ran_actions) {
+            {
+                auto phase = enter_phase(FramePhase::layout);
+                if (_layout_root_once(viewport_size)) {
+                    ++passes;
+                }
+            }
+            flush_tree_mutations();
+        }
+        return passes;
+    }
+
     auto NanSceneTree::draw(render::IRenderDevice& device) -> void {
         device.begin_frame();
         render::DrawContext ctx {device};
         render(ctx);
         device.end_frame();
+        flush_tree_mutations();
     }
 
     auto NanSceneTree::render(render::DrawContext& ctx) -> void {
+        auto phase = enter_phase(FramePhase::paint);
         if (root_) {
             root_->_propagate_draw(ctx);
         }
@@ -279,6 +383,10 @@ namespace nandina::scene
         });
 
         delete_queue_.push_back(node.weak_from_this());
+    }
+
+    void NanSceneTree::flush_deferred_deletes() {
+        _flush_deletes();
     }
 
     auto NanSceneTree::hit_test(const foundation::NanPoint world_point) const -> NanNode2D* {

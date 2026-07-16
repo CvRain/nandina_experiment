@@ -142,6 +142,29 @@ public:
     }
 };
 
+class LayoutInvalidationProbe final: public scene::NanControl {
+public:
+    int layouts = 0;
+    bool invalidate_once = false;
+
+protected:
+    void on_layout() override {
+        ++layouts;
+        if (invalidate_once) {
+            invalidate_once = false;
+            mark_layout_dirty();
+        }
+    }
+};
+
+class PaintMutationProbe final: public scene::NanControl {
+public:
+    void on_draw(render::DrawContext&) override {
+        set_size(foundation::NanSize(80.0F, 40.0F));
+        mark_layout_dirty();
+    }
+};
+
 auto opaque_color(float light) -> foundation::NanColor {
     return foundation::NanColor::from(
         foundation::NanOklch{.light = light, .chroma = 0.1F, .hue = 120.0F, .alpha = 1.0F});
@@ -458,6 +481,61 @@ TEST_CASE("Text size changes mark ancestor layout dirty", "[widget][layout][text
     row->relayout();
     REQUIRE_FALSE(row->layout_dirty());
     REQUIRE(row->width() == Catch::Approx(text->width()));
+}
+
+TEST_CASE("layout dirtiness crosses non-control ancestors", "[widget][layout][scheduler]") {
+    auto root = std::make_shared<scene::NanControl>();
+    auto bridge = std::make_shared<scene::NanNode2D>();
+    auto leaf = std::make_shared<scene::NanControl>();
+    bridge->add_child(leaf);
+    root->add_child(bridge);
+    root->clear_layout_dirty();
+    leaf->clear_layout_dirty();
+
+    leaf->mark_layout_dirty();
+    REQUIRE(leaf->layout_dirty());
+    REQUIRE(root->layout_dirty());
+}
+
+TEST_CASE("layout invalidation raised during layout is preserved", "[widget][layout][scheduler]") {
+    auto root = std::make_shared<LayoutInvalidationProbe>();
+    root->invalidate_once = true;
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 1);
+    REQUIRE(root->layouts == 1);
+    REQUIRE(root->layout_dirty());
+
+    REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 1);
+    REQUIRE(root->layouts == 2);
+    REQUIRE_FALSE(root->layout_dirty());
+}
+
+TEST_CASE("post-layout action may request one additional layout pass", "[widget][layout][scheduler]") {
+    auto root = std::make_shared<LayoutInvalidationProbe>();
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+    tree.post_layout([root] { root->mark_layout_dirty(); });
+
+    REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 2);
+    REQUIRE(root->layouts == 2);
+    REQUIRE_FALSE(root->layout_dirty());
+}
+
+TEST_CASE("paint mutation affects layout on the next frame", "[widget][layout][scheduler]") {
+    RecordingDevice dev;
+    auto root = std::make_shared<PaintMutationProbe>();
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 1);
+    REQUIRE_FALSE(root->layout_dirty());
+    tree.draw(dev);
+    REQUIRE(root->layout_dirty());
+
+    REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 1);
+    REQUIRE_FALSE(root->layout_dirty());
 }
 
 TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text]") {
@@ -1366,6 +1444,32 @@ TEST_CASE("ScrollView clamps offsets and translates content", "[widget][scroll]"
     scroll->set_scroll_offset(foundation::NanPoint(20.0F, 500.0F));
     REQUIRE(scroll->scroll_offset() == foundation::NanPoint(0.0F, 120.0F));
     REQUIRE(content->position() == foundation::NanPoint(0.0F, -120.0F));
+}
+
+TEST_CASE("ScrollView replaces content safely during process", "[widget][scroll][scheduler]") {
+    auto scroll = widget::ScrollView::create(widget::ScrollAxis::vertical);
+    auto initial = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 100.0F));
+    auto first = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 200.0F));
+    auto final = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 300.0F));
+    scroll->set_child(initial);
+    scene::NanSceneTree tree;
+    tree.set_root(scroll);
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::process);
+        REQUIRE_NOTHROW(scroll->set_child(first));
+        REQUIRE_NOTHROW(scroll->set_child(final));
+        REQUIRE(scroll->child() == final.get());
+        REQUIRE(scroll->child_count() == 1);
+    }
+
+    tree.flush_tree_mutations();
+    REQUIRE(scroll->child() == final.get());
+    REQUIRE(scroll->child_count() == 1);
+    REQUIRE(scroll->get_child(0) == final.get());
+    REQUIRE_FALSE(initial->is_inside_tree());
+    REQUIRE_FALSE(first->is_inside_tree());
+    REQUIRE(final->is_inside_tree());
 }
 
 TEST_CASE("ScrollView consumes wheel only when offset changes", "[widget][scroll][input]") {

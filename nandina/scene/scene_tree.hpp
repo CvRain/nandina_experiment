@@ -6,11 +6,13 @@
 #define NANDINA_EXPERIMENT_SCENE_TREE_HPP
 
 #include "../widget/primitives/text_layout_backend.hpp"
+#include "frame_scheduler.hpp"
 #include "input_event.hpp"
 #include "node2d.hpp"
 
 #include <memory>
 #include <optional>
+#include <functional>
 #include <vector>
 
 namespace nandina::render
@@ -33,6 +35,18 @@ namespace nandina::scene
      */
     class NanSceneTree {
     public:
+        class PhaseScope {
+        public:
+            PhaseScope(NanSceneTree& tree, FramePhase phase);
+            ~PhaseScope();
+            PhaseScope(const PhaseScope&) = delete;
+            auto operator=(const PhaseScope&) -> PhaseScope& = delete;
+
+        private:
+            NanSceneTree* tree_;
+            FramePhase previous_;
+        };
+
         NanSceneTree();
         ~NanSceneTree();
 
@@ -49,6 +63,16 @@ namespace nandina::scene
          * The previous root (and all its descendants) is destroyed.
          */
         auto set_root(std::shared_ptr<NanNode2D> root) -> void;
+
+        [[nodiscard]] auto phase() const -> FramePhase;
+        [[nodiscard]] auto enter_phase(FramePhase phase) -> PhaseScope;
+        void begin_phase(FramePhase phase);
+        void end_phase();
+        [[nodiscard]] auto defers_tree_mutation() const -> bool;
+        void defer_tree_mutation(std::function<void()> mutation);
+        void flush_tree_mutations();
+        void post_layout(std::function<void()> action);
+        [[nodiscard]] auto flush_post_layout_actions() -> bool;
         void set_default_text_pipeline(widget::primitives::TextPipeline pipeline);
         void clear_default_text_pipeline();
         [[nodiscard]] auto default_text_pipeline() const -> const widget::primitives::TextPipeline*;
@@ -58,6 +82,10 @@ namespace nandina::scene
         /// Call on_process(dt) on every node (top-down).
         /// Flushes any pending queue_delete() requests before processing.
         auto process(float dt) -> void;
+
+        /// Layout the root control to the supplied viewport. Post-layout callbacks
+        /// may request one additional pass; further invalidation remains for next frame.
+        auto layout_root(foundation::NanSize viewport_size) -> std::size_t;
 
         /// Draw every visible node (top-down, depth-first) via the given device.
         /// Brackets the frame with device.begin_frame()/end_frame() and threads a
@@ -116,6 +144,7 @@ namespace nandina::scene
          * If an ancestor is already queued, this call is a no-op.
          */
         auto queue_delete(NanNode& node) -> void;
+        void flush_deferred_deletes();
 
         // ---- hit testing ----
 
@@ -140,18 +169,22 @@ namespace nandina::scene
         auto _hovered_is_inside(const NanNode& node) const -> bool;
         auto _focused_is_inside(const NanNode& node) const -> bool;
         auto _flush_deletes() -> void;
+        auto _layout_root_once(foundation::NanSize viewport_size) -> bool;
 
         std::shared_ptr<NanNode2D> root_;
         // Deferred-delete requests and interaction targets are weak: if a node is
         // destroyed by another path before we act on it, the weak_ptr simply expires
         // instead of dangling.
         std::vector<std::weak_ptr<NanNode>> delete_queue_;
+        std::vector<std::function<void()>> tree_mutations_;
+        std::vector<std::function<void()>> post_layout_actions_;
         std::weak_ptr<NanNode2D> hovered_node_;
         std::weak_ptr<NanNode2D> focused_node_;
         std::weak_ptr<NanNode2D> pointer_capture_;
         foundation::NanPoint last_mouse_pos_ {};
         bool has_mouse_pos_ = false;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
+        FramePhase phase_ = FramePhase::idle;
     };
 
 } // namespace nandina::scene

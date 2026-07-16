@@ -69,6 +69,7 @@ module_resource = files(
 )
 
 module_scene = files(
+    'scene/frame_scheduler.hpp',
     'scene/input_event.hpp',
     'scene/node.hpp',
     'scene/node.cpp',
