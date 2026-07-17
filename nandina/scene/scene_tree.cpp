@@ -5,6 +5,7 @@
 #include "scene_tree.hpp"
 #include "../render/draw_context.hpp"
 #include "control.hpp"
+#include "canvas_layer.hpp"
 
 #include <algorithm>
 #include <numeric>
@@ -155,6 +156,23 @@ namespace nandina::scene
     }
 
     auto NanSceneTree::_layout_root_once(const foundation::NanSize viewport_size) -> bool {
+        if (auto* stack = root_ != nullptr ? root_->as_layer_stack() : nullptr;
+            stack != nullptr) {
+            bool laid_out = false;
+            for (auto* layer: stack->layers_in_order()) {
+                auto* control = layer->space() == CanvasSpace::screen ? layer->layout_root() : nullptr;
+                if (control == nullptr
+                    || (!control->layout_dirty() && control->size() == viewport_size)) {
+                    continue;
+                }
+                (void)control->measure_layout(LayoutConstraints::tight(viewport_size));
+                control->layout_to(foundation::NanRect::from_origin_size(
+                    foundation::NanPoint::zero(), viewport_size
+                ));
+                laid_out = true;
+            }
+            return laid_out;
+        }
         auto* control = root_ != nullptr ? root_->as_control() : nullptr;
         if (control == nullptr || (!control->layout_dirty() && control->size() == viewport_size)) {
             return false;
@@ -213,6 +231,10 @@ namespace nandina::scene
     auto NanSceneTree::dispatch_mouse_button(const MouseButtonEvent& event) -> void {
         auto copy = event;
         auto* captured = pointer_capture_.lock().get();
+        if (!_input_enabled_for(captured)) {
+            pointer_capture_.reset();
+            captured = nullptr;
+        }
         auto* hit =
             !copy.is_pressed() && captured != nullptr ? captured : hit_test(copy.screen_pos());
         if (!hit) {
@@ -234,6 +256,10 @@ namespace nandina::scene
         _transition_hover(hit, event.screen_pos());
 
         auto* target = pointer_capture_.lock().get();
+        if (!_input_enabled_for(target)) {
+            pointer_capture_.reset();
+            target = nullptr;
+        }
         if (target == nullptr) {
             target = hovered_node_.lock().get();
         }
@@ -251,7 +277,8 @@ namespace nandina::scene
 
     auto NanSceneTree::dispatch_key(const KeyEvent& event) -> void {
         auto* focused = focused_node_.lock().get();
-        if (!focused) {
+        if (!_input_enabled_for(focused)) {
+            _transition_focus(nullptr);
             return;
         }
 
@@ -271,7 +298,8 @@ namespace nandina::scene
 
     auto NanSceneTree::dispatch_text_input(const TextInputEvent& event) -> void {
         auto* focused = focused_node_.lock().get();
-        if (!focused) {
+        if (!_input_enabled_for(focused)) {
+            _transition_focus(nullptr);
             return;
         }
 
@@ -285,6 +313,9 @@ namespace nandina::scene
 
     void NanSceneTree::set_pointer_capture(NanNode2D* node) {
         if (node == nullptr || !node->is_inside_tree() || node->get_tree() != this) {
+            return;
+        }
+        if (!_input_enabled_for(node)) {
             return;
         }
         pointer_capture_ = weak_2d(node);
@@ -304,7 +335,7 @@ namespace nandina::scene
     auto NanSceneTree::set_focus(NanNode2D* node) -> void {
         if (node
             && (!node->is_inside_tree() || node->get_tree() != this || !node->is_visible_in_tree()
-                || !node->is_focusable()))
+                || !node->is_focusable() || !_input_enabled_for(node)))
         {
             return;
         }
@@ -394,6 +425,36 @@ namespace nandina::scene
             return nullptr;
         }
 
+        if (auto* stack = root_->as_layer_stack(); stack != nullptr) {
+            for (auto* layer: stack->layers_in_order(true)) {
+                if (!layer->is_visible_in_tree() || layer->input_mode() == LayerInputMode::disabled) {
+                    continue;
+                }
+                const auto child_count = layer->child_count();
+                if (child_count > 0) {
+                    std::vector<std::size_t> indices(child_count);
+                    std::iota(indices.begin(), indices.end(), static_cast<std::size_t>(0));
+                    std::ranges::stable_sort(indices, [layer](const std::size_t a, const std::size_t b) {
+                        const auto* lhs = layer->get_child(a);
+                        const auto* rhs = layer->get_child(b);
+                        return (lhs != nullptr ? lhs->z_index_hint() : 0)
+                            > (rhs != nullptr ? rhs->z_index_hint() : 0);
+                    });
+                    for (const auto index: indices) {
+                        auto* child = layer->get_child(index);
+                        auto* node = child != nullptr ? child->as_node2d() : nullptr;
+                        if (auto* hit = _hit_test_node(node, world_point); hit != nullptr) {
+                            return hit;
+                        }
+                    }
+                }
+                if (layer->input_mode() == LayerInputMode::block_below) {
+                    return nullptr;
+                }
+            }
+            return nullptr;
+        }
+
         return _hit_test_node(root_.get(), world_point);
     }
 
@@ -457,6 +518,20 @@ namespace nandina::scene
 
     void NanSceneTree::_collect_focusable_nodes(NanNode* node, std::vector<NanNode2D*>& out) {
         if (!node) {
+            return;
+        }
+
+        if (auto* stack = node->as_layer_stack(); stack != nullptr) {
+            for (auto* layer: stack->layers_in_order()) {
+                if (layer->is_visible_in_tree() && layer->input_mode() != LayerInputMode::disabled) {
+                    _collect_focusable_nodes(layer, out);
+                }
+            }
+            return;
+        }
+        if (auto* layer = node->as_canvas_layer();
+            layer != nullptr
+            && (!layer->is_visible_in_tree() || layer->input_mode() == LayerInputMode::disabled)) {
             return;
         }
 
@@ -581,6 +656,19 @@ namespace nandina::scene
         }
 
         return focused == &node || node.is_ancestor_of(*focused);
+    }
+
+    auto NanSceneTree::_input_enabled_for(const NanNode* node) -> bool {
+        if (node == nullptr || !node->is_visible_in_tree()) {
+            return false;
+        }
+        for (auto* current = node; current != nullptr; current = current->parent()) {
+            if (const auto* layer = current->as_canvas_layer();
+                layer != nullptr && layer->input_mode() == LayerInputMode::disabled) {
+                return false;
+            }
+        }
+        return true;
     }
 
     auto NanSceneTree::_flush_deletes() -> void {

@@ -13,6 +13,7 @@
 #include "render/draw_context.hpp"
 #include "render/render_device.hpp"
 #include "scene/control.hpp"
+#include "scene/canvas_layer.hpp"
 #include "scene/scene_tree.hpp"
 #include "widget/bindable_rect.hpp"
 #include "widget/button.hpp"
@@ -568,6 +569,53 @@ TEST_CASE("post-layout action may request one additional layout pass", "[widget]
     REQUIRE(tree.layout_root(foundation::NanSize(120.0F, 80.0F)) == 2);
     REQUIRE(root->layouts == 2);
     REQUIRE_FALSE(root->layout_dirty());
+}
+
+TEST_CASE("only screen canvas roots participate in viewport layout", "[widget][layout][canvas-layer]") {
+    auto stack = scene::LayerStack::create();
+    auto world = scene::CanvasLayer::create(scene::CanvasSpace::world, 0);
+    auto hud = scene::CanvasLayer::create(scene::CanvasSpace::screen, 10);
+    auto world_control = std::make_shared<LayoutInvalidationProbe>();
+    auto hud_control = std::make_shared<LayoutInvalidationProbe>();
+    world->add_child(world_control);
+    hud->set_layout_root(hud_control);
+    stack->add_layer(world);
+    stack->add_layer(hud);
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+
+    REQUIRE(tree.layout_root(foundation::NanSize(320.0F, 180.0F)) == 1);
+    REQUIRE(hud_control->size() == foundation::NanSize(320.0F, 180.0F));
+    REQUIRE(hud_control->layouts == 1);
+    REQUIRE(world_control->layouts == 0);
+    REQUIRE(world_control->layout_dirty());
+    REQUIRE_THROWS_AS(hud->set_space(scene::CanvasSpace::world), std::logic_error);
+}
+
+TEST_CASE("deferred canvas layout root is not laid out before commit", "[widget][layout][canvas-layer]") {
+    auto stack = scene::LayerStack::create();
+    auto layer = scene::CanvasLayer::create(scene::CanvasSpace::screen);
+    auto initial = std::make_shared<LayoutInvalidationProbe>();
+    auto replacement = std::make_shared<LayoutInvalidationProbe>();
+    layer->set_layout_root(initial);
+    stack->add_layer(layer);
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+    (void)tree.layout_root(foundation::NanSize(200.0F, 100.0F));
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::process);
+        layer->set_layout_root(replacement);
+        REQUIRE(layer->layout_root() == initial.get());
+        REQUIRE(replacement->layouts == 0);
+    }
+
+    tree.flush_tree_mutations();
+    REQUIRE(layer->layout_root() == replacement.get());
+    REQUIRE_FALSE(initial->is_inside_tree());
+    REQUIRE(replacement->is_inside_tree());
+    REQUIRE(tree.layout_root(foundation::NanSize(200.0F, 100.0F)) == 1);
+    REQUIRE(replacement->layouts == 1);
 }
 
 TEST_CASE("paint mutation affects layout on the next frame", "[widget][layout][scheduler]") {

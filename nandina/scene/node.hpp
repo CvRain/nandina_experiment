@@ -20,6 +20,8 @@ namespace nandina::scene
     class NanSceneTree;
     class NanControl;
     class NanNode2D;
+    class CanvasLayer;
+    class LayerStack;
 } // namespace nandina::scene
 
 namespace nandina::render
@@ -174,6 +176,25 @@ namespace nandina::scene
         }
         [[nodiscard]] virtual auto as_control() const -> const NanControl* {
             return nullptr;
+        }
+
+        [[nodiscard]] virtual auto as_canvas_layer() -> CanvasLayer* {
+            return nullptr;
+        }
+        [[nodiscard]] virtual auto as_canvas_layer() const -> const CanvasLayer* {
+            return nullptr;
+        }
+        [[nodiscard]] virtual auto as_layer_stack() -> LayerStack* {
+            return nullptr;
+        }
+        [[nodiscard]] virtual auto as_layer_stack() const -> const LayerStack* {
+            return nullptr;
+        }
+
+        /// Parent-specific child admission hook. Base nodes accept any child that
+        /// satisfies the NanNode/NanNode2D edge rule.
+        [[nodiscard]] virtual auto accepts_child(const NanNode& child) const -> bool {
+            return true;
         }
 
         virtual void apply_default_text_pipeline(const widget::primitives::TextPipeline& pipeline);

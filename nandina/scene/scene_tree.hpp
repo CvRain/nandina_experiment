@@ -168,6 +168,7 @@ namespace nandina::scene
         auto _sync_hover_after_tree_change() -> void;
         auto _hovered_is_inside(const NanNode& node) const -> bool;
         auto _focused_is_inside(const NanNode& node) const -> bool;
+        [[nodiscard]] static auto _input_enabled_for(const NanNode* node) -> bool;
         auto _flush_deletes() -> void;
         auto _layout_root_once(foundation::NanSize viewport_size) -> bool;
 

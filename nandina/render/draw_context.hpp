@@ -16,6 +16,7 @@ namespace nandina::scene
 {
     class NanNode;
     class NanNode2D;
+    class CanvasLayer;
 } // namespace nandina::scene
 
 namespace nandina::render
@@ -56,6 +57,7 @@ namespace nandina::render
         // Scene traversal writes world_ / opacity_ as it descends the tree.
         friend class scene::NanNode;
         friend class scene::NanNode2D;
+        friend class scene::CanvasLayer;
 
         IRenderDevice& device_;
         NanTransform2D world_;

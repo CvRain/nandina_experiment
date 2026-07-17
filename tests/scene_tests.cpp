@@ -4,8 +4,10 @@
 //
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include "scene/control.hpp"
+#include "scene/canvas_layer.hpp"
 #include "scene/input_event.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
@@ -400,6 +402,98 @@ TEST_CASE("replacing the scene root discards old frame queues", "[scene][schedul
     REQUIRE_FALSE(queued_child->is_inside_tree());
     REQUIRE_FALSE(post_layout_ran);
     REQUIRE(tree.root() == new_root.get());
+}
+
+TEST_CASE("canvas layer input honors order transform and blocking", "[scene][canvas-layer][input]") {
+    auto stack = scene::LayerStack::create();
+    auto world = scene::CanvasLayer::create(scene::CanvasSpace::world, 0);
+    auto hud = scene::CanvasLayer::create(scene::CanvasSpace::screen, 10);
+    auto world_target = std::make_shared<ProbeNode>(nullptr, "world");
+    auto hud_target = std::make_shared<ProbeNode>(nullptr, "hud");
+    foundation::NanTransform2D camera;
+    camera.set_position(foundation::NanPoint(100.0F, 50.0F));
+    world->set_canvas_transform(camera);
+    world_target->set_position(foundation::NanPoint(10.0F, 10.0F));
+    hud_target->set_position(foundation::NanPoint(110.0F, 60.0F));
+    world->add_child(world_target);
+    hud->add_child(hud_target);
+    stack->add_layer(world);
+    stack->add_layer(hud);
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+
+    REQUIRE(tree.hit_test(foundation::NanPoint(110.0F, 60.0F)) == hud_target.get());
+    hud_target->set_position(foundation::NanPoint(300.0F, 300.0F));
+    REQUIRE(tree.hit_test(foundation::NanPoint(110.0F, 60.0F)) == world_target.get());
+
+    hud->set_input_mode(scene::LayerInputMode::block_below);
+    REQUIRE(tree.hit_test(foundation::NanPoint(110.0F, 60.0F)) == nullptr);
+    hud->set_input_mode(scene::LayerInputMode::disabled);
+    REQUIRE(tree.hit_test(foundation::NanPoint(110.0F, 60.0F)) == world_target.get());
+}
+
+TEST_CASE("nested canvas transforms preserve global positioning", "[scene][canvas-layer][transform]") {
+    auto stack = scene::LayerStack::create();
+    auto layer = scene::CanvasLayer::create(scene::CanvasSpace::world);
+    foundation::NanTransform2D canvas;
+    canvas.set_position(foundation::NanPoint(80.0F, 40.0F));
+    canvas.set_rotation(0.35F);
+    canvas.set_scale_xy(1.5F, 1.5F);
+    layer->set_canvas_transform(canvas);
+    auto parent = std::make_shared<scene::NanNode2D>();
+    parent->set_position(foundation::NanPoint(12.0F, 9.0F));
+    parent->set_rotation(-0.2F);
+    auto child = std::make_shared<ProbeNode>(nullptr, "child");
+    parent->add_child(child);
+    layer->add_child(parent);
+    stack->add_layer(layer);
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+
+    const foundation::NanPoint target(175.0F, 95.0F);
+    child->set_global_position(target);
+    REQUIRE(child->global_position().get_x() == Catch::Approx(target.get_x()).margin(0.001F));
+    REQUIRE(child->global_position().get_y() == Catch::Approx(target.get_y()).margin(0.001F));
+    REQUIRE(child->to_global(foundation::NanPoint::zero()).get_x()
+            == Catch::Approx(target.get_x()).margin(0.001F));
+}
+
+TEST_CASE("disabled canvas invalidates focus capture and traversal", "[scene][canvas-layer][input]") {
+    auto stack = scene::LayerStack::create();
+    auto back = scene::CanvasLayer::create(scene::CanvasSpace::screen, 0);
+    auto front = scene::CanvasLayer::create(scene::CanvasSpace::screen, 10);
+    auto back_target = std::make_shared<ProbeNode>(nullptr, "back", true);
+    auto front_target = std::make_shared<ProbeNode>(nullptr, "front", true);
+    back->add_child(back_target);
+    front->add_child(front_target);
+    stack->add_layer(front);
+    stack->add_layer(back);
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+
+    tree.focus_next();
+    REQUIRE(tree.focused_node() == back_target.get());
+    tree.focus_next();
+    REQUIRE(tree.focused_node() == front_target.get());
+    tree.set_pointer_capture(front_target.get());
+    REQUIRE(tree.pointer_capture() == front_target.get());
+
+    front->set_input_mode(scene::LayerInputMode::disabled);
+    tree.dispatch_key(scene::KeyEvent(65, scene::KeyEvent::Action::press));
+    REQUIRE(tree.focused_node() == nullptr);
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(
+        foundation::NanPoint::zero(), foundation::NanPoint::zero()
+    ));
+    REQUIRE(tree.pointer_capture() == nullptr);
+    tree.focus_next();
+    REQUIRE(tree.focused_node() == back_target.get());
+}
+
+TEST_CASE("LayerStack rejects non-layer children", "[scene][canvas-layer]") {
+    auto stack = scene::LayerStack::create();
+    REQUIRE_THROWS_AS(stack->add_child(std::make_shared<scene::NanNode2D>()), std::runtime_error);
+    REQUIRE(stack->child_count() == 0);
+    REQUIRE(stack->layer_count() == 0);
 }
 
 TEST_CASE("removed and re-added node readies again", "[scene][lifecycle]") {

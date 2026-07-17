@@ -74,6 +74,9 @@ namespace nandina::scene
                 "NanNode::add_child: cannot mix NanNode and NanNode2D on the same edge"
             );
         }
+        if (!accepts_child(*child)) {
+            throw std::runtime_error("NanNode::add_child: parent rejects this child type");
+        }
 
         if (tree_ != nullptr && tree_->defers_tree_mutation()) {
             auto* raw = child.get();

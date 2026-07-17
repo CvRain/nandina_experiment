@@ -1,0 +1,6 @@
+option(
+    'physics2d',
+    type: 'feature',
+    value: 'disabled',
+    description: 'Enable the optional Box2D 3.x physics bridge',
+)

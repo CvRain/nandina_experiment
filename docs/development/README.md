@@ -446,6 +446,8 @@ Current A2 decisions:
 
 ### A3. Canvas Layers And Minimal Physics Bridge
 
+Status: A3a canvas core implemented; Box2D v3.1.1 has a disabled-by-default optional build entry, while the `PhysicsWorld2D`/body/shape bridge and physics tick remain pending.
+
 Add `LayerStack` and `CanvasLayer` as imperative scene objects before expanding rendering or physics features. Preserve one page tree and one lifecycle while allowing independent world/screen coordinate spaces:
 
 - Stable cross-layer ordering, visibility, and `pass`/`block_below`/`disabled` input policy.
@@ -453,6 +455,16 @@ Add `LayerStack` and `CanvasLayer` as imperative scene objects before expanding 
 - Screen-space root-Control layout boundaries; world-space layers never enter page layout automatically.
 - Layer-local child `z_index`; no fixed layer-count contract and no reuse of canvas order for physics filtering.
 - One default screen canvas keeps existing ordinary pages source-compatible.
+
+Current A3a decisions:
+
+- Existing page roots remain the implicit single screen canvas. Multi-canvas pages opt in by returning a `LayerStack` and add children through `add_layer()`.
+- `CanvasLayer` currently derives from `NanNode2D` to preserve the existing `NanSceneTree` root/edge contract and overrides draw traversal as a canvas boundary. Its inherited transform is the same authoritative canvas transform; layer ordering remains explicit through `order`/`set_order`. A future generic `NanNode` root may remove this compatibility inheritance without changing layer behavior.
+- Layer order is stable and independent of child insertion order and layer-local `z_index`. Canvas transforms are included in global bounds, hit testing, and screen/canvas conversion.
+- Canvas and nested node transforms follow the existing decomposed translate/rotate/scale model. A non-uniformly scaled canvas combined with nested rotation would require shear, which `NanTransform2D` cannot represent exactly and is not currently a supported precision contract.
+- Only a screen layer's declared layout root receives viewport constraints. World-layer Controls retain explicit scene geometry.
+- Input searches visible layers front-to-back; `block_below` stops lower-layer picking even when the blocking layer has no hit, while `disabled` skips the layer.
+- The optional Meson feature is `-Dphysics2d=enabled`. Its checksum-verified archive pins Box2D v3.1.1 commit `8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3`; fallback install targets are disabled, and the normal build remains network-free with the feature disabled.
 
 Add Box2D as an optional Meson dependency/subproject from `https://github.com/erincatto/box2d.git` and expose only a narrow `physics2d` bridge:
 

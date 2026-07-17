@@ -14,6 +14,7 @@
 #include "render/draw_context.hpp"
 #include "render/render_device.hpp"
 #include "scene/control.hpp"
+#include "scene/canvas_layer.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
 
@@ -267,4 +268,57 @@ TEST_CASE("inherited opacity multiplies down the tree", "[render][opacity]") {
 
     REQUIRE(dev.rects.size() == 1);
     REQUIRE(dev.rects[0].alpha == Catch::Approx(0.5F));
+}
+
+TEST_CASE("canvas layers draw by layer order and reset their transform", "[render][canvas-layer]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto stack = scene::LayerStack::create();
+    auto foreground = scene::CanvasLayer::create(scene::CanvasSpace::screen, 10);
+    auto background = scene::CanvasLayer::create(scene::CanvasSpace::world, -5);
+    auto foreground_node = std::make_shared<RectNode>(0.9F);
+    auto background_node = std::make_shared<RectNode>(0.2F);
+    foreground_node->set_position(foundation::NanPoint(5.0F, 6.0F));
+    background_node->set_position(foundation::NanPoint(2.0F, 3.0F));
+    foundation::NanTransform2D camera;
+    camera.set_position(foundation::NanPoint(100.0F, 50.0F));
+    background->set_canvas_transform(camera);
+    foreground->add_child(foreground_node);
+    background->add_child(background_node);
+    stack->add_layer(foreground);
+    stack->add_layer(background);
+    tree.set_root(stack);
+
+    tree.draw(dev);
+
+    REQUIRE(dev.rects.size() == 2);
+    REQUIRE(dev.rects[0].alpha == Catch::Approx(0.2F));
+    REQUIRE(dev.rects[0].rect.get_left() == Catch::Approx(102.0F));
+    REQUIRE(dev.rects[0].rect.get_top() == Catch::Approx(53.0F));
+    REQUIRE(dev.rects[1].alpha == Catch::Approx(0.9F));
+    REQUIRE(dev.rects[1].rect.get_left() == Catch::Approx(5.0F));
+    REQUIRE(dev.rects[1].rect.get_top() == Catch::Approx(6.0F));
+}
+
+TEST_CASE("CanvasLayer inherited transform aliases its canvas transform", "[render][canvas-layer]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto stack = scene::LayerStack::create();
+    auto layer = scene::CanvasLayer::create(scene::CanvasSpace::world, 2);
+    auto node = std::make_shared<RectNode>(1.0F);
+    node->set_position(foundation::NanPoint(3.0F, 4.0F));
+    layer->set_position(foundation::NanPoint(20.0F, 10.0F));
+    layer->add_child(node);
+    stack->add_layer(layer);
+    tree.set_root(stack);
+
+    REQUIRE(layer->canvas_transform() == layer->transform());
+    REQUIRE(layer->order() == 2);
+    REQUIRE(layer->z_index_hint() == 2);
+    tree.draw(dev);
+    REQUIRE(dev.rects[0].rect.get_left() == Catch::Approx(23.0F));
+    REQUIRE(dev.rects[0].rect.get_top() == Catch::Approx(14.0F));
+
+    layer->set_order(7);
+    REQUIRE(layer->z_index_hint() == 7);
 }

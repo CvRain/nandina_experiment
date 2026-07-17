@@ -4,6 +4,7 @@
 
 #include "node2d.hpp"
 #include "../render/draw_context.hpp"
+#include "canvas_layer.hpp"
 
 namespace nandina::scene
 {
@@ -73,10 +74,15 @@ namespace nandina::scene
     auto NanNode2D::global_transform() const -> foundation::NanTransform2D {
         if (global_invalid_) {
             cached_global_ = transform_;
-            for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
-                 p = p->parent() ? p->parent()->as_node2d() : nullptr)
-            {
-                cached_global_ = p->transform_ * cached_global_;
+            for (const auto* parent_node = parent(); parent_node != nullptr;
+                 parent_node = parent_node->parent()) {
+                if (const auto* layer = parent_node->as_canvas_layer(); layer != nullptr) {
+                    cached_global_ = layer->canvas_transform() * cached_global_;
+                    break;
+                }
+                if (const auto* p = parent_node->as_node2d(); p != nullptr) {
+                    cached_global_ = p->transform_ * cached_global_;
+                }
             }
             global_invalid_ = false;
         }
@@ -88,9 +94,16 @@ namespace nandina::scene
     }
 
     void NanNode2D::set_global_position(const foundation::NanPoint pos) {
-        if (auto* p = parent() ? parent()->as_node2d() : nullptr) {
-            const auto parent_inv = p->global_transform().inverse();
-            set_position(parent_inv.transform_point(pos));
+        if (const auto* parent_node = parent(); parent_node != nullptr) {
+            if (const auto* layer = parent_node->as_canvas_layer(); layer != nullptr) {
+                set_position(layer->canvas_transform().inverse_transform_point(pos));
+            }
+            else if (const auto* spatial_parent = parent_node->as_node2d(); spatial_parent != nullptr) {
+                set_position(spatial_parent->global_transform().inverse_transform_point(pos));
+            }
+            else {
+                set_position(pos);
+            }
         }
         else {
             set_position(pos);
@@ -99,10 +112,15 @@ namespace nandina::scene
 
     auto NanNode2D::global_rotation() const -> float {
         auto rot = rotation();
-        for (const auto* p = parent() ? parent()->as_node2d() : nullptr; p != nullptr;
-             p = p->parent() ? p->parent()->as_node2d() : nullptr)
-        {
-            rot += p->rotation();
+        for (const auto* parent_node = parent(); parent_node != nullptr;
+             parent_node = parent_node->parent()) {
+            if (const auto* layer = parent_node->as_canvas_layer(); layer != nullptr) {
+                rot += layer->canvas_transform().rotation();
+                break;
+            }
+            if (const auto* p = parent_node->as_node2d(); p != nullptr) {
+                rot += p->rotation();
+            }
         }
         return rot;
     }

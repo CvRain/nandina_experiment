@@ -71,6 +71,8 @@ module_resource = files(
 )
 
 module_scene = files(
+    'scene/canvas_layer.hpp',
+    'scene/canvas_layer.cpp',
     'scene/frame_scheduler.hpp',
     'scene/input_event.hpp',
     'scene/node.hpp',
@@ -157,14 +159,21 @@ module_app = files(
 )
 
 # 创建静态库
+nandina_dependencies = [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep]
+nandina_cpp_args = [
+    '-DNANDINA_BUILTIN_DEFAULT_FONT_SIZE=' + builtin_font_size.to_string(),
+    '-DNANDINA_BUILTIN_DEFAULT_FONT_LICENSE_SIZE=' + builtin_font_license_size.to_string(),
+]
+if box2d_dep.found()
+    nandina_dependencies += box2d_dep
+    nandina_cpp_args += '-DNANDINA_HAS_PHYSICS2D=1'
+endif
+
 nandina_lib = static_library(
     'nandina',
     [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app, builtin_font_data, builtin_font_license_data],
-    cpp_args : [
-        '-DNANDINA_BUILTIN_DEFAULT_FONT_SIZE=' + builtin_font_size.to_string(),
-        '-DNANDINA_BUILTIN_DEFAULT_FONT_LICENSE_SIZE=' + builtin_font_license_size.to_string(),
-    ],
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep],
+    cpp_args : nandina_cpp_args,
+    dependencies : nandina_dependencies,
     install : true,
 )
 
@@ -172,5 +181,5 @@ nandina_lib = static_library(
 nandina_dep = declare_dependency(
     link_with : nandina_lib,
     include_directories : include_directories('.'),
-    dependencies : [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep],
+    dependencies : nandina_dependencies,
 )
