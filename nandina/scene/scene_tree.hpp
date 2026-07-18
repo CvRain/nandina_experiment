@@ -82,6 +82,7 @@ namespace nandina::scene
         /// Call on_process(dt) on every node (top-down).
         /// Flushes any pending queue_delete() requests before processing.
         auto process(float dt) -> void;
+        auto physics_step(float dt) -> void;
 
         /// Layout the root control to the supplied viewport. Post-layout callbacks
         /// may request one additional pass; further invalidation remains for next frame.

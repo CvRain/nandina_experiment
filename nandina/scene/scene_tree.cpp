@@ -155,6 +155,12 @@ namespace nandina::scene
         }
     }
 
+    auto NanSceneTree::physics_step(const float dt) -> void {
+        if (root_) {
+            root_->_propagate_physics(dt);
+        }
+    }
+
     auto NanSceneTree::_layout_root_once(const foundation::NanSize viewport_size) -> bool {
         if (auto* stack = root_ != nullptr ? root_->as_layer_stack() : nullptr;
             stack != nullptr) {

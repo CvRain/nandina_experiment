@@ -12,6 +12,7 @@ namespace nandina::scene
         process,
         reactive,
         tree_commit,
+        physics,
         layout,
         post_layout,
         paint,

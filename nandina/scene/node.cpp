@@ -191,6 +191,7 @@ namespace nandina::scene
     }
 
     void NanNode::on_process(float /*dt*/) {}
+    void NanNode::physics_step(float /*dt*/) {}
     void NanNode::on_draw(render::DrawContext& /*ctx*/) {}
 
     auto NanNode::z_index_hint() const -> int {
@@ -257,6 +258,13 @@ namespace nandina::scene
         on_process(dt);
         for (auto& child: children_) {
             child->_propagate_process(dt);
+        }
+    }
+
+    void NanNode::_propagate_physics(const float dt) {
+        physics_step(dt);
+        for (auto& child: children_) {
+            child->_propagate_physics(dt);
         }
     }
 

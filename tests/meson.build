@@ -29,6 +29,15 @@ scene_tests = executable(
 )
 test('scene', scene_tests)
 
+if box2d_dep.found()
+    physics2d_tests = executable(
+        'physics2d_tests',
+        files('physics2d_tests.cpp'),
+        dependencies : [nandina_dep, catch2_with_main_dep],
+    )
+    test('physics2d', physics2d_tests)
+endif
+
 render_tests = executable(
     'render_tests',
     files('render_tests.cpp'),

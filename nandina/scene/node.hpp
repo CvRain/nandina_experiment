@@ -145,6 +145,9 @@ namespace nandina::scene
         /// Called every frame.  dt is the elapsed time in seconds.
         virtual void on_process(float dt);
 
+        /// Optional fixed-step subsystem hook. Base nodes do nothing.
+        virtual void physics_step(float dt);
+
         /// Called during draw traversal (top-down: parent drawn before children).
         /// The context carries the world transform, inherited opacity, and clip stack.
         virtual void on_draw(render::DrawContext& ctx);
@@ -214,6 +217,7 @@ namespace nandina::scene
 
         /// Internal: process this node then recursively process children.
         void _propagate_process(float dt);
+        void _propagate_physics(float dt);
 
         /// Internal: draw this node then recursively draw children (top-down).
         /// Threads world transform + inherited opacity + clip via the context.

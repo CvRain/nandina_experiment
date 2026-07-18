@@ -235,6 +235,11 @@ namespace nandina::app
             tree_.flush_deferred_deletes();
         }
 
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::physics);
+            tree_.physics_step(dt);
+        }
+
         const auto window_size = foundation::NanSize(
             static_cast<float>(GetScreenWidth()),
             static_cast<float>(GetScreenHeight())

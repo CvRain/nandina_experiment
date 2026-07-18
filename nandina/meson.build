@@ -158,6 +158,14 @@ module_app = files(
     'app/nan_window.cpp',
 )
 
+module_physics2d = []
+if box2d_dep.found()
+    module_physics2d = files(
+        'physics2d/physics_world2d.hpp',
+        'physics2d/physics_world2d.cpp',
+    )
+endif
+
 # 创建静态库
 nandina_dependencies = [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep]
 nandina_cpp_args = [
@@ -171,7 +179,7 @@ endif
 
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app, builtin_font_data, builtin_font_license_data],
+    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app, module_physics2d, builtin_font_data, builtin_font_license_data],
     cpp_args : nandina_cpp_args,
     dependencies : nandina_dependencies,
     install : true,
