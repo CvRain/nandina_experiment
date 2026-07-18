@@ -108,3 +108,73 @@ TEST_CASE("body and world teardown invalidate external handles", "[physics2d][li
     world.reset();
     REQUIRE_FALSE(second->valid());
 }
+
+TEST_CASE("box and circle shapes expose filter and sensor contracts", "[physics2d][shape]") {
+    auto world = physics2d::PhysicsWorld2D::create(
+        physics2d::PhysicsWorldConfig {.gravity = foundation::NanPoint::zero()}
+    );
+    auto body = world->create_body({.type = physics2d::PhysicsBodyType::dynamic_body});
+    auto box = body->create_box(foundation::NanSize(20.0F, 30.0F), {
+        .density = 2.0F,
+        .filter = {.category = 2, .mask = 4, .group = -1},
+    });
+    auto circle = body->create_circle(5.0F, {.sensor = true});
+
+    REQUIRE(body->shape_count() == 2);
+    REQUIRE(box->type() == physics2d::PhysicsShapeType::box);
+    REQUIRE_FALSE(box->sensor());
+    REQUIRE(circle->type() == physics2d::PhysicsShapeType::circle);
+    REQUIRE(circle->sensor());
+    REQUIRE(box->filter().category == 2);
+    REQUIRE(box->filter().mask == 4);
+    REQUIRE(box->filter().group == -1);
+
+    body->destroy_shape(*box);
+    REQUIRE_FALSE(box->valid());
+    REQUIRE(body->shape_count() == 1);
+}
+
+TEST_CASE("sensor events are snapshotted and shape destruction is deferred", "[physics2d][events]") {
+    auto world = physics2d::PhysicsWorld2D::create(physics2d::PhysicsWorldConfig {
+        .gravity = foundation::NanPoint::zero(),
+        .fixed_timestep = 1.0F / 60.0F,
+        .substeps = 2,
+    });
+    auto sensor_body = world->create_body({.type = physics2d::PhysicsBodyType::static_body});
+    auto visitor_body = world->create_body({
+        .type = physics2d::PhysicsBodyType::dynamic_body,
+        .position = foundation::NanPoint(5.0F, 0.0F),
+    });
+    auto sensor = sensor_body->create_circle(10.0F, {.sensor = true});
+    auto visitor = visitor_body->create_circle(5.0F);
+    std::size_t callbacks = 0;
+    world->set_event_handler([&](const physics2d::PhysicsTouchEvent& event) {
+        ++callbacks;
+        if (event.kind == physics2d::PhysicsTouchKind::sensor_begin) {
+            sensor_body->destroy_shape(*sensor);
+        }
+    });
+
+    REQUIRE(world->step(1.0F / 60.0F) == 1);
+    REQUIRE(callbacks >= 1);
+    REQUIRE_FALSE(sensor->valid());
+    REQUIRE_FALSE(world->events().empty());
+    REQUIRE(world->events().front().first != nullptr);
+    REQUIRE(world->events().front().second != nullptr);
+    REQUIRE(visitor->valid());
+}
+
+TEST_CASE("dynamic shape bodies respond to gravity", "[physics2d][simulation]") {
+    auto world = physics2d::PhysicsWorld2D::create(physics2d::PhysicsWorldConfig {
+        .gravity = foundation::NanPoint(0.0F, 1000.0F),
+        .fixed_timestep = 0.1F,
+        .substeps = 4,
+    });
+    auto body = world->create_body({
+        .type = physics2d::PhysicsBodyType::dynamic_body,
+        .position = foundation::NanPoint(0.0F, 0.0F),
+    });
+    (void)body->create_circle(5.0F);
+    REQUIRE(world->step(0.1F) == 1);
+    REQUIRE(body->position().get_y() > 0.0F);
+}

@@ -446,7 +446,7 @@ Current A2 decisions:
 
 ### A3. Canvas Layers And Minimal Physics Bridge
 
-Status: A3a canvas core and A3b1 physics world/body lifecycle implemented; shapes, contact/sensor events, and full body simulation remain pending.
+Status: A3a canvas core, A3b1 world/body lifecycle, and A3b2 box/circle shapes with touch events implemented; joints, polygon shapes, richer hit data, and debug draw remain pending.
 
 Add `LayerStack` and `CanvasLayer` as imperative scene objects before expanding rendering or physics features. Preserve one page tree and one lifecycle while allowing independent world/screen coordinate spaces:
 
@@ -468,7 +468,8 @@ Current A3a decisions:
 
 Add Box2D as an optional Meson dependency/subproject from `https://github.com/erincatto/box2d.git` and expose only a narrow `physics2d` bridge:
 
-- `PhysicsWorld2D` owns `b2WorldId`, fixed-step accumulation, pixels-per-meter conversion, and the formal physics phase. `PhysicsBody2D` wraps opaque Box2D body IDs and can bind an existing `NanNode2D` visual; dynamic bodies drive visuals after a step, while static/kinematic bodies read their transforms from scene state before a step. Shape creation and post-step events remain A3b2 work.
+- `PhysicsWorld2D` owns `b2WorldId`, fixed-step accumulation, pixels-per-meter conversion, the formal physics phase, and a stable per-step touch-event snapshot. `PhysicsBody2D` wraps opaque Box2D body IDs, owns box/circle shapes, applies density/material/filter settings, and can bind an existing `NanNode2D` visual; dynamic bodies drive visuals after a step, while static/kinematic bodies read their transforms from scene state before a step.
+- Sensor/contact events are pulled from Box2D after each fixed step and exposed as framework-owned shape references. A handler may request body/shape destruction while events are being delivered; mutation is committed after event dispatch and before the next fixed step. Box2D transient event pointers and IDs are never exposed as the application contract.
 - `PhysicsBody2D`/shape definitions wrap opaque Box2D 3.x IDs and bind simulation transforms to ordinary `NanNode2D` visuals by composition, not inheritance from Box2D types.
 - First shapes are box/polygon and circle, plus sensor/contact begin/end events and collision category/mask filtering.
 - Body/shape creation and destruction requested during stepping/event dispatch are committed at a physics safe point.
