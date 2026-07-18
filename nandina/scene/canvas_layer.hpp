@@ -64,7 +64,7 @@ namespace nandina::scene
         std::weak_ptr<NanControl> layout_root_;
     };
 
-    class LayerStack final: public NanNode2D {
+    class LayerStack: public NanNode2D {
     public:
         [[nodiscard]] static auto create() -> std::shared_ptr<LayerStack>;
 

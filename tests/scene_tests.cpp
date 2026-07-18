@@ -496,6 +496,15 @@ TEST_CASE("LayerStack rejects non-layer children", "[scene][canvas-layer]") {
     REQUIRE(stack->layer_count() == 0);
 }
 
+TEST_CASE("derived LayerStack preserves layer admission contract", "[scene][canvas-layer]") {
+    class CustomStack final: public scene::LayerStack {};
+    auto stack = std::make_shared<CustomStack>();
+    auto layer = scene::CanvasLayer::create();
+    REQUIRE_NOTHROW(stack->add_layer(layer));
+    REQUIRE_THROWS_AS(stack->add_child(std::make_shared<scene::NanNode2D>()), std::runtime_error);
+    REQUIRE(stack->layer_count() == 1);
+}
+
 TEST_CASE("removed and re-added node readies again", "[scene][lifecycle]") {
     std::vector<std::string> trace;
     auto root = std::make_shared<ProbeNode>(&trace, "root");

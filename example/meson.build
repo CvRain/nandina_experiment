@@ -31,3 +31,12 @@ executable('nandina_example',
     dependencies : [nandina_dep,raylib_dep],
     install : true
 )
+
+if box2d_dep.found()
+    executable(
+        'nandina_physics_example',
+        files('physics_main.cpp'),
+        dependencies : [nandina_dep, raylib_dep],
+        install : false,
+    )
+endif

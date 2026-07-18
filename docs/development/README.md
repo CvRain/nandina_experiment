@@ -470,9 +470,18 @@ Add Box2D as an optional Meson dependency/subproject from `https://github.com/er
 
 - `PhysicsWorld2D` owns `b2WorldId`, fixed-step accumulation, pixels-per-meter conversion, the formal physics phase, and a stable per-step touch-event snapshot. `PhysicsBody2D` wraps opaque Box2D body IDs, owns box/circle shapes, applies density/material/filter settings, and can bind an existing `NanNode2D` visual; dynamic bodies drive visuals after a step, while static/kinematic bodies read their transforms from scene state before a step.
 - Sensor/contact events are pulled from Box2D after each fixed step and exposed as framework-owned shape references. A handler may request body/shape destruction while events are being delivered; mutation is committed after event dispatch and before the next fixed step. Box2D transient event pointers and IDs are never exposed as the application contract.
+- Enabling `physics2d` also builds `nandina_physics_example`, an interactive LayerStack demo with a world canvas, screen-space HUD, static ramps, dynamic circles, and a sensor zone. It reuses ordinary `NanNode2D` visuals and the same scene lifecycle rather than adding a physics renderer.
 - `PhysicsBody2D`/shape definitions wrap opaque Box2D 3.x IDs and bind simulation transforms to ordinary `NanNode2D` visuals by composition, not inheritance from Box2D types.
 - First shapes are box/polygon and circle, plus sensor/contact begin/end events and collision category/mask filtering.
 - Body/shape creation and destruction requested during stepping/event dispatch are committed at a physics safe point.
+
+To build and run the optional visual physics example:
+
+```bash
+meson setup buildPhysics -Dphysics2d=enabled
+meson compile -C buildPhysics nandina_physics_example
+./buildPhysics/example/nandina_physics_example
+```
 - Dynamic bodies drive node transforms; static/kinematic bodies may be driven explicitly from scene state before a step. No two-way transform feedback loop is allowed.
 
 Integrate a `physics` phase after process/tree commit and before layout/paint. Physics uses a fixed timestep independent of render `dt`; movement/contact events update application state before reactive/layout work. A small headless fixture must prove deterministic stepping, deferred body destruction, sensor/contact delivery, unit conversion, and isolation from HUD layout.
