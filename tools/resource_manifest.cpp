@@ -116,7 +116,13 @@ namespace nandina::resource
         -> std::expected<ResourcePolicy, std::string> {
         try {
             const auto document = toml::parse_file(path.string());
-            const auto package_id = document["package_id"].value<std::string>();
+            const auto legacy_package_id = document["package_id"].value<std::string>();
+            const auto simple_package_id = document["package"].value<std::string>();
+            if (legacy_package_id && simple_package_id
+                && *legacy_package_id != *simple_package_id) {
+                return std::unexpected("package and package_id disagree");
+            }
+            const auto package_id = legacy_package_id.or_else([&] { return simple_package_id; });
             if (!package_id || !ResourceKey::parse(*package_id) || package_id->contains('/')) {
                 return std::unexpected("package_id must be a canonical single segment");
             }
@@ -141,13 +147,29 @@ namespace nandina::resource
                 }
             }
             const auto* roots = document["roots"].as_array();
-            if (!roots || roots->empty()) { return std::unexpected("at least one [[roots]] entry is required"); }
-            for (const auto& node: *roots) {
-                const auto* table = node.as_table();
-                if (!table) { return std::unexpected("roots entries must be tables"); }
-                auto root = parse_root(*table, policy.base_directory);
-                if (!root) { return std::unexpected(root.error()); }
-                policy.roots.push_back(std::move(*root));
+            if (roots && !roots->empty()) {
+                for (const auto& node: *roots) {
+                    const auto* table = node.as_table();
+                    if (!table) { return std::unexpected("roots entries must be tables"); }
+                    auto root = parse_root(*table, policy.base_directory);
+                    if (!root) { return std::unexpected(root.error()); }
+                    policy.roots.push_back(std::move(*root));
+                }
+            }
+            else {
+                const auto source = document["source"].value_or(std::string("assets"));
+                if (source.empty() || std::filesystem::path(source).is_absolute()) {
+                    return std::unexpected("source must be a relative non-empty path");
+                }
+                for (const auto& part: std::filesystem::path(source)) {
+                    if (part == "." || part == "..") {
+                        return std::unexpected("source contains traversal");
+                    }
+                }
+                policy.roots.push_back({
+                    .path = (policy.base_directory / source).lexically_normal(),
+                    .key_prefix = {},
+                });
             }
             if (const auto* excludes = document["excludes"].as_array()) {
                 for (const auto& node: *excludes) {

@@ -129,15 +129,16 @@ namespace
             std::cerr << "nanres: cannot create resources.toml\n";
             return 2;
         }
-        output << "package_id = \"com.example.application\"\n"
-                  "excludes = [\"**/*.tmp\"]\n\n"
-                  "[[roots]]\n"
-                  "path = \"res\"\n\n"
-                  "[[rules]]\n"
-                  "glob = \"**/*\"\n"
-                  "storage = \"auto\"\n"
-                  "streaming = false\n";
-        return output ? 0 : 2;
+        output << "package = \"com.example.application\"\n";
+        output.close();
+        if (!output) { return 2; }
+        std::error_code error;
+        std::filesystem::create_directories("assets", error);
+        if (error) {
+            std::cerr << "nanres: cannot create assets directory: " << error.message() << '\n';
+            return 2;
+        }
+        return 0;
     }
 
     [[nodiscard]] auto same_lock(

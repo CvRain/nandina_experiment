@@ -570,7 +570,7 @@ Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina s
 
 #### D2. Convention-Driven Resources
 
-Status: planned after D1.
+Status: initial convention mode implemented; default-resource lookup and per-resource overrides remain.
 
 The normal application layout is:
 
@@ -583,7 +583,9 @@ resources/
     └── data/
 ```
 
-`resources.toml` remains the only manually maintained inventory, but it becomes a small rule file rather than a list of every file. The minimum formal manifest contains a stable `package` identity; a default `assets` root maps paths to resource keys, and excludes/default policies/rare per-resource overrides handle exceptions. `resources.lock.toml` remains generated and committed: it records the solved UUID, normalized source path, hash, type, and storage decisions.
+`resources.toml` remains the only manually maintained inventory, but it becomes a small rule file rather than a list of every file. The minimum formal manifest is now `package = "org.example.app"`; without explicit `[[roots]]`, `source = "assets"` is used, and if `source` is omitted the same `assets` convention applies. Existing `package_id` and explicit roots remain compatible for projects that need aliases, bundled framework assets, or special storage rules. `resources.lock.toml` remains generated and committed: it records the solved UUID, normalized source path, hash, type, and storage decisions.
+
+`nanres init` creates this minimal manifest and an empty `assets/` directory. A new project can therefore put files under `assets/` and run `nanres scan` without writing a root table. Meson consumers use the same convention through the D1 exported resource toolchain.
 
 The intended flow is:
 

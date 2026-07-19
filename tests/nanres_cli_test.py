@@ -41,12 +41,33 @@ def main() -> int:
         initialized = run(nanres, root, "init")
         assert initialized.returncode == 0, initialized.stderr
         assert (root / "resources.toml").is_file()
+        assert (root / "assets").is_dir()
         duplicate = run(nanres, root, "init")
         assert duplicate.returncode == 2
 
+        simple_root = root / "simple"
+        simple_assets = simple_root / "assets"
+        simple_assets.mkdir(parents=True)
+        (simple_assets / "nested.txt").write_text("nested", encoding="ascii")
+        (simple_root / "resources.toml").write_text(
+            'package = "org.nandina.simple"\n', encoding="utf-8"
+        )
+        simple = run(nanres, simple_root, "scan")
+        assert simple.returncode == 0, simple.stderr
+        simple_fields = simple.stdout.split("\t")
+        assert simple_fields[1:4] == ["nested.txt", "text/plain", "6"], simple.stdout
+
+        conflict = root / "conflict"
+        conflict.mkdir()
+        (conflict / "resources.toml").write_text(
+            'package = "org.nandina.simple"\npackage_id = "org.nandina.other"\n',
+            encoding="utf-8",
+        )
+        assert run(nanres, conflict, "scan").returncode == 1
+
         policy = root / "resources.toml"
         policy.write_text(
-            'package_id = "org.nandina.test"\n'
+            'package = "org.nandina.test"\n'
             'excludes = ["**/*.tmp"]\n\n'
             '[[roots]]\n'
             'path = "assets"\n'

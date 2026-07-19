@@ -27,9 +27,7 @@ def main() -> int:
         os.symlink(nandina_source, subprojects / "nandina", target_is_directory=True)
         (assets / "hello.txt").write_text("hello from consumer", encoding="ascii")
         (resources / "resources.toml").write_text(
-            'package_id = "org.nandina.fixture"\n\n'
-            '[[roots]]\n'
-            'path = "assets"\n',
+            'package = "org.nandina.fixture"\n',
             encoding="ascii",
         )
         (source / "meson.build").write_text(

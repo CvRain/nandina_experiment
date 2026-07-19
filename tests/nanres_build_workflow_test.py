@@ -28,9 +28,7 @@ def main() -> int:
         (resources / "first.txt").write_text("first", encoding="ascii")
         policy = root / "resources.toml"
         policy.write_text(
-            'package_id = "org.nandina.workflow"\n\n'
-            '[[roots]]\n'
-            'path = "res"\n',
+            'package = "org.nandina.workflow"\nsource = "res"\n',
             encoding="ascii",
         )
         output = root / "build/resources"
