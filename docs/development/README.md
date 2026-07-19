@@ -464,7 +464,7 @@ Current A3a decisions:
 - Canvas and nested node transforms follow the existing decomposed translate/rotate/scale model. A non-uniformly scaled canvas combined with nested rotation would require shear, which `NanTransform2D` cannot represent exactly and is not currently a supported precision contract.
 - Only a screen layer's declared layout root receives viewport constraints. World-layer Controls retain explicit scene geometry.
 - Input searches visible layers front-to-back; `block_below` stops lower-layer picking even when the blocking layer has no hit, while `disabled` skips the layer.
-- The optional Meson feature is `-Dphysics2d=enabled`. Its checksum-verified archive pins Box2D v3.1.1 commit `8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3`; fallback install targets are disabled, and the normal build remains network-free with the feature disabled.
+- The optional Meson feature is `-Dphysics2d=enabled`. `subprojects/box2d` is a Git submodule pinned by the repository gitlink to Box2D v3.1.1 commit `8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3`. Meson mounts that local CMake project directly, disables its install targets, and never downloads Box2D through a wrap.
 
 Add Box2D as an optional Meson dependency/subproject from `https://github.com/erincatto/box2d.git` and expose only a narrow `physics2d` bridge:
 
@@ -478,10 +478,14 @@ Add Box2D as an optional Meson dependency/subproject from `https://github.com/er
 To build and run the optional visual physics example:
 
 ```bash
+git submodule update --init subprojects/box2d
 meson setup buildPhysics -Dphysics2d=enabled
 meson compile -C buildPhysics nandina_physics_example
 ./buildPhysics/example/nandina_physics_example
 ```
+
+For a fresh checkout, `git clone --recurse-submodules` initializes Box2D together with the other vendored dependencies. Updating Box2D is an explicit repository change: checkout the reviewed upstream commit inside `subprojects/box2d`, then commit the changed gitlink in this repository.
+
 - Dynamic bodies drive node transforms; static/kinematic bodies may be driven explicitly from scene state before a step. No two-way transform feedback loop is allowed.
 
 Integrate a `physics` phase after process/tree commit and before layout/paint. Physics uses a fixed timestep independent of render `dt`; movement/contact events update application state before reactive/layout work. A small headless fixture must prove deterministic stepping, deferred body destruction, sensor/contact delivery, unit conversion, and isolation from HUD layout.

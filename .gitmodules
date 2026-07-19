@@ -25,3 +25,6 @@
 [submodule "subprojects/utf8proc"]
 	path = subprojects/utf8proc
 	url = https://github.com/JuliaStrings/utf8proc.git
+[submodule "subprojects/box2d"]
+	path = subprojects/box2d
+	url = https://github.com/erincatto/box2d.git

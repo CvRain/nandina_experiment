@@ -88,32 +88,22 @@ fribidi_dep = fribidi_subproj.get_variable('libfribidi_dep')
 physics2d_option = get_option('physics2d')
 box2d_dep = disabler()
 if not physics2d_option.disabled()
-    box2d_system_dep = dependency(
+    box2d_options = cmake.subproject_options()
+    box2d_options.add_cmake_defines({
+        'BUILD_SHARED_LIBS': 'OFF',
+        'BOX2D_SAMPLES': 'OFF',
+        'BOX2D_BENCHMARKS': 'OFF',
+        'BOX2D_DOCS': 'OFF',
+        'BOX2D_UNIT_TESTS': 'OFF',
+    })
+    box2d_options.set_install(false)
+    box2d_subproj = cmake.subproject(
         'box2d',
-        version: '>=3.1.1',
-        method: 'pkg-config',
-        required: false,
+        options: box2d_options,
+        required: physics2d_option,
     )
-    if box2d_system_dep.found()
-        box2d_dep = box2d_system_dep
-    else
-        box2d_options = cmake.subproject_options()
-        box2d_options.add_cmake_defines({
-            'BUILD_SHARED_LIBS': 'OFF',
-            'BOX2D_SAMPLES': 'OFF',
-            'BOX2D_BENCHMARKS': 'OFF',
-            'BOX2D_DOCS': 'OFF',
-            'BOX2D_UNIT_TESTS': 'OFF',
-        })
-        box2d_options.set_install(false)
-        box2d_subproj = cmake.subproject(
-            'box2d-8c661469c9507d3ad6fbd2fea3f1aa71669c2fe3',
-            options: box2d_options,
-            required: physics2d_option,
-        )
-        if box2d_subproj.found()
-            box2d_dep = box2d_subproj.dependency('box2d')
-        endif
+    if box2d_subproj.found()
+        box2d_dep = box2d_subproj.dependency('box2d')
     endif
 endif
 sqlite3_dep = dependency(
