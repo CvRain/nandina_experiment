@@ -106,6 +106,13 @@ test(
         nanres,
     ],
 )
+nandina_subproject_fixture_test = find_program('nandina_subproject_fixture_test.py')
+test(
+    'nandina-subproject-fixture',
+    nandina_subproject_fixture_test,
+    args: [meson.project_source_root()],
+    timeout: 300,
+)
 test(
     'nanres-meson-package',
     nanres_package_probe,

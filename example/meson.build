@@ -1,18 +1,21 @@
-# example 可执行文件
+# example executable
 
 example_sources = files(
     'main.cpp',
 )
 
 nanres_policy = files('resources.toml')
+resource_nanres = nandina_resource_toolchain['nanres']
+resource_build_helper = nandina_resource_toolchain['build_helper']
+resource_install_helper = nandina_resource_toolchain['install_helper']
 nanres_package = custom_target(
     'nandina-example-resources',
     input: nanres_policy,
     output: 'resources',
     command: [
-        nanres_build_helper,
+        resource_build_helper,
         'build',
-        nanres,
+        resource_nanres,
         nanres_policy,
         '@OUTPUT@',
     ],
@@ -20,7 +23,7 @@ nanres_package = custom_target(
     build_always_stale: true,
 )
 meson.add_install_script(
-    nanres_install_helper,
+    resource_install_helper,
     nanres_package,
     nanres_policy,
     get_option('datadir'),

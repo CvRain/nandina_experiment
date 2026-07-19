@@ -134,5 +134,15 @@ nanres = executable(
 )
 nanres_build_helper = [python, files('tools/nanres_build_helper.py')]
 nanres_install_helper = [python, files('tools/nanres_install.py')]
-subdir('example')
-subdir('tests')
+nandina_resource_toolchain = {
+    'nanres': nanres,
+    'build_helper': nanres_build_helper,
+    'install_helper': nanres_install_helper,
+    'template': files('meson/nandina_resources.build'),
+}
+if not meson.is_subproject()
+    subdir('example')
+    if get_option('build_tests')
+        subdir('tests')
+    endif
+endif

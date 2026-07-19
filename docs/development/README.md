@@ -558,6 +558,65 @@ Split Todo into semantic components (`TodoHeader`, `TodoComposer`, `TodoList`, `
 
 ## Development Workflow
 
+### Developer Experience Roadmap
+
+The application-facing resource workflow is a separate delivery line from the runtime architecture. The target experience is that an application can include Nandina as a Meson subproject, keep a small human-authored resource rule file, and get resource validation, stable locks, packaging, development lookup, and installation from a normal `meson compile`.
+
+#### D1. Meson Subproject Export
+
+Status: initial non-cross export implemented.
+
+Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina subproject: the `nanres` executable, build helper, install helper, and resource build template. A clean external fixture consumes these values through `subproject('nandina')`, creates a package and lock, and does not copy Nandina's internal `meson.build` files. The current export is validated for native builds. Splitting `nanres` and its dependencies into a build-machine executable for cross compilation remains a D4 requirement and must be completed before claiming cross-build support.
+
+#### D2. Convention-Driven Resources
+
+Status: planned after D1.
+
+The normal application layout is:
+
+```text
+resources/
+├── resources.toml
+└── assets/
+    ├── images/
+    ├── fonts/
+    └── data/
+```
+
+`resources.toml` remains the only manually maintained inventory, but it becomes a small rule file rather than a list of every file. The minimum formal manifest contains a stable `package` identity; a default `assets` root maps paths to resource keys, and excludes/default policies/rare per-resource overrides handle exceptions. `resources.lock.toml` remains generated and committed: it records the solved UUID, normalized source path, hash, type, and storage decisions.
+
+The intended flow is:
+
+```text
+put files under resources/assets/
+→ meson compile
+→ nanres validates/scans/updates lock/packages
+→ the application resolves the build-tree package
+```
+
+No source-tree copying or manual package synchronization is required. A build metadata file may point development runtime lookup at the package in the build tree; release lookup remains executable-relative and install-prefix based.
+
+Do not replace the manifest with Lua. Resource identity and build inputs must remain statically inspectable, deterministic, cacheable, IDE-editable, and safe in cross builds. A future Lua or Python script may be an explicit asset generator whose declared outputs enter the normal scan root; it must not become the resource inventory, identity, or lifecycle engine.
+
+#### D3. Application Template And `nandina` CLI
+
+Status: planned after D2.
+
+`nanres` remains focused on scanning, validation, lock management, and package creation. A separate `nandina` command owns project-level actions such as `new`, `build`, `run`, `doctor`, and high-level resource edits. The first template should provide Hello World, the default `resources/` layout, a minimal manifest, and a Meson subproject declaration. Todo and Physics Canvas templates follow once the exported API is stable.
+
+#### D4. Distribution And CI
+
+Status: planned after D3.
+
+Document recursive submodule checkout, test clean application builds, offline/default builds, native host-tool builds for cross compilation, executable-relative/package-prefix lookup, deterministic lock/package regeneration, and system/user installation trees. Nandina-as-Git-submodule is a supported development mode; a release archive/wrap remains a future distribution option, not a second resource model.
+
+Resource configuration decisions:
+
+- Keep TOML as deterministic declaration data; improve its schema and defaults before adding another language.
+- Human intent belongs in `resources.toml`; solved inventory belongs in `resources.lock.toml`; runtime delivery belongs in SQLite packages.
+- Default conventions are overridable rules, not hard-coded runtime behavior.
+- `nandina` and `nanres` have separate responsibilities: project workflow versus resource solving/delivery.
+
 For each roadmap item:
 
 1. Write or update the low-level contract and invariants before authoring syntax.
