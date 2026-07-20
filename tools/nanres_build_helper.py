@@ -1,9 +1,11 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import pathlib
 import subprocess
 import sys
+import tomllib
 
 
 def run(
@@ -46,6 +48,21 @@ def main() -> int:
     run(nanres, policy, "pack", "--output", relative_output)
     if not (output / "resources.db").is_file():
         raise SystemExit("nanres pack did not produce resources.db")
+    metadata = {
+        "format": 1,
+        "package_id": None,
+        "package_root": str(output),
+        "database": "resources.db",
+    }
+    with policy.open("rb") as stream:
+        manifest = tomllib.load(stream)
+    metadata["package_id"] = manifest.get("package_id") or manifest.get("package")
+    if not isinstance(metadata["package_id"], str) or not metadata["package_id"]:
+        raise SystemExit("nanres metadata requires package_id or package in resources.toml")
+    metadata_path = output / "resource-location.json"
+    temporary = metadata_path.with_suffix(".json.tmp")
+    temporary.write_text(json.dumps(metadata, indent=2) + "\n", encoding="utf-8")
+    os.replace(temporary, metadata_path)
     return 0
 
 

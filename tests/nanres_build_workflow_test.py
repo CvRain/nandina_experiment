@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import pathlib
 import sqlite3
 import subprocess
@@ -34,6 +35,9 @@ def main() -> int:
         output = root / "build/resources"
 
         build(helper, nanres, policy, output)
+        metadata = json.loads((output / "resource-location.json").read_text(encoding="utf-8"))
+        assert metadata["package_id"] == "org.nandina.workflow"
+        assert metadata["database"] == "resources.db"
         lock = tomllib.loads((root / "resources.lock.toml").read_text(encoding="utf-8"))
         assert [item["key"] for item in lock["resources"]] == ["first.txt"]
 

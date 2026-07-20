@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 
+import json
 import os
 import pathlib
 import sqlite3
@@ -53,6 +54,8 @@ def main() -> int:
 
         package = build / "resources" / "resources.db"
         assert package.is_file()
+        metadata = json.loads((build / "resources" / "resource-location.json").read_text())
+        assert metadata["package_id"] == "org.nandina.fixture"
         lock = resources / "resources.lock.toml"
         assert lock.is_file()
         with sqlite3.connect(package) as database:

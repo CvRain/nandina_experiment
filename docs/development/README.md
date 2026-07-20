@@ -570,7 +570,7 @@ Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina s
 
 #### D2. Convention-Driven Resources
 
-Status: initial convention mode implemented; default-resource lookup and per-resource overrides remain.
+Status: initial convention mode and build-tree package metadata implemented; runtime metadata consumption and per-resource overrides remain.
 
 The normal application layout is:
 
@@ -597,6 +597,8 @@ put files under resources/assets/
 ```
 
 No source-tree copying or manual package synchronization is required. A build metadata file may point development runtime lookup at the package in the build tree; release lookup remains executable-relative and install-prefix based.
+
+The resource build helper now writes a generated `resource-location.json` beside `resources.db`. It records the package ID, build-tree package root, and database filename. This file is development metadata only: it is generated, must not be hand-edited or committed, and its absolute build path must never be embedded into a release binary. Runtime metadata consumption is the next D2 increment; existing executable-relative and install-prefix lookup remains authoritative until then.
 
 Do not replace the manifest with Lua. Resource identity and build inputs must remain statically inspectable, deterministic, cacheable, IDE-editable, and safe in cross builds. A future Lua or Python script may be an explicit asset generator whose declared outputs enter the normal scan root; it must not become the resource inventory, identity, or lifecycle engine.
 
