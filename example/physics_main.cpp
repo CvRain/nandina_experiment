@@ -27,8 +27,7 @@ namespace
     constexpr float scene_width = 900.0F;
     constexpr float scene_height = 560.0F;
 
-    [[nodiscard]] auto rgb(float r, float g, float b, float alpha = 1.0F)
-        -> foundation::NanColor {
+    [[nodiscard]] auto rgb(float r, float g, float b, float alpha = 1.0F) -> foundation::NanColor {
         return foundation::NanColor::from(foundation::NanLinearRgb {r, g, b, alpha});
     }
 
@@ -37,7 +36,9 @@ namespace
         enum class Kind { circle, box, sensor, backdrop };
 
         PhysicsVisual(Kind kind, foundation::NanSize size, foundation::NanColor color):
-            kind_(kind), size_(size), color_(color) {}
+            kind_(kind),
+            size_(size),
+            color_(color) {}
 
         [[nodiscard]] auto contains_point(const foundation::NanPoint point) const -> bool override {
             if (kind_ == Kind::circle) {
@@ -45,11 +46,12 @@ namespace
                 return point.length_squared() <= radius * radius;
             }
             return foundation::NanRect::from_xywh(
-                -size_.get_width() * 0.5F,
-                -size_.get_height() * 0.5F,
-                size_.get_width(),
-                size_.get_height()
-            ).contains_point(point);
+                       -size_.get_width() * 0.5F,
+                       -size_.get_height() * 0.5F,
+                       size_.get_width(),
+                       size_.get_height()
+            )
+                .contains_point(point);
         }
 
         [[nodiscard]] auto global_bounds() const -> foundation::NanRect override {
@@ -64,7 +66,9 @@ namespace
             );
         }
 
-        void set_active(const bool active) { active_ = active; }
+        void set_active(const bool active) {
+            active_ = active;
+        }
 
         void on_draw(render::DrawContext& ctx) override {
             scene::NanNode2D::on_draw(ctx);
@@ -91,11 +95,12 @@ namespace
                 return;
             }
             if (kind_ == Kind::sensor) {
-                const auto fill = active_ ? rgb(0.12F, 0.64F, 0.48F, 0.35F)
-                                          : rgb(0.10F, 0.38F, 0.34F, 0.20F);
+                const auto fill =
+                    active_ ? rgb(0.12F, 0.64F, 0.48F, 0.35F) : rgb(0.10F, 0.38F, 0.34F, 0.20F);
                 ctx.device().draw_rounded_rect(bounds, 8.0F, fill);
                 ctx.device().draw_rect_outline(
-                    bounds, active_ ? 3.0F : 1.5F,
+                    bounds,
+                    active_ ? 3.0F : 1.5F,
                     active_ ? rgb(0.35F, 0.95F, 0.67F) : rgb(0.30F, 0.68F, 0.58F)
                 );
                 return;
@@ -116,8 +121,8 @@ namespace
             spawn_(std::move(spawn)) {}
 
         [[nodiscard]] auto contains_point(const foundation::NanPoint point) const -> bool override {
-            return point.get_x() >= 0.0F && point.get_y() >= 0.0F
-                && point.get_x() <= scene_width && point.get_y() <= scene_height;
+            return point.get_x() >= 0.0F && point.get_y() >= 0.0F && point.get_x() <= scene_width
+                && point.get_y() <= scene_height;
         }
 
         [[nodiscard]] auto global_bounds() const -> foundation::NanRect override {
@@ -152,7 +157,8 @@ namespace
     class PhysicsDemoRoot final: public scene::LayerStack {
     public:
         PhysicsDemoRoot(reactive::Graph& graph, theme::NanTheme theme):
-            graph_(&graph), theme_(theme) {
+            graph_(&graph),
+            theme_(theme) {
             world_layer_ = scene::CanvasLayer::create(scene::CanvasSpace::world, 0);
             hud_layer_ = scene::CanvasLayer::create(scene::CanvasSpace::screen, 10);
             hud_layer_->set_input_mode(scene::LayerInputMode::pass);
@@ -168,12 +174,14 @@ namespace
             backdrop_->set_z_index(-20);
             world_layer_->add_child(backdrop_);
 
-            world_ = physics2d::PhysicsWorld2D::create(physics2d::PhysicsWorldConfig {
-                .gravity = foundation::NanPoint(0.0F, 980.0F),
-                .pixels_per_meter = 100.0F,
-                .fixed_timestep = 1.0F / 60.0F,
-                .substeps = 4,
-            });
+            world_ = physics2d::PhysicsWorld2D::create(
+                physics2d::PhysicsWorldConfig {
+                    .gravity = foundation::NanPoint(0.0F, 980.0F),
+                    .pixels_per_meter = 100.0F,
+                    .fixed_timestep = 1.0F / 60.0F,
+                    .substeps = 4,
+                }
+            );
             world_layer_->add_child(world_);
             build_boundaries();
             build_sensor();
@@ -189,7 +197,8 @@ namespace
             build_hud();
             world_->set_event_handler([this](const physics2d::PhysicsTouchEvent& event) {
                 if (event.kind == physics2d::PhysicsTouchKind::sensor_begin
-                    && event.first == sensor_shape_) {
+                    && event.first == sensor_shape_)
+                {
                     ++sensor_hits_;
                     sensor_visual_->set_active(true);
                     sensor_active_frames_ = 18;
@@ -226,23 +235,28 @@ namespace
         void build_boundaries() {
             add_static_box(
                 foundation::NanPoint(scene_width * 0.5F, scene_height - 20.0F),
-                foundation::NanSize(scene_width - 60.0F, 28.0F), 0.0F
+                foundation::NanSize(scene_width - 60.0F, 28.0F),
+                0.0F
             );
             add_static_box(
                 foundation::NanPoint(170.0F, 360.0F),
-                foundation::NanSize(260.0F, 18.0F), -0.16F
+                foundation::NanSize(260.0F, 18.0F),
+                -0.16F
             );
             add_static_box(
                 foundation::NanPoint(690.0F, 310.0F),
-                foundation::NanSize(280.0F, 18.0F), 0.18F
+                foundation::NanSize(280.0F, 18.0F),
+                0.18F
             );
             add_static_box(
                 foundation::NanPoint(20.0F, scene_height * 0.5F),
-                foundation::NanSize(24.0F, scene_height), 0.0F
+                foundation::NanSize(24.0F, scene_height),
+                0.0F
             );
             add_static_box(
                 foundation::NanPoint(scene_width - 20.0F, scene_height * 0.5F),
-                foundation::NanSize(24.0F, scene_height), 0.0F
+                foundation::NanSize(24.0F, scene_height),
+                0.0F
             );
         }
 
@@ -252,7 +266,9 @@ namespace
             const float rotation
         ) {
             auto visual = std::make_shared<PhysicsVisual>(
-                PhysicsVisual::Kind::box, size, rgb(0.18F, 0.24F, 0.30F)
+                PhysicsVisual::Kind::box,
+                size,
+                rgb(0.18F, 0.24F, 0.30F)
             );
             visual->set_position(position);
             visual->set_rotation(rotation);
@@ -270,7 +286,9 @@ namespace
             const auto size = foundation::NanSize(180.0F, 52.0F);
             const auto position = foundation::NanPoint(scene_width * 0.5F, scene_height - 74.0F);
             sensor_visual_ = std::make_shared<PhysicsVisual>(
-                PhysicsVisual::Kind::sensor, size, rgb(0.1F, 0.5F, 0.4F, 0.25F)
+                PhysicsVisual::Kind::sensor,
+                size,
+                rgb(0.1F, 0.5F, 0.4F, 0.25F)
             );
             sensor_visual_->set_position(position);
             sensor_visual_->set_z_index(5);
@@ -279,11 +297,14 @@ namespace
                 .type = physics2d::PhysicsBodyType::static_body,
                 .position = position,
             });
-            sensor_shape_ = body->create_box(size, {
-                .density = 0.0F,
-                .filter = {.category = 2, .mask = 1},
-                .sensor = true,
-            });
+            sensor_shape_ = body->create_box(
+                size,
+                {
+                    .density = 0.0F,
+                    .filter = {.category = 2, .mask = 1},
+                    .sensor = true,
+                }
+            );
             static_bodies_.push_back(std::move(body));
         }
 
@@ -294,8 +315,10 @@ namespace
             );
             const float radius = 14.0F + static_cast<float>(balls_.size() % 4) * 3.0F;
             const auto colors = std::array {
-                rgb(0.18F, 0.62F, 0.92F), rgb(0.92F, 0.34F, 0.42F),
-                rgb(0.96F, 0.68F, 0.20F), rgb(0.46F, 0.78F, 0.50F),
+                rgb(0.18F, 0.62F, 0.92F),
+                rgb(0.92F, 0.34F, 0.42F),
+                rgb(0.96F, 0.68F, 0.20F),
+                rgb(0.46F, 0.78F, 0.50F),
             };
             auto visual = std::make_shared<PhysicsVisual>(
                 PhysicsVisual::Kind::circle,
@@ -311,12 +334,15 @@ namespace
                 .rotation = static_cast<float>(balls_.size()) * 0.27F,
                 .visual = visual,
             });
-            (void)body->create_circle(radius, {
-                .density = 1.0F,
-                .friction = 0.45F,
-                .restitution = 0.58F,
-                .filter = {.category = 1, .mask = ~std::uint64_t {0}},
-            });
+            (void)body->create_circle(
+                radius,
+                {
+                    .density = 1.0F,
+                    .friction = 0.45F,
+                    .restitution = 0.58F,
+                    .filter = {.category = 1, .mask = ~std::uint64_t {0}},
+                }
+            );
             balls_.push_back({std::move(visual), std::move(body)});
             update_status();
         }
@@ -359,8 +385,8 @@ namespace
         void update_status() {
             if (status_ != nullptr) {
                 status_->set_text(
-                    std::to_string(balls_.size()) + " bodies · "
-                    + std::to_string(sensor_hits_) + " sensor hits · 点击场景生成"
+                    std::to_string(balls_.size()) + " bodies · " + std::to_string(sensor_hits_)
+                    + " sensor hits · 点击场景生成"
                 );
             }
         }
@@ -384,7 +410,9 @@ namespace
 
     class PhysicsPage final: public app::NanPageT<app::NoParams> {
     public:
-        [[nodiscard]] auto route_key() const -> std::string_view override { return "physics"; }
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "physics";
+        }
         [[nodiscard]] auto build(app::PageContext& context)
             -> std::shared_ptr<scene::NanNode2D> override {
             return std::make_shared<PhysicsDemoRoot>(context.graph(), context.theme());
@@ -394,8 +422,11 @@ namespace
     class PhysicsWindow final: public app::NanWindow {
     public:
         using NanWindow::NanWindow;
+
     protected:
-        void on_setup() override { use_router().push<PhysicsPage>(); }
+        void on_setup() override {
+            use_router().push<PhysicsPage>();
+        }
     };
 } // namespace
 
