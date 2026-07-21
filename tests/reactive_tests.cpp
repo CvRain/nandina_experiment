@@ -305,6 +305,148 @@ TEST_CASE("nested batch flushes only at outermost exit", "[reactive][batch]") {
     REQUIRE(runs == 2);
 }
 
+TEST_CASE("deferred effect scope keeps values synchronous and coalesces one wave", "[reactive][scheduler]") {
+    Graph graph;
+    Signal<int> first {graph, 0};
+    Signal<int> second {graph, 0};
+    int seen = 0;
+    int runs = 0;
+    make_effect(graph, [&] {
+        seen = first.get() + second.get();
+        ++runs;
+    });
+
+    auto deferred = graph.defer_effects();
+    first.set(10);
+    second.set(20);
+
+    REQUIRE(first.peek() == 10);
+    REQUIRE(second.peek() == 20);
+    REQUIRE(runs == 1);
+    REQUIRE(graph.has_pending_effects());
+
+    deferred.commit();
+    REQUIRE(runs == 2);
+    REQUIRE(seen == 30);
+    REQUIRE_FALSE(graph.has_pending_effects());
+}
+
+TEST_CASE("property bindings update in the deferred reactive wave", "[reactive][scheduler][property]") {
+    Graph graph;
+    EffectScope scope {graph};
+    Signal<int> source {graph, 1};
+    Property<int> property {0};
+    property.bind(scope, source);
+    REQUIRE(property.get() == 1);
+
+    auto deferred = graph.defer_effects();
+    source.set(2);
+    source.set(3);
+    graph.flush();
+
+    REQUIRE(source.peek() == 3);
+    REQUIRE(property.get() == 1);
+    deferred.commit();
+    REQUIRE(property.get() == 3);
+}
+
+TEST_CASE("deferred effect scopes and batches flush only at the outer tick", "[reactive][scheduler][batch]") {
+    Graph graph;
+    Signal<int> value {graph, 0};
+    int runs = 0;
+    make_effect(graph, [&] {
+        (void)value.get();
+        ++runs;
+    });
+
+    auto outer = graph.defer_effects();
+    value.set(1);
+    {
+        auto inner = graph.defer_effects();
+        batch(graph, [&] { value.set(2); });
+        inner.commit();
+    }
+    REQUIRE(runs == 1);
+
+    outer.commit();
+    REQUIRE(runs == 2);
+    REQUIRE(value.peek() == 2);
+}
+
+TEST_CASE("abandoned deferred effect scope restores automatic flushing", "[reactive][scheduler]") {
+    Graph graph;
+    Signal<int> value {graph, 0};
+    int seen = 0;
+    int runs = 0;
+    make_effect(graph, [&] {
+        seen = value.get();
+        ++runs;
+    });
+
+    {
+        auto deferred = graph.defer_effects();
+        value.set(1);
+    }
+    REQUIRE(runs == 1);
+    REQUIRE(graph.has_pending_effects());
+
+    value.set(2);
+    REQUIRE(runs == 2);
+    REQUIRE(seen == 2);
+    REQUIRE_FALSE(graph.has_pending_effects());
+}
+
+TEST_CASE("deferred effect commit restores scheduling after failure", "[reactive][scheduler]") {
+    Graph graph;
+    Signal<int> failing {graph, 0};
+    Signal<int> healthy {graph, 0};
+    int healthy_runs = 0;
+    make_effect(graph, [&] {
+        if (failing.get() == 1) {
+            throw std::runtime_error("expected failure");
+        }
+    });
+    make_effect(graph, [&] {
+        (void)healthy.get();
+        ++healthy_runs;
+    });
+
+    auto deferred = graph.defer_effects();
+    failing.set(1);
+    REQUIRE_THROWS_AS(deferred.commit(), std::runtime_error);
+    REQUIRE_FALSE(graph.has_pending_effects());
+
+    healthy.set(1);
+    REQUIRE(healthy_runs == 2);
+}
+
+TEST_CASE("self-invalidating effects advance once per deferred wave", "[reactive][scheduler]") {
+    Graph graph;
+    Signal<int> value {graph, 0};
+    int runs = 0;
+    make_effect(graph, [&] {
+        const auto current = value.get();
+        ++runs;
+        if (current < 2) {
+            value.set(current + 1);
+        }
+    });
+
+    REQUIRE(runs == 1);
+    REQUIRE(value.peek() == 1);
+
+    auto first_tick = graph.defer_effects();
+    first_tick.commit();
+    REQUIRE(runs == 2);
+    REQUIRE(value.peek() == 2);
+    REQUIRE(graph.has_pending_effects());
+
+    auto second_tick = graph.defer_effects();
+    second_tick.commit();
+    REQUIRE(runs == 3);
+    REQUIRE_FALSE(graph.has_pending_effects());
+}
+
 TEST_CASE("self-invalidating effect is deferred to the next flush", "[reactive][effect][scheduler]") {
     Graph g;
     Signal<int> value {g, 0};

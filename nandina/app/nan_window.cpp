@@ -217,6 +217,7 @@ namespace nandina::app
 
     void NanWindow::tick() {
         const float dt = GetFrameTime();
+        auto deferred_effects = app_.graph().defer_effects();
 
         {
             auto phase = tree_.enter_phase(scene::FramePhase::input);
@@ -238,6 +239,11 @@ namespace nandina::app
         {
             auto phase = tree_.enter_phase(scene::FramePhase::physics);
             tree_.physics_step(dt);
+        }
+
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::reactive);
+            deferred_effects.commit();
         }
 
         const auto window_size = foundation::NanSize(

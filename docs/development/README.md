@@ -128,7 +128,7 @@ The application framework is evaluated across twelve connected responsibilities,
 | Responsibility | Current contract | Next gaps |
 | --- | --- | --- |
 | 1. Window/display surface | `NanWindow` creates a raylib-backed visible surface and render device. | Multi-window policy, DPI/display changes, offscreen surfaces. |
-| 2. Event loop | A1a formalizes input/process/tree-commit/layout/post-layout/paint/dispose phases. | UI task draining, tick-level reactive batching, reconcile/style phases, dirty-only paint. |
+| 2. Event loop | A1a formalizes frame phases; A1b batches effects into one post-physics reactive wave. | UI task draining, reconcile/style phases, dirty-only paint. |
 | 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Canvas-aware coordinate routing/input blocking, native IME, shortcuts, gestures, drag/drop. |
 | 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
 | 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle. | Keyed reconciliation and declarative region ownership. |
@@ -139,7 +139,7 @@ The application framework is evaluated across twelve connected responsibilities,
 | 10. State binding | Signal/Computed/Effect/Scope and limited Label binding. | General properties, automatic bindings, `If`, keyed `ForEach`, no manual refresh. |
 | 11. Async | No complete application-facing model yet. | UI dispatcher, background tasks, cancellation, coroutine adapters, stale-result policy. |
 | 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
-| Supporting 2D simulation | Scene transforms/process are suitable for lightweight gameplay, but no physics world is integrated. | Optional Box2D 3.x bridge, fixed physics phase, collision events, and canvas/world isolation. |
+| Supporting 2D simulation | Optional Box2D 3.x bridge, fixed physics phase, shape/contact events, and canvas/world isolation. | Interpolation polish, richer queries/shapes, joints, and debug draw. |
 
 The current Todo page is intentionally the pressure test for the next abstraction layer. It still manually rebuilds list children, wires effects, marks layout dirty, and coordinates post-layout scrolling. Those operations prove the underlying runtime but are not the desired application-authoring surface.
 
@@ -240,7 +240,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. The active main line is application authoring: formalize runtime scheduling and invalidation, add property binding, establish the minimal canvas/physics boundary needed by the scene model, then continue through keyed reconciliation, async scope, style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, and the minimal A3 canvas/physics boundary are implemented. The active main line is A4 keyed reconciliation, followed by async scope, style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -379,7 +379,7 @@ Resource delivery is complete. The next main line raises the application-facing 
 
 ### A1. Runtime Tick And Dirty Contract
 
-Status: A1a runtime contract implemented; task draining, tick-level reactive batching, style/semantics consumers, local layout boundaries, and dirty-only paint remain.
+Status: A1a runtime contract and A1b tick-level reactive wave implemented; task draining, reconciliation/style/semantics consumers, local layout boundaries, and dirty-only paint remain.
 
 Formalize one UI tick:
 
@@ -399,7 +399,7 @@ dispose deferred objects
 
 Introduce typed dirty flags for style, measure, layout, paint, and semantics. Setters mark the minimum required flags; application code must not call `mark_layout_dirty()` to synchronize normal widget state. Tree mutation during layout/paint is deferred to a safe phase.
 
-Current A1a decisions:
+Current A1 decisions:
 
 - Scalar/property mutation is synchronous. Input callbacks and later callbacks in the same dispatch can read the new value; reactive work, layout, and paint later in the same tick observe it.
 - One reactive flush wave runs each effect at most once. Self-invalidation is retained for the next flush rather than looping in the current wave, and a flush has a hard cascade limit for diagnostics.
@@ -408,12 +408,14 @@ Current A1a decisions:
 - A setter called during paint updates the stored value immediately. Work whose phase has already passed, including layout or already-painted content, is visible in the next tick; paint never restarts midway.
 - The window root is the current correctness-preserving layout boundary. Dirty measure/layout flags propagate through the full ancestor chain, including non-Control nodes, to prevent lost invalidation. Local layout roots are deferred until containers can declare stable constraint boundaries; replaying arbitrary subtrees with stale parent constraints is not valid.
 
-The A1a tick implemented by `NanWindow` is:
+The tick implemented by `NanWindow` is:
 
 ```text
 input
 process / on_frame
 commit deferred tree mutations
+physics
+flush one reactive effect wave
 layout root
 post-layout actions
 optional second layout root pass
@@ -421,11 +423,17 @@ paint / present
 commit paint-time tree mutations for the next tick
 ```
 
+`NanWindow` opens a deferred-effect scope before input and commits it in the reactive phase after
+physics. Signal and Property values remain synchronously readable throughout the tick, while effects
+invalidated by input, process, or physics are deduplicated into that phase. A self-invalidating effect
+remains queued for the next tick. Graphs used outside a window retain their existing synchronous flush
+behavior, and explicit nested `batch()` calls cannot flush ahead of the enclosing tick.
+
 The Todo example now uses the formal post-layout queue for scroll-to-end instead of a hand-written extra-frame flag.
 
 ### A2. Property And Binding Core
 
-Status: core implemented for `Property<T>`, read-only observation, disconnectable events, scoped one-way binding, and `Signal<T>::update(fn)`. `Text`/`Label` are the representative migrated path; broader widget property coverage and tick-level batching remain.
+Status: core implemented for `Property<T>`, read-only observation, disconnectable events, scoped one-way binding, and `Signal<T>::update(fn)`. `Text`/`Label` are the representative migrated path; broader widget property coverage remains.
 
 Add `Property<T>`, read-only observation, and events while preserving ordinary setters. Both paths must converge on the same mutation/dirty logic:
 
@@ -442,7 +450,7 @@ Current A2 decisions:
 - `ReadProperty<T>` exposes value reads and observation without mutation. `Event<Args...>` supports multiple RAII subscriptions and safe disconnect during dispatch.
 - One-way bindings are owned by an `EffectScope`; replacing a binding disposes the previous effect, and leaving the tree disposes both the effect and its source-capturing binding description. A detached widget must be bound again when it is mounted again, so it cannot retain a dangling reference after page state is destroyed.
 - Binding sources are structural: any source exposing `get()` with a compatible value type works, including `Signal<T>` and `Computed<T>`. There is no parallel widget-specific binding engine.
-- Binding callbacks still follow the current Graph flush policy. Moving normal application mutations to one reactive wave per UI tick belongs to the pending A1 task-drain/reactive phase integration, not to `Property<T>` itself.
+- Binding callbacks follow the Graph flush policy: synchronous for standalone graphs and one deferred reactive wave per `NanWindow` tick.
 
 ### A3. Canvas Layers And Minimal Physics Bridge
 

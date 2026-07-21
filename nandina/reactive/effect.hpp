@@ -5,7 +5,7 @@
 //
 // make_effect(g, fn) 注册一个副作用: 构造时立即执行一次 fn(), 执行期间读取的任意
 // signal / computed 都会成为它的依赖; 任一依赖变化后, effect 被重新调度执行
-// (非 batch 中立即执行, batch 内合并到一次 flush)。
+// (通常立即执行, batch 或应用 tick 延迟域内合并到一次 flush)。
 //
 // 句柄: 返回 Effect* (Graph 持有所有权)。dispose() 提前停止追踪并释放;
 // 未显式 dispose 的会在 Graph 析构时统一释放。

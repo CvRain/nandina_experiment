@@ -6,7 +6,7 @@
 // 一个 Graph 拥有所有响应式节点 (signal / computed / effect) 的调度关系:
 //   - current_reader_: 当前正在执行的 Reactor, 用于自动建立依赖边;
 //   - pending_:        待执行的 effect 队列;
-//   - batch_depth_:    batch 嵌套深度, > 0 时失效只入队不立即 flush;
+//   - batch/deferred:  显式 batch 与应用 tick 延迟域只入队, 在边界统一 flush;
 //   - reactors_:       Graph 持有的 Computed/Effect (unique_ptr), 统一释放。
 //
 // 设计要点 (与 v2 一致):
@@ -80,12 +80,33 @@ namespace nandina::reactive
     /// 响应式调度图。所有 signal / computed / effect 必须依附于一个 Graph 实例。
     class Graph {
     public:
+        class DeferredEffects {
+        public:
+            explicit DeferredEffects(Graph& graph);
+            ~DeferredEffects();
+
+            DeferredEffects(const DeferredEffects&) = delete;
+            auto operator=(const DeferredEffects&) -> DeferredEffects& = delete;
+            DeferredEffects(DeferredEffects&& other) noexcept;
+            auto operator=(DeferredEffects&& other) noexcept -> DeferredEffects&;
+
+            /// Resume automatic flushing and run one pending effect wave.
+            /// Signal values remain synchronous while the scope is active.
+            void commit();
+
+        private:
+            Graph* graph_;
+        };
+
         class ReadScope {
         public:
             ReadScope(Graph& graph, Reactor* reactor):
-                graph_(&graph), previous_(graph.begin_read(reactor)) {}
+                graph_(&graph),
+                previous_(graph.begin_read(reactor)) {}
 
-            ~ReadScope() { graph_->end_read(previous_); }
+            ~ReadScope() {
+                graph_->end_read(previous_);
+            }
 
             ReadScope(const ReadScope&) = delete;
             auto operator=(const ReadScope&) -> ReadScope& = delete;
@@ -132,7 +153,7 @@ namespace nandina::reactive
 
         // ── 失效与调度 ──────────────────────────────────────────────────────────
         /// source 值变化后调用: 递增 version, 把全部订阅者标 dirty,
-        /// 非 batch 且非 flush 中时立即 flush。
+        /// 非 batch / deferred scope 且非 flush 中时立即 flush。
         void notify_source(Source& source);
 
         /// 把 reactor 标记 dirty 并执行其失效传播逻辑 (判重, 幂等)。
@@ -141,11 +162,17 @@ namespace nandina::reactive
         /// 把 reactor 加入待执行队列 (去重)。由 effect 的 on_invalidate 调用。
         void enqueue(Reactor& reactor);
 
-        /// 执行所有待处理 reactor。batch 退出、或 source 变化 (非 batch 中) 时自动调用。
+        /// 执行所有待处理 reactor。同步模式下由 source 变化或 batch 退出自动调用。
         void flush();
         void run_effect_once(Reactor& reactor);
 
         [[nodiscard]] auto has_pending_effects() const -> bool;
+
+        /// Defer effect flushing until commit(). This is the application tick
+        /// boundary; standalone Graph users retain synchronous behavior.
+        [[nodiscard]] auto defer_effects() -> DeferredEffects {
+            return DeferredEffects {*this};
+        }
 
         // ── batch ───────────────────────────────────────────────────────────────
         void begin_batch();
@@ -156,12 +183,16 @@ namespace nandina::reactive
         }
 
     private:
+        void begin_deferred_effects();
+        void end_deferred_effects(bool flush_pending);
+
         std::uint64_t next_id_ = 1;
         Reactor* current_reader_ = nullptr;
         std::vector<Reactor*> pending_;
         std::vector<Reactor*> next_pending_;
         std::unordered_set<Reactor*> ran_in_flush_;
         std::uint32_t batch_depth_ = 0;
+        std::uint32_t deferred_effect_depth_ = 0;
         bool flushing_ = false;
         bool tearing_down_ = false;
         /// Graph 持有的 Computed/Effect。Signal 由调用方持有, 不在此列。

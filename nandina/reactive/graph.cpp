@@ -7,9 +7,41 @@
 #include <algorithm>
 #include <cassert>
 #include <stdexcept>
+#include <utility>
 
 namespace nandina::reactive
 {
+
+    Graph::DeferredEffects::DeferredEffects(Graph& graph): graph_(&graph) {
+        graph_->begin_deferred_effects();
+    }
+
+    Graph::DeferredEffects::~DeferredEffects() {
+        if (graph_ != nullptr) {
+            graph_->end_deferred_effects(false);
+        }
+    }
+
+    Graph::DeferredEffects::DeferredEffects(DeferredEffects&& other) noexcept:
+        graph_(std::exchange(other.graph_, nullptr)) {}
+
+    auto Graph::DeferredEffects::operator=(DeferredEffects&& other) noexcept -> DeferredEffects& {
+        if (this != &other) {
+            if (graph_ != nullptr) {
+                graph_->end_deferred_effects(false);
+            }
+            graph_ = std::exchange(other.graph_, nullptr);
+        }
+        return *this;
+    }
+
+    void Graph::DeferredEffects::commit() {
+        if (graph_ == nullptr) {
+            return;
+        }
+        auto* graph = std::exchange(graph_, nullptr);
+        graph->end_deferred_effects(true);
+    }
 
     Graph::~Graph() {
         // 整体析构: 各 reactor 的 teardown 跳过跨节点解绑 (都将被释放, 解绑既无必要
@@ -96,7 +128,7 @@ namespace nandina::reactive
         for (auto* reactor: snapshot) {
             invalidate_reactor(*reactor);
         }
-        if (batch_depth_ == 0 && !flushing_) {
+        if (batch_depth_ == 0 && deferred_effect_depth_ == 0 && !flushing_) {
             flush();
         }
     }
@@ -127,7 +159,7 @@ namespace nandina::reactive
     }
 
     void Graph::flush() {
-        if (flushing_) {
+        if (flushing_ || batch_depth_ > 0 || deferred_effect_depth_ > 0) {
             return;
         }
         flushing_ = true;
@@ -140,7 +172,8 @@ namespace nandina::reactive
             while (idx < pending_.size()) {
                 if (idx >= max_effects_per_flush) {
                     pending_.erase(
-                        pending_.begin(), pending_.begin() + static_cast<std::ptrdiff_t>(idx)
+                        pending_.begin(),
+                        pending_.begin() + static_cast<std::ptrdiff_t>(idx)
                     );
                     throw std::runtime_error("reactive effect cascade exceeded flush limit");
                 }
@@ -207,6 +240,18 @@ namespace nandina::reactive
         return !pending_.empty() || !next_pending_.empty();
     }
 
+    void Graph::begin_deferred_effects() {
+        ++deferred_effect_depth_;
+    }
+
+    void Graph::end_deferred_effects(const bool flush_pending) {
+        assert(deferred_effect_depth_ > 0);
+        --deferred_effect_depth_;
+        if (flush_pending && deferred_effect_depth_ == 0 && batch_depth_ == 0) {
+            flush();
+        }
+    }
+
     // ── batch ───────────────────────────────────────────────────────────────────
 
     void Graph::begin_batch() {
@@ -216,7 +261,7 @@ namespace nandina::reactive
     void Graph::end_batch() {
         assert(batch_depth_ > 0);
         --batch_depth_;
-        if (batch_depth_ == 0) {
+        if (batch_depth_ == 0 && deferred_effect_depth_ == 0) {
             flush();
         }
     }

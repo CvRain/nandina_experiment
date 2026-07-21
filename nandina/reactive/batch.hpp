@@ -5,7 +5,7 @@
 //
 // batch(g, fn) 在一个批处理作用域内执行 fn(): 作用域内对 signal 的多次 set 只标记
 // 失效、不立即触发 effect; 作用域退出 (最外层) 时统一 flush 一次, 把每个受影响的
-// effect 合并为单次执行。支持嵌套: 只有最外层 batch 退出时才 flush。
+// effect 合并为单次执行。支持嵌套; 若外层还有应用 tick 延迟域, 则留到其 reactive phase。
 // 即使 fn 抛异常, endBatch 也保证被调用 (RAII guard), 不会卡在批量模式。
 //
 
