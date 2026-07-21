@@ -106,6 +106,14 @@ namespace nandina::scene
          */
         auto add_child(std::shared_ptr<NanNode> child) -> NanNode&;
 
+        /// Insert a detached child at a stable sibling position. Existing siblings
+        /// keep their lifecycle state; an out-of-range index appends the child.
+        auto insert_child(std::size_t index, std::shared_ptr<NanNode> child) -> NanNode&;
+
+        /// Reorder an attached child without exit/enter/ready notifications.
+        /// Returns false when child is not attached to this parent.
+        auto move_child(NanNode& child, std::size_t index) -> bool;
+
         /**
          * Remove a child node and return ownership to the caller.
          * @return The removed child as shared_ptr, or nullptr if not found.

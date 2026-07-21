@@ -380,6 +380,33 @@ TEST_CASE("ownership-returning removal is rejected during traversal", "[scene][s
     REQUIRE(root->child_count() == 0);
 }
 
+TEST_CASE("moving a child preserves lifecycle and focus", "[scene][scheduler][identity]") {
+    std::vector<std::string> trace;
+    auto root = std::make_shared<ProbeNode>(&trace, "root");
+    auto first = std::make_shared<ProbeNode>(&trace, "first", true);
+    auto second = std::make_shared<ProbeNode>(&trace, "second", true);
+    auto third = std::make_shared<ProbeNode>(&trace, "third", true);
+    root->add_child(first);
+    root->add_child(third);
+    root->insert_child(1, second);
+    REQUIRE(root->get_child(0) == first.get());
+    REQUIRE(root->get_child(1) == second.get());
+    REQUIRE(root->get_child(2) == third.get());
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+    tree.set_focus(second.get());
+    trace.clear();
+
+    REQUIRE(root->move_child(*third, 0));
+    REQUIRE(root->get_child(0) == third.get());
+    REQUIRE(root->get_child(1) == first.get());
+    REQUIRE(root->get_child(2) == second.get());
+    REQUIRE(tree.focused_node() == second.get());
+    REQUIRE(trace.empty());
+
+    REQUIRE_FALSE(root->move_child(*root, 0));
+}
+
 TEST_CASE("replacing the scene root discards old frame queues", "[scene][scheduler]") {
     auto old_root = std::make_shared<ProbeNode>(nullptr, "old");
     auto queued_child = std::make_shared<ProbeNode>(nullptr, "queued");

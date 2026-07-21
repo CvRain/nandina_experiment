@@ -57,33 +57,37 @@ namespace nandina::scene
     }
 
     auto NanNode::add_child(std::shared_ptr<NanNode> child) -> NanNode& {
+        return insert_child(children_.size(), std::move(child));
+    }
+
+    auto NanNode::insert_child(const std::size_t index, std::shared_ptr<NanNode> child) -> NanNode& {
         if (!child) {
-            throw std::runtime_error("NanNode::add_child: child is null");
+            throw std::runtime_error("NanNode::insert_child: child is null");
         }
         if (!child->parent_.expired()) {
-            throw std::runtime_error("NanNode::add_child: child already has a parent");
+            throw std::runtime_error("NanNode::insert_child: child already has a parent");
         }
         if (child->tree_ != nullptr) {
-            throw std::runtime_error("NanNode::add_child: child is already in a tree");
+            throw std::runtime_error("NanNode::insert_child: child is already in a tree");
         }
 
         const auto* parent_2d = as_node2d();
         const auto* child_2d = child->as_node2d();
         if ((parent_2d != nullptr) != (child_2d != nullptr)) {
             throw std::runtime_error(
-                "NanNode::add_child: cannot mix NanNode and NanNode2D on the same edge"
+                "NanNode::insert_child: cannot mix NanNode and NanNode2D on the same edge"
             );
         }
         if (!accepts_child(*child)) {
-            throw std::runtime_error("NanNode::add_child: parent rejects this child type");
+            throw std::runtime_error("NanNode::insert_child: parent rejects this child type");
         }
 
         if (tree_ != nullptr && tree_->defers_tree_mutation()) {
             auto* raw = child.get();
             auto parent = shared_from_this();
             tree_->defer_tree_mutation(
-                [parent = std::move(parent), child = std::move(child)]() mutable {
-                    parent->add_child(std::move(child));
+                [parent = std::move(parent), index, child = std::move(child)]() mutable {
+                    parent->insert_child(index, std::move(child));
                 }
             );
             return *raw;
@@ -91,7 +95,11 @@ namespace nandina::scene
 
         child->parent_ = weak_from_this();
         auto* raw = child.get();
-        children_.push_back(std::move(child));
+        children_.insert(
+            children_.begin()
+                + static_cast<std::ptrdiff_t>(std::min(index, children_.size())),
+            std::move(child)
+        );
 
         // If this node is already in a tree, propagate enter_tree to the new subtree.
         if (tree_) {
@@ -104,6 +112,44 @@ namespace nandina::scene
         }
 
         return *raw;
+    }
+
+    auto NanNode::move_child(NanNode& child, const std::size_t index) -> bool {
+        if (child.parent() != this) {
+            return false;
+        }
+        if (tree_ != nullptr && tree_->defers_tree_mutation()) {
+            auto parent = shared_from_this();
+            auto target = child.weak_from_this();
+            tree_->defer_tree_mutation([parent = std::move(parent), target, index] {
+                if (auto current = target.lock();
+                    current != nullptr && current->parent() == parent.get())
+                {
+                    (void)parent->move_child(*current, index);
+                }
+            });
+            return true;
+        }
+
+        const auto current = std::ranges::find(children_, &child, &std::shared_ptr<NanNode>::get);
+        if (current == children_.end()) {
+            return false;
+        }
+        const auto old_index = static_cast<std::size_t>(std::distance(children_.begin(), current));
+        const auto target_index = std::min(index, children_.size() - 1);
+        if (old_index == target_index) {
+            return true;
+        }
+        auto owned = std::move(*current);
+        children_.erase(current);
+        children_.insert(
+            children_.begin() + static_cast<std::ptrdiff_t>(target_index),
+            std::move(owned)
+        );
+        if (auto* control = as_control(); control != nullptr) {
+            control->mark_layout_dirty();
+        }
+        return true;
     }
 
     auto NanNode::remove_child(NanNode& child) -> std::shared_ptr<NanNode> {

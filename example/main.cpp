@@ -12,6 +12,7 @@
 #include "scene/control.hpp"
 #include "theme/theme.hpp"
 #include "widget/button.hpp"
+#include "widget/declarative.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
 #include "widget/scroll_view.hpp"
@@ -20,6 +21,7 @@
 #include <algorithm>
 #include <cctype>
 #include <cstdint>
+#include <functional>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -35,11 +37,64 @@ struct TodoItem {
     auto operator==(const TodoItem&) const -> bool = default;
 };
 
+class TodoRow final: public widget::Row {
+public:
+    using Action = std::function<void(std::uint64_t)>;
+
+    TodoRow(reactive::Graph& graph, theme::NanTheme theme, Action toggle, Action remove):
+        toggle_(std::move(toggle)),
+        remove_(std::move(remove)) {
+        label_ = widget::Label::create(graph, "", theme);
+        label_->set_overflow(widget::primitives::TextOverflow::clip);
+
+        toggle_button_ = widget::Button::create("完成", theme);
+        toggle_button_->set_treatment(theme::ButtonTreatment::outlined);
+        toggle_button_->set_on_click([this] { toggle_(id_); });
+
+        auto remove_button = widget::Button::create("删除", theme);
+        remove_button->set_tone(theme::ButtonTone::secondary);
+        remove_button->set_treatment(theme::ButtonTreatment::outlined);
+        remove_button->set_on_click([this] { remove_(id_); });
+
+        auto label_item = widget::FlexItem::create(
+            scene::LayoutFlexPolicy {
+                .grow = 1.0F,
+                .shrink = 1.0F,
+                .limits = {.min_width = 80.0F},
+            }
+        );
+        label_item->set_child(label_);
+        set_gap(8.0F)
+            .set_cross_alignment(widget::LayoutAlignment::stretch)
+            .add(label_item)
+            .add(toggle_button_)
+            .add(remove_button);
+    }
+
+    void update(const TodoItem& item, const theme::NanTheme& theme) {
+        id_ = item.id;
+        label_->set_text((item.completed ? "[已完成] " : "[待办] ") + item.title);
+        label_->set_color(
+            item.completed ? theme.palette.on_surface_variant : theme.palette.on_surface
+        );
+        toggle_button_->set_text(item.completed ? "撤销" : "完成");
+    }
+
+private:
+    Action toggle_;
+    Action remove_;
+    std::shared_ptr<widget::Label> label_;
+    std::shared_ptr<widget::Button> toggle_button_;
+    std::uint64_t id_ = 0;
+};
+
 class TodoPageRoot final: public scene::NanControl {
 public:
     TodoPageRoot(
         reactive::Graph& graph,
         reactive::Signal<std::vector<TodoItem>>& todos,
+        reactive::Computed<std::string>& status,
+        reactive::Computed<bool>& empty,
         theme::NanTheme theme
     ):
         graph_(&graph),
@@ -52,6 +107,7 @@ public:
 
         status_ = widget::Label::create(graph, "", theme_);
         status_->set_color(theme_.palette.on_surface_variant);
+        status_->bind_text(status);
 
         input_ = std::make_shared<widget::TextField>("", "添加一个任务", theme_);
         input_->set_on_submit([this](std::string_view value) { submit(value); });
@@ -70,7 +126,36 @@ public:
 
         list_view_ = widget::ScrollView::create(widget::ScrollAxis::vertical);
         list_view_->set_wheel_step(36.0F);
-        list_view_->set_child(widget::Column::create());
+
+        auto empty_region =
+            widget::IfRegion<widget::Label>::create(graph, [this](reactive::ReactiveScope&) {
+                auto label = widget::Label::create(*graph_, "暂无任务", theme_);
+                label->set_color(theme_.palette.on_surface_variant);
+                return label;
+            });
+        empty_region->bind(empty);
+
+        auto rows = widget::ForEach<TodoItem, std::uint64_t, TodoRow>::create(
+            graph,
+            [](const TodoItem& item) { return item.id; },
+            [this](reactive::ReactiveScope&, const TodoItem&) {
+                return std::make_shared<TodoRow>(
+                    *graph_,
+                    theme_,
+                    [this](const std::uint64_t id) { toggle(id); },
+                    [this](const std::uint64_t id) { remove(id); }
+                );
+            },
+            [this](TodoRow& row, const TodoItem& item) { row.update(item, theme_); }
+        );
+        rows->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+        rows->bind(todos);
+
+        auto list_content = widget::Column::create();
+        list_content->set_cross_alignment(widget::LayoutAlignment::stretch)
+            .add(empty_region)
+            .add(rows);
+        list_view_->set_child(list_content);
 
         const auto list_expanded = widget::Expanded::create();
         list_expanded->set_child(list_view_);
@@ -85,29 +170,6 @@ public:
         const auto padding = widget::Padding::create(foundation::NanInsets::all(16.0F));
         padding->set_child(content);
         add_child(padding);
-    }
-
-    void stage_items(std::vector<TodoItem> items) {
-        pending_items_ = std::move(items);
-        rebuild_pending_ = true;
-    }
-
-    [[nodiscard]] auto input_field() const -> widget::TextField* {
-        return input_.get();
-    }
-    [[nodiscard]] auto list_view() const -> widget::ScrollView* {
-        return list_view_.get();
-    }
-    [[nodiscard]] auto rendered_item_count() const -> std::size_t {
-        return rendered_item_count_;
-    }
-
-    void on_process(float dt) override {
-        scene::NanControl::on_process(dt);
-        if (rebuild_pending_) {
-            rebuild_pending_ = false;
-            rebuild_list();
-        }
     }
 
     void on_ready() override {
@@ -133,7 +195,11 @@ private:
             items.push_back(TodoItem {.id = next_id_++, .title = title});
         });
         input_->set_value("");
-        scroll_to_end_pending_ = true;
+        get_tree()->post_layout([weak = std::weak_ptr<widget::ScrollView>(list_view_)] {
+            if (auto list = weak.lock()) {
+                list->set_scroll_offset(list->maximum_scroll_offset());
+            }
+        });
     }
 
     void toggle(std::uint64_t id) {
@@ -151,71 +217,6 @@ private:
         });
     }
 
-    void rebuild_list() {
-        auto column = widget::Column::create();
-        column->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
-        rendered_item_count_ = pending_items_.size();
-        const auto completed = static_cast<std::size_t>(
-            std::ranges::count(pending_items_, true, &TodoItem::completed)
-        );
-        status_->set_text(
-            std::to_string(pending_items_.size()) + " tasks, " + std::to_string(completed)
-            + " completed / 已完成"
-        );
-
-        if (pending_items_.empty()) {
-            auto empty = widget::Label::create(*graph_, "暂无任务", theme_);
-            empty->set_color(theme_.palette.on_surface_variant);
-            column->add(empty);
-        }
-        for (const auto& item: pending_items_) {
-            auto label = widget::Label::create(
-                *graph_,
-                (item.completed ? "[已完成] " : "[待办] ") + item.title,
-                theme_
-            );
-            label->set_color(
-                item.completed ? theme_.palette.on_surface_variant : theme_.palette.on_surface
-            );
-            label->set_overflow(widget::primitives::TextOverflow::clip);
-
-            auto toggle_button = widget::Button::create(item.completed ? "撤销" : "完成", theme_);
-            toggle_button->set_treatment(theme::ButtonTreatment::outlined);
-            toggle_button->set_on_click([this, id = item.id] { toggle(id); });
-
-            auto remove_button = widget::Button::create("删除", theme_);
-            remove_button->set_tone(theme::ButtonTone::secondary);
-            remove_button->set_treatment(theme::ButtonTreatment::outlined);
-            remove_button->set_on_click([this, id = item.id] { remove(id); });
-
-            auto label_item = widget::FlexItem::create(
-                scene::LayoutFlexPolicy {
-                    .grow = 1.0F,
-                    .shrink = 1.0F,
-                    .limits = {.min_width = 80.0F},
-                }
-            );
-            label_item->set_child(label);
-            auto row = widget::Row::create();
-            row->set_gap(8.0F)
-                .set_cross_alignment(widget::LayoutAlignment::stretch)
-                .add(label_item)
-                .add(toggle_button)
-                .add(remove_button);
-            column->add(row);
-        }
-        list_view_->set_child(column);
-        mark_layout_dirty();
-        if (scroll_to_end_pending_) {
-            scroll_to_end_pending_ = false;
-            get_tree()->post_layout([weak = std::weak_ptr<widget::ScrollView>(list_view_)] {
-                if (auto list = weak.lock()) {
-                    list->set_scroll_offset(list->maximum_scroll_offset());
-                }
-            });
-        }
-    }
-
     reactive::Graph* graph_;
     reactive::Signal<std::vector<TodoItem>>* todos_;
     theme::NanTheme theme_;
@@ -224,11 +225,7 @@ private:
     std::shared_ptr<widget::TextField> input_;
     std::shared_ptr<widget::Button> add_button_;
     std::shared_ptr<widget::ScrollView> list_view_;
-    std::vector<TodoItem> pending_items_;
     std::uint64_t next_id_ = 4;
-    std::size_t rendered_item_count_ = 0;
-    bool rebuild_pending_ = false;
-    bool scroll_to_end_pending_ = false;
 };
 
 class TodoPage final: public app::NanPageT<app::NoParams> {
@@ -248,16 +245,16 @@ public:
                 {.id = 3, .title = "检查动态任务列表的滚动效果"},
             }
         );
-        auto root = std::make_shared<TodoPageRoot>(
-            context.graph(),
-            todos,
-            context.theme()
-        );
-        context.scope().effect([weak = std::weak_ptr<TodoPageRoot>(root), &todos] {
-            if (auto current = weak.lock()) {
-                current->stage_items(todos.get());
-            }
+        auto& status = context.scope().computed([&todos] {
+            const auto& items = todos.get();
+            const auto completed =
+                static_cast<std::size_t>(std::ranges::count(items, true, &TodoItem::completed));
+            return std::to_string(items.size()) + " tasks, " + std::to_string(completed)
+                + " completed / 已完成";
         });
+        auto& empty = context.scope().computed([&todos] { return todos.get().empty(); });
+        auto root =
+            std::make_shared<TodoPageRoot>(context.graph(), todos, status, empty, context.theme());
         return root;
     }
 };

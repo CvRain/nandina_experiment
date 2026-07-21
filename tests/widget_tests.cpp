@@ -17,6 +17,7 @@
 #include "scene/scene_tree.hpp"
 #include "widget/bindable_rect.hpp"
 #include "widget/button.hpp"
+#include "widget/declarative.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
 #include "widget/text_field.hpp"
@@ -28,6 +29,7 @@
 #include <stdexcept>
 #include <string>
 #include <string_view>
+#include <unordered_map>
 #include <vector>
 
 using namespace nandina;
@@ -166,12 +168,194 @@ public:
     }
 };
 
+struct RegionItem {
+    int key = 0;
+    std::string value;
+
+    auto operator==(const RegionItem&) const -> bool = default;
+};
+
+class RegionControl final: public scene::NanControl {
+public:
+    explicit RegionControl(int key): key(key) {}
+
+    [[nodiscard]] auto is_focusable() const -> bool override {
+        return true;
+    }
+
+    void on_enter_tree() override {
+        ++enters;
+    }
+
+    void on_ready() override {
+        ++readies;
+    }
+
+    void on_exit_tree() override {
+        ++exits;
+    }
+
+    int key = 0;
+    std::string value;
+    int enters = 0;
+    int readies = 0;
+    int exits = 0;
+};
+
 auto opaque_color(float light) -> foundation::NanColor {
     return foundation::NanColor::from(
         foundation::NanOklch{.light = light, .chroma = 0.1F, .hue = 120.0F, .alpha = 1.0F});
 }
 
 } // namespace
+
+TEST_CASE("ForEach reuses keyed controls and disposes removed scopes", "[widget][declarative][foreach]") {
+    reactive::Graph graph;
+    reactive::Signal<int> probe {graph, 0};
+    reactive::Signal<std::vector<RegionItem>> items {
+        graph,
+        {{.key = 1, .value = "one"}, {.key = 2, .value = "two"}}
+    };
+    std::unordered_map<int, int> scope_runs;
+    auto region = widget::ForEach<RegionItem, int, RegionControl>::create(
+        graph,
+        [](const RegionItem& item) { return item.key; },
+        [&](reactive::ReactiveScope& scope, const RegionItem& item) {
+            scope.effect([&, key = item.key] {
+                (void)probe.get();
+                ++scope_runs[key];
+            });
+            return std::make_shared<RegionControl>(item.key);
+        },
+        [](RegionControl& control, const RegionItem& item) { control.value = item.value; }
+    );
+    region->bind(items);
+    scene::NanSceneTree tree;
+    tree.set_root(region);
+
+    auto* first = region->node_for(1);
+    auto* second = region->node_for(2);
+    REQUIRE(first != nullptr);
+    REQUIRE(second != nullptr);
+    REQUIRE(first->value == "one");
+    REQUIRE(first->enters == 1);
+    REQUIRE(first->readies == 1);
+    tree.set_focus(first);
+
+    items.set({{.key = 2, .value = "two updated"}, {.key = 1, .value = "one updated"}});
+    REQUIRE(region->node_for(1) == first);
+    REQUIRE(region->node_for(2) == second);
+    REQUIRE(region->get_child(0) == second);
+    REQUIRE(region->get_child(1) == first);
+    REQUIRE(first->value == "one updated");
+    REQUIRE(second->value == "two updated");
+    REQUIRE(first->enters == 1);
+    REQUIRE(first->readies == 1);
+    REQUIRE(first->exits == 0);
+    REQUIRE(tree.focused_node() == first);
+
+    std::weak_ptr<scene::NanNode> removed = first->weak_from_this();
+    items.set({{.key = 2, .value = "remaining"}});
+    REQUIRE(region->item_count() == 1);
+    REQUIRE(region->node_for(1) == nullptr);
+    REQUIRE(removed.expired());
+    REQUIRE(tree.focused_node() == nullptr);
+
+    const auto removed_runs = scope_runs[1];
+    const auto retained_runs = scope_runs[2];
+    probe.set(1);
+    REQUIRE(scope_runs[1] == removed_runs);
+    REQUIRE(scope_runs[2] == retained_runs + 1);
+}
+
+TEST_CASE("ForEach rejects duplicate keys before changing children", "[widget][declarative][foreach]") {
+    reactive::Graph graph;
+    auto region = widget::ForEach<RegionItem, int, RegionControl>::create(
+        graph,
+        [](const RegionItem& item) { return item.key; },
+        [](reactive::ReactiveScope&, const RegionItem& item) {
+            return std::make_shared<RegionControl>(item.key);
+        }
+    );
+    region->set_items({{.key = 1, .value = "one"}});
+    auto* original = region->node_for(1);
+
+    REQUIRE_THROWS_AS(
+        region->set_items({{.key = 1}, {.key = 1}}),
+        std::invalid_argument
+    );
+    REQUIRE(region->item_count() == 1);
+    REQUIRE(region->node_for(1) == original);
+}
+
+TEST_CASE("ForEach preserves its tree when item creation fails", "[widget][declarative][foreach]") {
+    reactive::Graph graph;
+    auto region = widget::ForEach<RegionItem, int, RegionControl>::create(
+        graph,
+        [](const RegionItem& item) { return item.key; },
+        [](reactive::ReactiveScope&, const RegionItem& item) {
+            if (item.key == 2) {
+                return std::shared_ptr<RegionControl> {};
+            }
+            return std::make_shared<RegionControl>(item.key);
+        }
+    );
+    region->set_items({{.key = 1, .value = "one"}});
+    auto* original = region->node_for(1);
+
+    REQUIRE_THROWS_AS(
+        region->set_items({{.key = 1}, {.key = 2}}),
+        std::runtime_error
+    );
+    REQUIRE(region->item_count() == 1);
+    REQUIRE(region->node_for(1) == original);
+    REQUIRE(region->get_child(0) == original);
+}
+
+TEST_CASE("IfRegion reuses stable branches and clears replaced scopes", "[widget][declarative][if]") {
+    reactive::Graph graph;
+    reactive::Signal<bool> condition {graph, false};
+    reactive::Signal<int> probe {graph, 0};
+    int true_runs = 0;
+    int false_runs = 0;
+    auto region = widget::IfRegion<RegionControl>::create(
+        graph,
+        [&](reactive::ReactiveScope& scope) {
+            scope.effect([&] {
+                (void)probe.get();
+                ++true_runs;
+            });
+            return std::make_shared<RegionControl>(1);
+        },
+        [&](reactive::ReactiveScope& scope) {
+            scope.effect([&] {
+                (void)probe.get();
+                ++false_runs;
+            });
+            return std::make_shared<RegionControl>(0);
+        }
+    );
+    region->bind(condition);
+    scene::NanSceneTree tree;
+    tree.set_root(region);
+
+    auto* false_branch = region->active_node();
+    REQUIRE(false_branch != nullptr);
+    condition.set(false);
+    REQUIRE(region->active_node() == false_branch);
+
+    std::weak_ptr<scene::NanNode> removed = false_branch->weak_from_this();
+    condition.set(true);
+    REQUIRE(region->condition());
+    REQUIRE(region->active_node() != nullptr);
+    REQUIRE(region->active_node()->key == 1);
+    REQUIRE(removed.expired());
+
+    const auto old_false_runs = false_runs;
+    probe.set(1);
+    REQUIRE(false_runs == old_false_runs);
+    REQUIRE(true_runs == 2);
+}
 
 TEST_CASE("NanControl rect hit-test and bounds", "[widget][control]") {
     scene::NanControl c{foundation::NanSize(40, 20)};

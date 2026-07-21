@@ -18,6 +18,22 @@ namespace nandina::widget
             std::erase_if(items, [](const auto& item) { return item.expired(); });
         }
 
+        [[nodiscard]] auto control_children(scene::NanNode& parent)
+            -> std::vector<std::weak_ptr<scene::NanControl>> {
+            std::vector<std::weak_ptr<scene::NanControl>> result;
+            result.reserve(parent.child_count());
+            for (std::size_t index = 0; index < parent.child_count(); ++index) {
+                auto* node = parent.get_child(index);
+                auto* control = node != nullptr ? node->as_control() : nullptr;
+                if (control != nullptr) {
+                    result.push_back(
+                        std::static_pointer_cast<scene::NanControl>(node->shared_from_this())
+                    );
+                }
+            }
+            return result;
+        }
+
         [[nodiscard]] auto child_constraints(scene::LayoutConstraints constraints)
             -> scene::LayoutConstraints {
             return {
@@ -281,9 +297,10 @@ namespace nandina::widget
             scene::LayoutConstraints constraints,
             LayoutAxis axis,
             float gap,
-            const std::unordered_map<scene::NanControl*, LayoutAlignment>& overrides
+            std::vector<std::pair<std::weak_ptr<scene::NanControl>, LayoutAlignment>>& overrides
         ) -> std::vector<WrapRun> {
             prune_expired(items);
+            std::erase_if(overrides, [](const auto& entry) { return entry.first.expired(); });
 
             std::vector<WrapRun> runs;
             WrapRun current;
@@ -312,7 +329,9 @@ namespace nandina::widget
                 }
                 current.main += child_main;
                 current.cross = std::max(current.cross, child_cross);
-                const auto override = overrides.find(child.get());
+                const auto override = std::ranges::find_if(overrides, [&child](const auto& entry) {
+                    return entry.first.lock() == child;
+                });
                 current.children.push_back(
                     WrapRun::Child {
                         .control = std::move(child),
@@ -340,7 +359,6 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Flex::add: child is null");
         }
-        items_.push_back(child);
         add_child(std::move(child));
         mark_layout_dirty();
         relayout();
@@ -397,12 +415,12 @@ namespace nandina::widget
     }
 
     auto Flex::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
-        prune_expired(items_);
+        auto items = control_children(*this);
 
         float used_main = 0.0F;
         float used_cross = 0.0F;
         std::size_t visible_count = 0;
-        for (auto& item: items_) {
+        for (auto& item: items) {
             auto child = item.lock();
             if (!child || !child->visible()) {
                 continue;
@@ -420,7 +438,8 @@ namespace nandina::widget
     }
 
     auto Flex::on_layout() -> void {
-        layout_linear_items(items_, axis_, gap_, main_alignment_, cross_alignment_, size());
+        auto items = control_children(*this);
+        layout_linear_items(items, axis_, gap_, main_alignment_, cross_alignment_, size());
     }
 
     void Flex::on_ready() {
@@ -449,9 +468,8 @@ namespace nandina::widget
             throw std::invalid_argument("Wrap child alignment cannot be space_between");
         }
         if (cross_alignment.has_value()) {
-            child_cross_alignments_[child.get()] = *cross_alignment;
+            child_cross_alignments_.emplace_back(child, *cross_alignment);
         }
-        items_.push_back(child);
         add_child(std::move(child));
         mark_layout_dirty();
         relayout();
@@ -465,11 +483,15 @@ namespace nandina::widget
         if (alignment == LayoutAlignment::space_between) {
             throw std::invalid_argument("Wrap child alignment cannot be space_between");
         }
+        std::erase_if(child_cross_alignments_, [&child](const auto& entry) {
+            const auto current = entry.first.lock();
+            return current == nullptr || current.get() == &child;
+        });
         if (alignment.has_value()) {
-            child_cross_alignments_[&child] = *alignment;
-        }
-        else {
-            child_cross_alignments_.erase(&child);
+            child_cross_alignments_.emplace_back(
+                std::static_pointer_cast<scene::NanControl>(child.shared_from_this()),
+                *alignment
+            );
         }
         mark_layout_dirty();
         relayout();
@@ -548,8 +570,9 @@ namespace nandina::widget
     }
 
     auto Wrap::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        auto items = control_children(*this);
         const auto runs =
-            collect_wrap_runs(items_, constraints, axis_, gap_, child_cross_alignments_);
+            collect_wrap_runs(items, constraints, axis_, gap_, child_cross_alignments_);
         float used_main = 0.0F;
         float used_cross = 0.0F;
         for (std::size_t i = 0; i < runs.size(); ++i) {
@@ -563,8 +586,9 @@ namespace nandina::widget
     }
 
     auto Wrap::on_layout() -> void {
+        auto items = control_children(*this);
         auto runs = collect_wrap_runs(
-            items_,
+            items,
             scene::LayoutConstraints::tight(size()),
             axis_,
             gap_,
@@ -631,7 +655,6 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Column::add: child is null");
         }
-        items_.push_back(child);
         add_child(std::move(child));
         mark_layout_dirty();
         relayout();
@@ -677,12 +700,12 @@ namespace nandina::widget
     }
 
     auto Column::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
-        prune_expired(items_);
+        auto items = control_children(*this);
 
         float y = 0.0F;
         float max_width = 0.0F;
         std::size_t visible_count = 0;
-        for (auto& item: items_) {
+        for (auto& item: items) {
             auto child = item.lock();
             if (!child || !child->visible()) {
                 continue;
@@ -700,8 +723,9 @@ namespace nandina::widget
     }
 
     auto Column::on_layout() -> void {
+        auto items = control_children(*this);
         layout_linear_items(
-            items_,
+            items,
             LayoutAxis::vertical,
             gap_,
             main_alignment_,
@@ -723,7 +747,6 @@ namespace nandina::widget
         if (!child) {
             throw std::runtime_error("Row::add: child is null");
         }
-        items_.push_back(child);
         add_child(std::move(child));
         mark_layout_dirty();
         relayout();
@@ -769,12 +792,12 @@ namespace nandina::widget
     }
 
     auto Row::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
-        prune_expired(items_);
+        auto items = control_children(*this);
 
         float x = 0.0F;
         float max_height = 0.0F;
         std::size_t visible_count = 0;
-        for (auto& item: items_) {
+        for (auto& item: items) {
             auto child = item.lock();
             if (!child || !child->visible()) {
                 continue;
@@ -792,8 +815,9 @@ namespace nandina::widget
     }
 
     auto Row::on_layout() -> void {
+        auto items = control_children(*this);
         layout_linear_items(
-            items_,
+            items,
             LayoutAxis::horizontal,
             gap_,
             main_alignment_,

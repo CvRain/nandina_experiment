@@ -240,7 +240,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, and the minimal A3 canvas/physics boundary are implemented. The active main line is A4 keyed reconciliation, followed by async scope, style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, and A4 declarative regions are implemented. The active main line is A5 UI dispatch and async scope, followed by style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -263,6 +263,7 @@ The text, clipping, editing, layout, interactive example, and R1-R10 resource-de
 | R8 Application bootstrap | Complete in `9b0933d`. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
 | R9 Window text pipeline | Complete in `9b0933d`. | Render-device-scoped default FontPipelineCache, scene-context inheritance, explicit override preservation, and ordered scene/GPU teardown. |
 | R10 Cleanup/verification | Complete in `9b0933d`. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
+| A4 Declarative regions | Complete. | Imperative `IfRegion` and keyed `ForEach`, stable child movement, item scopes, and a Todo acceptance migration without whole-list refresh. |
 
 Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line breaking, OpenType ligature-internal carets, native IME acquisition, clipboard/undo, scrollbar chrome, kinetic scrolling, Grid/Anchor, exact transformed polygon clipping, and accessibility bridges.
 
@@ -379,7 +380,7 @@ Resource delivery is complete. The next main line raises the application-facing 
 
 ### A1. Runtime Tick And Dirty Contract
 
-Status: A1a runtime contract and A1b tick-level reactive wave implemented; task draining, reconciliation/style/semantics consumers, local layout boundaries, and dirty-only paint remain.
+Status: A1a runtime contract and A1b tick-level reactive wave implemented; task draining, style/semantics consumers, local layout boundaries, and dirty-only paint remain. A4 reconciliation runs in the reactive wave before layout.
 
 Formalize one UI tick:
 
@@ -502,9 +503,15 @@ Acceptance scene: a minimal space-battle fixture has a world layer containing a 
 
 ### A4. Declarative Regions And Keyed Reconciliation
 
+Status: complete.
+
 Implement low-level imperative objects for `If` and keyed `ForEach` before adding DSL wrappers. `ForEach` owns a key-to-node map, reuses unchanged nodes, moves nodes without recreating them, destroys removed scopes, and preserves focus/edit state. First version need not virtualize.
 
 Todo success criteria: no `clear_children()` refresh, no hand-written synchronization effect, no explicit layout invalidation, and no recreated row for an unchanged key.
+
+`NanNode::insert_child()` and `move_child()` provide stable sibling ordering without lifecycle churn. Layout containers read the concrete scene-child order directly instead of maintaining a parallel item list. `ForEach` validates duplicate keys before mutation, owns one node and `ReactiveScope` per key, detaches removed nodes before disposing their scopes, and reorders retained nodes without disturbing focus. `IfRegion` gives each active branch the same scoped lifetime contract.
+
+The Todo page now binds a page-scoped status `Computed`, projects tasks through a concrete `TodoRow` keyed by ID, uses `IfRegion` for its empty state, and schedules scroll-to-end directly through `post_layout()`. It contains no list synchronization effect, whole-list child replacement, or application-level `mark_layout_dirty()` call.
 
 ### A5. UI Dispatcher And Async Scope
 

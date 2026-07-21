@@ -10,7 +10,7 @@
 
 #include <memory>
 #include <optional>
-#include <unordered_map>
+#include <utility>
 #include <vector>
 
 namespace nandina::widget
@@ -59,7 +59,6 @@ namespace nandina::widget
         float gap_ = 0.0F;
         LayoutAlignment main_alignment_ = LayoutAlignment::start;
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
-        std::vector<std::weak_ptr<scene::NanControl>> items_;
     };
 
     class Wrap: public scene::NanControl {
@@ -105,8 +104,8 @@ namespace nandina::widget
         LayoutAlignment main_alignment_ = LayoutAlignment::start;
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
         LayoutAlignment run_alignment_ = LayoutAlignment::start;
-        std::vector<std::weak_ptr<scene::NanControl>> items_;
-        std::unordered_map<scene::NanControl*, LayoutAlignment> child_cross_alignments_;
+        std::vector<std::pair<std::weak_ptr<scene::NanControl>, LayoutAlignment>>
+            child_cross_alignments_;
     };
 
     using Flow = Wrap;
@@ -135,7 +134,6 @@ namespace nandina::widget
         float gap_ = 0.0F;
         LayoutAlignment main_alignment_ = LayoutAlignment::start;
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
-        std::vector<std::weak_ptr<scene::NanControl>> items_;
     };
 
     class Row: public scene::NanControl {
@@ -162,7 +160,6 @@ namespace nandina::widget
         float gap_ = 0.0F;
         LayoutAlignment main_alignment_ = LayoutAlignment::start;
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
-        std::vector<std::weak_ptr<scene::NanControl>> items_;
     };
 
     class Padding: public scene::NanControl {
