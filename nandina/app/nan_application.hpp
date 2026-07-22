@@ -26,6 +26,7 @@
 #include "application_config.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
+#include "ui_dispatcher.hpp"
 
 #include <concepts>
 #include <memory>
@@ -58,6 +59,8 @@ namespace nandina::app
         [[nodiscard]] auto font_loader() -> text::FontLoader&;
         [[nodiscard]] auto font_families() -> text::FontFamilyRegistry&;
         [[nodiscard]] auto application_id() const noexcept -> std::string_view;
+        [[nodiscard]] auto dispatcher() -> UiDispatcher&;
+        [[nodiscard]] auto background_executor() -> BackgroundExecutor&;
 
         template<typename StoreT, typename... Args>
             requires std::derived_from<StoreT, NanStore>
@@ -85,6 +88,8 @@ namespace nandina::app
         auto run(NanWindow& window) -> int;
 
     private:
+        UiDispatcher dispatcher_;
+        BackgroundExecutor background_executor_;
         reactive::Graph graph_;
         theme::NanTheme theme_;
         std::string application_id_;

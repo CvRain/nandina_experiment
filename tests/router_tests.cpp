@@ -12,8 +12,12 @@
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <atomic>
+#include <chrono>
+#include <exception>
 #include <memory>
 #include <string_view>
+#include <thread>
 
 namespace
 {
@@ -107,6 +111,37 @@ namespace
             return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
         }
     };
+
+    struct AsyncPageParams {
+        std::atomic_bool* started = nullptr;
+        std::atomic_bool* cancelled = nullptr;
+        bool* completed = nullptr;
+    };
+
+    class AsyncPage final: public app::NanPageT<AsyncPageParams> {
+    public:
+        explicit AsyncPage(AsyncPageParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "async";
+        }
+
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
+            const auto params = this->params();
+            context.async_scope().run(
+                [params](app::CancellationToken token) {
+                    params.started->store(true, std::memory_order_release);
+                    while (!token.stop_requested()) {
+                        std::this_thread::yield();
+                    }
+                    params.cancelled->store(true, std::memory_order_release);
+                },
+                [params](std::expected<void, std::exception_ptr>) { *params.completed = true; }
+            );
+            return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
 } // namespace
 
 TEST_CASE("router pushes keep-alive pages and toggles top visibility", "[app][router]") {
@@ -143,6 +178,45 @@ TEST_CASE("router pushes keep-alive pages and toggles top visibility", "[app][ro
     REQUIRE(router.host()->child_count() == 1);
     REQUIRE(home_root->visible());
     REQUIRE_FALSE(router.pop());
+}
+
+TEST_CASE("router frame cancellation suppresses page async completion", "[app][router][async]") {
+    using namespace std::chrono_literals;
+
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::UiDispatcher dispatcher;
+    app::BackgroundExecutor executor {1};
+    app::NanRouter
+        router {graph, theme, nullptr, nullptr, nullptr, nullptr, nullptr, &dispatcher, &executor};
+    std::atomic_bool started = false;
+    std::atomic_bool cancelled = false;
+    bool completed = false;
+
+    router.push<PlainPage>();
+    router.push<AsyncPage>(AsyncPageParams {
+        .started = &started,
+        .cancelled = &cancelled,
+        .completed = &completed,
+    });
+    const auto start_deadline = std::chrono::steady_clock::now() + 2s;
+    while (!started.load(std::memory_order_acquire)
+           && std::chrono::steady_clock::now() < start_deadline)
+    {
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE(started.load(std::memory_order_acquire));
+
+    REQUIRE(router.pop());
+    const auto cancel_deadline = std::chrono::steady_clock::now() + 2s;
+    while (!cancelled.load(std::memory_order_acquire)
+           && std::chrono::steady_clock::now() < cancel_deadline)
+    {
+        std::this_thread::sleep_for(1ms);
+    }
+    REQUIRE(cancelled.load(std::memory_order_acquire));
+    (void)dispatcher.drain();
+    REQUIRE_FALSE(completed);
 }
 
 TEST_CASE("router pop_to keeps target frame and removes newer frames", "[app][router]") {

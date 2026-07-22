@@ -148,6 +148,10 @@ module_widget = files(
 )
 
 module_app = files(
+    'app/ui_dispatcher.hpp',
+    'app/ui_dispatcher.cpp',
+    'app/async_scope.hpp',
+    'app/async_scope.cpp',
     'app/application_config.hpp',
     'app/application_config.cpp',
     'app/window_config.hpp',

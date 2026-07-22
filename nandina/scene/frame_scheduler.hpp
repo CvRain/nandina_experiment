@@ -9,6 +9,7 @@ namespace nandina::scene
     enum class FramePhase : std::uint8_t {
         idle,
         input,
+        tasks,
         process,
         reactive,
         tree_commit,

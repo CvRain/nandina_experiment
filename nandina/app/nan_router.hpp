@@ -14,6 +14,7 @@
 #include "../scene/control.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
+#include "async_scope.hpp"
 
 #include <cstddef>
 #include <memory>
@@ -36,7 +37,9 @@ namespace nandina::app
             NanTypeKey store_key = nullptr,
             resource::ResourceManager* resources = nullptr,
             text::FontLoader* font_loader = nullptr,
-            text::FontFamilyRegistry* font_families = nullptr
+            text::FontFamilyRegistry* font_families = nullptr,
+            UiDispatcher* dispatcher = nullptr,
+            BackgroundExecutor* background_executor = nullptr
         );
         ~NanRouter() = default;
 
@@ -112,6 +115,7 @@ namespace nandina::app
             std::unique_ptr<NanPage> page;
             std::shared_ptr<scene::NanNode2D> root;
             std::unique_ptr<reactive::ReactiveScope> scope;
+            std::unique_ptr<AsyncScope> async_scope;
             std::string key;
         };
 
@@ -128,6 +132,8 @@ namespace nandina::app
         resource::ResourceManager* resources_ = nullptr;
         text::FontLoader* font_loader_ = nullptr;
         text::FontFamilyRegistry* font_families_ = nullptr;
+        UiDispatcher* dispatcher_ = nullptr;
+        BackgroundExecutor* background_executor_ = nullptr;
         std::shared_ptr<scene::NanControl> host_;
         std::vector<Frame> frames_;
     };

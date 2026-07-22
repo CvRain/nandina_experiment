@@ -116,6 +116,14 @@ namespace nandina::app
         return application_id_;
     }
 
+    auto NanApplication::dispatcher() -> UiDispatcher& {
+        return dispatcher_;
+    }
+
+    auto NanApplication::background_executor() -> BackgroundExecutor& {
+        return background_executor_;
+    }
+
     auto NanApplication::store_base() -> NanStore* {
         return store_.get();
     }
@@ -125,6 +133,7 @@ namespace nandina::app
     }
 
     auto NanApplication::run(NanWindow& window) -> int {
+        dispatcher_.require_ui_thread();
         window.open();
         while (!window.should_close()) {
             window.tick();

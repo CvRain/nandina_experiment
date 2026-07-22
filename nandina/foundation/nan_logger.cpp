@@ -4,12 +4,14 @@
 
 #include "nan_logger.hpp"
 
+#include <exception>
 #include <spdlog/sinks/rotating_file_sink.h>
 #include <spdlog/sinks/stdout_color_sinks.h>
 #include <spdlog/spdlog.h>
 
 #include <memory>
 #include <mutex>
+#include <print>
 #include <stdexcept>
 #include <string>
 #include <unordered_map>
@@ -144,6 +146,17 @@ namespace nandina::log
             std::scoped_lock lock(backend->mutex);
             return backend->logger;
         }
+
+        /// 日志后端失效时直接写 stderr，避免回退路径再次依赖日志或格式化设施。
+        void report_backend_failure(const char* operation, const char* message) noexcept {
+            std::println(
+                stderr,
+                "[LoggerBackend] Failed to {}{}{}",
+                operation,
+                message != nullptr ? ": " : "",
+                message != nullptr ? message : ""
+            );
+        }
     } // namespace
 
     namespace detail
@@ -168,8 +181,12 @@ namespace nandina::log
                     );
                 }
             }
-            catch (...) {
+            catch (const std::exception& e) {
                 // 日志后端故障不能中断应用控制流。
+                report_backend_failure("write log", e.what());
+            }
+            catch (...) {
+                report_backend_failure("write log", nullptr);
             }
         }
 
@@ -186,8 +203,12 @@ namespace nandina::log
                     logger->flush();
                 }
             }
-            catch (...) {
+            catch (const std::exception& e) {
                 // 与普通写入一致，flush 失败不改变应用控制流。
+                report_backend_failure("flush log", e.what());
+            }
+            catch (...) {
+                report_backend_failure("flush log", nullptr);
             }
         }
 
@@ -198,7 +219,12 @@ namespace nandina::log
                 ensure_initialized(current);
                 return current.root;
             }
+            catch (const std::exception& e) {
+                report_backend_failure("initialize default backend", e.what());
+                return nullptr;
+            }
             catch (...) {
+                report_backend_failure("initialize default backend", nullptr);
                 return nullptr;
             }
         }
@@ -235,8 +261,12 @@ namespace nandina::log
             current.initialized = false;
             current.explicitly_initialized = false;
         }
-        catch (...) {
+        catch (const std::exception& e) {
             // shutdown 保持 noexcept，后端与分配错误留给进程回收。
+            report_backend_failure("shutdown logger", e.what());
+        }
+        catch (...) {
+            report_backend_failure("shutdown logger", nullptr);
         }
     }
 
@@ -252,8 +282,12 @@ namespace nandina::log
                 detail::set_level(backend, level);
             }
         }
-        catch (...) {
+        catch (const std::exception& e) {
             // 全局配置失败时保持现有日志状态。
+            report_backend_failure("set log level", e.what());
+        }
+        catch (...) {
+            report_backend_failure("set log level", nullptr);
         }
     }
 
@@ -270,8 +304,12 @@ namespace nandina::log
                 detail::flush(backend);
             }
         }
-        catch (...) {
+        catch (const std::exception& e) {
             // flush 保持 noexcept。
+            report_backend_failure("flush log", e.what());
+        }
+        catch (...) {
+            report_backend_failure("flush log", nullptr);
         }
     }
 

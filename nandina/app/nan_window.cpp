@@ -77,7 +77,9 @@ namespace nandina::app
             app_.store_type_key(),
             &app_.resources(),
             &app_.font_loader(),
-            &app_.font_families()
+            &app_.font_families(),
+            &app_.dispatcher(),
+            &app_.background_executor()
         );
         set_content(router_->host());
         return *router_;
@@ -222,6 +224,11 @@ namespace nandina::app
         {
             auto phase = tree_.enter_phase(scene::FramePhase::input);
             poll_and_dispatch_input();
+        }
+
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::tasks);
+            (void)app_.dispatcher().drain();
         }
 
         {

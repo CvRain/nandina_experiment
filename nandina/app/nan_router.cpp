@@ -35,7 +35,9 @@ namespace nandina::app
         NanTypeKey store_key,
         resource::ResourceManager* resources,
         text::FontLoader* font_loader,
-        text::FontFamilyRegistry* font_families
+        text::FontFamilyRegistry* font_families,
+        UiDispatcher* dispatcher,
+        BackgroundExecutor* background_executor
     ):
         graph_(&graph),
         theme_(&theme),
@@ -44,6 +46,8 @@ namespace nandina::app
         resources_(resources),
         font_loader_(font_loader),
         font_families_(font_families),
+        dispatcher_(dispatcher),
+        background_executor_(background_executor),
         host_(std::make_shared<PageHost>()) {}
 
     auto NanRouter::host() -> std::shared_ptr<scene::NanControl> {
@@ -131,6 +135,9 @@ namespace nandina::app
         }
 
         auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
+        auto async_scope = dispatcher_ && background_executor_
+                             ? std::make_unique<AsyncScope>(*dispatcher_, *background_executor_)
+                             : nullptr;
         PageContext context {
             *this,
             *graph_,
@@ -140,7 +147,8 @@ namespace nandina::app
             store_key_,
             resources_,
             font_loader_,
-            font_families_
+            font_families_,
+            async_scope.get()
         };
         auto root = page->build(context);
         if (!root) {
@@ -154,6 +162,7 @@ namespace nandina::app
                 .page = std::move(page),
                 .root = std::move(root),
                 .scope = std::move(scope),
+                .async_scope = std::move(async_scope),
                 .key = {},
             }
         );
@@ -180,6 +189,9 @@ namespace nandina::app
 
     void NanRouter::drop_frame(Frame& frame) {
         detach_root(frame.root);
+        if (frame.async_scope != nullptr) {
+            frame.async_scope->clear();
+        }
         if (frame.scope != nullptr) {
             frame.scope->clear();
         }

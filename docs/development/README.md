@@ -244,7 +244,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, and A4 declarative regions are implemented. The active main line is A5 UI dispatch and async scope, followed by style/theme context, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, and A5 UI dispatch/async scope are implemented. The active main line is A6 font requests and style context, followed by theme rules, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -519,7 +519,11 @@ The Todo page now binds a page-scoped status `Computed`, projects tasks through 
 
 ### A5. UI Dispatcher And Async Scope
 
-Only the UI thread may mutate widgets. Add a UI dispatcher, background task execution, cancellation token, and page/widget-owned `AsyncScope`. Completion returns through the event-loop task phase and is discarded if the owner is gone or a newer generation superseded it. Coroutine syntax may wrap this model later; it is not the underlying contract.
+Status: complete.
+
+Only the UI thread may mutate widgets. `UiDispatcher` captures that thread, accepts cross-thread posts, and drains a stable queue snapshot in the event-loop task phase before process/reactive/layout work. `BackgroundExecutor` owns a bounded worker pool, while `CancellationToken` provides cooperative cancellation without exposing the executor implementation.
+
+`AsyncScope::run()` starts a latest-wins generation and returns its `std::expected` result through the UI dispatcher. Starting a newer generation cancels the previous token; clearing or destroying the scope invalidates queued completions. Application-created router frames own a page `AsyncScope`, expose it through `PageContext`, and clear it after detaching the page root. Widgets or application services can own additional scopes over the same application dispatcher/executor when they need independent concurrent operation slots. Coroutine syntax may wrap this model later; it is not the underlying contract.
 
 ### A6. Font Requests And Style Context
 

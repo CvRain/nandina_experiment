@@ -66,6 +66,13 @@ router_tests = executable(
 )
 test('router', router_tests)
 
+async_tests = executable(
+    'async_tests',
+    files('async_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('async', async_tests)
+
 button_tests = executable(
     'button_tests',
     files('button_tests.cpp'),
