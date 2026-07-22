@@ -20,6 +20,7 @@ namespace nandina::reactive
 {
 
     /// 在批处理作用域内执行 fn。fn 签名为 void()。
+    /// std::invocable 约束 Fn 可无参数调用。
     template<typename Fn>
         requires std::invocable<Fn>
     void batch(Graph& graph, Fn&& fn) {

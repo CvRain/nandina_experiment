@@ -57,7 +57,7 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 
 | Layer | Current state |
 | --- | --- |
-| `foundation` | Geometry, color, color spaces, and decomposed `NanTransform2D`. |
+| `foundation` | Geometry, color, color spaces, decomposed `NanTransform2D`, and the backend-neutral logging service. |
 | `scene` | `NanNode`, `NanNode2D`, `NanSceneTree`, input events, focus/hover, deferred delete, `NanControl`. |
 | `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend factory. |
 | `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, `ReactiveScope`, batching. |
@@ -66,6 +66,10 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 | `theme` | `NanTheme`, palette/tokens, button style resolver. |
 | `widget` | Text, Label, Button, EditableText, TextField, ScrollView, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
+
+### Logging Contract
+
+Framework and application code logs through `foundation/nan_logger.hpp` and never includes spdlog directly. `log::initialize(LoggerConfig)` configures the process root, level, and optional rotating file sink; `NanApplication` installs the default process configuration. `log::get("module.name")` returns a lightweight shared named handle, while free `log::info()`-style functions target the root logger. The public header exposes only standard C++ types, disabled levels avoid formatting work, backend failures do not interrupt application control flow, and `log::shutdown()` safely invalidates existing handles.
 
 ## Scene Composition And Physics Boundaries
 

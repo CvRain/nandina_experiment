@@ -79,8 +79,8 @@ namespace nandina::reactive
         requires std::invocable<Fn>
     auto make_effect(Graph& graph, Fn&& fn) -> Effect* {
         auto owned = std::make_unique<Effect>(graph, std::function<void()>(std::forward<Fn>(fn)));
-        auto* raw = owned.get();
-        graph.adopt(std::move(owned));
+        // adopt 转移所有权并返回 Graph 持有的稳定地址。
+        auto* raw = static_cast<Effect*>(graph.adopt(std::move(owned)));
         graph.run_effect_once(*raw); // 立即执行一次, 建立初始依赖。
         return raw;
     }

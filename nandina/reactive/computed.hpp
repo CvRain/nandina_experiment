@@ -3,6 +3,8 @@
 //
 // reactive/computed — 惰性派生值 (移植自 v2 Zig 版)
 //
+// Computed: 用于创建派生值，能够随依赖变化而自动重新计算。
+//
 // make_computed<T>(g, fn) 创建一个派生值: fn() 返回 T, 执行期间读取的
 // signal / 其它 computed 自动成为依赖。它同时是:
 //   - 一个 Reactor: 订阅上游依赖, 依赖变化时把自己标 dirty 并把失效继续向下游传播;
@@ -77,6 +79,7 @@ namespace nandina::reactive
         /// 上游变化时把失效继续传播给本 computed 的订阅者。
         /// 因 invalidate_reactor 在置 dirty 前会判重, 此处不会重复传播。
         void on_invalidate(Graph& graph) override {
+            // 失效传播可能改变订阅关系，遍历稳定快照而不是原容器。
             const auto snapshot = source_.subs;
             for (auto* sub: snapshot) {
                 graph.invalidate_reactor(*sub);

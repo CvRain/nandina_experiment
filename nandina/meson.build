@@ -28,6 +28,8 @@ module_fundation = files(
     'foundation/transform2d.cpp',
     'foundation/utf8.hpp',
     'foundation/utf8.cpp',
+    'foundation/nan_logger.hpp',
+    'foundation/nan_logger.cpp',
 )
 
 module_reactive = files(

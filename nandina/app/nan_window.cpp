@@ -7,6 +7,7 @@
 #include "nan_window.hpp"
 #include "nan_application.hpp"
 
+#include "../foundation/nan_logger.hpp"
 #include "../foundation/utf8.hpp"
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
@@ -14,7 +15,6 @@
 #include "../scene/input_event.hpp"
 
 #include <raylib.h>
-#include <spdlog/spdlog.h>
 
 #include <utility>
 
@@ -138,7 +138,7 @@ namespace nandina::app
         tree_.set_default_text_pipeline(*default_text_pipeline_);
         opened_ = true;
 
-        spdlog::info(
+        log::get("app.window").info(
             "NanWindow: opened {}x{} \"{}\"",
             config_.width,
             config_.height,
@@ -285,7 +285,7 @@ namespace nandina::app
         device_.reset();
         CloseWindow();
         opened_ = false;
-        spdlog::info("NanWindow: closed");
+        log::get("app.window").info("NanWindow: closed");
     }
 
 } // namespace nandina::app

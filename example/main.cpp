@@ -6,6 +6,7 @@
 #include "app/nan_page.hpp"
 #include "app/nan_window.hpp"
 #include "foundation/geometry.hpp"
+#include "foundation/nan_logger.hpp"
 #include "reactive/computed.hpp"
 #include "reactive/scope.hpp"
 #include "reactive/signal.hpp"
@@ -49,7 +50,10 @@ public:
 
         toggle_button_ = widget::Button::create("完成", theme);
         toggle_button_->set_treatment(theme::ButtonTreatment::outlined);
-        toggle_button_->set_on_click([this] { toggle_(id_); });
+        toggle_button_->set_on_click([this] {
+            log::get("todo.row").debug("toggle task {}", id_);
+            toggle_(id_);
+        });
 
         auto remove_button = widget::Button::create("删除", theme);
         remove_button->set_tone(theme::ButtonTone::secondary);
@@ -270,16 +274,16 @@ protected:
 };
 
 auto main() -> int {
-    app::NanApplication application(
-        app::NanApplicationConfig::for_process("org.nandina.todo")
-    );
+    app::NanApplication application(app::NanApplicationConfig::for_process("org.nandina.todo"));
     auto chinese_fallback = text::register_optional_font_fallback(
         application.font_families(),
         application.resources(),
         resource::ResourceKey("families/zh-cn"),
         resource::ResourceKey("fonts/fallback/zh-cn")
     );
-    if (!chinese_fallback) { return 2; }
+    if (!chinese_fallback) {
+        return 2;
+    }
     application.set_theme(theme::default_theme());
 
     TodoWindow window {

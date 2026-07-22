@@ -4,7 +4,7 @@
 // app/nan_application — 应用主入口。
 //
 // NanApplication 是进程级的编排者:
-//   - 初始化日志 (spdlog);
+//   - 初始化进程级日志服务;
 //   - 持有响应式 Graph —— 它必须比任何 window / widget 活得久, 因为 widget 卸载时
 //     会回访 graph (dispose effect / detach source)。App 持有它 = 最长生命周期;
 //   - run(window): 进入阻塞主循环, 每帧驱动 window tick, 直到窗口请求关闭。

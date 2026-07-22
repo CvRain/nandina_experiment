@@ -5,11 +5,10 @@
 #include "nan_application.hpp"
 #include "nan_window.hpp"
 
+#include "../foundation/nan_logger.hpp"
 #include "../resource/backends/builtin_backend.hpp"
 #include "../resource/backends/sqlite_backend.hpp"
 #include "../resource/platform_resource_locator.hpp"
-
-#include <spdlog/spdlog.h>
 
 namespace nandina::app
 {
@@ -34,13 +33,15 @@ namespace nandina::app
     } // namespace
 
     NanApplication::NanApplication() {
+        log::initialize();
         install_builtin_services(resources_, resource_backends_, font_families_);
         font_loader_ = std::make_unique<text::FontLoader>(resources_);
-        spdlog::info("NanApplication: initialized");
+        log::get("app.application").info("NanApplication: initialized");
     }
 
     NanApplication::NanApplication(NanApplicationConfig config):
         application_id_(std::move(config.application_id)) {
+        log::initialize({.name = application_id_.empty() ? "nandina" : application_id_});
         install_builtin_services(resources_, resource_backends_, font_families_);
         auto locator = resource::PlatformResourceLocator::create({
             .application_id = application_id_,
@@ -79,7 +80,10 @@ namespace nandina::app
             --priority;
         }
         font_loader_ = std::make_unique<text::FontLoader>(resources_);
-        spdlog::info("NanApplication: initialized {}", application_id_);
+        log::get("app.application").info(
+            "NanApplication: initialized {}",
+            application_id_
+        );
     }
 
     NanApplication::~NanApplication() = default;
@@ -126,7 +130,7 @@ namespace nandina::app
             window.tick();
         }
         window.close();
-        spdlog::info("NanApplication: exited");
+        log::get("app.application").info("NanApplication: exited");
         return 0;
     }
 

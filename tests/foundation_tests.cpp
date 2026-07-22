@@ -2,13 +2,113 @@
 // Foundation-layer UTF-8 tests.
 //
 
+#include "foundation/nan_logger.hpp"
 #include "foundation/utf8.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 
+#include <chrono>
+#include <filesystem>
+#include <fstream>
+#include <iterator>
+#include <stdexcept>
 #include <string>
 
 using namespace nandina;
+
+namespace
+{
+    struct LogShutdown {
+        ~LogShutdown() {
+            log::shutdown();
+        }
+    };
+
+    [[nodiscard]] auto temporary_log_path() -> std::filesystem::path {
+        return std::filesystem::temp_directory_path()
+            / ("nandina-logger-"
+               + std::to_string(std::chrono::steady_clock::now().time_since_epoch().count())
+               + ".log");
+    }
+
+    [[nodiscard]] auto read_file(const std::filesystem::path& path) -> std::string {
+        std::ifstream input(path);
+        return {
+            std::istreambuf_iterator<char>(input),
+            std::istreambuf_iterator<char>()
+        };
+    }
+} // namespace
+
+TEST_CASE("Logger hides its backend and shares named state", "[foundation][logger]") {
+    log::shutdown();
+    const LogShutdown shutdown;
+    const auto path = temporary_log_path();
+
+    log::initialize({
+        .name = "logger-test",
+        .level = log::LogLevel::trace,
+        .file = path,
+    });
+    const auto first = log::get("foundation.test");
+    const auto second = log::get("foundation.test");
+    REQUIRE(first.name() == "foundation.test");
+    REQUIRE(first.enabled(log::LogLevel::debug));
+
+    first.set_level(log::LogLevel::error);
+    REQUIRE_FALSE(second.enabled(log::LogLevel::warning));
+    second.warn("hidden message");
+    second.error("visible {}", 42);
+    log::info("root message");
+    log::flush();
+
+    const auto contents = read_file(path);
+    REQUIRE(contents.find("visible 42") != std::string::npos);
+    REQUIRE(contents.find("root message") != std::string::npos);
+    REQUIRE(contents.find("hidden message") == std::string::npos);
+
+    log::shutdown();
+    REQUIRE_FALSE(first.enabled(log::LogLevel::critical));
+    REQUIRE_NOTHROW(first.info("inactive handle"));
+    std::error_code error;
+    std::filesystem::remove(path, error);
+}
+
+TEST_CASE("Explicit Logger configuration replaces the implicit default", "[foundation][logger]") {
+    log::shutdown();
+    const LogShutdown shutdown;
+    const auto logger = log::get("foundation.early");
+    const auto path = temporary_log_path();
+
+    log::initialize({
+        .name = "configured",
+        .level = log::LogLevel::debug,
+        .file = path,
+    });
+    logger.debug("configured existing handle");
+    log::flush();
+
+    const auto contents = read_file(path);
+    REQUIRE(contents.find("configured existing handle") != std::string::npos);
+
+    log::shutdown();
+    std::error_code error;
+    std::filesystem::remove(path, error);
+}
+
+TEST_CASE("Logger rejects invalid configuration", "[foundation][logger]") {
+    log::shutdown();
+    const LogShutdown shutdown;
+    REQUIRE_THROWS_AS(
+        log::initialize({.name = ""}),
+        std::invalid_argument
+    );
+    REQUIRE_THROWS_AS(
+        log::initialize({.file = temporary_log_path(), .max_file_size = 0}),
+        std::invalid_argument
+    );
+    REQUIRE_THROWS_AS(log::get(""), std::invalid_argument);
+}
 
 TEST_CASE("UTF-8 encodes Unicode scalar values", "[foundation][utf8]") {
     REQUIRE(foundation::utf8::encode(U'A') == "A");
