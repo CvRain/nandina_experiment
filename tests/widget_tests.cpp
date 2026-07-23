@@ -956,6 +956,80 @@ TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text
     REQUIRE(dev.clip_clears == 1);
 }
 
+TEST_CASE("Text consumes inherited style unless the instance overrides it", "[widget][text][style]") {
+    auto root = std::make_shared<scene::NanControl>();
+    auto inherited = std::make_shared<widget::primitives::Text>("inherited");
+    auto explicit_text = std::make_shared<widget::primitives::Text>("explicit");
+    explicit_text->set_font_size(19.0F);
+    explicit_text->set_color(opaque_color(0.4F));
+    explicit_text->set_font_weight(500);
+    root->add_child(inherited);
+    root->add_child(explicit_text);
+
+    theme::StyleContext context;
+    context.font_size = theme::StyleValue<float>::explicit_value(28.0F);
+    context.text_color = theme::StyleValue<foundation::NanColor>::explicit_value(
+        opaque_color(0.7F).with_alpha(0.3F)
+    );
+    auto inherited_font = text::FontRequest {};
+    inherited_font.weight = 700;
+    context.font = theme::StyleValue<text::FontRequest>::explicit_value(inherited_font);
+    root->set_style_context(context);
+
+    REQUIRE(inherited->font_size() == Catch::Approx(28.0F));
+    REQUIRE(inherited->color().alpha() == Catch::Approx(0.3F));
+    REQUIRE(inherited->font().weight == 700);
+    REQUIRE(explicit_text->font_size() == Catch::Approx(19.0F));
+    REQUIRE(explicit_text->color().alpha() == Catch::Approx(1.0F));
+    REQUIRE(explicit_text->font().weight == 500);
+
+    context.font_size = theme::StyleValue<float>::explicit_value(32.0F);
+    context.text_color = theme::StyleValue<foundation::NanColor>::initial();
+    inherited_font.weight = 300;
+    context.font = theme::StyleValue<text::FontRequest>::explicit_value(inherited_font);
+    root->set_style_context(context);
+
+    REQUIRE(inherited->font_size() == Catch::Approx(32.0F));
+    REQUIRE(inherited->color().alpha() == Catch::Approx(1.0F));
+    REQUIRE(inherited->font().weight == 300);
+    REQUIRE(explicit_text->font_size() == Catch::Approx(19.0F));
+    REQUIRE(explicit_text->font().weight == 500);
+}
+
+TEST_CASE("Label keeps component theme, StyleContext, and instance priority", "[widget][label][style]") {
+    reactive::Graph graph;
+    theme::ThemeManager manager;
+    auto themed = theme::default_theme();
+    themed.palette.on_surface = theme::nan_color(0.62F, 0.08F, 210.0F);
+    themed.tokens.typography.label_lg = 21.0F;
+    manager.set_theme(themed);
+
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(manager);
+    auto label = widget::Label::create(graph, "Label");
+    tree.set_root(label);
+    REQUIRE(label->color().oklch().light == Catch::Approx(0.62F));
+    REQUIRE(label->font_size() == Catch::Approx(21.0F));
+
+    theme::StyleContext context;
+    context.text_color = theme::StyleValue<foundation::NanColor>::explicit_value(
+        theme::nan_color(0.44F, 0.08F, 210.0F)
+    );
+    context.font_size = theme::StyleValue<float>::explicit_value(27.0F);
+    label->set_style_context(context);
+    REQUIRE(label->color().oklch().light == Catch::Approx(0.44F));
+    REQUIRE(label->font_size() == Catch::Approx(27.0F));
+
+    label->clear_style_context();
+    REQUIRE(label->color().oklch().light == Catch::Approx(0.62F));
+    REQUIRE(label->font_size() == Catch::Approx(21.0F));
+
+    label->set_color(theme::nan_color(0.83F, 0.08F, 210.0F));
+    themed.palette.on_surface = theme::nan_color(0.31F, 0.08F, 210.0F);
+    manager.set_theme(themed);
+    REQUIRE(label->color().oklch().light == Catch::Approx(0.83F));
+}
+
 TEST_CASE("Text clip intersects and restores an ancestor clip", "[widget][text][clip]") {
     RecordingDevice dev;
     render::DrawContext context(dev);

@@ -62,6 +62,7 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto text_pipeline() const -> TextPipeline;
         void apply_default_text_pipeline(const TextPipeline& pipeline) override;
         void apply_font_context(text::FontPipelineCache& context) override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
 
         /// The referenced backend must outlive this Text instance.
         void set_layout_backend(const ITextLayoutBackend& backend);
@@ -75,6 +76,8 @@ namespace nandina::widget::primitives
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
             -> foundation::NanSize override;
+        void apply_component_color(foundation::NanColor color);
+        void apply_component_font_size(float size);
 
     private:
         void apply_text(const std::string& text);
@@ -88,6 +91,9 @@ namespace nandina::widget::primitives
         const ITextLayoutBackend* backend_ = nullptr;
         ITextLayoutRenderer* renderer_ = nullptr;
         bool pipeline_explicit_ = false;
+        bool color_explicit_ = false;
+        bool font_size_explicit_ = false;
+        bool font_explicit_ = false;
         text::FontPipelineCache* font_context_ = nullptr;
         std::shared_ptr<text::FontPipeline> resolved_font_pipeline_;
     };

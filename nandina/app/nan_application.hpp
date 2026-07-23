@@ -22,7 +22,8 @@
 #include "../resource/resource_manager.hpp"
 #include "../text/font_family.hpp"
 #include "../text/font_loader.hpp"
-#include "../theme/theme.hpp"
+#include "../theme/theme_manager.hpp"
+#include "../theme/style_document.hpp"
 #include "application_config.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
@@ -54,6 +55,12 @@ namespace nandina::app
 
         void set_theme(theme::NanTheme theme);
         [[nodiscard]] auto theme() const -> const theme::NanTheme&;
+        [[nodiscard]] auto theme_manager() -> theme::ThemeManager&;
+        [[nodiscard]] auto theme_manager() const -> const theme::ThemeManager&;
+        [[nodiscard]] auto apply_styles(const theme::StyleDocument& document)
+            -> std::expected<void, std::string>;
+        [[nodiscard]] auto load_styles(const std::filesystem::path& path)
+            -> std::expected<void, std::string>;
         [[nodiscard]] auto resources() -> resource::ResourceManager&;
         [[nodiscard]] auto resources() const -> const resource::ResourceManager&;
         [[nodiscard]] auto font_loader() -> text::FontLoader&;
@@ -91,7 +98,7 @@ namespace nandina::app
         UiDispatcher dispatcher_;
         BackgroundExecutor background_executor_;
         reactive::Graph graph_;
-        theme::NanTheme theme_;
+        theme::ThemeManager theme_manager_;
         std::string application_id_;
         resource::ResourceManager resources_;
         std::unique_ptr<text::FontLoader> font_loader_;

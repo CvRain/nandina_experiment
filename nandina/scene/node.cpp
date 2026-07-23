@@ -4,6 +4,7 @@
 
 #include "node.hpp"
 #include "../render/draw_context.hpp"
+#include "../theme/theme_manager.hpp"
 #include "node2d.hpp"
 #include "scene_tree.hpp"
 
@@ -56,6 +57,24 @@ namespace nandina::scene
         return tree_;
     }
 
+    void NanNode::set_style_context(theme::StyleContext context) {
+        style_context_ = std::move(context);
+        const auto* inherited = parent() != nullptr ? &parent()->resolved_style_context_ : nullptr;
+        _resolve_style_context(inherited);
+    }
+
+    void NanNode::clear_style_context() {
+        set_style_context({});
+    }
+
+    auto NanNode::style_context() const -> const theme::StyleContext& {
+        return style_context_;
+    }
+
+    auto NanNode::resolved_style_context() const -> const theme::ResolvedStyleContext& {
+        return resolved_style_context_;
+    }
+
     auto NanNode::add_child(std::shared_ptr<NanNode> child) -> NanNode& {
         return insert_child(children_.size(), std::move(child));
     }
@@ -100,6 +119,8 @@ namespace nandina::scene
             children_.begin() + static_cast<std::ptrdiff_t>(std::min(index, children_.size())),
             std::move(child)
         );
+
+        raw->_resolve_style_context(&resolved_style_context_);
 
         // If this node is already in a tree, propagate enter_tree to the new subtree.
         if (tree_) {
@@ -166,6 +187,7 @@ namespace nandina::scene
                     child._propagate_exit_tree();
                 }
                 child.parent_.reset();
+                child._resolve_style_context(nullptr);
                 auto result = std::move(*it);
                 children_.erase(it);
                 if (auto* control = as_control(); control != nullptr) {
@@ -261,6 +283,14 @@ namespace nandina::scene
 
     void NanNode::apply_font_context(text::FontPipelineCache& /*context*/) {}
 
+    void NanNode::on_style_context_changed(
+        const theme::ResolvedStyleContext& /*context*/
+    ) {}
+
+    void NanNode::on_theme_changed(const theme::ThemeManager& /*manager*/) {}
+
+    void NanNode::on_theme_context_removed() {}
+
     void NanNode::_set_tree(NanSceneTree* tree) {
         tree_ = tree;
     }
@@ -280,11 +310,16 @@ namespace nandina::scene
             child->parent_ = self;
         }
         tree_ = tree;
+        const auto* inherited = parent() != nullptr ? &parent()->resolved_style_context_ : nullptr;
+        _resolve_style_context(inherited);
         if (const auto* pipeline = tree->default_text_pipeline(); pipeline != nullptr) {
             apply_default_text_pipeline(*pipeline);
         }
         if (auto* context = tree->font_context(); context != nullptr) {
             apply_font_context(*context);
+        }
+        if (const auto* manager = tree->theme_manager(); manager != nullptr) {
+            on_theme_changed(*manager);
         }
         on_enter_tree();
         for (auto& child: children_) {
@@ -307,6 +342,7 @@ namespace nandina::scene
 
     void NanNode::_propagate_exit_tree() {
         on_exit_tree();
+        on_theme_context_removed();
         for (auto& child: children_) {
             child->_propagate_exit_tree();
         }
@@ -325,6 +361,28 @@ namespace nandina::scene
         physics_step(dt);
         for (auto& child: children_) {
             child->_propagate_physics(dt);
+        }
+    }
+
+    void NanNode::_resolve_style_context(const theme::ResolvedStyleContext* inherited) {
+        resolved_style_context_ = theme::resolve_style_context(style_context_, inherited);
+        on_style_context_changed(resolved_style_context_);
+        for (auto& child: children_) {
+            child->_resolve_style_context(&resolved_style_context_);
+        }
+    }
+
+    void NanNode::_propagate_theme_changed(const theme::ThemeManager& manager) {
+        on_theme_changed(manager);
+        for (auto& child: children_) {
+            child->_propagate_theme_changed(manager);
+        }
+    }
+
+    void NanNode::_propagate_theme_context_removed() {
+        on_theme_context_removed();
+        for (auto& child: children_) {
+            child->_propagate_theme_context_removed();
         }
     }
 
@@ -350,6 +408,8 @@ namespace nandina::scene
 
         // Update world transform for this node (virtual: no RTTI in traversal).
         const auto saved_world = _push_draw_transform(ctx);
+        const float saved_opacity = ctx.opacity_;
+        ctx.opacity_ *= std::clamp(resolved_style_context_.opacity, 0.0F, 1.0F);
 
         on_draw(ctx);
 
@@ -370,6 +430,7 @@ namespace nandina::scene
             }
         }
 
+        ctx.opacity_ = saved_opacity;
         _pop_draw_transform(ctx, saved_world);
     }
 

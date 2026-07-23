@@ -93,11 +93,33 @@ namespace nandina::app
     }
 
     void NanApplication::set_theme(theme::NanTheme theme) {
-        theme_ = theme;
+        theme_manager_.set_theme(std::move(theme));
     }
 
     auto NanApplication::theme() const -> const theme::NanTheme& {
-        return theme_;
+        return theme_manager_.theme();
+    }
+
+    auto NanApplication::theme_manager() -> theme::ThemeManager& {
+        return theme_manager_;
+    }
+
+    auto NanApplication::theme_manager() const -> const theme::ThemeManager& {
+        return theme_manager_;
+    }
+
+    auto NanApplication::apply_styles(const theme::StyleDocument& document)
+        -> std::expected<void, std::string> {
+        return document.apply(theme_manager_, &font_families_);
+    }
+
+    auto NanApplication::load_styles(const std::filesystem::path& path)
+        -> std::expected<void, std::string> {
+        auto document = theme::load_style_document(path);
+        if (!document) {
+            return std::unexpected(document.error());
+        }
+        return apply_styles(*document);
     }
 
     auto NanApplication::resources() -> resource::ResourceManager& {

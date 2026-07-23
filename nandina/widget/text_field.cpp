@@ -7,6 +7,7 @@
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
 #include "../scene/scene_tree.hpp"
+#include "../theme/theme_manager.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -60,6 +61,7 @@ namespace nandina::widget
 
     void TextField::set_theme(theme::NanTheme theme) {
         theme_ = theme;
+        theme_explicit_ = true;
         apply_theme();
         mark_layout_dirty();
     }
@@ -91,6 +93,7 @@ namespace nandina::widget
             get_tree()->set_focus(nullptr);
         }
         apply_theme();
+        mark_layout_dirty();
     }
     auto TextField::disabled() const -> bool {
         return disabled_;
@@ -98,9 +101,25 @@ namespace nandina::widget
 
     void TextField::set_invalid(const bool value) {
         invalid_ = value;
+        apply_theme();
     }
     auto TextField::invalid() const -> bool {
         return invalid_;
+    }
+
+    auto TextField::visual_state() const -> theme::TextFieldVisualState {
+        auto state = theme::TextFieldVisualState::normal;
+        if (focused_) state = state | theme::TextFieldVisualState::focused;
+        if (disabled_) state = state | theme::TextFieldVisualState::disabled;
+        if (invalid_) state = state | theme::TextFieldVisualState::invalid;
+        return state;
+    }
+
+    auto TextField::resolved_style() const -> theme::TextFieldStyle {
+        if (theme_manager_ != nullptr) {
+            return theme_manager_->style().resolve_text_field(theme_, visual_state());
+        }
+        return theme::resolve_text_field_style(theme_, visual_state());
     }
 
     auto TextField::editable_text() -> primitives::EditableText& {
@@ -142,25 +161,47 @@ namespace nandina::widget
         mark_layout_dirty();
     }
 
+    void TextField::on_style_context_changed(const theme::ResolvedStyleContext& /*context*/) {
+        apply_theme();
+        mark_layout_dirty();
+    }
+
+    void TextField::on_theme_changed(const theme::ThemeManager& manager) {
+        theme_manager_ = &manager;
+        if (!theme_explicit_) {
+            theme_ = manager.theme();
+        }
+        apply_theme();
+        mark_layout_dirty();
+    }
+
+    void TextField::on_theme_context_removed() {
+        theme_manager_ = nullptr;
+    }
+
     void TextField::set_font(text::FontRequest request) {
+        font_explicit_ = true;
         edit_.text_node().set_font(request);
         placeholder_.set_font(std::move(request));
         mark_layout_dirty();
     }
 
     void TextField::set_font_family(resource::ResourceKey family) {
+        font_explicit_ = true;
         edit_.text_node().set_font_family(family);
         placeholder_.set_font_family(std::move(family));
         mark_layout_dirty();
     }
 
     void TextField::set_font_weight(const int weight) {
+        font_explicit_ = true;
         edit_.text_node().set_font_weight(weight);
         placeholder_.set_font_weight(weight);
         mark_layout_dirty();
     }
 
     void TextField::set_font_slant(const text::FontSlant slant) {
+        font_explicit_ = true;
         edit_.text_node().set_font_slant(slant);
         placeholder_.set_font_slant(slant);
         mark_layout_dirty();
@@ -173,12 +214,14 @@ namespace nandina::widget
     auto TextField::on_input(scene::InputEvent& event) -> bool {
         if (event.type() == scene::EventType::focus_enter) {
             focused_ = !disabled_;
+            apply_theme();
             return edit_.on_input(event);
         }
         else if (event.type() == scene::EventType::focus_leave) {
             focused_ = false;
             dragging_ = false;
             edit_.clear_composition();
+            apply_theme();
             return edit_.on_input(event);
         }
         if (disabled_) {
@@ -220,15 +263,15 @@ namespace nandina::widget
 
     void TextField::on_draw(render::DrawContext& ctx) {
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
-        const auto disabled_alpha = disabled_ ? theme_.tokens.opacity.disabled : 1.0F;
-        const auto border = invalid_ ? theme_.palette.error : theme_.palette.outline_variant;
-        surface_.set_fill(theme_.palette.surface_variant.with_alpha(disabled_alpha));
-        surface_.set_border(border.with_alpha(disabled_alpha), theme_.tokens.border.thin);
-        if (focused_ && !disabled_) {
+        const auto style = resolved_style();
+        surface_.set_fill(style.background);
+        surface_.set_border(style.border_color, style.border_width);
+        surface_.set_radius(style.radius);
+        if (style.focus_ring_width > 0.0F && style.focus_ring_color.alpha() > 0.0F) {
             ctx.device().draw_rect_outline(
-                world.expanded(theme_.tokens.border.focus_ring),
-                theme_.tokens.border.focus_ring,
-                (invalid_ ? theme_.palette.error : theme_.palette.primary).with_alpha(ctx.opacity())
+                world.expanded(style.focus_ring_width),
+                style.focus_ring_width,
+                style.focus_ring_color.with_alpha(style.focus_ring_color.alpha() * ctx.opacity())
             );
         }
         surface_.set_size(size());
@@ -275,30 +318,38 @@ namespace nandina::widget
     }
 
     void TextField::apply_theme() {
-        padding_x_ = theme_.tokens.spacing.md;
-        height_ = 40.0F;
-        const float state_alpha = disabled_ ? theme_.tokens.opacity.disabled : 1.0F;
+        const auto style = resolved_style();
+        padding_x_ = style.padding_x;
+        height_ = style.height;
 
-        surface_.set_fill(theme_.palette.surface_variant);
-        surface_.set_radius(theme_.tokens.radius.sm);
-        surface_.set_border(theme_.palette.outline_variant, theme_.tokens.border.thin);
+        surface_.set_fill(style.background);
+        surface_.set_radius(style.radius);
+        surface_.set_border(style.border_color, style.border_width);
 
+        const auto& context = resolved_style_context();
+        const auto font = context.font_from_context && !font_explicit_ ? context.font
+                                                                       : edit_.style().font;
+        const auto font_size = context.font_size_from_context
+            ? context.font_size
+            : style.font_size;
+        const auto text_color = context.text_color_from_context ? context.text_color
+                                                                 : style.foreground;
         const primitives::TextStyle value_style {
-            .color = theme_.palette.on_surface.with_alpha(state_alpha),
-            .font_size = theme_.tokens.typography.label_md,
-            .font = edit_.style().font,
+            .color = text_color,
+            .font_size = font_size,
+            .font = font,
             .overflow = primitives::TextOverflow::clip,
             .max_lines = 1,
         };
         const primitives::TextStyle placeholder_style {
-            .color = theme_.palette.on_surface_variant.with_alpha(0.72F * state_alpha),
-            .font_size = theme_.tokens.typography.label_md,
-            .font = placeholder_.style().font,
+            .color = context.text_color_from_context ? context.text_color : style.placeholder,
+            .font_size = font_size,
+            .font = font,
             .overflow = primitives::TextOverflow::ellipsis,
             .max_lines = 1,
         };
         edit_.set_style(value_style);
-        edit_.set_selection_color(theme_.palette.primary.with_alpha(0.32F));
+        edit_.set_selection_color(style.selection);
         placeholder_.set_style(placeholder_style);
     }
 

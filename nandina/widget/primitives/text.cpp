@@ -47,6 +47,9 @@ namespace nandina::widget::primitives
         }
         const bool font_changed = style_.font != style.font;
         style_ = style;
+        color_explicit_ = true;
+        font_size_explicit_ = true;
+        font_explicit_ = true;
         if (font_changed) {
             resolve_font();
         }
@@ -60,6 +63,7 @@ namespace nandina::widget::primitives
 
     void Text::set_color(foundation::NanColor color) {
         style_.color = color;
+        color_explicit_ = true;
     }
 
     auto Text::color() const -> foundation::NanColor {
@@ -68,6 +72,7 @@ namespace nandina::widget::primitives
 
     void Text::set_font_size(float size) {
         style_.font_size = size;
+        font_size_explicit_ = true;
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
@@ -80,6 +85,7 @@ namespace nandina::widget::primitives
         if (request.weight < 1 || request.weight > 1000) {
             throw std::invalid_argument("Text font weight must be between 1 and 1000");
         }
+        font_explicit_ = true;
         if (style_.font == request) {
             return;
         }
@@ -182,6 +188,31 @@ namespace nandina::widget::primitives
         resolve_font();
     }
 
+    void Text::on_style_context_changed(const theme::ResolvedStyleContext& context) {
+        bool metrics_changed = false;
+        bool font_changed = false;
+
+        if (!color_explicit_) {
+            style_.color = context.text_color;
+        }
+        if (!font_size_explicit_ && style_.font_size != context.font_size) {
+            style_.font_size = context.font_size;
+            metrics_changed = true;
+        }
+        if (!font_explicit_ && style_.font != context.font) {
+            style_.font = context.font;
+            font_changed = true;
+        }
+
+        if (font_changed) {
+            resolve_font();
+        }
+        if (metrics_changed) {
+            mark_layout_dirty();
+            update_metrics(last_layout_constraints());
+        }
+    }
+
     void Text::set_layout_backend(const ITextLayoutBackend& backend) {
         backend_ = &backend;
         pipeline_explicit_ = true;
@@ -246,6 +277,21 @@ namespace nandina::widget::primitives
     auto Text::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
         update_metrics(constraints);
         return size();
+    }
+
+    void Text::apply_component_color(foundation::NanColor color) {
+        if (!color_explicit_) {
+            style_.color = color;
+        }
+    }
+
+    void Text::apply_component_font_size(const float size) {
+        if (font_size_explicit_ || style_.font_size == size) {
+            return;
+        }
+        style_.font_size = size;
+        mark_layout_dirty();
+        update_metrics(last_layout_constraints());
     }
 
     void Text::update_metrics(scene::LayoutConstraints constraints) {

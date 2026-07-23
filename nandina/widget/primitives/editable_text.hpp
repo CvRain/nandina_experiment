@@ -65,6 +65,7 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto text_pipeline() const -> TextPipeline;
         void apply_default_text_pipeline(const TextPipeline& pipeline) override;
         void apply_font_context(text::FontPipelineCache& context) override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
 
         void draw_at(render::DrawContext& ctx, foundation::NanPoint position);
 

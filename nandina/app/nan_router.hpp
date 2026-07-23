@@ -12,6 +12,7 @@
 
 #include "../reactive/graph.hpp"
 #include "../scene/control.hpp"
+#include "../theme/theme_manager.hpp"
 #include "nan_page.hpp"
 #include "nan_store.hpp"
 #include "async_scope.hpp"
@@ -33,6 +34,17 @@ namespace nandina::app
         explicit NanRouter(
             reactive::Graph& graph,
             const theme::NanTheme& theme,
+            NanStore* store = nullptr,
+            NanTypeKey store_key = nullptr,
+            resource::ResourceManager* resources = nullptr,
+            text::FontLoader* font_loader = nullptr,
+            text::FontFamilyRegistry* font_families = nullptr,
+            UiDispatcher* dispatcher = nullptr,
+            BackgroundExecutor* background_executor = nullptr
+        );
+        explicit NanRouter(
+            reactive::Graph& graph,
+            theme::ThemeManager& theme_manager,
             NanStore* store = nullptr,
             NanTypeKey store_key = nullptr,
             resource::ResourceManager* resources = nullptr,
@@ -127,6 +139,7 @@ namespace nandina::app
 
         reactive::Graph* graph_;
         const theme::NanTheme* theme_;
+        theme::ThemeManager* theme_manager_ = nullptr;
         NanStore* store_ = nullptr;
         NanTypeKey store_key_ = nullptr;
         resource::ResourceManager* resources_ = nullptr;

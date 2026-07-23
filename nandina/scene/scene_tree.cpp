@@ -48,6 +48,7 @@ namespace nandina::scene
     }
 
     NanSceneTree::~NanSceneTree() {
+        clear_theme_manager();
         pointer_capture_.reset();
         _transition_hover(nullptr, has_mouse_pos_ ? last_mouse_pos_ : foundation::NanPoint {});
         _transition_focus(nullptr);
@@ -158,6 +159,49 @@ namespace nandina::scene
 
     auto NanSceneTree::font_context() const noexcept -> text::FontPipelineCache* {
         return font_context_;
+    }
+
+    void NanSceneTree::set_theme_manager(theme::ThemeManager& manager) {
+        if (theme_manager_ == &manager) {
+            return;
+        }
+        clear_theme_manager();
+        theme_manager_ = &manager;
+        theme_manager_->add_observer(*this);
+        on_theme_revision_changed(manager);
+    }
+
+    void NanSceneTree::clear_theme_manager() noexcept {
+        if (theme_manager_ == nullptr) {
+            return;
+        }
+        theme_manager_->remove_observer(*this);
+        theme_manager_ = nullptr;
+        if (root_) {
+            root_->_propagate_theme_context_removed();
+        }
+    }
+
+    auto NanSceneTree::theme_manager() const noexcept -> theme::ThemeManager* {
+        return theme_manager_;
+    }
+
+    void NanSceneTree::on_theme_revision_changed(const theme::ThemeManager& manager) {
+        if (root_) {
+            root_->_propagate_theme_changed(manager);
+        }
+    }
+
+    void NanSceneTree::on_theme_manager_destroyed(
+        const theme::ThemeManager& manager
+    ) noexcept {
+        if (theme_manager_ != &manager) {
+            return;
+        }
+        theme_manager_ = nullptr;
+        if (root_) {
+            root_->_propagate_theme_context_removed();
+        }
     }
 
     auto NanSceneTree::process(const float dt) -> void {

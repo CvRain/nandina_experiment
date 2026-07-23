@@ -4,6 +4,7 @@
 
 #include "button.hpp"
 #include "../render/draw_context.hpp"
+#include "../theme/theme_manager.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -79,22 +80,44 @@ namespace nandina::widget
         mark_layout_dirty();
     }
 
+    void Button::on_style_context_changed(const theme::ResolvedStyleContext& /*context*/) {
+        mark_layout_dirty();
+        apply_text_style(visual_state());
+    }
+
+    void Button::on_theme_changed(const theme::ThemeManager& manager) {
+        theme_manager_ = &manager;
+        if (!theme_explicit_) {
+            theme_ = manager.theme();
+        }
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    void Button::on_theme_context_removed() {
+        theme_manager_ = nullptr;
+    }
+
     void Button::set_font(text::FontRequest request) {
+        font_explicit_ = true;
         text_.set_font(std::move(request));
         mark_layout_dirty();
     }
 
     void Button::set_font_family(resource::ResourceKey family) {
+        font_explicit_ = true;
         text_.set_font_family(std::move(family));
         mark_layout_dirty();
     }
 
     void Button::set_font_weight(const int weight) {
+        font_explicit_ = true;
         text_.set_font_weight(weight);
         mark_layout_dirty();
     }
 
     void Button::set_font_slant(const text::FontSlant slant) {
+        font_explicit_ = true;
         text_.set_font_slant(slant);
         mark_layout_dirty();
     }
@@ -111,6 +134,7 @@ namespace nandina::widget
 
     void Button::set_theme(theme::NanTheme theme) {
         theme_ = theme;
+        theme_explicit_ = true;
         mark_layout_dirty();
         apply_metrics();
     }
@@ -165,6 +189,11 @@ namespace nandina::widget
     }
 
     auto Button::resolved_style() const -> theme::ButtonStyle {
+        if (theme_manager_ != nullptr) {
+            return theme_manager_->style().resolve_button(
+                theme_, tone_, treatment_, size_, visual_state()
+            );
+        }
         return theme::resolve_button_style(theme_, tone_, treatment_, size_, visual_state());
     }
 
@@ -217,13 +246,11 @@ namespace nandina::widget
     void Button::on_pressable_state_changed() {}
 
     auto Button::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
-        const auto style = theme::resolve_button_style(
-            theme_,
-            tone_,
-            treatment_,
-            size_,
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
-        );
+        const auto state = disabled() ? theme::ButtonVisualState::disabled
+                                      : theme::ButtonVisualState::normal;
+        const auto style = theme_manager_ != nullptr
+            ? theme_manager_->style().resolve_button(theme_, tone_, treatment_, size_, state)
+            : theme::resolve_button_style(theme_, tone_, treatment_, size_, state);
         apply_text_style(
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
@@ -244,13 +271,11 @@ namespace nandina::widget
     }
 
     void Button::apply_metrics() {
-        const auto style = theme::resolve_button_style(
-            theme_,
-            tone_,
-            treatment_,
-            size_,
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
-        );
+        const auto state = disabled() ? theme::ButtonVisualState::disabled
+                                      : theme::ButtonVisualState::normal;
+        const auto style = theme_manager_ != nullptr
+            ? theme_manager_->style().resolve_button(theme_, tone_, treatment_, size_, state)
+            : theme::resolve_button_style(theme_, tone_, treatment_, size_, state);
         apply_text_style(
             disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
         );
@@ -259,11 +284,14 @@ namespace nandina::widget
     }
 
     void Button::apply_text_style(theme::ButtonVisualState state) {
-        const auto style = theme::resolve_button_style(theme_, tone_, treatment_, size_, state);
+        const auto style = theme_manager_ != nullptr
+            ? theme_manager_->style().resolve_button(theme_, tone_, treatment_, size_, state)
+            : theme::resolve_button_style(theme_, tone_, treatment_, size_, state);
+        const auto& context = resolved_style_context();
         const primitives::TextStyle text_style {
-            .color = style.foreground,
-            .font_size = style.font_size,
-            .font = text_.font(),
+            .color = context.text_color_from_context ? context.text_color : style.foreground,
+            .font_size = context.font_size_from_context ? context.font_size : style.font_size,
+            .font = context.font_from_context && !font_explicit_ ? context.font : text_.font(),
             .overflow = text_overflow_,
             .max_lines = 1,
         };

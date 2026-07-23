@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_SCENE_TREE_HPP
 
 #include "../widget/primitives/text_layout_backend.hpp"
+#include "../theme/theme_manager.hpp"
 #include "frame_scheduler.hpp"
 #include "input_event.hpp"
 #include "node2d.hpp"
@@ -38,7 +39,7 @@ namespace nandina::scene
      * Also provides front-to-back hit-testing, hover tracking, and focus dispatch.
      * Hit-testing may use a world-space bounds coarse pass before local-space fine tests.
      */
-    class NanSceneTree {
+    class NanSceneTree: private theme::ThemeObserver {
     public:
         class PhaseScope {
         public:
@@ -84,6 +85,9 @@ namespace nandina::scene
         void set_font_context(text::FontPipelineCache& context) noexcept;
         void clear_font_context() noexcept;
         [[nodiscard]] auto font_context() const noexcept -> text::FontPipelineCache*;
+        void set_theme_manager(theme::ThemeManager& manager);
+        void clear_theme_manager() noexcept;
+        [[nodiscard]] auto theme_manager() const noexcept -> theme::ThemeManager*;
 
         // ---- per-frame traversal ----
 
@@ -180,6 +184,8 @@ namespace nandina::scene
         [[nodiscard]] static auto _input_enabled_for(const NanNode* node) -> bool;
         auto _flush_deletes() -> void;
         auto _layout_root_once(foundation::NanSize viewport_size) -> bool;
+        void on_theme_revision_changed(const theme::ThemeManager& manager) override;
+        void on_theme_manager_destroyed(const theme::ThemeManager& manager) noexcept override;
 
         std::shared_ptr<NanNode2D> root_;
         // Deferred-delete requests and interaction targets are weak: if a node is
@@ -195,6 +201,7 @@ namespace nandina::scene
         bool has_mouse_pos_ = false;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         text::FontPipelineCache* font_context_ = nullptr;
+        theme::ThemeManager* theme_manager_ = nullptr;
         FramePhase phase_ = FramePhase::idle;
     };
 

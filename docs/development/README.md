@@ -244,7 +244,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, and A5 UI dispatch/async scope are implemented. The active main line is A6 font requests and style context, followed by theme rules, accessibility, and a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, and A7 theme rules are implemented. The active main line is A8 accessibility semantics, followed by a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -527,13 +527,17 @@ Only the UI thread may mutate widgets. `UiDispatcher` captures that thread, acce
 
 ### A6. Font Requests And Style Context
 
-Status: A6a font requests and window resolution context implemented; four-state inherited style values remain pending.
+Status: complete.
 
 Replace the scene-wide fixed default `TextPipeline` assumption with a window font-resolution context backed by `FontFamilyRegistry` and `FontPipelineCache`. Extend text style/request with logical family, weight, and slant. Add imperative controls such as `set_font_family()`, `set_font_weight()`, and `set_font()`; explicit low-level pipelines remain a supported override.
 
 Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, locale/direction, and opacity inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not.
 
+`StyleContext` is stored on every scene node and resolves against the nearest parent into a `ResolvedStyleContext`. Changes propagate immediately through attached or detached subtrees; detaching a node clears inherited results, while `initial` cuts a single property back to its framework default. Text primitives consume inherited font requests, font size, and color unless an instance setter or complete `TextStyle` has supplied an explicit override. Resolved opacity multiplies through `DrawContext`, so nested styled subtrees preserve the existing renderer-independent opacity contract.
+
 ### A7. NanStyle And ThemeManager
+
+Status: complete.
 
 Keep the shadcn-like primitives + tokens + semantic variant model. `NanStyle` maps component type/variant/state to token references and can be subclassed for application-specific rule algorithms. `ThemeManager` owns named light/dark/high-contrast token sets and a revision; switching themes marks style roots dirty.
 
@@ -551,6 +555,35 @@ component instance overrides
 Token references re-resolve on theme changes. Literal instance values remain fixed. A child with no typography override follows its nearest parent context; its background/layout continue to use its own component rule. A child may request `initial` to ignore inherited text style or `inherit` to force inheritance.
 
 Structured `styles.toml` is a data authoring form for tokens, named themes, font-family declarations, and ordinary component mappings. It must compile to the same `NanStyle`/ThemeManager objects used by C++ configuration, not create a separate style engine.
+
+`ThemeManager` owns named `NanTheme` values, the active `NanStyle`, and a monotonic revision. Scene trees observe that revision and recursively notify mounted widgets; Button, TextField, Label, Router, and newly built pages therefore see the current theme without rebuilding the scene. Token-backed rules resolve again for every revision, while literal rule values and explicit widget themes remain fixed. `NanStyle` provides ordered, wildcard-capable Button and TextField rules and virtual typed resolvers for application-specific algorithms. TextField state uses composable focused/disabled/invalid flags instead of losing one state when another is active.
+
+`StyleDocument` parses C++-independent theme data and installs it into the same runtime objects. Font families are registered in two phases before fallback/default links are applied, allowing forward references inside one document. Applications may call `NanApplication::load_styles()` before opening their window, or parse/apply a document explicitly:
+
+```toml
+active_theme = "dark"
+
+[themes.dark.palette]
+primary = [0.31, 0.12, 250.0, 1.0]
+
+[themes.dark.tokens.spacing]
+xl = 33.0
+
+[[styles.button]]
+treatment = "ghost"
+background = "$palette.primary"
+padding_x = "$tokens.spacing.xl"
+radius = 12.0
+
+[[styles.text_field]]
+state = "focused"
+border_color = "$palette.primary"
+
+[[fonts.family]]
+name = "families/application-ui"
+default = true
+faces = [{ resource = "fonts/application-ui/medium", weight = 500 }]
+```
 
 ### A8. Accessibility Semantics
 

@@ -98,8 +98,17 @@ module_render = files(
 module_theme = files(
     'theme/tokens.hpp',
     'theme/theme.hpp',
+    'theme/style_context.hpp',
     'theme/button_style.hpp',
     'theme/button_style.cpp',
+    'theme/text_field_style.hpp',
+    'theme/text_field_style.cpp',
+    'theme/nan_style.hpp',
+    'theme/nan_style.cpp',
+    'theme/theme_manager.hpp',
+    'theme/theme_manager.cpp',
+    'theme/style_document.hpp',
+    'theme/style_document.cpp',
 )
 
 module_text = files(
@@ -174,7 +183,7 @@ if box2d_dep.found()
 endif
 
 # 创建静态库
-nandina_dependencies = [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep]
+nandina_dependencies = [sdl_dep, spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep, tomlplusplus_dep]
 nandina_cpp_args = [
     '-DNANDINA_BUILTIN_DEFAULT_FONT_SIZE=' + builtin_font_size.to_string(),
     '-DNANDINA_BUILTIN_DEFAULT_FONT_LICENSE_SIZE=' + builtin_font_license_size.to_string(),

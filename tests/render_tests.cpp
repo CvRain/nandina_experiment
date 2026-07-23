@@ -257,17 +257,29 @@ TEST_CASE("nested control overflow clips are intersected", "[render][clip][contr
 }
 
 TEST_CASE("inherited opacity multiplies down the tree", "[render][opacity]") {
-    // RectNode folds ctx.opacity() into alpha. Base opacity is 1.0 (no opacity
-    // inheritance API on Node2D yet), so this verifies the identity case: a
-    // node tagged 0.5 draws at 0.5 when ctx.opacity() == 1.
     RecordingDevice dev;
     scene::NanSceneTree tree;
-    tree.set_root(std::make_shared<RectNode>(0.5F));
+    auto root = std::make_shared<RectNode>(1.0F);
+    auto inherited_child = std::make_shared<RectNode>(1.0F);
+    auto initial_child = std::make_shared<RectNode>(1.0F);
+
+    theme::StyleContext root_style;
+    root_style.opacity = theme::StyleValue<float>::explicit_value(0.5F);
+    root->set_style_context(root_style);
+
+    theme::StyleContext initial_style;
+    initial_style.opacity = theme::StyleValue<float>::initial();
+    initial_child->set_style_context(initial_style);
+    root->add_child(inherited_child);
+    root->add_child(initial_child);
+    tree.set_root(root);
 
     tree.draw(dev);
 
-    REQUIRE(dev.rects.size() == 1);
+    REQUIRE(dev.rects.size() == 3);
     REQUIRE(dev.rects[0].alpha == Catch::Approx(0.5F));
+    REQUIRE(dev.rects[1].alpha == Catch::Approx(0.25F));
+    REQUIRE(dev.rects[2].alpha == Catch::Approx(0.5F));
 }
 
 TEST_CASE("canvas layers draw by layer order and reset their transform", "[render][canvas-layer]") {

@@ -33,6 +33,9 @@ namespace nandina::widget
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
         void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
         void apply_font_context(text::FontPipelineCache& context) override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
+        void on_theme_changed(const theme::ThemeManager& manager) override;
+        void on_theme_context_removed() override;
         void set_font(text::FontRequest request);
         void set_font_family(resource::ResourceKey family);
         void set_font_weight(int weight);
@@ -69,6 +72,9 @@ namespace nandina::widget
 
         primitives::Text text_;
         theme::NanTheme theme_;
+        const theme::ThemeManager* theme_manager_ = nullptr;
+        bool theme_explicit_ = false;
+        bool font_explicit_ = false;
         theme::ButtonTone tone_ = theme::ButtonTone::primary;
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;
         theme::ButtonSize size_ = theme::ButtonSize::medium;

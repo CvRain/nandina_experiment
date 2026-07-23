@@ -50,6 +50,31 @@ namespace nandina::app
         background_executor_(background_executor),
         host_(std::make_shared<PageHost>()) {}
 
+    NanRouter::NanRouter(
+        reactive::Graph& graph,
+        theme::ThemeManager& theme_manager,
+        NanStore* store,
+        NanTypeKey store_key,
+        resource::ResourceManager* resources,
+        text::FontLoader* font_loader,
+        text::FontFamilyRegistry* font_families,
+        UiDispatcher* dispatcher,
+        BackgroundExecutor* background_executor
+    ):
+        NanRouter(
+            graph,
+            theme_manager.theme(),
+            store,
+            store_key,
+            resources,
+            font_loader,
+            font_families,
+            dispatcher,
+            background_executor
+        ) {
+        theme_manager_ = &theme_manager;
+    }
+
     auto NanRouter::host() -> std::shared_ptr<scene::NanControl> {
         return host_;
     }
@@ -59,7 +84,7 @@ namespace nandina::app
     }
 
     auto NanRouter::theme() const -> const theme::NanTheme& {
-        return *theme_;
+        return theme_manager_ != nullptr ? theme_manager_->theme() : *theme_;
     }
 
     auto NanRouter::store_base() -> NanStore* {
@@ -142,7 +167,7 @@ namespace nandina::app
             *this,
             *graph_,
             *scope,
-            *theme_,
+            theme(),
             store_,
             store_key_,
             resources_,

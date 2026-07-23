@@ -11,6 +11,7 @@
 #include "theme/theme.hpp"
 
 #include <catch2/catch_test_macros.hpp>
+#include <catch2/catch_approx.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -277,6 +278,23 @@ TEST_CASE("router supports no-params pages and passes theme through context", "[
     auto* control = static_cast<scene::NanControl*>(root);
     REQUIRE(control->background().has_value());
     REQUIRE(control->background()->alpha() == app_theme.palette.primary.alpha());
+}
+
+TEST_CASE("router reads the active ThemeManager theme for new pages", "[app][router][theme]") {
+    reactive::Graph graph;
+    theme::ThemeManager manager;
+    auto first = theme::default_theme();
+    first.palette.primary = theme::nan_color(0.41F, 0.12F, 120.0F);
+    auto second = theme::default_theme();
+    second.palette.primary = theme::nan_color(0.73F, 0.12F, 120.0F);
+    REQUIRE(manager.register_theme("first", first));
+    REQUIRE(manager.register_theme("second", second));
+    REQUIRE(manager.activate("first"));
+
+    app::NanRouter router {graph, manager};
+    REQUIRE(router.theme().palette.primary.oklch().light == Catch::Approx(0.41F));
+    REQUIRE(manager.activate("second"));
+    REQUIRE(router.theme().palette.primary.oklch().light == Catch::Approx(0.73F));
 }
 
 TEST_CASE("router clears page reactive scope when a frame is popped", "[app][router][scope]") {

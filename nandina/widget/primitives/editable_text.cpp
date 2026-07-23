@@ -191,6 +191,11 @@ namespace nandina::widget::primitives
         mark_layout_dirty();
     }
 
+    void EditableText::on_style_context_changed(const theme::ResolvedStyleContext& context) {
+        text_.on_style_context_changed(context);
+        mark_layout_dirty();
+    }
+
     void EditableText::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
         if (has_selection()) {
             const auto& layout = text_.layout_result();

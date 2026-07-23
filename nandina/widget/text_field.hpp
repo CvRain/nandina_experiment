@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_WIDGET_TEXT_FIELD_HPP
 
 #include "../theme/theme.hpp"
+#include "../theme/text_field_style.hpp"
 #include "primitives/editable_text.hpp"
 #include "primitives/surface.hpp"
 #include "primitives/text.hpp"
@@ -50,6 +51,8 @@ namespace nandina::widget
         [[nodiscard]] auto disabled() const -> bool;
         void set_invalid(bool value);
         [[nodiscard]] auto invalid() const -> bool;
+        [[nodiscard]] auto visual_state() const -> theme::TextFieldVisualState;
+        [[nodiscard]] auto resolved_style() const -> theme::TextFieldStyle;
 
         [[nodiscard]] auto editable_text() -> primitives::EditableText&;
         [[nodiscard]] auto editable_text() const -> const primitives::EditableText&;
@@ -60,6 +63,9 @@ namespace nandina::widget
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
         void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
         void apply_font_context(text::FontPipelineCache& context) override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
+        void on_theme_changed(const theme::ThemeManager& manager) override;
+        void on_theme_context_removed() override;
         void set_font(text::FontRequest request);
         void set_font_family(resource::ResourceKey family);
         void set_font_weight(int weight);
@@ -89,6 +95,9 @@ namespace nandina::widget
         primitives::EditableText edit_;
         primitives::Text placeholder_;
         theme::NanTheme theme_;
+        const theme::ThemeManager* theme_manager_ = nullptr;
+        bool theme_explicit_ = false;
+        bool font_explicit_ = false;
         float padding_x_ = 0.0F;
         float height_ = 0.0F;
         float scroll_x_ = 0.0F;

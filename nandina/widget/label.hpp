@@ -50,12 +50,15 @@ namespace nandina::widget
     protected:
         void on_ready() override;
         void on_exit_tree() override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
+        void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
         void activate_binding();
 
         reactive::EffectScope scope_;
         std::function<void(reactive::EffectScope&, primitives::Text&)> binding_;
+        theme::NanTheme theme_;
     };
 
 } // namespace nandina::widget

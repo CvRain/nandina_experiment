@@ -13,6 +13,8 @@
 #include <string_view>
 #include <vector>
 
+#include "../theme/style_context.hpp"
+
 namespace nandina::scene
 {
 
@@ -37,6 +39,11 @@ namespace nandina::widget::primitives
 namespace nandina::text
 {
     class FontPipelineCache;
+}
+
+namespace nandina::theme
+{
+    class ThemeManager;
 }
 
 namespace nandina::scene
@@ -98,6 +105,12 @@ namespace nandina::scene
 
         /// The scene tree this node belongs to, or nullptr.
         [[nodiscard]] auto get_tree() const -> NanSceneTree*;
+
+        void set_style_context(theme::StyleContext context);
+        void clear_style_context();
+        [[nodiscard]] auto style_context() const -> const theme::StyleContext&;
+        [[nodiscard]] auto resolved_style_context() const
+            -> const theme::ResolvedStyleContext&;
 
         // ---- child management ----
 
@@ -216,6 +229,10 @@ namespace nandina::scene
         virtual void apply_default_text_pipeline(const widget::primitives::TextPipeline& pipeline);
         virtual void apply_font_context(text::FontPipelineCache& context);
 
+        virtual void on_style_context_changed(const theme::ResolvedStyleContext& context);
+        virtual void on_theme_changed(const theme::ThemeManager& manager);
+        virtual void on_theme_context_removed();
+
     protected:
         /// Internal: set the owning scene tree (called by NanSceneTree).
         void _set_tree(NanSceneTree* tree);
@@ -232,6 +249,9 @@ namespace nandina::scene
         /// Internal: process this node then recursively process children.
         void _propagate_process(float dt);
         void _propagate_physics(float dt);
+        void _resolve_style_context(const theme::ResolvedStyleContext* inherited);
+        void _propagate_theme_changed(const theme::ThemeManager& manager);
+        void _propagate_theme_context_removed();
 
         /// Internal: draw this node then recursively draw children (top-down).
         /// Threads world transform + inherited opacity + clip via the context.
@@ -260,6 +280,8 @@ namespace nandina::scene
         // outlives the nodes, so a raw pointer is safe here (a tree is not a node).
         NanSceneTree* tree_ = nullptr;
         std::string name_;
+        theme::StyleContext style_context_;
+        theme::ResolvedStyleContext resolved_style_context_;
 
         /// True once on_ready() has fired for the current tree membership.
         /// Guards against double-ready when children are added during on_enter_tree().

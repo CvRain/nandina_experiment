@@ -618,3 +618,80 @@ TEST_CASE("modifiers propagate through button and key events", "[scene][modifier
     REQUIRE(btn.modifiers().ctrl);
     REQUIRE(btn.type() == scene::EventType::mouse_button);
 }
+
+TEST_CASE("StyleContext resolves four-state inherited values", "[scene][style]") {
+    const auto inherited = theme::ResolvedStyleContext {
+        .font_size = 24.0F,
+        .opacity = 0.6F,
+        .locale = "zh-CN",
+        .direction = theme::TextDirection::left_to_right,
+    };
+
+    theme::StyleContext local;
+    local.font_size = theme::StyleValue<float>::initial();
+    local.opacity = theme::StyleValue<float>::explicit_value(0.8F);
+    local.locale = theme::StyleValue<std::string>::inherit();
+    local.direction = theme::StyleValue<theme::TextDirection>::explicit_value(
+        theme::TextDirection::right_to_left
+    );
+
+    const auto resolved = theme::resolve_style_context(local, &inherited);
+    REQUIRE(resolved.font_size == Catch::Approx(16.0F));
+    REQUIRE(resolved.opacity == Catch::Approx(0.8F));
+    REQUIRE(resolved.locale == "zh-CN");
+    REQUIRE(resolved.direction == theme::TextDirection::right_to_left);
+    REQUIRE(theme::resolve_style_value(local.font_size, 12.0F, &inherited.font_size, false)
+            == Catch::Approx(12.0F));
+    REQUIRE(
+        theme::resolve_style_value(
+            theme::StyleValue<int> {},
+            3,
+            static_cast<const int*>(nullptr),
+            false
+        )
+        == 3
+    );
+    REQUIRE_THROWS_AS(local.font_size.value(), std::logic_error);
+}
+
+TEST_CASE("StyleContext changes propagate through the scene hierarchy", "[scene][style]") {
+    auto root = std::make_shared<scene::NanNode2D>();
+    auto inherited_child = std::make_shared<scene::NanNode2D>();
+    auto initial_child = std::make_shared<scene::NanNode2D>();
+    auto grandchild = std::make_shared<scene::NanNode2D>();
+
+    theme::StyleContext initial_override;
+    initial_override.font_size = theme::StyleValue<float>::initial();
+    initial_child->set_style_context(initial_override);
+    initial_child->add_child(grandchild);
+    root->add_child(inherited_child);
+    root->add_child(initial_child);
+
+    theme::StyleContext root_style;
+    root_style.font_size = theme::StyleValue<float>::explicit_value(24.0F);
+    root_style.locale = theme::StyleValue<std::string>::explicit_value("zh-CN");
+    root->set_style_context(root_style);
+
+    REQUIRE(inherited_child->resolved_style_context().font_size == Catch::Approx(24.0F));
+    REQUIRE(inherited_child->resolved_style_context().locale == "zh-CN");
+    REQUIRE(initial_child->resolved_style_context().font_size == Catch::Approx(16.0F));
+    REQUIRE(grandchild->resolved_style_context().font_size == Catch::Approx(16.0F));
+    REQUIRE(grandchild->resolved_style_context().locale == "zh-CN");
+
+    root_style.font_size = theme::StyleValue<float>::explicit_value(30.0F);
+    root_style.locale = theme::StyleValue<std::string>::explicit_value("en-GB");
+    root->set_style_context(root_style);
+
+    REQUIRE(inherited_child->resolved_style_context().font_size == Catch::Approx(30.0F));
+    REQUIRE(inherited_child->resolved_style_context().locale == "en-GB");
+    REQUIRE(initial_child->resolved_style_context().font_size == Catch::Approx(16.0F));
+    REQUIRE(grandchild->resolved_style_context().locale == "en-GB");
+
+    auto detached = root->remove_child(*inherited_child);
+    REQUIRE(detached->resolved_style_context().font_size == Catch::Approx(16.0F));
+    REQUIRE(detached->resolved_style_context().locale == "und");
+
+    root->add_child(detached);
+    REQUIRE(detached->resolved_style_context().font_size == Catch::Approx(30.0F));
+    REQUIRE(detached->resolved_style_context().locale == "en-GB");
+}

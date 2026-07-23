@@ -3,6 +3,7 @@
 //
 
 #include "label.hpp"
+#include "../theme/theme_manager.hpp"
 
 #include <utility>
 
@@ -11,9 +12,10 @@ namespace nandina::widget
 
     Label::Label(reactive::Graph& graph, std::string text, theme::NanTheme theme):
         primitives::Text(std::move(text)),
-        scope_(graph) {
-        set_color(theme.palette.on_surface);
-        set_font_size(theme.tokens.typography.label_lg);
+        scope_(graph),
+        theme_(std::move(theme)) {
+        apply_component_color(theme_.palette.on_surface);
+        apply_component_font_size(theme_.tokens.typography.label_lg);
     }
 
     auto Label::create(reactive::Graph& graph, std::string text, theme::NanTheme theme)
@@ -37,6 +39,26 @@ namespace nandina::widget
         scope_.clear();
         binding_ = {};
         primitives::Text::on_exit_tree();
+    }
+
+    void Label::on_theme_changed(const theme::ThemeManager& manager) {
+        theme_ = manager.theme();
+        if (!resolved_style_context().text_color_from_context) {
+            apply_component_color(theme_.palette.on_surface);
+        }
+        if (!resolved_style_context().font_size_from_context) {
+            apply_component_font_size(theme_.tokens.typography.label_lg);
+        }
+    }
+
+    void Label::on_style_context_changed(const theme::ResolvedStyleContext& context) {
+        primitives::Text::on_style_context_changed(context);
+        if (!context.text_color_from_context) {
+            apply_component_color(theme_.palette.on_surface);
+        }
+        if (!context.font_size_from_context) {
+            apply_component_font_size(theme_.tokens.typography.label_lg);
+        }
     }
 
 } // namespace nandina::widget

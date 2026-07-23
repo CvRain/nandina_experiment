@@ -56,7 +56,9 @@ namespace nandina::app
 
     NanWindow::NanWindow(NanApplication& app, WindowConfig config):
         app_(app),
-        config_(std::move(config)) {}
+        config_(std::move(config)) {
+        tree_.set_theme_manager(app_.theme_manager());
+    }
 
     NanWindow::~NanWindow() {
         // 若 run 未显式 close (异常路径), 兜底关闭窗口。
@@ -72,7 +74,7 @@ namespace nandina::app
     auto NanWindow::use_router() -> NanRouter& {
         router_ = std::make_unique<NanRouter>(
             app_.graph(),
-            app_.theme(),
+            app_.theme_manager(),
             app_.store_base(),
             app_.store_type_key(),
             &app_.resources(),
