@@ -126,6 +126,7 @@ namespace nandina::app
             app_.font_loader(),
             app_.font_families()
         );
+        tree_.set_font_context(*font_pipeline_cache_);
         auto pipeline = font_pipeline_cache_->get({});
         if (!pipeline) {
             font_pipeline_cache_.reset();
@@ -137,7 +138,6 @@ namespace nandina::app
         }
         default_font_pipeline_ = *pipeline;
         default_text_pipeline_ = default_font_pipeline_->pipeline();
-        tree_.set_default_text_pipeline(*default_text_pipeline_);
         opened_ = true;
 
         log::get("app.window").info(
@@ -285,6 +285,7 @@ namespace nandina::app
         }
         tree_.set_root(nullptr);
         tree_.clear_default_text_pipeline();
+        tree_.clear_font_context();
         default_text_pipeline_.reset();
         default_font_pipeline_.reset();
         font_pipeline_cache_.reset();

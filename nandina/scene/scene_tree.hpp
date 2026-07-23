@@ -20,6 +20,11 @@ namespace nandina::render
     class IRenderDevice;
 } // namespace nandina::render
 
+namespace nandina::text
+{
+    class FontPipelineCache;
+}
+
 namespace nandina::scene
 {
 
@@ -76,6 +81,9 @@ namespace nandina::scene
         void set_default_text_pipeline(widget::primitives::TextPipeline pipeline);
         void clear_default_text_pipeline();
         [[nodiscard]] auto default_text_pipeline() const -> const widget::primitives::TextPipeline*;
+        void set_font_context(text::FontPipelineCache& context) noexcept;
+        void clear_font_context() noexcept;
+        [[nodiscard]] auto font_context() const noexcept -> text::FontPipelineCache*;
 
         // ---- per-frame traversal ----
 
@@ -186,6 +194,7 @@ namespace nandina::scene
         foundation::NanPoint last_mouse_pos_ {};
         bool has_mouse_pos_ = false;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
+        text::FontPipelineCache* font_context_ = nullptr;
         FramePhase phase_ = FramePhase::idle;
     };
 

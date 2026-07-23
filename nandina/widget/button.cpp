@@ -74,6 +74,31 @@ namespace nandina::widget
         mark_layout_dirty();
     }
 
+    void Button::apply_font_context(text::FontPipelineCache& context) {
+        text_.apply_font_context(context);
+        mark_layout_dirty();
+    }
+
+    void Button::set_font(text::FontRequest request) {
+        text_.set_font(std::move(request));
+        mark_layout_dirty();
+    }
+
+    void Button::set_font_family(resource::ResourceKey family) {
+        text_.set_font_family(std::move(family));
+        mark_layout_dirty();
+    }
+
+    void Button::set_font_weight(const int weight) {
+        text_.set_font_weight(weight);
+        mark_layout_dirty();
+    }
+
+    void Button::set_font_slant(const text::FontSlant slant) {
+        text_.set_font_slant(slant);
+        mark_layout_dirty();
+    }
+
     void Button::set_text_overflow(primitives::TextOverflow overflow) {
         text_overflow_ = overflow;
         mark_layout_dirty();
@@ -238,6 +263,7 @@ namespace nandina::widget
         const primitives::TextStyle text_style {
             .color = style.foreground,
             .font_size = style.font_size,
+            .font = text_.font(),
             .overflow = text_overflow_,
             .max_lines = 1,
         };

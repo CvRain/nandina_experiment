@@ -6,6 +6,8 @@
 #include "text/font_family.hpp"
 #include "text/font_pipeline.hpp"
 #include "text/harfbuzz_text_backend.hpp"
+#include "scene/scene_tree.hpp"
+#include "widget/primitives/text.hpp"
 
 #include <filesystem>
 #include <fstream>
@@ -167,6 +169,24 @@ TEST_CASE("FontPipelineCache owns ordered render resources", "[resource][font][p
     REQUIRE((*first)->pipeline().backend != nullptr);
     REQUIRE((*first)->pipeline().renderer != nullptr);
     REQUIRE(device.next_texture == 2);
+
+    auto text_node = std::make_shared<widget::primitives::Text>("context font");
+    text_node->set_font_family(resource::ResourceKey("families/ui"));
+    scene::NanSceneTree tree;
+    tree.set_font_context(cache);
+    tree.set_root(text_node);
+    REQUIRE(text_node->font().family == resource::ResourceKey("families/ui"));
+    auto requested = cache.get(text_node->font());
+    REQUIRE(requested.has_value());
+    REQUIRE(text_node->text_pipeline().backend == (*requested)->pipeline().backend);
+
+    auto explicit_text = std::make_shared<widget::primitives::Text>("explicit pipeline");
+    const widget::primitives::TextPipeline explicit_pipeline {
+        .backend = &widget::primitives::deterministic_text_layout_backend(),
+    };
+    explicit_text->set_text_pipeline(explicit_pipeline);
+    tree.set_root(explicit_text);
+    REQUIRE(explicit_text->text_pipeline().backend == explicit_pipeline.backend);
 }
 
 TEST_CASE("builtin default family creates a portable text pipeline", "[resource][font][builtin]") {

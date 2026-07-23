@@ -4,6 +4,7 @@
 
 #include "text.hpp"
 #include "../../render/draw_context.hpp"
+#include "../../text/font_pipeline.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -41,7 +42,14 @@ namespace nandina::widget::primitives
 
     void Text::set_style(TextStyle style) {
         style.max_lines = std::max(1, style.max_lines);
+        if (style.font.weight < 1 || style.font.weight > 1000) {
+            throw std::invalid_argument("Text font weight must be between 1 and 1000");
+        }
+        const bool font_changed = style_.font != style.font;
         style_ = style;
+        if (font_changed) {
+            resolve_font();
+        }
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
@@ -66,6 +74,45 @@ namespace nandina::widget::primitives
 
     auto Text::font_size() const -> float {
         return style_.font_size;
+    }
+
+    void Text::set_font(text::FontRequest request) {
+        if (request.weight < 1 || request.weight > 1000) {
+            throw std::invalid_argument("Text font weight must be between 1 and 1000");
+        }
+        if (style_.font == request) {
+            return;
+        }
+        style_.font = std::move(request);
+        resolve_font();
+    }
+
+    void Text::set_font_family(resource::ResourceKey family) {
+        auto request = style_.font;
+        request.family = std::move(family);
+        set_font(std::move(request));
+    }
+
+    void Text::clear_font_family() {
+        auto request = style_.font;
+        request.family.reset();
+        set_font(std::move(request));
+    }
+
+    void Text::set_font_weight(const int weight) {
+        auto request = style_.font;
+        request.weight = weight;
+        set_font(std::move(request));
+    }
+
+    void Text::set_font_slant(const text::FontSlant slant) {
+        auto request = style_.font;
+        request.slant = slant;
+        set_font(std::move(request));
+    }
+
+    auto Text::font() const -> const text::FontRequest& {
+        return style_.font;
     }
 
     void Text::set_overflow(TextOverflow overflow) {
@@ -111,6 +158,7 @@ namespace nandina::widget::primitives
         backend_ = pipeline.backend;
         renderer_ = pipeline.renderer;
         pipeline_explicit_ = true;
+        resolved_font_pipeline_.reset();
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
@@ -127,6 +175,11 @@ namespace nandina::widget::primitives
         renderer_ = pipeline.renderer;
         mark_layout_dirty();
         update_metrics(last_layout_constraints());
+    }
+
+    void Text::apply_font_context(text::FontPipelineCache& context) {
+        font_context_ = &context;
+        resolve_font();
     }
 
     void Text::set_layout_backend(const ITextLayoutBackend& backend) {
@@ -204,6 +257,22 @@ namespace nandina::widget::primitives
             }
         );
         set_size(layout_.size);
+    }
+
+    void Text::resolve_font() {
+        if (pipeline_explicit_ || font_context_ == nullptr) {
+            return;
+        }
+        auto pipeline = font_context_->get(style_.font);
+        if (!pipeline) {
+            throw std::runtime_error("Text cannot resolve font: " + pipeline.error().message);
+        }
+        resolved_font_pipeline_ = std::move(*pipeline);
+        const auto resolved = resolved_font_pipeline_->pipeline();
+        backend_ = resolved.backend;
+        renderer_ = resolved.renderer;
+        mark_layout_dirty();
+        update_metrics(last_layout_constraints());
     }
 
 } // namespace nandina::widget::primitives

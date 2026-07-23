@@ -202,6 +202,35 @@ public:
     int exits = 0;
 };
 
+class InteractiveRegionRow final: public widget::Row {
+public:
+    explicit InteractiveRegionRow(int key, int& toggles, int& removals): key(key) {
+        auto label = widget::FlexItem::create(
+            scene::LayoutFlexPolicy {
+                .grow = 1.0F,
+                .shrink = 1.0F,
+                .limits = {.min_width = 80.0F},
+            }
+        );
+        label->set_child(
+            std::make_shared<scene::NanControl>(foundation::NanSize(120.0F, 32.0F))
+        );
+        toggle = widget::Button::create("完成");
+        toggle->set_on_click([&toggles] { ++toggles; });
+        remove = widget::Button::create("删除");
+        remove->set_on_click([&removals] { ++removals; });
+        set_gap(8.0F)
+            .set_cross_alignment(widget::LayoutAlignment::stretch)
+            .add(label)
+            .add(toggle)
+            .add(remove);
+    }
+
+    int key = 0;
+    std::shared_ptr<widget::Button> toggle;
+    std::shared_ptr<widget::Button> remove;
+};
+
 auto opaque_color(float light) -> foundation::NanColor {
     return foundation::NanColor::from(
         foundation::NanOklch{.light = light, .chroma = 0.1F, .hue = 120.0F, .alpha = 1.0F});
@@ -266,6 +295,82 @@ TEST_CASE("ForEach reuses keyed controls and disposes removed scopes", "[widget]
     probe.set(1);
     REQUIRE(scope_runs[1] == removed_runs);
     REQUIRE(scope_runs[2] == retained_runs + 1);
+}
+
+TEST_CASE("dynamic keyed rows keep button hit geometry and scroll extent", "[widget][declarative][scroll][input]") {
+    reactive::Graph graph;
+    reactive::Signal<std::vector<RegionItem>> items {
+        graph,
+        {{.key = 1, .value = "one"}, {.key = 2, .value = "two"}, {.key = 3, .value = "three"}}
+    };
+    int toggles = 0;
+    int removals = 0;
+    auto rows = widget::ForEach<RegionItem, int, InteractiveRegionRow>::create(
+        graph,
+        [](const RegionItem& item) { return item.key; },
+        [&](reactive::ReactiveScope&, const RegionItem& item) {
+            return std::make_shared<InteractiveRegionRow>(item.key, toggles, removals);
+        }
+    );
+    rows->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+    rows->bind(items);
+    auto content = widget::Column::create();
+    content->set_cross_alignment(widget::LayoutAlignment::stretch).add(rows);
+    auto scroll = widget::ScrollView::create();
+    scroll->set_child(content);
+    scene::NanSceneTree tree;
+    tree.set_root(scroll);
+
+    REQUIRE(tree.layout_root(foundation::NanSize(400.0F, 120.0F)) == 1);
+    auto* first = rows->node_for(1);
+    REQUIRE(first != nullptr);
+    REQUIRE(first->remove->parent() == first);
+    REQUIRE(first->width() == Catch::Approx(400.0F));
+
+    const auto remove_point = first->remove->global_bounds().get_center();
+    REQUIRE(tree.hit_test(remove_point) == first->remove.get());
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(remove_point, foundation::NanPoint {}));
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        remove_point,
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        remove_point,
+    });
+    REQUIRE(removals == 1);
+
+    const auto toggle_point = first->toggle->global_bounds().get_center();
+    REQUIRE(tree.hit_test(toggle_point) == first->toggle.get());
+    tree.dispatch_mouse_move(scene::MouseMoveEvent(toggle_point, foundation::NanPoint {}));
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        toggle_point,
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        toggle_point,
+    });
+    REQUIRE(toggles == 1);
+
+    std::vector<RegionItem> expanded;
+    for (int key = 1; key <= 10; ++key) {
+        expanded.push_back(RegionItem {.key = key, .value = std::to_string(key)});
+    }
+    items.set(std::move(expanded));
+    REQUIRE(tree.layout_root(foundation::NanSize(400.0F, 120.0F)) == 1);
+    REQUIRE(first->width() == Catch::Approx(400.0F));
+    REQUIRE(scroll->maximum_scroll_offset().get_y() > 0.0F);
+
+    const auto wheel_point = foundation::NanPoint(10.0F, 10.0F);
+    tree.dispatch_mouse_wheel(
+        scene::MouseWheelEvent(wheel_point, foundation::NanPoint(0.0F, -1.0F))
+    );
+    REQUIRE(scroll->scroll_offset().get_y() > 0.0F);
 }
 
 TEST_CASE("ForEach rejects duplicate keys before changing children", "[widget][declarative][foreach]") {

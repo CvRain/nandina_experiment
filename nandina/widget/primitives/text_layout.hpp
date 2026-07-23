@@ -7,6 +7,7 @@
 
 #include "../../foundation/nandina_color.hpp"
 #include "../../scene/control.hpp"
+#include "../../text/font_family.hpp"
 
 #include <cstddef>
 #include <cstdint>
@@ -29,6 +30,7 @@ namespace nandina::widget::primitives
             foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255}
         );
         float font_size = 16.0F;
+        text::FontRequest font;
         TextOverflow overflow = TextOverflow::ellipsis;
         int max_lines = 1;
     };

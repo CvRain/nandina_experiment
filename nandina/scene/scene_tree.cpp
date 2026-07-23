@@ -148,6 +148,18 @@ namespace nandina::scene
         return default_text_pipeline_ ? &*default_text_pipeline_ : nullptr;
     }
 
+    void NanSceneTree::set_font_context(text::FontPipelineCache& context) noexcept {
+        font_context_ = &context;
+    }
+
+    void NanSceneTree::clear_font_context() noexcept {
+        font_context_ = nullptr;
+    }
+
+    auto NanSceneTree::font_context() const noexcept -> text::FontPipelineCache* {
+        return font_context_;
+    }
+
     auto NanSceneTree::process(const float dt) -> void {
         _flush_deletes();
         if (root_) {

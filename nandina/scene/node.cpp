@@ -60,7 +60,8 @@ namespace nandina::scene
         return insert_child(children_.size(), std::move(child));
     }
 
-    auto NanNode::insert_child(const std::size_t index, std::shared_ptr<NanNode> child) -> NanNode& {
+    auto NanNode::insert_child(const std::size_t index, std::shared_ptr<NanNode> child)
+        -> NanNode& {
         if (!child) {
             throw std::runtime_error("NanNode::insert_child: child is null");
         }
@@ -96,8 +97,7 @@ namespace nandina::scene
         child->parent_ = weak_from_this();
         auto* raw = child.get();
         children_.insert(
-            children_.begin()
-                + static_cast<std::ptrdiff_t>(std::min(index, children_.size())),
+            children_.begin() + static_cast<std::ptrdiff_t>(std::min(index, children_.size())),
             std::move(child)
         );
 
@@ -177,7 +177,8 @@ namespace nandina::scene
         return nullptr;
     }
 
-    auto NanNode::replace_child(NanNode* current, std::shared_ptr<NanNode> replacement) -> NanNode& {
+    auto NanNode::replace_child(NanNode* current, std::shared_ptr<NanNode> replacement)
+        -> NanNode& {
         if (!replacement) {
             throw std::runtime_error("NanNode::replace_child: replacement is null");
         }
@@ -187,17 +188,18 @@ namespace nandina::scene
         if (tree_ != nullptr && tree_->defers_tree_mutation()) {
             auto* raw = replacement.get();
             auto parent = shared_from_this();
-            auto current_weak = current != nullptr ? current->weak_from_this() : std::weak_ptr<NanNode> {};
-            tree_->defer_tree_mutation(
-                [parent = std::move(parent), current_weak, replacement = std::move(replacement)](
-                ) mutable {
-                    auto current_shared = current_weak.lock();
-                    auto* attached = current_shared != nullptr && current_shared->parent() == parent.get()
-                        ? current_shared.get()
-                        : nullptr;
-                    parent->replace_child(attached, std::move(replacement));
-                }
-            );
+            auto current_weak =
+                current != nullptr ? current->weak_from_this() : std::weak_ptr<NanNode> {};
+            tree_->defer_tree_mutation([parent = std::move(parent),
+                                        current_weak,
+                                        replacement = std::move(replacement)]() mutable {
+                auto current_shared = current_weak.lock();
+                auto* attached =
+                    current_shared != nullptr && current_shared->parent() == parent.get()
+                    ? current_shared.get()
+                    : nullptr;
+                parent->replace_child(attached, std::move(replacement));
+            });
             return *raw;
         }
         if (current != nullptr && current->parent() == this) {
@@ -257,6 +259,8 @@ namespace nandina::scene
         const widget::primitives::TextPipeline& /*pipeline*/
     ) {}
 
+    void NanNode::apply_font_context(text::FontPipelineCache& /*context*/) {}
+
     void NanNode::_set_tree(NanSceneTree* tree) {
         tree_ = tree;
     }
@@ -268,9 +272,19 @@ namespace nandina::scene
         if (tree_ == tree) {
             return;
         }
+        // 子类可以在构造函数中组装子树；此时父节点尚未由 shared_ptr 持有，
+        // insert_child() 无法取得有效 weak_from_this()。挂树前统一补全父链，
+        // 保证全局变换、命中测试和输入冒泡看到真实层级。
+        const auto self = weak_from_this();
+        for (auto& child: children_) {
+            child->parent_ = self;
+        }
         tree_ = tree;
         if (const auto* pipeline = tree->default_text_pipeline(); pipeline != nullptr) {
             apply_default_text_pipeline(*pipeline);
+        }
+        if (auto* context = tree->font_context(); context != nullptr) {
+            apply_font_context(*context);
         }
         on_enter_tree();
         for (auto& child: children_) {

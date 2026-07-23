@@ -8,8 +8,15 @@
 #include "text_layout_backend.hpp"
 #include "../../reactive/property.hpp"
 
+#include <memory>
 #include <string>
 #include <string_view>
+
+namespace nandina::text
+{
+    class FontPipeline;
+    class FontPipelineCache;
+}
 
 namespace nandina::widget::primitives
 {
@@ -34,6 +41,12 @@ namespace nandina::widget::primitives
 
         void set_font_size(float size);
         [[nodiscard]] auto font_size() const -> float;
+        void set_font(text::FontRequest request);
+        void set_font_family(resource::ResourceKey family);
+        void clear_font_family();
+        void set_font_weight(int weight);
+        void set_font_slant(text::FontSlant slant);
+        [[nodiscard]] auto font() const -> const text::FontRequest&;
 
         void set_overflow(TextOverflow overflow);
         [[nodiscard]] auto overflow() const -> TextOverflow;
@@ -48,6 +61,7 @@ namespace nandina::widget::primitives
         void set_text_pipeline(TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> TextPipeline;
         void apply_default_text_pipeline(const TextPipeline& pipeline) override;
+        void apply_font_context(text::FontPipelineCache& context) override;
 
         /// The referenced backend must outlive this Text instance.
         void set_layout_backend(const ITextLayoutBackend& backend);
@@ -66,6 +80,7 @@ namespace nandina::widget::primitives
         void apply_text(const std::string& text);
         void
         update_metrics(scene::LayoutConstraints constraints = scene::LayoutConstraints::loose());
+        void resolve_font();
 
         reactive::Property<std::string> text_;
         TextStyle style_ {};
@@ -73,6 +88,8 @@ namespace nandina::widget::primitives
         const ITextLayoutBackend* backend_ = nullptr;
         ITextLayoutRenderer* renderer_ = nullptr;
         bool pipeline_explicit_ = false;
+        text::FontPipelineCache* font_context_ = nullptr;
+        std::shared_ptr<text::FontPipeline> resolved_font_pipeline_;
     };
 
 } // namespace nandina::widget::primitives

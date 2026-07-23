@@ -32,6 +32,11 @@ namespace nandina::widget
         void set_text_pipeline(primitives::TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
         void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
+        void apply_font_context(text::FontPipelineCache& context) override;
+        void set_font(text::FontRequest request);
+        void set_font_family(resource::ResourceKey family);
+        void set_font_weight(int weight);
+        void set_font_slant(text::FontSlant slant);
 
         void set_text_overflow(primitives::TextOverflow overflow);
         [[nodiscard]] auto text_overflow() const -> primitives::TextOverflow;

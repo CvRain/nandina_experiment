@@ -527,6 +527,8 @@ Only the UI thread may mutate widgets. `UiDispatcher` captures that thread, acce
 
 ### A6. Font Requests And Style Context
 
+Status: A6a font requests and window resolution context implemented; four-state inherited style values remain pending.
+
 Replace the scene-wide fixed default `TextPipeline` assumption with a window font-resolution context backed by `FontFamilyRegistry` and `FontPipelineCache`. Extend text style/request with logical family, weight, and slant. Add imperative controls such as `set_font_family()`, `set_font_weight()`, and `set_font()`; explicit low-level pipelines remain a supported override.
 
 Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, locale/direction, and opacity inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not.

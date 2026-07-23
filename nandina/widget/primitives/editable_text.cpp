@@ -186,6 +186,11 @@ namespace nandina::widget::primitives
         mark_layout_dirty();
     }
 
+    void EditableText::apply_font_context(text::FontPipelineCache& context) {
+        text_.apply_font_context(context);
+        mark_layout_dirty();
+    }
+
     void EditableText::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
         if (has_selection()) {
             const auto& layout = text_.layout_result();

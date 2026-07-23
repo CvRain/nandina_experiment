@@ -26,6 +26,8 @@ namespace nandina::text
         int weight = 400;
 
         FontSlant slant = FontSlant::normal;
+
+        auto operator<=>(const FontRequest&) const = default;
     };
 
     struct ResolvedFontFamily {

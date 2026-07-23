@@ -34,6 +34,11 @@ namespace nandina::widget::primitives
     struct TextPipeline;
 }
 
+namespace nandina::text
+{
+    class FontPipelineCache;
+}
+
 namespace nandina::scene
 {
 
@@ -209,6 +214,7 @@ namespace nandina::scene
         }
 
         virtual void apply_default_text_pipeline(const widget::primitives::TextPipeline& pipeline);
+        virtual void apply_font_context(text::FontPipelineCache& context);
 
     protected:
         /// Internal: set the owning scene tree (called by NanSceneTree).

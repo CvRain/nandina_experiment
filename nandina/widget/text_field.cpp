@@ -136,6 +136,36 @@ namespace nandina::widget
         mark_layout_dirty();
     }
 
+    void TextField::apply_font_context(text::FontPipelineCache& context) {
+        edit_.apply_font_context(context);
+        placeholder_.apply_font_context(context);
+        mark_layout_dirty();
+    }
+
+    void TextField::set_font(text::FontRequest request) {
+        edit_.text_node().set_font(request);
+        placeholder_.set_font(std::move(request));
+        mark_layout_dirty();
+    }
+
+    void TextField::set_font_family(resource::ResourceKey family) {
+        edit_.text_node().set_font_family(family);
+        placeholder_.set_font_family(std::move(family));
+        mark_layout_dirty();
+    }
+
+    void TextField::set_font_weight(const int weight) {
+        edit_.text_node().set_font_weight(weight);
+        placeholder_.set_font_weight(weight);
+        mark_layout_dirty();
+    }
+
+    void TextField::set_font_slant(const text::FontSlant slant) {
+        edit_.text_node().set_font_slant(slant);
+        placeholder_.set_font_slant(slant);
+        mark_layout_dirty();
+    }
+
     auto TextField::is_focusable() const -> bool {
         return !disabled_;
     }
@@ -256,12 +286,14 @@ namespace nandina::widget
         const primitives::TextStyle value_style {
             .color = theme_.palette.on_surface.with_alpha(state_alpha),
             .font_size = theme_.tokens.typography.label_md,
+            .font = edit_.style().font,
             .overflow = primitives::TextOverflow::clip,
             .max_lines = 1,
         };
         const primitives::TextStyle placeholder_style {
             .color = theme_.palette.on_surface_variant.with_alpha(0.72F * state_alpha),
             .font_size = theme_.tokens.typography.label_md,
+            .font = placeholder_.style().font,
             .overflow = primitives::TextOverflow::ellipsis,
             .max_lines = 1,
         };
