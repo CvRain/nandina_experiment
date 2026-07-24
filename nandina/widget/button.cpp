@@ -46,6 +46,7 @@ namespace nandina::widget
         text_.set_text(std::move(text));
         mark_layout_dirty();
         apply_metrics();
+        mark_semantics_dirty();
     }
 
     auto Button::text() const -> std::string_view {
@@ -243,7 +244,31 @@ namespace nandina::widget
         }
     }
 
-    void Button::on_pressable_state_changed() {}
+    void Button::on_pressable_state_changed() {
+        mark_semantics_dirty();
+    }
+
+    auto Button::semantics_properties() const -> semantics::Properties {
+        return {
+            .role = semantics::Role::button,
+            .label = std::string(text()),
+            .state = {
+                .focusable = !disabled(),
+                .focused = focused(),
+                .disabled = disabled(),
+            },
+            .actions = disabled() ? semantics::Action::none
+                                  : semantics::Action::activate | semantics::Action::focus,
+        };
+    }
+
+    auto Button::on_semantics_action(const semantics::ActionRequest& request) -> bool {
+        if (request.action != semantics::Action::activate || disabled()) {
+            return false;
+        }
+        activate();
+        return true;
+    }
 
     auto Button::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
         const auto state = disabled() ? theme::ButtonVisualState::disabled

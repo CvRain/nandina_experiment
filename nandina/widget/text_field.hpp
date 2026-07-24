@@ -78,6 +78,8 @@ namespace nandina::widget
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
             -> foundation::NanSize override;
+        [[nodiscard]] auto semantics_properties() const -> semantics::Properties override;
+        auto on_semantics_action(const semantics::ActionRequest& request) -> bool override;
 
     private:
         void apply_theme();

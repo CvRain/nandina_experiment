@@ -11,7 +11,10 @@
 #include "reactive/scope.hpp"
 #include "reactive/signal.hpp"
 #include "scene/control.hpp"
+#include "semantics/semantics.hpp"
+#include "theme/nan_style.hpp"
 #include "theme/theme.hpp"
+#include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
 #include "widget/declarative.hpp"
 #include "widget/label.hpp"
@@ -77,11 +80,27 @@ public:
 
     void update(const TodoItem& item, const theme::NanTheme& theme) {
         id_ = item.id;
+        completed_ = item.completed;
         label_->set_text((item.completed ? "[已完成] " : "[待办] ") + item.title);
         label_->set_color(
             item.completed ? theme.palette.on_surface_variant : theme.palette.on_surface
         );
         toggle_button_->set_text(item.completed ? "撤销" : "完成");
+        set_semantics_override(
+            semantics::Properties {
+                .role = semantics::Role::list_item,
+                .label = item.title,
+                .value = item.completed ? "已完成" : "未完成",
+            }
+        );
+    }
+
+    void on_theme_changed(const theme::ThemeManager& manager) override {
+        Row::on_theme_changed(manager);
+        label_->set_color(
+            completed_ ? manager.theme().palette.on_surface_variant
+                       : manager.theme().palette.on_surface
+        );
     }
 
 private:
@@ -90,6 +109,7 @@ private:
     std::shared_ptr<widget::Label> label_;
     std::shared_ptr<widget::Button> toggle_button_;
     std::uint64_t id_ = 0;
+    bool completed_ = false;
 };
 
 class TodoPageRoot final: public scene::NanControl {
@@ -99,15 +119,30 @@ public:
         reactive::Signal<std::vector<TodoItem>>& todos,
         reactive::Computed<std::string>& status,
         reactive::Computed<bool>& empty,
-        theme::NanTheme theme
+        theme::ThemeManager& themes
     ):
         graph_(&graph),
         todos_(&todos),
-        theme_(theme) {
+        themes_(&themes),
+        theme_(themes.theme()) {
         set_background(theme_.palette.surface);
 
         title_ = widget::Label::create(graph, "待办事项 / Todo workspace", theme_);
         title_->set_font_size(24.0F);
+
+        theme_button_ = widget::Button::create("切换浅色主题", theme_);
+        theme_button_->set_treatment(theme::ButtonTreatment::outlined);
+        theme_button_->set_on_click([this] {
+            const auto target = themes_->active_name() == "dark" ? "light" : "dark";
+            (void)themes_->activate(target);
+        });
+
+        const auto title_expanded = widget::Expanded::create();
+        title_expanded->set_child(title_);
+        const auto title_row = widget::Row::create();
+        title_row->set_cross_alignment(widget::LayoutAlignment::center)
+            .add(title_expanded)
+            .add(theme_button_);
 
         status_ = widget::Label::create(graph, "", theme_);
         status_->set_color(theme_.palette.on_surface_variant);
@@ -130,6 +165,12 @@ public:
 
         list_view_ = widget::ScrollView::create(widget::ScrollAxis::vertical);
         list_view_->set_wheel_step(36.0F);
+        list_view_->set_semantics_override(
+            semantics::Properties {
+                .role = semantics::Role::list,
+                .label = "待办事项",
+            }
+        );
 
         auto empty_region =
             widget::IfRegion<widget::Label>::create(graph, [this](reactive::ReactiveScope&) {
@@ -166,7 +207,7 @@ public:
         const auto content = widget::Column::create();
         content->set_gap(10.0F)
             .set_cross_alignment(widget::LayoutAlignment::stretch)
-            .add(title_)
+            .add(title_row)
             .add(status_)
             .add(input_row)
             .add(list_expanded);
@@ -179,6 +220,16 @@ public:
     void on_ready() override {
         scene::NanControl::on_ready();
         get_tree()->set_focus(input_.get());
+    }
+
+    void on_theme_changed(const theme::ThemeManager& manager) override {
+        scene::NanControl::on_theme_changed(manager);
+        theme_ = manager.theme();
+        set_background(theme_.palette.surface);
+        status_->set_color(theme_.palette.on_surface_variant);
+        theme_button_->set_text(
+            manager.active_name() == "dark" ? "切换浅色主题" : "切换深色主题"
+        );
     }
 
 private:
@@ -223,11 +274,13 @@ private:
 
     reactive::Graph* graph_;
     reactive::Signal<std::vector<TodoItem>>* todos_;
+    theme::ThemeManager* themes_;
     theme::NanTheme theme_;
     std::shared_ptr<widget::Label> title_;
     std::shared_ptr<widget::Label> status_;
     std::shared_ptr<widget::TextField> input_;
     std::shared_ptr<widget::Button> add_button_;
+    std::shared_ptr<widget::Button> theme_button_;
     std::shared_ptr<widget::ScrollView> list_view_;
     std::uint64_t next_id_ = 4;
 };
@@ -257,8 +310,9 @@ public:
                 + " completed / 已完成";
         });
         auto& empty = context.scope().computed([&todos] { return todos.get().empty(); });
-        auto root =
-            std::make_shared<TodoPageRoot>(context.graph(), todos, status, empty, context.theme());
+        auto root = std::make_shared<TodoPageRoot>(
+            context.graph(), todos, status, empty, context.theme_manager()
+        );
         return root;
     }
 };
@@ -284,7 +338,34 @@ auto main() -> int {
     if (!chinese_fallback) {
         return 2;
     }
-    application.set_theme(theme::default_theme());
+    auto dark_theme = theme::default_theme();
+    auto light_theme = theme::default_theme();
+    light_theme.palette.primary = theme::nan_color(0.56F, 0.18F, 250.0F);
+    light_theme.palette.on_primary = theme::nan_color(0.98F, 0.01F, 250.0F);
+    light_theme.palette.secondary = theme::nan_color(0.62F, 0.13F, 150.0F);
+    light_theme.palette.on_secondary = theme::nan_color(0.16F, 0.02F, 150.0F);
+    light_theme.palette.surface = theme::nan_color(0.97F, 0.01F, 270.0F);
+    light_theme.palette.on_surface = theme::nan_color(0.22F, 0.02F, 275.0F);
+    light_theme.palette.surface_variant = theme::nan_color(0.91F, 0.02F, 275.0F);
+    light_theme.palette.on_surface_variant = theme::nan_color(0.43F, 0.03F, 275.0F);
+    light_theme.palette.outline = theme::nan_color(0.58F, 0.02F, 275.0F);
+    light_theme.palette.outline_variant = theme::nan_color(0.78F, 0.02F, 275.0F);
+
+    auto style = std::make_shared<theme::NanStyle>();
+    theme::ButtonStyleRule buttons;
+    buttons.radius = theme::ThemeScalar::literal(7.0F);
+    style->add_button_rule(std::move(buttons));
+    theme::TextFieldStyleRule focused_field;
+    focused_field.state = theme::TextFieldVisualState::focused;
+    focused_field.border_color = theme::ThemeColor::token(theme::ColorToken::primary);
+    focused_field.focus_ring_color = theme::ThemeColor::token(theme::ColorToken::primary);
+    style->add_text_field_rule(std::move(focused_field));
+
+    auto& themes = application.theme_manager();
+    (void)themes.register_theme("dark", dark_theme);
+    (void)themes.register_theme("light", light_theme);
+    themes.set_style(std::move(style));
+    (void)themes.activate("dark");
 
     TodoWindow window {
         application,

@@ -261,6 +261,11 @@ namespace nandina::app
         );
         (void)tree_.layout_root(window_size);
 
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::semantics);
+            (void)tree_.update_semantics();
+        }
+
         device_->begin_frame();
         device_->clear(config_.background);
         {

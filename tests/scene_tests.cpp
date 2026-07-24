@@ -695,3 +695,60 @@ TEST_CASE("StyleContext changes propagate through the scene hierarchy", "[scene]
     REQUIRE(detached->resolved_style_context().font_size == Catch::Approx(30.0F));
     REQUIRE(detached->resolved_style_context().locale == "en-GB");
 }
+
+TEST_CASE("semantics snapshots merge and hide composed descendants", "[scene][semantics]") {
+    auto root = std::make_shared<scene::NanControl>(foundation::NanSize(240.0F, 120.0F));
+    root->set_semantics_composition(semantics::Composition::merge_descendants);
+    root->set_semantics_override(
+        semantics::Properties {
+            .role = semantics::Role::generic,
+            .label = "Todo panel",
+        }
+    );
+
+    auto visible = std::make_shared<scene::NanControl>(foundation::NanSize(80.0F, 24.0F));
+    visible->set_semantics_override(
+        semantics::Properties {
+            .role = semantics::Role::static_text,
+            .label = "Visible child",
+        }
+    );
+    auto hidden = std::make_shared<scene::NanControl>(foundation::NanSize(80.0F, 24.0F));
+    hidden->set_semantics_composition(semantics::Composition::hidden);
+    hidden->set_semantics_override(
+        semantics::Properties {
+            .role = semantics::Role::static_text,
+            .label = "Hidden child",
+        }
+    );
+    root->add_child(visible);
+    root->add_child(hidden);
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+    REQUIRE(tree.semantics_dirty());
+    REQUIRE(tree.update_semantics());
+    REQUIRE_FALSE(tree.semantics_dirty());
+    REQUIRE(tree.semantics_tree().roots.size() == 1);
+
+    const auto& semantic_root = tree.semantics_tree().roots.front();
+    REQUIRE(semantic_root.id == root->semantics_id());
+    REQUIRE(semantic_root.properties.role == semantics::Role::generic);
+    REQUIRE(semantic_root.properties.label == "Todo panel, Visible child");
+    REQUIRE(semantic_root.children.empty());
+    REQUIRE(tree.semantics_tree().find(visible->semantics_id()) == nullptr);
+    REQUIRE_FALSE(tree.update_semantics());
+
+    const auto revision = tree.semantics_tree().revision;
+    visible->set_semantics_override(
+        semantics::Properties {
+            .role = semantics::Role::static_text,
+            .label = "Updated child",
+        }
+    );
+    REQUIRE(tree.semantics_dirty());
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.semantics_tree().revision == revision + 1);
+    REQUIRE(tree.semantics_tree().roots.front().properties.label
+            == "Todo panel, Updated child");
+}

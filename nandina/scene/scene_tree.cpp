@@ -8,6 +8,7 @@
 #include "canvas_layer.hpp"
 
 #include <algorithm>
+#include <iterator>
 #include <numeric>
 
 namespace nandina::scene
@@ -32,6 +33,94 @@ namespace nandina::scene
                 return {};
             }
             return std::static_pointer_cast<NanNode2D>(node->shared_from_this());
+        }
+
+        void append_text(std::string& target, const std::string& value) {
+            if (value.empty() || target == value) {
+                return;
+            }
+            if (!target.empty()) {
+                target += ", ";
+            }
+            target += value;
+        }
+
+        void merge_state(semantics::State& target, const semantics::State& source) {
+            target.focusable = target.focusable || source.focusable;
+            target.focused = target.focused || source.focused;
+            target.disabled = target.disabled || source.disabled;
+            target.read_only = target.read_only || source.read_only;
+            target.invalid = target.invalid || source.invalid;
+            if (!target.checked && source.checked) {
+                target.checked = source.checked;
+            }
+            if (!target.selected && source.selected) {
+                target.selected = source.selected;
+            }
+        }
+
+        void merge_semantics_node(semantics::Node& target, const semantics::Node& source) {
+            append_text(target.properties.label, source.properties.label);
+            if (target.properties.value.empty()) {
+                target.properties.value = source.properties.value;
+            }
+            append_text(target.properties.hint, source.properties.hint);
+            target.properties.actions |= source.properties.actions;
+            merge_state(target.properties.state, source.properties.state);
+            if (!target.bounds.is_valid()) {
+                target.bounds = source.bounds;
+            } else if (source.bounds.is_valid()) {
+                target.bounds = target.bounds.united(source.bounds);
+            }
+            for (const auto& child: source.children) {
+                merge_semantics_node(target, child);
+            }
+        }
+
+        [[nodiscard]] auto build_semantics_nodes(NanNode* source) -> std::vector<semantics::Node> {
+            if (source == nullptr || !source->is_visible_in_tree()
+                || source->semantics_composition() == semantics::Composition::hidden) {
+                return {};
+            }
+
+            std::vector<semantics::Node> children;
+            for (std::size_t i = 0; i < source->child_count(); ++i) {
+                auto descendants = build_semantics_nodes(source->get_child(i));
+                children.insert(
+                    children.end(),
+                    std::make_move_iterator(descendants.begin()),
+                    std::make_move_iterator(descendants.end())
+                );
+            }
+
+            auto properties = source->resolved_semantics_properties();
+            const auto composition = source->semantics_composition();
+            const bool exposed = properties.role != semantics::Role::none
+                || composition == semantics::Composition::expose
+                || composition == semantics::Composition::merge_descendants;
+            if (!exposed) {
+                return children;
+            }
+            if (properties.role == semantics::Role::none) {
+                properties.role = semantics::Role::generic;
+            }
+
+            semantics::Node node {
+                .id = source->semantics_id(),
+                .properties = std::move(properties),
+                .bounds = source->as_node2d() != nullptr
+                    ? source->as_node2d()->global_bounds()
+                    : foundation::NanRect::empty(),
+                .children = composition == semantics::Composition::merge_descendants
+                    ? std::vector<semantics::Node> {}
+                    : std::move(children),
+            };
+            if (composition == semantics::Composition::merge_descendants) {
+                for (const auto& child: children) {
+                    merge_semantics_node(node, child);
+                }
+            }
+            return {std::move(node)};
         }
 
     } // namespace
@@ -132,6 +221,7 @@ namespace nandina::scene
         }
 
         _sync_hover_after_tree_change();
+        mark_semantics_dirty();
     }
 
     void NanSceneTree::set_default_text_pipeline(widget::primitives::TextPipeline pipeline) {
@@ -184,6 +274,53 @@ namespace nandina::scene
 
     auto NanSceneTree::theme_manager() const noexcept -> theme::ThemeManager* {
         return theme_manager_;
+    }
+
+    void NanSceneTree::mark_semantics_dirty() noexcept {
+        semantics_dirty_ = true;
+    }
+
+    auto NanSceneTree::semantics_dirty() const noexcept -> bool {
+        return semantics_dirty_;
+    }
+
+    auto NanSceneTree::update_semantics() -> bool {
+        if (!semantics_dirty_) {
+            return false;
+        }
+        semantics_tree_.roots = build_semantics_nodes(root_.get());
+        ++semantics_tree_.revision;
+        semantics_dirty_ = false;
+        return true;
+    }
+
+    auto NanSceneTree::semantics_tree() const noexcept -> const semantics::Tree& {
+        return semantics_tree_;
+    }
+
+    auto NanSceneTree::perform_semantics_action(
+        const semantics::SemanticsId id,
+        semantics::ActionRequest request
+    ) -> bool {
+        (void)update_semantics();
+        const auto* snapshot = semantics_tree_.find(id);
+        if (snapshot == nullptr
+            || !semantics::supports(snapshot->properties.actions, request.action)) {
+            return false;
+        }
+        auto* source = _find_semantics_source(root_.get(), id);
+        if (source == nullptr) {
+            return false;
+        }
+        if (request.action == semantics::Action::focus) {
+            auto* target = source->as_node2d();
+            if (target == nullptr || !target->is_focusable()) {
+                return false;
+            }
+            set_focus(target);
+            return true;
+        }
+        return source->on_semantics_action(request);
     }
 
     void NanSceneTree::on_theme_revision_changed(const theme::ThemeManager& manager) {
@@ -271,6 +408,9 @@ namespace nandina::scene
                 }
             }
             flush_tree_mutations();
+        }
+        if (passes > 0) {
+            mark_semantics_dirty();
         }
         return passes;
     }
@@ -608,6 +748,22 @@ namespace nandina::scene
         }
     }
 
+    auto NanSceneTree::_find_semantics_source(NanNode* node, const semantics::SemanticsId id)
+        -> NanNode* {
+        if (node == nullptr) {
+            return nullptr;
+        }
+        if (node->semantics_id() == id) {
+            return node;
+        }
+        for (std::size_t i = 0; i < node->child_count(); ++i) {
+            if (auto* found = _find_semantics_source(node->get_child(i), id); found != nullptr) {
+                return found;
+            }
+        }
+        return nullptr;
+    }
+
     auto
     NanSceneTree::_bubble_input(NanNode* start, InputEvent& event, const NanNode* stop_exclusive)
         -> void {
@@ -691,6 +847,7 @@ namespace nandina::scene
             FocusEnterEvent enter_event;
             _bubble_input(next_focus, enter_event, common_ancestor);
         }
+        mark_semantics_dirty();
     }
 
     auto NanSceneTree::_sync_hover_after_tree_change() -> void {

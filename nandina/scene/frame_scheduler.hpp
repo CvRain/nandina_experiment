@@ -16,6 +16,7 @@ namespace nandina::scene
         physics,
         layout,
         post_layout,
+        semantics,
         paint,
         dispose,
     };

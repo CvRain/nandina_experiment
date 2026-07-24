@@ -173,7 +173,8 @@ namespace nandina::app
             resources_,
             font_loader_,
             font_families_,
-            async_scope.get()
+            async_scope.get(),
+            theme_manager_
         };
         auto root = page->build(context);
         if (!root) {

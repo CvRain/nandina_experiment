@@ -87,6 +87,11 @@ module_scene = files(
     'scene/control.cpp',
 )
 
+module_semantics = files(
+    'semantics/semantics.hpp',
+    'semantics/semantics.cpp',
+)
+
 module_render = files(
     'render/render_device.hpp',
     'render/clip_stack.hpp',
@@ -195,7 +200,7 @@ endif
 
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_resource, module_scene, module_render, module_theme, module_text, module_widget, module_app, module_physics2d, builtin_font_data, builtin_font_license_data],
+    [module_fundation, module_reactive, module_resource, module_scene, module_semantics, module_render, module_theme, module_text, module_widget, module_app, module_physics2d, builtin_font_data, builtin_font_license_data],
     cpp_args : nandina_cpp_args,
     dependencies : nandina_dependencies,
     install : true,

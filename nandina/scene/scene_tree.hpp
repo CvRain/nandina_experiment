@@ -7,6 +7,7 @@
 
 #include "../widget/primitives/text_layout_backend.hpp"
 #include "../theme/theme_manager.hpp"
+#include "../semantics/semantics.hpp"
 #include "frame_scheduler.hpp"
 #include "input_event.hpp"
 #include "node2d.hpp"
@@ -88,6 +89,17 @@ namespace nandina::scene
         void set_theme_manager(theme::ThemeManager& manager);
         void clear_theme_manager() noexcept;
         [[nodiscard]] auto theme_manager() const noexcept -> theme::ThemeManager*;
+
+        // ---- accessibility semantics ----
+
+        void mark_semantics_dirty() noexcept;
+        [[nodiscard]] auto semantics_dirty() const noexcept -> bool;
+        [[nodiscard]] auto update_semantics() -> bool;
+        [[nodiscard]] auto semantics_tree() const noexcept -> const semantics::Tree&;
+        [[nodiscard]] auto perform_semantics_action(
+            semantics::SemanticsId id,
+            semantics::ActionRequest request
+        ) -> bool;
 
         // ---- per-frame traversal ----
 
@@ -171,6 +183,8 @@ namespace nandina::scene
     private:
         static auto _hit_test_node(NanNode2D* node, foundation::NanPoint world_point) -> NanNode2D*;
         static void _collect_focusable_nodes(NanNode* node, std::vector<NanNode2D*>& out);
+        [[nodiscard]] static auto _find_semantics_source(NanNode* node, semantics::SemanticsId id)
+            -> NanNode*;
 
         auto
         _bubble_input(NanNode* start, InputEvent& event, const NanNode* stop_exclusive = nullptr)
@@ -202,6 +216,8 @@ namespace nandina::scene
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         text::FontPipelineCache* font_context_ = nullptr;
         theme::ThemeManager* theme_manager_ = nullptr;
+        semantics::Tree semantics_tree_;
+        bool semantics_dirty_ = true;
         FramePhase phase_ = FramePhase::idle;
     };
 

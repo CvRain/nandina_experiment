@@ -31,6 +31,11 @@ namespace nandina::text
     class FontFamilyRegistry;
 } // namespace nandina::text
 
+namespace nandina::theme
+{
+    class ThemeManager;
+}
+
 namespace nandina::app
 {
 
@@ -58,7 +63,8 @@ namespace nandina::app
             resource::ResourceManager* resources = nullptr,
             text::FontLoader* font_loader = nullptr,
             text::FontFamilyRegistry* font_families = nullptr,
-            AsyncScope* async_scope = nullptr
+            AsyncScope* async_scope = nullptr,
+            theme::ThemeManager* theme_manager = nullptr
         ):
             router_(&router),
             graph_(&graph),
@@ -69,7 +75,8 @@ namespace nandina::app
             resources_(resources),
             font_loader_(font_loader),
             font_families_(font_families),
-            async_scope_(async_scope) {}
+            async_scope_(async_scope),
+            theme_manager_(theme_manager) {}
 
         [[nodiscard]] auto router() -> NanRouter& {
             return *router_;
@@ -85,6 +92,17 @@ namespace nandina::app
 
         [[nodiscard]] auto theme() const -> const theme::NanTheme& {
             return *theme_;
+        }
+
+        [[nodiscard]] auto has_theme_manager() const noexcept -> bool {
+            return theme_manager_ != nullptr;
+        }
+
+        [[nodiscard]] auto theme_manager() -> theme::ThemeManager& {
+            if (!theme_manager_) {
+                throw std::runtime_error("PageContext::theme_manager: service is unavailable");
+            }
+            return *theme_manager_;
         }
 
         [[nodiscard]] auto has_store() const -> bool {
@@ -149,6 +167,7 @@ namespace nandina::app
         text::FontLoader* font_loader_ = nullptr;
         text::FontFamilyRegistry* font_families_ = nullptr;
         AsyncScope* async_scope_ = nullptr;
+        theme::ThemeManager* theme_manager_ = nullptr;
     };
 
     class NanPage {

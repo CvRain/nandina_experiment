@@ -4,6 +4,7 @@
 
 #include "pressable.hpp"
 #include "../../scene/input_event.hpp"
+#include "../../scene/scene_tree.hpp"
 
 namespace nandina::widget::primitives
 {
@@ -17,8 +18,12 @@ namespace nandina::widget::primitives
             hovered_ = false;
             pressed_ = false;
             focused_ = false;
+            if (is_inside_tree() && get_tree()->focused_node() == this) {
+                get_tree()->set_focus(nullptr);
+            }
         }
         on_pressable_state_changed();
+        mark_semantics_dirty();
     }
 
     auto Pressable::disabled() const -> bool {
@@ -111,6 +116,12 @@ namespace nandina::widget::primitives
         }
     }
 
+    void Pressable::activate() {
+        if (!disabled_) {
+            emit_click();
+        }
+    }
+
     void Pressable::set_hovered(bool hovered) {
         if (hovered_ == hovered) {
             return;
@@ -133,6 +144,7 @@ namespace nandina::widget::primitives
         }
         focused_ = focused;
         on_pressable_state_changed();
+        mark_semantics_dirty();
     }
 
 } // namespace nandina::widget::primitives

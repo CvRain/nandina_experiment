@@ -467,3 +467,70 @@ TEST_CASE("button text overflow controls its internal text primitive", "[widget]
     REQUIRE(dev.texts.size() == 1);
     REQUIRE_FALSE(dev.texts[0].text.ends_with("..."));
 }
+
+TEST_CASE("semantic actions activate and focus buttons", "[widget][button][semantics]") {
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("Save");
+    int activations = 0;
+    button->set_on_click([&] { ++activations; });
+    tree.set_root(button);
+
+    REQUIRE(tree.update_semantics());
+    const auto* node = tree.semantics_tree().find(button->semantics_id());
+    REQUIRE(node != nullptr);
+    REQUIRE(node->properties.role == semantics::Role::button);
+    REQUIRE(node->properties.label == "Save");
+    REQUIRE(semantics::supports(node->properties.actions, semantics::Action::activate));
+    REQUIRE(semantics::supports(node->properties.actions, semantics::Action::focus));
+
+    REQUIRE(tree.perform_semantics_action(
+        button->semantics_id(), {.action = semantics::Action::activate}
+    ));
+    REQUIRE(activations == 1);
+    REQUIRE(tree.perform_semantics_action(
+        button->semantics_id(), {.action = semantics::Action::focus}
+    ));
+    REQUIRE(tree.focused_node() == button.get());
+
+    REQUIRE(tree.update_semantics());
+    node = tree.semantics_tree().find(button->semantics_id());
+    REQUIRE(node->properties.state.focused);
+
+    button->set_disabled(true);
+    REQUIRE(tree.update_semantics());
+    node = tree.semantics_tree().find(button->semantics_id());
+    REQUIRE(node->properties.state.disabled);
+    REQUIRE(node->properties.actions == semantics::Action::none);
+    REQUIRE_FALSE(tree.perform_semantics_action(
+        button->semantics_id(), {.action = semantics::Action::activate}
+    ));
+}
+
+TEST_CASE("text field semantics expose value and editable state", "[widget][text-field][semantics]") {
+    scene::NanSceneTree tree;
+    auto field = std::make_shared<widget::TextField>("draft", "Task title");
+    tree.set_root(field);
+
+    REQUIRE(tree.update_semantics());
+    const auto* node = tree.semantics_tree().find(field->semantics_id());
+    REQUIRE(node != nullptr);
+    REQUIRE(node->properties.role == semantics::Role::text_field);
+    REQUIRE(node->properties.label == "Task title");
+    REQUIRE(node->properties.value == "draft");
+    REQUIRE(semantics::supports(node->properties.actions, semantics::Action::set_value));
+
+    REQUIRE(tree.perform_semantics_action(
+        field->semantics_id(),
+        {.action = semantics::Action::set_value, .value = "review"}
+    ));
+    REQUIRE(field->value() == "review");
+
+    field->set_invalid(true);
+    field->set_read_only(true);
+    REQUIRE(tree.update_semantics());
+    node = tree.semantics_tree().find(field->semantics_id());
+    REQUIRE(node->properties.value == "review");
+    REQUIRE(node->properties.state.invalid);
+    REQUIRE(node->properties.state.read_only);
+    REQUIRE_FALSE(semantics::supports(node->properties.actions, semantics::Action::set_value));
+}

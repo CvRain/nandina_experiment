@@ -44,6 +44,7 @@ namespace nandina::widget
     void TextField::set_value(std::string value) {
         edit_.set_value(std::move(value));
         mark_layout_dirty();
+        mark_semantics_dirty();
     }
 
     auto TextField::value() const -> std::string_view {
@@ -53,6 +54,7 @@ namespace nandina::widget
     void TextField::set_placeholder(std::string placeholder) {
         placeholder_.set_text(std::move(placeholder));
         mark_layout_dirty();
+        mark_semantics_dirty();
     }
 
     auto TextField::placeholder() const -> std::string_view {
@@ -81,6 +83,7 @@ namespace nandina::widget
     void TextField::set_read_only(const bool value) {
         read_only_ = value;
         edit_.set_read_only(value);
+        mark_semantics_dirty();
     }
     auto TextField::read_only() const -> bool {
         return read_only_;
@@ -94,6 +97,7 @@ namespace nandina::widget
         }
         apply_theme();
         mark_layout_dirty();
+        mark_semantics_dirty();
     }
     auto TextField::disabled() const -> bool {
         return disabled_;
@@ -102,6 +106,7 @@ namespace nandina::widget
     void TextField::set_invalid(const bool value) {
         invalid_ = value;
         apply_theme();
+        mark_semantics_dirty();
     }
     auto TextField::invalid() const -> bool {
         return invalid_;
@@ -215,6 +220,7 @@ namespace nandina::widget
         if (event.type() == scene::EventType::focus_enter) {
             focused_ = !disabled_;
             apply_theme();
+            mark_semantics_dirty();
             return edit_.on_input(event);
         }
         else if (event.type() == scene::EventType::focus_leave) {
@@ -222,6 +228,7 @@ namespace nandina::widget
             dragging_ = false;
             edit_.clear_composition();
             apply_theme();
+            mark_semantics_dirty();
             return edit_.on_input(event);
         }
         if (disabled_) {
@@ -315,6 +322,34 @@ namespace nandina::widget
         const auto measured = constraints.constrain(foundation::NanSize(natural_width, height_));
         set_size(measured);
         return measured;
+    }
+
+    auto TextField::semantics_properties() const -> semantics::Properties {
+        auto actions = disabled_ ? semantics::Action::none : semantics::Action::focus;
+        if (!disabled_ && !read_only_) {
+            actions |= semantics::Action::set_value;
+        }
+        return {
+            .role = semantics::Role::text_field,
+            .label = std::string(placeholder()),
+            .value = std::string(value()),
+            .state = {
+                .focusable = !disabled_,
+                .focused = focused_,
+                .disabled = disabled_,
+                .read_only = read_only_,
+                .invalid = invalid_,
+            },
+            .actions = actions,
+        };
+    }
+
+    auto TextField::on_semantics_action(const semantics::ActionRequest& request) -> bool {
+        if (request.action != semantics::Action::set_value || disabled_ || read_only_) {
+            return false;
+        }
+        set_value(request.value);
+        return true;
     }
 
     void TextField::apply_theme() {

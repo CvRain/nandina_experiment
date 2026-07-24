@@ -25,6 +25,7 @@ namespace nandina::widget::primitives
 
     void Text::apply_text(const std::string&) {
         mark_layout_dirty();
+        mark_semantics_dirty();
         update_metrics(last_layout_constraints());
     }
 
@@ -277,6 +278,13 @@ namespace nandina::widget::primitives
     auto Text::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
         update_metrics(constraints);
         return size();
+    }
+
+    auto Text::semantics_properties() const -> semantics::Properties {
+        return {
+            .role = semantics::Role::static_text,
+            .label = std::string(text()),
+        };
     }
 
     void Text::apply_component_color(foundation::NanColor color) {

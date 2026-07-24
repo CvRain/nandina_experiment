@@ -67,6 +67,7 @@ namespace nandina::scene
         }
         size_ = size;
         measured_size_ = size;
+        mark_semantics_dirty();
         if (auto* control_parent = parent() != nullptr ? parent()->as_control() : nullptr) {
             control_parent->mark_layout_dirty();
         }
@@ -105,6 +106,9 @@ namespace nandina::scene
     }
 
     auto NanControl::mark_dirty(const DirtyFlags flags) -> void {
+        if (has_any(flags, DirtyFlags::semantics)) {
+            mark_semantics_dirty();
+        }
         const auto newly_dirty = static_cast<DirtyFlags>(
             static_cast<std::uint8_t>(flags)
             & ~static_cast<std::uint8_t>(dirty_flags_)

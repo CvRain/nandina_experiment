@@ -148,6 +148,7 @@ namespace nandina::scene
 
     void NanNode2D::set_visible(const bool v) {
         visible_ = v;
+        mark_semantics_dirty();
     }
 
     // ---- draw order ----
@@ -174,6 +175,7 @@ namespace nandina::scene
 
     void NanNode2D::_propagate_invalidate_global() {
         global_invalid_ = true;
+        mark_semantics_dirty();
         for (size_t i = 0; i < child_count(); ++i) {
             auto* child = get_child(i);
             if (auto* child_2d = child ? child->as_node2d() : nullptr) {

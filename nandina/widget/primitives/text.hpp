@@ -76,6 +76,7 @@ namespace nandina::widget::primitives
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
             -> foundation::NanSize override;
+        [[nodiscard]] auto semantics_properties() const -> semantics::Properties override;
         void apply_component_color(foundation::NanColor color);
         void apply_component_font_size(float size);
 

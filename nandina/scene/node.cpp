@@ -9,13 +9,19 @@
 #include "scene_tree.hpp"
 
 #include <algorithm>
+#include <atomic>
 #include <stdexcept>
 #include <vector>
 
-namespace nandina::scene
+    namespace nandina::scene
 {
 
-    NanNode::NanNode() = default;
+    namespace
+    {
+        std::atomic<semantics::SemanticsId> next_semantics_id {1};
+    }
+
+    NanNode::NanNode(): semantics_id_(next_semantics_id.fetch_add(1, std::memory_order_relaxed)) {}
 
     NanNode::~NanNode() {
         // Remove from tree before destruction (calls on_exit_tree on children).
@@ -131,6 +137,7 @@ namespace nandina::scene
         if (auto* control = as_control(); control != nullptr) {
             control->mark_layout_dirty();
         }
+        mark_semantics_dirty();
 
         return *raw;
     }
@@ -170,6 +177,7 @@ namespace nandina::scene
         if (auto* control = as_control(); control != nullptr) {
             control->mark_layout_dirty();
         }
+        mark_semantics_dirty();
         return true;
     }
 
@@ -193,6 +201,7 @@ namespace nandina::scene
                 if (auto* control = as_control(); control != nullptr) {
                     control->mark_layout_dirty();
                 }
+                mark_semantics_dirty();
                 return result;
             }
         }
@@ -252,6 +261,45 @@ namespace nandina::scene
         name_ = std::move(name);
     }
 
+    auto NanNode::semantics_id() const noexcept -> semantics::SemanticsId {
+        return semantics_id_;
+    }
+
+    void NanNode::set_semantics_composition(const semantics::Composition composition) {
+        if (semantics_composition_ == composition) {
+            return;
+        }
+        semantics_composition_ = composition;
+        mark_semantics_dirty();
+    }
+
+    auto NanNode::semantics_composition() const noexcept -> semantics::Composition {
+        return semantics_composition_;
+    }
+
+    void NanNode::set_semantics_override(semantics::Properties properties) {
+        semantics_override_ = std::move(properties);
+        mark_semantics_dirty();
+    }
+
+    void NanNode::clear_semantics_override() {
+        if (!semantics_override_) {
+            return;
+        }
+        semantics_override_.reset();
+        mark_semantics_dirty();
+    }
+
+    auto NanNode::resolved_semantics_properties() const -> semantics::Properties {
+        return semantics_override_.value_or(semantics_properties());
+    }
+
+    void NanNode::mark_semantics_dirty() {
+        if (tree_ != nullptr) {
+            tree_->mark_semantics_dirty();
+        }
+    }
+
     void NanNode::on_enter_tree() {}
     void NanNode::on_ready() {}
     void NanNode::on_exit_tree() {}
@@ -290,6 +338,14 @@ namespace nandina::scene
     void NanNode::on_theme_changed(const theme::ThemeManager& /*manager*/) {}
 
     void NanNode::on_theme_context_removed() {}
+
+    auto NanNode::semantics_properties() const -> semantics::Properties {
+        return {};
+    }
+
+    auto NanNode::on_semantics_action(const semantics::ActionRequest& /*request*/) -> bool {
+        return false;
+    }
 
     void NanNode::_set_tree(NanSceneTree* tree) {
         tree_ = tree;

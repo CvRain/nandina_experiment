@@ -244,7 +244,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, and A7 theme rules are implemented. The active main line is A8 accessibility semantics, followed by a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7 theme rules, and A8 accessibility semantics are implemented. The active main line is A9, a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -587,7 +587,13 @@ faces = [{ resource = "fonts/application-ui/medium", weight = 500 }]
 
 ### A8. Accessibility Semantics
 
-Add a semantics capability/tree with role, label, value, state, actions, focus, and bounds. Semantic widgets provide defaults; composition decides whether to expose, merge, or hide primitive children. Dirty semantics update in the formal tick. Platform AT-SPI/UI Automation/NSAccessibility adapters come after the internal contract is stable.
+Status: complete.
+
+`NanNode` owns a stable semantics id and exposes platform-independent properties containing role, label, value, hint, state, actions, focusability, and bounds. Widgets provide defaults: text exposes static text, Button exposes activation/focus, and TextField exposes editable value plus focused/disabled/read-only/invalid state. Application components can replace these defaults with `set_semantics_override()`.
+
+Composition is explicit through `automatic`, `expose`, `merge_descendants`, and `hidden`. Nodes without their own semantics transparently hoist semantic descendants; merging produces one accessible element while retaining descendant labels, state, actions, and bounds; hiding prunes the complete subtree. `NanSceneTree` rebuilds its immutable semantics snapshot only when dirty, after layout in the formal `semantics` frame phase, so adapters always observe current geometry. Semantic actions are routed back to the source node through the same focus and widget behavior used by ordinary input.
+
+The internal contract deliberately has no AT-SPI, UI Automation, or NSAccessibility dependency. Those platform adapters consume `semantics_tree()` and call `perform_semantics_action()` after the snapshot model is stable.
 
 ### A9. Thin Authoring DSL
 

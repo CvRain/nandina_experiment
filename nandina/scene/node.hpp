@@ -7,8 +7,10 @@
 
 #include "../foundation/transform2d.hpp"
 #include "../render/clip_stack.hpp"
+#include "../semantics/semantics.hpp"
 
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -150,6 +152,16 @@ namespace nandina::scene
         [[nodiscard]] auto name() const -> std::string_view;
         void set_name(std::string name);
 
+        // ---- accessibility semantics ----
+
+        [[nodiscard]] auto semantics_id() const noexcept -> semantics::SemanticsId;
+        void set_semantics_composition(semantics::Composition composition);
+        [[nodiscard]] auto semantics_composition() const noexcept -> semantics::Composition;
+        void set_semantics_override(semantics::Properties properties);
+        void clear_semantics_override();
+        [[nodiscard]] auto resolved_semantics_properties() const -> semantics::Properties;
+        void mark_semantics_dirty();
+
         // ---- lifecycle (override in subclasses) ----
 
         /// Called when the node enters the tree (top-down: parent before children).
@@ -232,6 +244,8 @@ namespace nandina::scene
         virtual void on_style_context_changed(const theme::ResolvedStyleContext& context);
         virtual void on_theme_changed(const theme::ThemeManager& manager);
         virtual void on_theme_context_removed();
+        [[nodiscard]] virtual auto semantics_properties() const -> semantics::Properties;
+        virtual auto on_semantics_action(const semantics::ActionRequest& request) -> bool;
 
     protected:
         /// Internal: set the owning scene tree (called by NanSceneTree).
@@ -282,6 +296,9 @@ namespace nandina::scene
         std::string name_;
         theme::StyleContext style_context_;
         theme::ResolvedStyleContext resolved_style_context_;
+        semantics::SemanticsId semantics_id_ = 0;
+        semantics::Composition semantics_composition_ = semantics::Composition::automatic;
+        std::optional<semantics::Properties> semantics_override_;
 
         /// True once on_ready() has fired for the current tree membership.
         /// Guards against double-ready when children are added during on_enter_tree().

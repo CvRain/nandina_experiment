@@ -31,6 +31,7 @@ namespace nandina::widget::primitives
     protected:
         virtual void on_pressable_state_changed() {}
         virtual void on_click() {}
+        void activate();
 
     private:
         void emit_click();
