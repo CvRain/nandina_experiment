@@ -65,7 +65,7 @@ namespace nandina::theme
             .background = transparent(theme.palette.surface),
             .foreground = pair.accent,
             .border_color = transparent(pair.accent),
-            .focus_ring_color = pair.accent,
+            .focus_ring_color = theme.palette.focus_ring,
             .border_width = 0.0F,
             .radius = theme.tokens.radius.sm,
             .focus_ring_width = theme.tokens.border.focus_ring,

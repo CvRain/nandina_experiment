@@ -125,16 +125,18 @@ public:
         todos_(&todos),
         themes_(&themes),
         theme_(themes.theme()) {
-        set_background(theme_.palette.surface);
+        set_background(theme_.palette.background);
 
         title_ = widget::Label::create(graph, "待办事项 / Todo workspace", theme_);
         title_->set_font_size(24.0F);
 
-        theme_button_ = widget::Button::create("切换浅色主题", theme_);
+        theme_button_ = widget::Button::create(preference_label(themes.preference()), theme_);
         theme_button_->set_treatment(theme::ButtonTreatment::outlined);
         theme_button_->set_on_click([this] {
-            const auto target = themes_->active_name() == "dark" ? "light" : "dark";
-            (void)themes_->activate(target);
+            const auto next = next_preference(themes_->preference());
+            themes_->set_preference(next);
+            // 偏好变化不一定改变有效主题，例如系统深色切换到强制深色。
+            theme_button_->set_text(preference_label(next));
         });
 
         const auto title_expanded = widget::Expanded::create();
@@ -225,14 +227,37 @@ public:
     void on_theme_changed(const theme::ThemeManager& manager) override {
         scene::NanControl::on_theme_changed(manager);
         theme_ = manager.theme();
-        set_background(theme_.palette.surface);
+        set_background(theme_.palette.background);
         status_->set_color(theme_.palette.on_surface_variant);
-        theme_button_->set_text(
-            manager.active_name() == "dark" ? "切换浅色主题" : "切换深色主题"
-        );
+        theme_button_->set_text(preference_label(manager.preference()));
     }
 
 private:
+    [[nodiscard]] static auto next_preference(theme::ThemePreference preference)
+        -> theme::ThemePreference {
+        switch (preference) {
+            case theme::ThemePreference::system:
+                return theme::ThemePreference::light;
+            case theme::ThemePreference::light:
+                return theme::ThemePreference::dark;
+            case theme::ThemePreference::dark:
+                return theme::ThemePreference::system;
+        }
+        return theme::ThemePreference::system;
+    }
+
+    [[nodiscard]] static auto preference_label(theme::ThemePreference preference) -> std::string {
+        switch (preference) {
+            case theme::ThemePreference::system:
+                return "外观：跟随系统";
+            case theme::ThemePreference::light:
+                return "外观：浅色";
+            case theme::ThemePreference::dark:
+                return "外观：深色";
+        }
+        return "外观";
+    }
+
     [[nodiscard]] static auto has_non_space(std::string_view text) -> bool {
         return std::ranges::any_of(text, [](const char ch) {
             return std::isspace(static_cast<unsigned char>(ch)) == 0;
@@ -340,6 +365,8 @@ auto main() -> int {
     }
     auto dark_theme = theme::default_theme();
     auto light_theme = theme::default_theme();
+    light_theme.palette.background = theme::nan_color(0.99F, 0.005F, 270.0F);
+    light_theme.palette.on_background = theme::nan_color(0.18F, 0.02F, 275.0F);
     light_theme.palette.primary = theme::nan_color(0.56F, 0.18F, 250.0F);
     light_theme.palette.on_primary = theme::nan_color(0.98F, 0.01F, 250.0F);
     light_theme.palette.secondary = theme::nan_color(0.62F, 0.13F, 150.0F);
@@ -350,6 +377,8 @@ auto main() -> int {
     light_theme.palette.on_surface_variant = theme::nan_color(0.43F, 0.03F, 275.0F);
     light_theme.palette.outline = theme::nan_color(0.58F, 0.02F, 275.0F);
     light_theme.palette.outline_variant = theme::nan_color(0.78F, 0.02F, 275.0F);
+    light_theme.palette.focus_ring = light_theme.palette.primary;
+    light_theme.palette.selection = light_theme.palette.primary.with_alpha(0.28F);
 
     auto style = std::make_shared<theme::NanStyle>();
     theme::ButtonStyleRule buttons;
@@ -362,10 +391,12 @@ auto main() -> int {
     style->add_text_field_rule(std::move(focused_field));
 
     auto& themes = application.theme_manager();
-    (void)themes.register_theme("dark", dark_theme);
-    (void)themes.register_theme("light", light_theme);
+    (void)themes.register_theme("todo-dark", dark_theme);
+    (void)themes.register_theme("todo-light", light_theme);
+    (void)themes.register_family("todo", "todo-light", "todo-dark");
     themes.set_style(std::move(style));
-    (void)themes.activate("dark");
+    (void)themes.activate_family("todo");
+    themes.set_preference(theme::ThemePreference::system);
 
     TodoWindow window {
         application,
@@ -378,7 +409,7 @@ auto main() -> int {
             .resizable = true,
             .msaa = true,
             .vsync = false,
-            .background = application.theme().palette.surface,
+            .background = application.theme().palette.background,
         },
     };
 

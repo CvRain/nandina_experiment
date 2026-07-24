@@ -25,8 +25,12 @@ namespace nandina::theme
     };
 
     struct StyleDocument {
+        std::map<std::string, NanReferencePalette, std::less<>> reference_palettes;
         std::map<std::string, NanTheme, std::less<>> themes;
+        std::map<std::string, ThemeFamily, std::less<>> theme_families;
         std::string active_theme = "default";
+        std::string active_family;
+        ThemePreference preference = ThemePreference::system;
         std::shared_ptr<NanStyle> style = std::make_shared<NanStyle>();
         std::vector<FontFamilyDeclaration> font_families;
 

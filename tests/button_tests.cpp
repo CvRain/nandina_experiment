@@ -214,6 +214,48 @@ TEST_CASE("ThemeManager switches attached widget trees by revision", "[theme][ma
     REQUIRE(button->resolved_style().background.oklch().light == Catch::Approx(0.38F));
 }
 
+TEST_CASE("ThemeManager resolves family variants from appearance preference", "[theme][manager]") {
+    theme::ThemeManager manager;
+    auto light = theme::default_theme();
+    light.palette.primary = theme::nan_color(0.82F, 0.08F, 250.0F);
+    auto dark = theme::default_theme();
+    dark.palette.primary = theme::nan_color(0.42F, 0.08F, 250.0F);
+
+    REQUIRE(manager.register_theme("ocean-light", light));
+    REQUIRE(manager.register_theme("ocean-dark", dark));
+    REQUIRE(manager.register_family("ocean", "ocean-light", "ocean-dark"));
+    REQUIRE(manager.activate_family("ocean"));
+    REQUIRE(manager.active_family() == "ocean");
+    REQUIRE(manager.active_name() == "ocean-light");
+
+    const auto light_revision = manager.revision();
+    manager.set_system_appearance(theme::ColorAppearance::dark);
+    REQUIRE(manager.active_name() == "ocean-dark");
+    REQUIRE(manager.revision() == light_revision + 1);
+
+    const auto dark_revision = manager.revision();
+    manager.set_preference(theme::ThemePreference::dark);
+    REQUIRE(manager.revision() == dark_revision);
+    manager.set_system_appearance(theme::ColorAppearance::light);
+    REQUIRE(manager.active_name() == "ocean-dark");
+    REQUIRE(manager.revision() == dark_revision);
+
+    manager.set_preference(theme::ThemePreference::light);
+    REQUIRE(manager.active_name() == "ocean-light");
+    REQUIRE(manager.theme().palette.primary.oklch().light == Catch::Approx(0.82F));
+}
+
+TEST_CASE("reference color scales expose stable shade indices", "[theme][palette]") {
+    theme::NanColorScale scale;
+    scale.at(theme::ColorShade::shade_50) = theme::nan_color(0.95F, 0.02F, 240.0F);
+    scale.at(theme::ColorShade::shade_500) = theme::nan_color(0.62F, 0.12F, 240.0F);
+    scale.at(theme::ColorShade::shade_950) = theme::nan_color(0.18F, 0.04F, 240.0F);
+
+    REQUIRE(scale.at(theme::ColorShade::shade_50).oklch().light == Catch::Approx(0.95F));
+    REQUIRE(scale.at(theme::ColorShade::shade_500).oklch().light == Catch::Approx(0.62F));
+    REQUIRE(scale.at(theme::ColorShade::shade_950).oklch().light == Catch::Approx(0.18F));
+}
+
 TEST_CASE("TextField rules compose focused and invalid states", "[theme][text-field]") {
     theme::ThemeManager manager;
     auto style = std::make_shared<theme::NanStyle>();
@@ -327,6 +369,54 @@ faces = [{ resource = "fonts/fallback-ui/regular", weight = 400 }]
 background = "$palette.missing"
 )toml");
     REQUIRE_FALSE(invalid.has_value());
+}
+
+TEST_CASE("styles.toml resolves reference palettes and appearance-aware families", "[theme][toml]") {
+    constexpr std::string_view source = R"toml(
+active_family = "ocean"
+appearance = "dark"
+
+[palettes.ocean.primary]
+"50" = [0.98, 0.01, 250.0]
+"100" = [0.93, 0.02, 250.0]
+"200" = [0.87, 0.04, 250.0]
+"300" = [0.80, 0.06, 250.0]
+"400" = [0.72, 0.09, 250.0]
+"500" = [0.64, 0.12, 250.0]
+"600" = [0.56, 0.12, 250.0]
+"700" = [0.48, 0.11, 250.0]
+"800" = [0.39, 0.09, 250.0]
+"900" = [0.30, 0.07, 250.0]
+"950" = [0.21, 0.05, 250.0]
+
+[themes.ocean-light.palette]
+primary = "$palettes.ocean.primary.500"
+
+[themes.ocean-dark.palette]
+primary = "$palettes.ocean.primary.300"
+
+[theme_families.ocean]
+light = "ocean-light"
+dark = "ocean-dark"
+)toml";
+
+    const auto document = theme::parse_style_document(source);
+    REQUIRE(document.has_value());
+    REQUIRE(document->reference_palettes.size() == 1);
+    REQUIRE(document->theme_families.size() == 1);
+
+    theme::ThemeManager manager;
+    REQUIRE(document->apply(manager).has_value());
+    REQUIRE(manager.active_family() == "ocean");
+    REQUIRE(manager.preference() == theme::ThemePreference::dark);
+    REQUIRE(manager.active_name() == "ocean-dark");
+    REQUIRE(manager.theme().palette.primary.oklch().light == Catch::Approx(0.80F));
+
+    const auto missing_stop = theme::parse_style_document(R"toml(
+[palettes.incomplete.primary]
+"50" = [0.9, 0.1, 250.0]
+)toml");
+    REQUIRE_FALSE(missing_stop.has_value());
 }
 
 TEST_CASE("Button instance theme and StyleContext keep their cascade priority", "[theme][cascade]") {

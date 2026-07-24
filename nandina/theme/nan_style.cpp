@@ -11,6 +11,10 @@ namespace nandina::theme
             return *literal;
         }
         switch (std::get<ColorToken>(value.value())) {
+            case ColorToken::background:
+                return theme.palette.background;
+            case ColorToken::on_background:
+                return theme.palette.on_background;
             case ColorToken::primary:
                 return theme.palette.primary;
             case ColorToken::on_primary:
@@ -19,6 +23,10 @@ namespace nandina::theme
                 return theme.palette.secondary;
             case ColorToken::on_secondary:
                 return theme.palette.on_secondary;
+            case ColorToken::tertiary:
+                return theme.palette.tertiary;
+            case ColorToken::on_tertiary:
+                return theme.palette.on_tertiary;
             case ColorToken::surface:
                 return theme.palette.surface;
             case ColorToken::on_surface:
@@ -31,10 +39,22 @@ namespace nandina::theme
                 return theme.palette.outline;
             case ColorToken::outline_variant:
                 return theme.palette.outline_variant;
+            case ColorToken::success:
+                return theme.palette.success;
+            case ColorToken::on_success:
+                return theme.palette.on_success;
+            case ColorToken::warning:
+                return theme.palette.warning;
+            case ColorToken::on_warning:
+                return theme.palette.on_warning;
             case ColorToken::error:
                 return theme.palette.error;
             case ColorToken::on_error:
                 return theme.palette.on_error;
+            case ColorToken::focus_ring:
+                return theme.palette.focus_ring;
+            case ColorToken::selection:
+                return theme.palette.selection;
         }
         return theme.palette.primary;
     }

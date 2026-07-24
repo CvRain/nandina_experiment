@@ -13,14 +13,14 @@ namespace nandina::theme
         const bool focused = has_text_field_state(state, TextFieldVisualState::focused);
         const float alpha = disabled ? theme.tokens.opacity.disabled : 1.0F;
         const auto border = invalid ? theme.palette.error : theme.palette.outline_variant;
-        const auto focus = invalid ? theme.palette.error : theme.palette.primary;
+        const auto focus = invalid ? theme.palette.error : theme.palette.focus_ring;
         return {
             .background = theme.palette.surface_variant.with_alpha(alpha),
             .foreground = theme.palette.on_surface.with_alpha(alpha),
             .placeholder = theme.palette.on_surface_variant.with_alpha(0.72F * alpha),
             .border_color = border.with_alpha(alpha),
             .focus_ring_color = focus.with_alpha(focused || invalid ? 1.0F : 0.0F),
-            .selection = theme.palette.primary.with_alpha(0.32F),
+            .selection = theme.palette.selection,
             .border_width = theme.tokens.border.thin,
             .radius = theme.tokens.radius.sm,
             .focus_ring_width = focused ? theme.tokens.border.focus_ring : 0.0F,

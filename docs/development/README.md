@@ -244,7 +244,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7 theme rules, and A8 accessibility semantics are implemented. The active main line is A9, a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7/A7b theme rules and appearance model, and A8 accessibility semantics are implemented. The active main line is A9, a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -584,6 +584,46 @@ name = "families/application-ui"
 default = true
 faces = [{ resource = "fonts/application-ui/medium", weight = 500 }]
 ```
+
+### A7b. Reference Palettes And Appearance
+
+Status: complete.
+
+Stabilize the theme model before A9 can freeze it into authoring helpers. Theme colors have three distinct layers: complete 50-950 `NanColorScale` values form reusable `NanReferencePalette` authoring inputs; each concrete light or dark `NanTheme` owns a resolved `NanColorScheme`; component variants and interaction states continue to live in `NanStyle`. Runtime widgets therefore depend on semantic names such as `background`, `primary`, `success`, `warning`, `focus_ring`, and `selection`, never on a raw shade number.
+
+`ThemeManager` groups named concrete themes into families. A family supplies light and dark variants, while `ThemePreference` selects system, forced light, or forced dark appearance. Platform adapters report operating-system changes through `set_system_appearance()`; the cross-platform theme core does not poll native APIs. Revisions are published only when the effective concrete theme changes.
+
+`styles.toml` preserves direct semantic color arrays and additionally accepts reference palettes and families:
+
+```toml
+active_family = "application"
+appearance = "system"
+
+[palettes.brand.primary]
+"50" = [0.98, 0.01, 250.0]
+"100" = [0.93, 0.02, 250.0]
+"200" = [0.87, 0.04, 250.0]
+"300" = [0.80, 0.06, 250.0]
+"400" = [0.72, 0.09, 250.0]
+"500" = [0.64, 0.12, 250.0]
+"600" = [0.56, 0.12, 250.0]
+"700" = [0.48, 0.11, 250.0]
+"800" = [0.39, 0.09, 250.0]
+"900" = [0.30, 0.07, 250.0]
+"950" = [0.21, 0.05, 250.0]
+
+[themes.application-light.palette]
+primary = "$palettes.brand.primary.500"
+
+[themes.application-dark.palette]
+primary = "$palettes.brand.primary.300"
+
+[theme_families.application]
+light = "application-light"
+dark = "application-dark"
+```
+
+The current text pipeline intentionally limits typography tokens to supported properties. User text scaling belongs to accessibility/application preferences and will multiply resolved typography rather than becoming a fixed color-theme value. Non-circular corner shapes remain deferred until the renderer can draw them consistently.
 
 ### A8. Accessibility Semantics
 

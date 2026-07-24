@@ -17,18 +17,28 @@
 namespace nandina::theme
 {
     enum class ColorToken {
+        background,
+        on_background,
         primary,
         on_primary,
         secondary,
         on_secondary,
+        tertiary,
+        on_tertiary,
         surface,
         on_surface,
         surface_variant,
         on_surface_variant,
         outline,
         outline_variant,
+        success,
+        on_success,
+        warning,
+        on_warning,
         error,
         on_error,
+        focus_ring,
+        selection,
     };
 
     enum class ScalarToken {
