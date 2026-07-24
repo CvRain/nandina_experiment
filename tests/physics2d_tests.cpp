@@ -4,6 +4,7 @@
 #include "physics2d/physics_world2d.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
+#include "widget/authoring.hpp"
 
 using namespace nandina;
 
@@ -23,6 +24,26 @@ TEST_CASE("PhysicsWorld2D validates configuration and converts units", "[physics
             == foundation::NanPoint(2.0F, 0.5F));
     REQUIRE(world.meters_to_pixels(foundation::NanPoint(2.0F, 0.5F))
             == foundation::NanPoint(100.0F, 25.0F));
+}
+
+TEST_CASE("authoring configures the concrete physics world", "[physics2d][authoring]") {
+    int events = 0;
+    auto world = widget::authoring::from(physics2d::PhysicsWorld2D::create(
+                     physics2d::PhysicsWorldConfig {
+                         .gravity = foundation::NanPoint::zero(),
+                         .pixels_per_meter = 40.0F,
+                     }
+    ))
+                     .configure([&](physics2d::PhysicsWorld2D& value) {
+                         value.set_event_handler([&](const auto&) { ++events; });
+                     })
+                     .build();
+
+    static_assert(
+        std::same_as<decltype(world), std::shared_ptr<physics2d::PhysicsWorld2D>>
+    );
+    REQUIRE(world->config().pixels_per_meter == Catch::Approx(40.0F));
+    REQUIRE(events == 0);
 }
 
 TEST_CASE("PhysicsWorld2D uses deterministic fixed steps and caps catch-up", "[physics2d]") {

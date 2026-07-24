@@ -59,6 +59,13 @@ widget_tests = executable(
 )
 test('widget', widget_tests)
 
+authoring_tests = executable(
+    'authoring_tests',
+    files('authoring_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('authoring', authoring_tests)
+
 router_tests = executable(
     'router_tests',
     files('router_tests.cpp'),

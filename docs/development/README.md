@@ -244,7 +244,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7/A7b theme rules and appearance model, and A8 accessibility semantics are implemented. The active main line is A9, a thin DSL over the same imperative widgets. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7/A7b theme rules and appearance model, A8 accessibility semantics, and the A9 thin authoring DSL are implemented. The active main line is A10 Todo component extraction and paired authoring forms. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -637,14 +637,30 @@ The internal contract deliberately has no AT-SPI, UI Automation, or NSAccessibil
 
 ### A9. Thin Authoring DSL
 
-Only after A1-A8 are usable, add builders/DSL for composition and binding. DSL expressions return or expose concrete widgets and call the same setters/properties/events as imperative code. No DSL-only node, lifecycle, renderer, style, or state path is allowed. Layer and physics authoring helpers must also return the same concrete `CanvasLayer`, `PhysicsWorld2D`, body, and shape objects used imperatively.
+Status: complete.
 
-Maintain paired tests/pages:
+`widget::authoring::NodeBuilder<T>` is a temporary composition helper around `std::shared_ptr<T>`. `make<T>()` constructs a concrete object, while `from()` accepts the result of an existing factory such as `CanvasLayer::create()`, `ForEach::create()`, or `PhysicsWorld2D::create()`. `configure()` invokes ordinary setters, property bindings, and event APIs on `T&`; `children()` and `child()` forward to the existing `add()` and `set_child()` contracts. `expose()` and `build()` return the original concrete shared pointer rather than a wrapper node.
 
-- imperative construction;
-- authored construction;
-- equivalent concrete widget access and mutation;
-- equivalent binding lifetime, keyed reuse, layout, input, style, semantics, and teardown.
+```cpp
+std::shared_ptr<widget::Button> save;
+auto form = widget::authoring::make<widget::Column>()
+    .configure([](widget::Column& value) {
+        value.set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+    })
+    .children(
+        widget::authoring::make<widget::Label>(graph, "Settings"),
+        widget::authoring::make<widget::Button>("Save")
+            .configure([](widget::Button& value) {
+                value.set_treatment(theme::ButtonTreatment::outlined);
+            })
+            .expose(save)
+    )
+    .build();
+```
+
+There is no DSL-owned node, binding scope, lifecycle callback, renderer, style resolver, or state store. The builder disappears after composition; scene ownership and teardown remain unchanged. The generic `from()` path also keeps canvas and optional physics authoring on their existing concrete APIs instead of introducing parallel helper types.
+
+The A9 acceptance tests pair imperative and authored construction and verify equivalent concrete widget access, mutation, binding lifetime, keyed reuse, layout, input, style, semantics, and teardown. A10 adds the paired Todo example forms over extracted application components.
 
 ### A10. Todo Refactor And Component Extraction
 
