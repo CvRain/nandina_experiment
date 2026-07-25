@@ -161,8 +161,8 @@ namespace nandina::app
 
         auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
         auto async_scope = dispatcher_ && background_executor_
-                             ? std::make_unique<AsyncScope>(*dispatcher_, *background_executor_)
-                             : nullptr;
+            ? std::make_unique<AsyncScope>(*dispatcher_, *background_executor_)
+            : nullptr;
         PageContext context {
             *this,
             *graph_,
@@ -174,7 +174,8 @@ namespace nandina::app
             font_loader_,
             font_families_,
             async_scope.get(),
-            theme_manager_
+            theme_manager_,
+            dispatcher_
         };
         auto root = page->build(context);
         if (!root) {

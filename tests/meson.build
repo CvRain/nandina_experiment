@@ -66,6 +66,13 @@ authoring_tests = executable(
 )
 test('authoring', authoring_tests)
 
+todo_authoring_tests = executable(
+    'todo_authoring_tests',
+    files('todo_authoring_tests.cpp'),
+    dependencies : [todo_example_dep, catch2_with_main_dep],
+)
+test('todo-authoring', todo_authoring_tests)
+
 router_tests = executable(
     'router_tests',
     files('router_tests.cpp'),

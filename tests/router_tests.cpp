@@ -85,6 +85,26 @@ namespace
         }
     };
 
+    struct DispatcherProbeParams {
+        bool* available = nullptr;
+        app::UiDispatcher** dispatcher = nullptr;
+    };
+
+    class DispatcherProbePage final: public app::NanPageT<DispatcherProbeParams> {
+    public:
+        explicit DispatcherProbePage(DispatcherProbeParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "dispatcher-probe";
+        }
+
+        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+            *params().available = context.has_dispatcher();
+            *params().dispatcher = &context.dispatcher();
+            return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
+
     struct ScopedObserverLog {
         int observed = 0;
         int runs = 0;
@@ -102,7 +122,8 @@ namespace
             return "scoped-observer";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto& store = context.store<TestStore>();
             auto* log = params().log;
             context.scope().effect([&store, log] {
@@ -179,6 +200,23 @@ TEST_CASE("router pushes keep-alive pages and toggles top visibility", "[app][ro
     REQUIRE(router.host()->child_count() == 1);
     REQUIRE(home_root->visible());
     REQUIRE_FALSE(router.pop());
+}
+
+TEST_CASE("router exposes its UI dispatcher through page context", "[app][router][dispatcher]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {graph, theme, nullptr, nullptr, nullptr, nullptr, nullptr, &dispatcher};
+    bool available = false;
+    app::UiDispatcher* observed = nullptr;
+
+    router.push<DispatcherProbePage>(DispatcherProbeParams {
+        .available = &available,
+        .dispatcher = &observed,
+    });
+
+    REQUIRE(available);
+    REQUIRE(observed == &dispatcher);
 }
 
 TEST_CASE("router frame cancellation suppresses page async completion", "[app][router][async]") {

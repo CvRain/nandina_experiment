@@ -145,7 +145,7 @@ The application framework is evaluated across twelve connected responsibilities,
 | 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
 | Supporting 2D simulation | Optional Box2D 3.x bridge, fixed physics phase, shape/contact events, and canvas/world isolation. | Interpolation polish, richer queries/shapes, joints, and debug draw. |
 
-The current Todo page is intentionally the pressure test for the next abstraction layer. It still manually rebuilds list children, wires effects, marks layout dirty, and coordinates post-layout scrolling. Those operations prove the underlying runtime but are not the desired application-authoring surface.
+The Todo example is the acceptance surface for application authoring. Its keyed list, conditional empty state, bindings, and post-layout scrolling use the framework contracts directly; A10 additionally presents the same extracted components through imperative and DSL-authored pages.
 
 ## Layout System
 
@@ -217,7 +217,8 @@ The current example is a Todo page using:
 
 - `NanApplication` with app-level `NanTheme`.
 - `NanWindow` and `NanRouter`.
-- `TodoPage : NanPageT<NoParams>` with page-scoped reactive state.
+- paired `ImperativeTodoPage` and `DslTodoPage` routes with typed `TodoPageParams`.
+- an application-owned `TodoStore` shared by both keep-alive pages.
 - semantic `Label`, `Button`, and `TextField` controls sharing one resource-backed text pipeline.
 - interactive add/complete/remove actions, a dynamic ScrollView list, and resize-sensitive Flex layout.
 - automatic SQLite/builtin resource discovery and window-owned default font pipeline inheritance.
@@ -244,7 +245,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a/A1b, the A2 property core, the minimal A3 canvas/physics boundary, A4 declarative regions, A5 UI dispatch/async scope, A6 font/style context, A7/A7b theme rules and appearance model, A8 accessibility semantics, and the A9 thin authoring DSL are implemented. The active main line is A10 Todo component extraction and paired authoring forms. Canvas/physics work is supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A10 are implemented through the paired imperative/DSL Todo acceptance pages. The next main-line selection begins from the deferred application capabilities below, with router lifecycle/history as the leading candidate. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -664,7 +665,11 @@ The A9 acceptance tests pair imperative and authored construction and verify equ
 
 ### A10. Todo Refactor And Component Extraction
 
-Split Todo into semantic components (`TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, `TodoEmptyState`) and first rewrite it using the new imperative Property/ForEach/Style APIs. Then add a second DSL authoring form over the same components. The example becomes the acceptance test that normal application code describes state projection and intent rather than framework refresh mechanics.
+Status: complete.
+
+Todo is split into semantic `TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, and `TodoEmptyState` components backed by one application-owned `TodoStore`. `ImperativeTodoPage` composes those concrete components with ordinary setters and `add()`, while `DslTodoPage` composes the same types through `widget::authoring`; neither page has a separate state, binding, style, reconciliation, or lifecycle path.
+
+The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and visit number. Navigation is posted through `PageContext::dispatcher()` and runs in the next UI task phase, after the active input callback and outside scene traversal. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
 
 ### Deferred After Authoring Core
 

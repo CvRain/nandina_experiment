@@ -15,8 +15,8 @@
 #include "../resource/resource_manager.hpp"
 #include "../scene/node2d.hpp"
 #include "../theme/theme.hpp"
-#include "nan_store.hpp"
 #include "async_scope.hpp"
+#include "nan_store.hpp"
 
 #include <concepts>
 #include <memory>
@@ -64,7 +64,8 @@ namespace nandina::app
             text::FontLoader* font_loader = nullptr,
             text::FontFamilyRegistry* font_families = nullptr,
             AsyncScope* async_scope = nullptr,
-            theme::ThemeManager* theme_manager = nullptr
+            theme::ThemeManager* theme_manager = nullptr,
+            UiDispatcher* dispatcher = nullptr
         ):
             router_(&router),
             graph_(&graph),
@@ -76,7 +77,8 @@ namespace nandina::app
             font_loader_(font_loader),
             font_families_(font_families),
             async_scope_(async_scope),
-            theme_manager_(theme_manager) {}
+            theme_manager_(theme_manager),
+            dispatcher_(dispatcher) {}
 
         [[nodiscard]] auto router() -> NanRouter& {
             return *router_;
@@ -124,6 +126,17 @@ namespace nandina::app
             return *async_scope_;
         }
 
+        [[nodiscard]] auto has_dispatcher() const noexcept -> bool {
+            return dispatcher_ != nullptr;
+        }
+
+        [[nodiscard]] auto dispatcher() -> UiDispatcher& {
+            if (!dispatcher_) {
+                throw std::runtime_error("PageContext::dispatcher: service is unavailable");
+            }
+            return *dispatcher_;
+        }
+
         [[nodiscard]] auto resources() -> resource::ResourceManager& {
             if (!resources_) {
                 throw std::runtime_error("PageContext::resources: services are unavailable");
@@ -168,6 +181,7 @@ namespace nandina::app
         text::FontFamilyRegistry* font_families_ = nullptr;
         AsyncScope* async_scope_ = nullptr;
         theme::ThemeManager* theme_manager_ = nullptr;
+        UiDispatcher* dispatcher_ = nullptr;
     };
 
     class NanPage {

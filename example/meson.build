@@ -4,6 +4,17 @@ example_sources = files(
     'main.cpp',
 )
 
+todo_example_library = static_library(
+    'nandina_todo_example',
+    files('todo_app.cpp'),
+    dependencies : [nandina_dep],
+)
+todo_example_dep = declare_dependency(
+    link_with : todo_example_library,
+    include_directories : include_directories('.'),
+    dependencies : [nandina_dep],
+)
+
 nanres_policy = files('resources.toml')
 resource_nanres = nandina_resource_toolchain['nanres']
 resource_build_helper = nandina_resource_toolchain['build_helper']
@@ -31,7 +42,7 @@ meson.add_install_script(
 
 executable('nandina_example',
     example_sources,
-    dependencies : [nandina_dep,raylib_dep],
+    dependencies : [todo_example_dep, raylib_dep],
     install : true
 )
 
