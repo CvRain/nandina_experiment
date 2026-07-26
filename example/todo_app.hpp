@@ -42,18 +42,17 @@ namespace nandina::examples::todo
         [[nodiscard]] auto add(std::string_view title) -> bool;
         void toggle(std::uint64_t id);
         void remove(std::uint64_t id);
-        [[nodiscard]] auto next_visit() -> std::uint64_t;
+        void bump_visit();
 
         reactive::Signal<std::vector<TodoItem>> items;
+        reactive::Signal<std::uint64_t> visits;
 
     private:
         std::uint64_t next_id_ = 4;
-        std::uint64_t visits_ = 1;
     };
 
     struct TodoPageParams {
         std::string source = "应用启动";
-        std::uint64_t visit = 1;
     };
 
     class TodoRow final: public widget::Row {
@@ -84,7 +83,7 @@ namespace nandina::examples::todo
         TodoHeader(
             reactive::Graph& graph,
             reactive::Computed<std::string>& status,
-            const TodoPageParams& params,
+            reactive::Computed<std::string>& visit_text,
             std::string authoring_label,
             std::string navigation_label,
             theme::ThemeManager& themes,
@@ -179,6 +178,7 @@ namespace nandina::examples::todo
         [[nodiscard]] auto route_key() const -> std::string_view override;
         [[nodiscard]] auto build(app::PageContext& context)
             -> std::shared_ptr<scene::NanNode2D> override;
+        void on_activate(app::PageContext& context) override;
         [[nodiscard]] auto workspace() const -> const std::shared_ptr<TodoWorkspace>&;
 
     private:
@@ -191,6 +191,7 @@ namespace nandina::examples::todo
         [[nodiscard]] auto route_key() const -> std::string_view override;
         [[nodiscard]] auto build(app::PageContext& context)
             -> std::shared_ptr<scene::NanNode2D> override;
+        void on_activate(app::PageContext& context) override;
         [[nodiscard]] auto workspace() const -> const std::shared_ptr<TodoWorkspace>&;
 
     private:

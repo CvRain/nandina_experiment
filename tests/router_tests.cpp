@@ -357,3 +357,119 @@ TEST_CASE("router clears page reactive scope when a frame is popped", "[app][rou
     REQUIRE(log.observed == 5);
     REQUIRE(log.runs == 2);
 }
+
+struct LifecycleLog {
+    int activations = 0;
+    int deactivations = 0;
+};
+
+struct LifecycleParams {
+    LifecycleLog* log = nullptr;
+    std::string key = "lifecycle";
+};
+
+class LifecyclePage final: public app::NanPageT<LifecycleParams> {
+public:
+    explicit LifecyclePage(LifecycleParams params): NanPageT(params) {}
+
+    [[nodiscard]] auto route_key() const -> std::string_view override {
+        return params().key;
+    }
+
+    [[nodiscard]] auto build(app::PageContext& context)
+        -> std::shared_ptr<scene::NanNode2D> override {
+        return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+    }
+
+    void on_activate(app::PageContext& /*context*/) override {
+        ++params().log->activations;
+    }
+
+    void on_deactivate(app::PageContext& /*context*/) override {
+        ++params().log->deactivations;
+    }
+};
+
+TEST_CASE("page on_activate fires on initial push", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme};
+    LifecycleLog log;
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &log});
+    REQUIRE(log.activations == 1);
+    REQUIRE(log.deactivations == 0);
+}
+
+TEST_CASE("page on_deactivate fires when another page pushes on top", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme};
+    LifecycleLog first_log;
+    LifecycleLog second_log;
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &first_log});
+    REQUIRE(first_log.activations == 1);
+    REQUIRE(first_log.deactivations == 0);
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &second_log});
+    REQUIRE(first_log.deactivations == 1);
+    REQUIRE(second_log.activations == 1);
+    REQUIRE(second_log.deactivations == 0);
+}
+
+TEST_CASE("page on_activate fires when pop restores keep-alive page", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme};
+    LifecycleLog first_log;
+    LifecycleLog second_log;
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &first_log});
+    router.push<LifecyclePage>(LifecycleParams {.log = &second_log});
+    // first: 1 activation, 1 deactivation; second: 1 activation
+    REQUIRE(first_log.activations == 1);
+    REQUIRE(first_log.deactivations == 1);
+    REQUIRE(second_log.activations == 1);
+
+    REQUIRE(router.pop());
+    // second page dropped (deactivation already handled by drop_frame)
+    // first page reactivated
+    REQUIRE(first_log.activations == 2);
+}
+
+TEST_CASE("pop_to reactivates target keep-alive page", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme};
+    LifecycleLog first_log;
+    LifecycleLog middle_log;
+    LifecycleLog last_log;
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &first_log, .key = "first"});
+    router.push<LifecyclePage>(LifecycleParams {.log = &middle_log, .key = "middle"});
+    router.push<LifecyclePage>(LifecycleParams {.log = &last_log, .key = "last"});
+
+    REQUIRE(first_log.activations == 1);
+    REQUIRE(first_log.deactivations == 1);
+    REQUIRE(middle_log.activations == 1);
+    REQUIRE(middle_log.deactivations == 1);
+    REQUIRE(last_log.activations == 1);
+
+    REQUIRE(router.pop_to("first"));
+    // pop_to removes middle and last, reactivates first
+    REQUIRE(first_log.activations == 2);
+}
+
+TEST_CASE("router clear deactivates active page", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::NanRouter router {graph, theme};
+    LifecycleLog log;
+
+    router.push<LifecyclePage>(LifecycleParams {.log = &log});
+    REQUIRE(log.activations == 1);
+
+    router.clear();
+    REQUIRE(log.deactivations == 1);
+}

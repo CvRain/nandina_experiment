@@ -34,8 +34,11 @@ namespace nandina::examples::todo
                 + " completed / 已完成";
         }
 
-        [[nodiscard]] auto parameter_summary(const TodoPageParams& params) -> std::string {
-            return "页面参数：来自 " + params.source + " · 第 " + std::to_string(params.visit)
+        [[nodiscard]] auto parameter_summary(
+            const TodoPageParams& params,
+            const std::uint64_t visit
+        ) -> std::string {
+            return "页面参数：来自 " + params.source + " · 第 " + std::to_string(visit)
                 + " 次访问";
         }
 
@@ -56,6 +59,9 @@ namespace nandina::examples::todo
             auto& store = context.store<TodoStore>();
             auto& status = context.scope().computed([&store] { return status_for(store); });
             auto& empty = context.scope().computed([&store] { return store.items.get().empty(); });
+            auto& visit_text = context.scope().computed([&store, &params] {
+                return parameter_summary(params, store.visits.get());
+            });
             auto list = std::make_shared<TodoList>(context.graph(), empty, store, context.theme());
             auto composer = std::make_shared<TodoComposer>(
                 context.theme(),
@@ -72,7 +78,7 @@ namespace nandina::examples::todo
             auto header = std::make_shared<TodoHeader>(
                 context.graph(),
                 status,
-                params,
+                visit_text,
                 std::move(authoring_label),
                 std::move(navigation_label),
                 context.theme_manager(),
@@ -95,7 +101,8 @@ namespace nandina::examples::todo
                 {.id = 2, .title = "验证中文输入、鼠标和窗口缩放"},
                 {.id = 3, .title = "检查动态任务列表的滚动效果"},
             }
-        ) {}
+        ),
+        visits(graph, 0) {}
 
     auto TodoStore::add(const std::string_view title) -> bool {
         if (!has_non_space(title)) {
@@ -122,8 +129,8 @@ namespace nandina::examples::todo
         });
     }
 
-    auto TodoStore::next_visit() -> std::uint64_t {
-        return ++visits_;
+    void TodoStore::bump_visit() {
+        visits.set(visits.get() + 1);
     }
 
     TodoRow::TodoRow(reactive::Graph& graph, theme::NanTheme theme, Action toggle, Action remove):
@@ -197,7 +204,7 @@ namespace nandina::examples::todo
     TodoHeader::TodoHeader(
         reactive::Graph& graph,
         reactive::Computed<std::string>& status,
-        const TodoPageParams& params,
+        reactive::Computed<std::string>& visit_text,
         std::string authoring_label,
         std::string navigation_label,
         theme::ThemeManager& themes,
@@ -242,8 +249,9 @@ namespace nandina::examples::todo
             .add(title_expanded)
             .add(actions);
 
-        parameters_ = widget::Label::create(graph, parameter_summary(params), themes.theme());
+        parameters_ = widget::Label::create(graph, "", themes.theme());
         parameters_->set_color(themes.theme().palette.on_surface_variant);
+        parameters_->bind_text(visit_text);
         status_ = widget::Label::create(graph, "", themes.theme());
         status_->set_color(themes.theme().palette.on_surface_variant);
         status_->bind_text(status);
@@ -444,14 +452,16 @@ namespace nandina::examples::todo
         return "todo-imperative";
     }
 
+    void ImperativeTodoPage::on_activate(app::PageContext& context) {
+        context.store<TodoStore>().bump_visit();
+    }
+
     auto ImperativeTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         auto& router = context.router();
-        auto& store = context.store<TodoStore>();
         auto parts =
-            make_page_parts(context, params(), "命令式构建", "查看 DSL 版本", [&router, &store] {
+            make_page_parts(context, params(), "命令式构建", "查看 DSL 版本", [&router] {
                 router.push<DslTodoPage>(TodoPageParams {
                     .source = "命令式页面",
-                    .visit = store.next_visit(),
                 });
             });
 
@@ -484,15 +494,17 @@ namespace nandina::examples::todo
         return "todo-dsl";
     }
 
+    void DslTodoPage::on_activate(app::PageContext& context) {
+        context.store<TodoStore>().bump_visit();
+    }
+
     auto DslTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         auto& router = context.router();
-        auto& store = context.store<TodoStore>();
         auto parts =
-            make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router, &store] {
+            make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router] {
                 if (!router.pop_to("todo-imperative")) {
                     router.push<ImperativeTodoPage>(TodoPageParams {
                         .source = "DSL 页面",
-                        .visit = store.next_visit(),
                     });
                 }
             });

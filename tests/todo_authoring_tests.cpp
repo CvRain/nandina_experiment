@@ -53,7 +53,7 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
         &dispatcher
     };
     auto& imperative =
-        router.push<ImperativeTodoPage>(TodoPageParams {.source = "测试入口", .visit = 1});
+        router.push<ImperativeTodoPage>(TodoPageParams {.source = "测试入口"});
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
@@ -122,7 +122,7 @@ TEST_CASE("DSL Todo page can pass params to a new imperative page", "[todo][para
         nullptr,
         &dispatcher
     };
-    auto& dsl = router.push<DslTodoPage>(TodoPageParams {.source = "直接入口", .visit = 1});
+    auto& dsl = router.push<DslTodoPage>(TodoPageParams {.source = "直接入口"});
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());

@@ -198,6 +198,17 @@ namespace nandina::app
         [[nodiscard]] virtual auto build(PageContext& context)
             -> std::shared_ptr<scene::NanNode2D> = 0;
 
+        /// Called when this keep-alive page becomes the top of the stack (visible again).
+        /// The default implementation is a no-op. Pages override this to refresh
+        /// state that may have changed while the page was hidden (e.g. visit counters,
+        /// live data from a shared Store).
+        virtual void on_activate(PageContext& context) {}
+
+        /// Called when this keep-alive page is no longer the top of the stack (hidden
+        /// by another page being pushed on top). The page root remains mounted and
+        /// reactive bindings stay active. The default implementation is a no-op.
+        virtual void on_deactivate(PageContext& context) {}
+
     protected:
         NanPage() = default;
     };

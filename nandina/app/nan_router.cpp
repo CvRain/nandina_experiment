@@ -191,6 +191,7 @@ namespace nandina::app
                 .scope = std::move(scope),
                 .async_scope = std::move(async_scope),
                 .key = {},
+                .active = false,
             }
         );
         frames_.back().key = std::string(frames_.back().page->route_key());
@@ -198,8 +199,38 @@ namespace nandina::app
     }
 
     void NanRouter::sync_visibility() {
+        // Find the previously active frame (if any) and the new top frame.
+        Frame* deactivating = nullptr;
+        Frame* activating = nullptr;
+
+        for (auto& frame : frames_) {
+            if (frame.active) {
+                deactivating = &frame;
+                break;
+            }
+        }
+
+        // Set all frames invisible, mark top as visible.
         for (std::size_t i = 0; i < frames_.size(); ++i) {
             frames_[i].root->set_visible(i + 1 == frames_.size());
+        }
+
+        if (!frames_.empty()) {
+            activating = &frames_.back();
+        }
+
+        // Deactivate the previously active page before activating the new one.
+        if (deactivating != nullptr && deactivating != activating) {
+            deactivating->active = false;
+            auto ctx = make_context_for(*deactivating);
+            deactivating->page->on_deactivate(ctx);
+        }
+
+        // Activate the new top page.
+        if (activating != nullptr && !activating->active) {
+            activating->active = true;
+            auto ctx = make_context_for(*activating);
+            activating->page->on_activate(ctx);
         }
     }
 
@@ -215,6 +246,11 @@ namespace nandina::app
     }
 
     void NanRouter::drop_frame(Frame& frame) {
+        if (frame.active) {
+            frame.active = false;
+            auto ctx = make_context_for(frame);
+            frame.page->on_deactivate(ctx);
+        }
         detach_root(frame.root);
         if (frame.async_scope != nullptr) {
             frame.async_scope->clear();
@@ -222,6 +258,23 @@ namespace nandina::app
         if (frame.scope != nullptr) {
             frame.scope->clear();
         }
+    }
+
+    auto NanRouter::make_context_for(Frame& frame) -> PageContext {
+        return PageContext {
+            *this,
+            *graph_,
+            *frame.scope,
+            theme(),
+            store_,
+            store_key_,
+            resources_,
+            font_loader_,
+            font_families_,
+            frame.async_scope.get(),
+            theme_manager_,
+            dispatcher_
+        };
     }
 
 } // namespace nandina::app

@@ -135,17 +135,17 @@ The application framework is evaluated across twelve connected responsibilities,
 | 2. Event loop | A1a formalizes frame phases; A1b batches effects into one post-physics reactive wave. | UI task draining, reconcile/style phases, dirty-only paint. |
 | 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Canvas-aware coordinate routing/input blocking, native IME, shortcuts, gestures, drag/drop. |
 | 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
-| 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle. | Keyed reconciliation and declarative region ownership. |
+| 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle, keep-alive page activate/deactivate. | Keyed reconciliation and declarative region ownership. |
 | 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, and bounded post-layout relayout. | Screen-canvas layout roots, diagnostics, Grid/Anchor, richer intrinsic contracts. |
 | 7. Paint/composition | Tree draw traversal, sibling z-order, clip stack, typed paint dirtiness, replaceable render device. | World/screen CanvasLayer boundaries, dirty-only paint, damage tracking, retained caches, animation phases. |
 | 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
-| 9. Style | `NanTheme`, tokens/palette, primitive and Button variants. | `NanStyle`, style context/cascade, ThemeManager, structured style files. |
-| 10. State binding | Signal/Computed/Effect/Scope and limited Label binding. | General properties, automatic bindings, `If`, keyed `ForEach`, no manual refresh. |
-| 11. Async | No complete application-facing model yet. | UI dispatcher, background tasks, cancellation, coroutine adapters, stale-result policy. |
+| 9. Style | `NanTheme`, tokens/palette, `NanStyle`, `ThemeManager`, `StyleDocument` (styles.toml), reference palettes, theme families, appearance preference. | Widget-level style overrides, richer variant/state rules. |
+| 10. State binding | Signal/Computed/Effect/Scope, `Property<T>`, one-way bindings, `If`, keyed `ForEach`. | General property binding coverage, automatic two-way bindings. |
+| 11. Async | `UiDispatcher`, `BackgroundExecutor`, `CancellationToken`, `AsyncScope`. | Coroutine adapters, stale-result policy. |
 | 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
 | Supporting 2D simulation | Optional Box2D 3.x bridge, fixed physics phase, shape/contact events, and canvas/world isolation. | Interpolation polish, richer queries/shapes, joints, and debug draw. |
 
-The Todo example is the acceptance surface for application authoring. Its keyed list, conditional empty state, bindings, and post-layout scrolling use the framework contracts directly; A10 additionally presents the same extracted components through imperative and DSL-authored pages.
+The Todo example is the acceptance surface for application authoring. Its keyed list, conditional empty state, bindings, post-layout scrolling, and reactive page visit counter use the framework contracts directly; A10 presents the same extracted components through imperative and DSL-authored pages, and A11 adds keep-alive page activate/deactivate lifecycle hooks.
 
 ## Layout System
 
@@ -669,11 +669,26 @@ Status: complete.
 
 Todo is split into semantic `TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, and `TodoEmptyState` components backed by one application-owned `TodoStore`. `ImperativeTodoPage` composes those concrete components with ordinary setters and `add()`, while `DslTodoPage` composes the same types through `widget::authoring`; neither page has a separate state, binding, style, reconciliation, or lifecycle path.
 
-The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and visit number. Navigation is posted through `PageContext::dispatcher()` and runs in the next UI task phase, after the active input callback and outside scene traversal. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
+The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and a reactive visit counter driven by the shared `TodoStore::visits` signal. Navigation is posted through `PageContext::dispatcher()` and runs in the next UI task phase, after the active input callback and outside scene traversal. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
+
+### A11. Page Activate/Deactivate Lifecycle
+
+Status: complete.
+
+`NanPage` gains two virtual lifecycle hooks:
+
+- `on_activate(PageContext&)` — called when a keep-alive page becomes the visible top of the router stack. Fires on initial push and again every time a `pop`/`pop_to` restores the page.
+- `on_deactivate(PageContext&)` — called when a keep-alive page is hidden by another page pushing on top, or when the page is popped/dropped from the stack.
+
+The router tracks a per-frame `active` flag and constructs a `PageContext` for the frame from its stored scope, async scope, and the router's shared services. Deactivation fires before activation on the same transition (`deactivate(old) → activate(new)`).
+
+The Todo example uses `on_activate` to drive a reactive `TodoStore::visits` signal. Each activation bumps the visit counter, and the page header binds a `Computed<std::string>` that displays the source parameter together with the current visit count. This replaces the previous pattern of passing a static visit number through `TodoPageParams`, which could not update when `pop_to` restored a keep-alive page.
+
+Tests cover: initial push activation, push-on-top deactivation, pop reactivation, pop_to reactivation, and clear-then-deactivate. All router tests (13 cases, 77 assertions) pass.
 
 ### Deferred After Authoring Core
 
-- Router activate/deactivate/replace lifecycle, history, deep links, and transitions.
+- Router history, deep links, replace semantics, and page transitions.
 - Tween/animation primitives and reusable impact/ripple effects.
 - Camera2D, offscreen/custom viewports, physics interpolation polish, broader Box2D joints, and advanced spatial queries.
 - Sprite/shape convenience nodes, particles, audio, navigation, scene serialization, and ECS remain optional future game-facing work rather than requirements for the application framework.

@@ -25,7 +25,7 @@ namespace
     protected:
         void on_setup() override {
             use_router().push<examples::todo::ImperativeTodoPage>(
-                examples::todo::TodoPageParams {.source = "应用启动", .visit = 1}
+                examples::todo::TodoPageParams {.source = "应用启动"}
             );
         }
     };

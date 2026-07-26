@@ -129,6 +129,7 @@ namespace nandina::app
             std::unique_ptr<reactive::ReactiveScope> scope;
             std::unique_ptr<AsyncScope> async_scope;
             std::string key;
+            bool active = false;
         };
 
         void push_page(std::unique_ptr<NanPage> page);
@@ -136,6 +137,7 @@ namespace nandina::app
         void attach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void detach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void drop_frame(Frame& frame);
+        [[nodiscard]] auto make_context_for(Frame& frame) -> PageContext;
 
         reactive::Graph* graph_;
         const theme::NanTheme* theme_;
