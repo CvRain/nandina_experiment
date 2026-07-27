@@ -140,7 +140,7 @@ The application framework is evaluated across twelve connected responsibilities,
 | 7. Paint/composition | Tree draw traversal, sibling z-order, clip stack, typed paint dirtiness, replaceable render device. | World/screen CanvasLayer boundaries, dirty-only paint, damage tracking, retained caches, animation phases. |
 | 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
 | 9. Style | `NanTheme`, tokens/palette, `NanStyle`, `ThemeManager`, `StyleDocument` (styles.toml), reference palettes, theme families, appearance preference. | Widget-level style overrides, richer variant/state rules. |
-| 10. State binding | Signal/Computed/Effect/Scope, `Property<T>`, one-way bindings, `If`, keyed `ForEach`. | General property binding coverage, automatic two-way bindings. |
+| 10. State binding | Signal/Computed/Effect/Scope, `Property<T>`, one-way bindings, `If`, keyed `ForEach`, free-function authoring factories. | General property binding coverage, automatic two-way bindings. |
 | 11. Async | `UiDispatcher`, `BackgroundExecutor`, `CancellationToken`, `AsyncScope`. | Coroutine adapters, stale-result policy. |
 | 12. Accessibility/delivery | R1-R10 resource delivery, install/portable layouts. | Semantic tree, keyboard navigation contract, platform accessibility and app packaging. |
 | Supporting 2D simulation | Optional Box2D 3.x bridge, fixed physics phase, shape/contact events, and canvas/world isolation. | Interpolation polish, richer queries/shapes, joints, and debug draw. |
@@ -640,7 +640,7 @@ The internal contract deliberately has no AT-SPI, UI Automation, or NSAccessibil
 
 Status: complete.
 
-`widget::authoring::NodeBuilder<T>` is a temporary composition helper around `std::shared_ptr<T>`. `make<T>()` constructs a concrete object, while `from()` accepts the result of an existing factory such as `CanvasLayer::create()`, `ForEach::create()`, or `PhysicsWorld2D::create()`. `configure()` invokes ordinary setters, property bindings, and event APIs on `T&`; `children()` and `child()` forward to the existing `add()` and `set_child()` contracts. `expose()` and `build()` return the original concrete shared pointer rather than a wrapper node.
+`widget::authoring::NodeBuilder<T>` is the v1 stable composition helper around `std::shared_ptr<T>`. `make<T>()` constructs a concrete object, while `from()` accepts the result of an existing factory such as `CanvasLayer::create()`, `ForEach::create()`, or `PhysicsWorld2D::create()`. `configure()` invokes ordinary setters, property bindings, and event APIs on `T&`; `children()` and `child()` forward to the existing `add()` and `set_child()` contracts. `expose()` and `build()` return the original concrete shared pointer rather than a wrapper node. Free-function factories (`row()`, `column()`, `label()`, `button()`, `padding()`, etc.) are thin aliases for `make<T>(args...)` documented in A12.
 
 ```cpp
 std::shared_ptr<widget::Button> save;
@@ -685,6 +685,48 @@ The router tracks a per-frame `active` flag and constructs a `PageContext` for t
 The Todo example uses `on_activate` to drive a reactive `TodoStore::visits` signal. Each activation bumps the visit counter, and the page header binds a `Computed<std::string>` that displays the source parameter together with the current visit count. This replaces the previous pattern of passing a static visit number through `TodoPageParams`, which could not update when `pop_to` restored a keep-alive page.
 
 Tests cover: initial push activation, push-on-top deactivation, pop reactivation, pop_to reactivation, and clear-then-deactivate. All router tests (13 cases, 77 assertions) pass.
+
+### A12. Authoring Factory Functions
+
+Status: complete.
+
+`widget::authoring` gains free-function factories that are semantic aliases for `make<T>(args...)`. They do not introduce a new object model, renderer, or lifecycle — they return the same `NodeBuilder<T>` and produce the same concrete `shared_ptr<T>` as `make<T>()`.
+
+Layout factories:
+
+- `row()`, `column()`, `flex(axis)`
+- `padding(insets)`, `center()`, `expanded(flex)`
+- `flex_item(policy)`, `scroll_view(axis)`
+
+Control factories:
+
+- `label(graph, text, theme)`, `button(text, theme)`, `text_field(value, placeholder, theme)`
+
+Theme parameters default to `default_theme()`.
+
+Usage before and after:
+
+```cpp
+// Before (A9)
+auto page = widget::authoring::make<widget::Column>()
+    .configure([](widget::Column& c) { c.set_gap(10.0F); })
+    .children(
+        widget::authoring::make<widget::Label>(graph, "Overview"),
+        widget::authoring::make<widget::Button>("Run")
+    )
+    .build();
+
+// After (A12)
+using namespace widget::authoring;
+auto page = column()
+    .configure([](widget::Column& c) { c.set_gap(10.0F); })
+    .children(label(graph, "Overview"), button("Run"))
+    .build();
+```
+
+The `DslTodoPage` example now uses these factories. Authoring tests cover type identity, layout equivalence with imperative construction, nested tree composition, and `expose`/`configure` on factory-produced builders (4 new test cases). The `make<T>()` entry point remains valid and is the underlying mechanism; the factories are thin inline wrappers.
+
+The A9 section previously marked `NodeBuilder<T>` as "temporary" — this label is removed. `NodeBuilder<T>` together with the free-function factories is the v1 stable authoring API.
 
 ### Deferred After Authoring Core
 

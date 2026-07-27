@@ -206,3 +206,151 @@ TEST_CASE("authoring rejects null factory results", "[authoring]") {
         std::invalid_argument
     );
 }
+
+TEST_CASE("free function factories produce same types as make<T>", "[authoring][factory]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    // Layout factories
+    {
+        auto r = row().build();
+        static_assert(std::same_as<decltype(r), std::shared_ptr<widget::Row>>);
+        auto c = column().build();
+        static_assert(std::same_as<decltype(c), std::shared_ptr<widget::Column>>);
+        auto p = padding(foundation::NanInsets::all(8.0F)).build();
+        static_assert(std::same_as<decltype(p), std::shared_ptr<widget::Padding>>);
+        auto ct = center().build();
+        static_assert(std::same_as<decltype(ct), std::shared_ptr<widget::Center>>);
+        auto ex = expanded(2).build();
+        static_assert(std::same_as<decltype(ex), std::shared_ptr<widget::Expanded>>);
+        REQUIRE(ex->layout_flex_factor() == 2.0F);
+        auto fi = flex_item(scene::LayoutFlexPolicy {.grow = 1.0F}).build();
+        static_assert(std::same_as<decltype(fi), std::shared_ptr<widget::FlexItem>>);
+        auto sv = scroll_view(widget::ScrollAxis::horizontal).build();
+        static_assert(std::same_as<decltype(sv), std::shared_ptr<widget::ScrollView>>);
+        auto fl = flex(widget::LayoutAxis::vertical).build();
+        static_assert(std::same_as<decltype(fl), std::shared_ptr<widget::Flex>>);
+    }
+
+    // Control factories
+    {
+        auto lb = label(graph, "Hello").build();
+        static_assert(std::same_as<decltype(lb), std::shared_ptr<widget::Label>>);
+        REQUIRE(lb->text() == "Hello");
+
+        auto bt = button("Click").build();
+        static_assert(std::same_as<decltype(bt), std::shared_ptr<widget::Button>>);
+        REQUIRE(bt->text() == "Click");
+
+        auto tf = text_field("val", "placeholder").build();
+        static_assert(std::same_as<decltype(tf), std::shared_ptr<widget::TextField>>);
+        REQUIRE(tf->value() == "val");
+    }
+}
+
+TEST_CASE(
+    "free function DSL trees match imperative construction",
+    "[authoring][factory][layout]"
+) {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    // Imperative
+    auto imp_button = widget::Button::create("Save");
+    imp_button->set_tone(theme::ButtonTone::primary);
+    auto imp = widget::Column::create();
+    imp->set_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+    imp->add(imp_button);
+
+    // DSL with free functions
+    std::shared_ptr<widget::Button> dsl_button;
+    auto dsl =
+        column()
+            .configure([](widget::Column& c) {
+                c.set_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+            })
+            .children(
+                button("Save")
+                    .configure(
+                        [](widget::Button& b) { b.set_tone(theme::ButtonTone::primary); }
+                    )
+                    .expose(dsl_button)
+            )
+            .build();
+
+    scene::NanSceneTree imp_tree;
+    imp_tree.set_root(imp);
+    scene::NanSceneTree dsl_tree;
+    dsl_tree.set_root(dsl);
+    REQUIRE(imp_tree.layout_root(foundation::NanSize(200.0F, 80.0F)) == 1);
+    REQUIRE(dsl_tree.layout_root(foundation::NanSize(200.0F, 80.0F)) == 1);
+
+    REQUIRE(dsl_button->tone() == imp_button->tone());
+    REQUIRE(dsl_button->global_bounds() == imp_button->global_bounds());
+    REQUIRE(dsl->child_count() == imp->child_count());
+    REQUIRE(dsl->gap() == Catch::Approx(imp->gap()));
+}
+
+TEST_CASE("free function factories compose nested layout trees", "[authoring][factory][layout]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    std::shared_ptr<widget::Label> title_label;
+    std::shared_ptr<widget::Button> action_btn;
+    auto root =
+        padding(foundation::NanInsets::all(12.0F))
+            .child(
+                column()
+                    .configure([](widget::Column& c) {
+                        c.set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+                    })
+                    .children(
+                        label(graph, "Settings").expose(title_label),
+                        row()
+                            .configure([](widget::Row& r) {
+                                r.set_gap(6.0F)
+                                    .set_cross_alignment(widget::LayoutAlignment::center);
+                            })
+                            .children(
+                                expanded().child(label(graph, "Status")),
+                                button("Apply").expose(action_btn)
+                            )
+                    )
+            )
+            .build();
+
+    REQUIRE(root->child_count() == 1);
+    REQUIRE(root->get_child(0) != nullptr);
+    auto* col = dynamic_cast<widget::Column*>(root->get_child(0));
+    REQUIRE(col != nullptr);
+    REQUIRE(col->child_count() == 2);
+    REQUIRE(col->get_child(0) == title_label.get());
+    REQUIRE(title_label->text() == "Settings");
+
+    auto* row = dynamic_cast<widget::Row*>(col->get_child(1));
+    REQUIRE(row != nullptr);
+    REQUIRE(row->child_count() == 2);
+    REQUIRE(row->get_child(1) == action_btn.get());
+    REQUIRE(action_btn->text() == "Apply");
+}
+
+TEST_CASE("free function factories support expose and configure", "[authoring][factory]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    std::shared_ptr<widget::Label> exposed;
+    auto root = column()
+                    .children(
+                        label(graph, "First"),
+                        label(graph, "Second")
+                            .configure([](widget::Label& l) { l.set_font_size(18.0F); })
+                            .expose(exposed)
+                    )
+                    .build();
+
+    REQUIRE(root->child_count() == 2);
+    REQUIRE(exposed != nullptr);
+    REQUIRE(exposed->text() == "Second");
+    REQUIRE(exposed->font_size() == Catch::Approx(18.0F));
+    REQUIRE(root->get_child(1) == exposed.get());
+}

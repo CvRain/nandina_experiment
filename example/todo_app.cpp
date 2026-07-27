@@ -499,6 +499,7 @@ namespace nandina::examples::todo
     }
 
     auto DslTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        using namespace widget::authoring;
         auto& router = context.router();
         auto parts =
             make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router] {
@@ -509,25 +510,23 @@ namespace nandina::examples::todo
                 }
             });
 
-        auto content =
-            widget::authoring::make<widget::Column>()
-                .configure([](widget::Column& value) {
-                    value.set_gap(10.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
-                })
-                .children(parts.header, parts.composer, parts.list)
-                .build();
-        auto padding = widget::authoring::make<widget::Padding>(foundation::NanInsets::all(16.0F))
-                           .child(content)
+        auto content = column()
+                           .configure([](widget::Column& c) {
+                               c.set_gap(10.0F)
+                                   .set_cross_alignment(widget::LayoutAlignment::stretch);
+                           })
+                           .children(parts.header, parts.composer, parts.list)
                            .build();
-        workspace_ = widget::authoring::make<TodoWorkspace>(
+        auto pad = padding(foundation::NanInsets::all(16.0F)).child(content).build();
+        workspace_ = make<TodoWorkspace>(
                          context.theme_manager(),
                          parts.header,
                          parts.composer,
                          parts.list
         )
-                         .configure([&](TodoWorkspace& value) {
-                             value.set_name("todo-dsl-root");
-                             value.set_content(padding);
+                         .configure([&](TodoWorkspace& w) {
+                             w.set_name("todo-dsl-root");
+                             w.set_content(pad);
                          })
                          .build();
         return workspace_;
