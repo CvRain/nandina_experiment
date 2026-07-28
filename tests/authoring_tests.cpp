@@ -9,6 +9,7 @@
 #include "widget/authoring.hpp"
 #include "widget/button.hpp"
 #include "widget/declarative.hpp"
+#include "widget/grid.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
 
@@ -353,4 +354,117 @@ TEST_CASE("free function factories support expose and configure", "[authoring][f
     REQUIRE(exposed->text() == "Second");
     REQUIRE(exposed->font_size() == Catch::Approx(18.0F));
     REQUIRE(root->get_child(1) == exposed.get());
+}
+
+TEST_CASE("grid factory produces correct concrete type", "[authoring][factory][grid]") {
+    using namespace widget::authoring;
+    auto g = grid(3).build();
+    static_assert(std::same_as<decltype(g), std::shared_ptr<widget::Grid>>);
+    REQUIRE(g->columns() == 3);
+    REQUIRE(g->column_gap() == Catch::Approx(0.0F));
+    REQUIRE(g->row_gap() == Catch::Approx(0.0F));
+}
+
+TEST_CASE("grid layout arranges children in rows and columns", "[authoring][factory][grid]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    std::shared_ptr<widget::Label> a;
+    std::shared_ptr<widget::Label> b;
+    std::shared_ptr<widget::Label> c;
+    std::shared_ptr<widget::Label> d;
+    auto g = grid(2)
+                 .configure([](widget::Grid& gr) {
+                     gr.set_column_gap(8.0F).set_row_gap(4.0F);
+                 })
+                 .children(
+                     label(graph, "A").expose(a),
+                     label(graph, "B").expose(b),
+                     label(graph, "C").expose(c),
+                     label(graph, "D").expose(d)
+                 )
+                 .build();
+
+    REQUIRE(g->columns() == 2);
+    REQUIRE(g->column_gap() == Catch::Approx(8.0F));
+    REQUIRE(g->row_gap() == Catch::Approx(4.0F));
+    REQUIRE(g->child_count() == 4);
+
+    scene::NanSceneTree tree;
+    tree.set_root(g);
+    REQUIRE(tree.layout_root(foundation::NanSize(400.0F, 200.0F)) == 1);
+
+    // A (row 0, col 0) should be above C (row 1, col 0)
+    REQUIRE(a->global_bounds().get_y() < c->global_bounds().get_y());
+    // B (row 0, col 1) should be to the right of A
+    REQUIRE(b->global_bounds().get_x() == Catch::Approx(a->global_bounds().get_right() + 8.0F));
+    // C and D should be in row 1 (below A and B)
+    REQUIRE(c->global_bounds().get_y() > b->global_bounds().get_bottom());
+}
+
+TEST_CASE("grid with single column behaves like a column", "[authoring][factory][grid]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    auto g = grid(1)
+                 .configure([](widget::Grid& gr) {
+                     gr.set_row_gap(5.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+                 })
+                 .children(label(graph, "One"), label(graph, "Two"), label(graph, "Three"))
+                 .build();
+
+    scene::NanSceneTree tree;
+    tree.set_root(g);
+    REQUIRE(tree.layout_root(foundation::NanSize(200.0F, 300.0F)) == 1);
+
+    REQUIRE(g->child_count() == 3);
+    auto* first = g->get_child(0)->as_control();
+    auto* last = g->get_child(2)->as_control();
+    REQUIRE(first != nullptr);
+    REQUIRE(last != nullptr);
+    // Stacked vertically
+    REQUIRE(first->global_bounds().get_y() < last->global_bounds().get_y());
+    // All same x position (left-aligned)
+    REQUIRE(first->global_bounds().get_x() == Catch::Approx(last->global_bounds().get_x()));
+}
+
+TEST_CASE("grid with 0 children produces empty measured size", "[authoring][factory][grid]") {
+    using namespace widget::authoring;
+    auto g = grid(3)
+                 .configure([](widget::Grid& gr) {
+                     gr.set_column_gap(10.0F).set_row_gap(6.0F);
+                 })
+                 .build();
+
+    scene::NanSceneTree tree;
+    tree.set_root(g);
+    // Layout succeeds with zero children (no crash).
+    REQUIRE(tree.layout_root(foundation::NanSize(400.0F, 200.0F)) == 1);
+    REQUIRE(g->child_count() == 0);
+}
+
+TEST_CASE("grid with cross_alignment lays out children correctly", "[authoring][factory][grid]") {
+    using namespace widget::authoring;
+    reactive::Graph graph;
+
+    std::shared_ptr<widget::Label> left_label;
+    std::shared_ptr<widget::Label> right_label;
+    auto g = grid(2)
+                 .configure([](widget::Grid& gr) {
+                     gr.set_row_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::center);
+                 })
+                 .children(
+                     label(graph, "Short").expose(left_label),
+                     label(graph, "Longer").expose(right_label)
+                 )
+                 .build();
+
+    scene::NanSceneTree tree;
+    tree.set_root(g);
+    REQUIRE(tree.layout_root(foundation::NanSize(400.0F, 200.0F)) == 1);
+
+    // Both children exist and are in the same row.
+    REQUIRE(left_label != nullptr);
+    REQUIRE(right_label != nullptr);
+    REQUIRE(left_label->global_bounds().get_y() == Catch::Approx(right_label->global_bounds().get_y()));
 }

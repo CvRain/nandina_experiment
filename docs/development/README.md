@@ -136,7 +136,7 @@ The application framework is evaluated across twelve connected responsibilities,
 | 3. Input | Mouse/keyboard dispatch, hit testing, focus/hover, pointer editing. | Canvas-aware coordinate routing/input blocking, native IME, shortcuts, gestures, drag/drop. |
 | 4. Object model | Concrete `NanNode`/`NanControl` objects with virtual capabilities and C++ setters. | Unified property/event surface without replacing ordinary setters. |
 | 5. Widget tree | Shared-owned scene tree, weak observations, enter/exit/ready lifecycle, keep-alive page activate/deactivate. | Keyed reconciliation and declarative region ownership. |
-| 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, and bounded post-layout relayout. | Screen-canvas layout roots, diagnostics, Grid/Anchor, richer intrinsic contracts. |
+| 6. Layout | Bottom-up measure/top-down layout, typed invalidation, root correctness boundary, bounded post-layout relayout, Row/Column/Flex/Wrap/Grid/Padding/Center/Expanded. | Screen-canvas layout roots, diagnostics, Anchor, richer intrinsic contracts. |
 | 7. Paint/composition | Tree draw traversal, sibling z-order, clip stack, typed paint dirtiness, replaceable render device. | World/screen CanvasLayer boundaries, dirty-only paint, damage tracking, retained caches, animation phases. |
 | 8. Text | FreeType/HarfBuzz/FriBidi/utf8proc, fallback faces, editing geometry, CJK package. | Native IME, UAX #14, emoji/color glyphs, rich text, per-widget family request. |
 | 9. Style | `NanTheme`, tokens/palette, `NanStyle`, `ThemeManager`, `StyleDocument` (styles.toml), reference palettes, theme families, appearance preference. | Widget-level style overrides, richer variant/state rules. |
@@ -168,6 +168,7 @@ Implemented layout controls:
 - `Center`: single-child centering wrapper.
 - `Wrap`: automatic run-based wrapping layout.
 - `Flow`: alias of `Wrap` for semantic flow layout use.
+- `Grid`: fixed-column grid layout with row-by-row cell filling, equal-width columns, per-column/row gaps, and per-cell cross alignment.
 - `ScrollView`: clipped single-child horizontal/vertical viewport.
 
 Current layout capabilities:
@@ -184,7 +185,7 @@ Current layout limitations:
 
 - Flex sizing intentionally covers basis/grow/shrink/min-max redistribution, not the complete CSS flexbox specification.
 - No `space-around` or baseline alignment strategy yet; `space_between` supports linear children and per-run Wrap/Flow distribution.
-- Grid and anchors are deferred; `ScrollView` is the selected low-level viewport and currently omits scrollbar chrome and kinetic scrolling.
+- Grid layout is available; Anchor layout is deferred. `ScrollView` is the selected low-level viewport and currently omits scrollbar chrome and kinetic scrolling.
 - `Padding` does not model full content-box / border-box semantics.
 - Layout dirty/cache invalidation is still coarse.
 - Default `NanControl::on_layout()` direct-child behavior is transitional.
@@ -728,13 +729,36 @@ The `DslTodoPage` example now uses these factories. Authoring tests cover type i
 
 The A9 section previously marked `NodeBuilder<T>` as "temporary" — this label is removed. `NodeBuilder<T>` together with the free-function factories is the v1 stable authoring API.
 
+### A13. Grid Layout
+
+Status: complete.
+
+`widget::Grid` is a grid layout container. Children fill cells row by row, left to right, with a fixed column count. Each column receives an equal fraction of available main-axis space after gaps; row heights are the maximum measured height in that row. Children are measured with loose cross-axis constraints so cell alignment (`start`, `center`, `end`, `stretch`) takes effect.
+
+API:
+
+- `Grid(columns)` / `Grid::create(columns)` — construct with column count (default 2)
+- `add(child)`, `set_columns(n)`, `set_column_gap(g)`, `set_row_gap(g)`, `set_gap(cg, rg)`
+- `set_cross_alignment(align)` — vertical alignment of children within their row cells
+
+Authoring factory: `grid(columns)` returns `NodeBuilder<Grid>`.
+
+Layout protocol:
+
+- `on_measure`: measures each child with cell-width constraints, computes column widths as per-column maxima, row heights as per-row maxima, returns constrained total size.
+- `on_layout`: measures children with loose cross-axis constraints, positions each child within its cell according to `cross_alignment`, assigns final rects.
+
+Tests cover: type identity, row/column ordering with 2 columns, single-column stacking, zero-child safety, and cross-axis alignment (5 new test cases).
+
+The deferred "richer Grid/Anchor layout" item is partially addressed; Anchor layout remains deferred.
+
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.
 - Tween/animation primitives and reusable impact/ripple effects.
 - Camera2D, offscreen/custom viewports, physics interpolation polish, broader Box2D joints, and advanced spatial queries.
 - Sprite/shape convenience nodes, particles, audio, navigation, scene serialization, and ECS remain optional future game-facing work rather than requirements for the application framework.
-- Virtualized lists, richer Grid/Anchor layout, and retained render caches.
+- Virtualized lists, richer Anchor layout, and retained render caches.
 - Native IME, clipboard/undo, UAX #14, emoji and rich text.
 - System font discovery as an explicit application feature.
 

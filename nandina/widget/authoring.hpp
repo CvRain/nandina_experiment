@@ -10,6 +10,7 @@
 #include "../scene/control.hpp"
 #include "../theme/theme.hpp"
 #include "button.hpp"
+#include "grid.hpp"
 #include "label.hpp"
 #include "layout.hpp"
 #include "scroll_view.hpp"
@@ -149,6 +150,10 @@ namespace nandina::widget::authoring
     [[nodiscard]] inline auto scroll_view(ScrollAxis axis = ScrollAxis::vertical)
         -> NodeBuilder<ScrollView> {
         return make<ScrollView>(axis);
+    }
+
+    [[nodiscard]] inline auto grid(int columns = 2) -> NodeBuilder<Grid> {
+        return make<Grid>(columns);
     }
 
     // ── 控件 ──
