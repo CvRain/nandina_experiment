@@ -185,6 +185,34 @@ TEST_CASE("authoring wraps keyed regions without changing reuse", "[authoring][d
     REQUIRE(region->get_child(1) == first);
 }
 
+TEST_CASE("ListView binds a structural model without inheritance", "[widget][list][model]") {
+    reactive::Graph graph;
+    reactive::Signal<std::vector<Item>> items {
+        graph,
+        {{.key = 1, .value = "one"}, {.key = 2, .value = "two"}},
+    };
+    using View = widget::ListView<Item, int, ItemControl>;
+    auto view = View::create(
+        graph,
+        [](const Item& item) { return item.key; },
+        [](reactive::ReactiveScope&, const Item& item) {
+            return std::make_shared<ItemControl>(item.key);
+        },
+        [](ItemControl& control, const Item& item) { control.value = item.value; }
+    );
+    view->set_model(items);
+
+    scene::NanSceneTree tree;
+    tree.set_root(view);
+    REQUIRE(view->item_count() == 2);
+    auto* retained = view->node_for(1);
+
+    items.set({{.key = 2, .value = "updated"}, {.key = 1, .value = "retained"}});
+    REQUIRE(view->node_for(1) == retained);
+    REQUIRE(retained->value == "retained");
+    REQUIRE(view->get_child(1) == retained);
+}
+
 TEST_CASE("authoring configures existing canvas factories", "[authoring][canvas]") {
     auto layer = widget::authoring::from(scene::CanvasLayer::create(scene::CanvasSpace::world, 2))
                      .configure([](scene::CanvasLayer& value) {
@@ -249,10 +277,7 @@ TEST_CASE("free function factories produce same types as make<T>", "[authoring][
     }
 }
 
-TEST_CASE(
-    "free function DSL trees match imperative construction",
-    "[authoring][factory][layout]"
-) {
+TEST_CASE("free function DSL trees match imperative construction", "[authoring][factory][layout]") {
     using namespace widget::authoring;
     reactive::Graph graph;
 
@@ -265,19 +290,16 @@ TEST_CASE(
 
     // DSL with free functions
     std::shared_ptr<widget::Button> dsl_button;
-    auto dsl =
-        column()
-            .configure([](widget::Column& c) {
-                c.set_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
-            })
-            .children(
-                button("Save")
-                    .configure(
-                        [](widget::Button& b) { b.set_tone(theme::ButtonTone::primary); }
-                    )
-                    .expose(dsl_button)
-            )
-            .build();
+    auto dsl = column()
+                   .configure([](widget::Column& c) {
+                       c.set_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+                   })
+                   .children(button("Save")
+                                 .configure([](widget::Button& b) {
+                                     b.set_tone(theme::ButtonTone::primary);
+                                 })
+                                 .expose(dsl_button))
+                   .build();
 
     scene::NanSceneTree imp_tree;
     imp_tree.set_root(imp);
@@ -309,8 +331,9 @@ TEST_CASE("free function factories compose nested layout trees", "[authoring][fa
                         label(graph, "Settings").expose(title_label),
                         row()
                             .configure([](widget::Row& r) {
-                                r.set_gap(6.0F)
-                                    .set_cross_alignment(widget::LayoutAlignment::center);
+                                r.set_gap(6.0F).set_cross_alignment(
+                                    widget::LayoutAlignment::center
+                                );
                             })
                             .children(
                                 expanded().child(label(graph, "Status")),
@@ -374,9 +397,7 @@ TEST_CASE("grid layout arranges children in rows and columns", "[authoring][fact
     std::shared_ptr<widget::Label> c;
     std::shared_ptr<widget::Label> d;
     auto g = grid(2)
-                 .configure([](widget::Grid& gr) {
-                     gr.set_column_gap(8.0F).set_row_gap(4.0F);
-                 })
+                 .configure([](widget::Grid& gr) { gr.set_column_gap(8.0F).set_row_gap(4.0F); })
                  .children(
                      label(graph, "A").expose(a),
                      label(graph, "B").expose(b),
@@ -430,11 +451,9 @@ TEST_CASE("grid with single column behaves like a column", "[authoring][factory]
 
 TEST_CASE("grid with 0 children produces empty measured size", "[authoring][factory][grid]") {
     using namespace widget::authoring;
-    auto g = grid(3)
-                 .configure([](widget::Grid& gr) {
-                     gr.set_column_gap(10.0F).set_row_gap(6.0F);
-                 })
-                 .build();
+    auto g = grid(3).configure(
+                        [](widget::Grid& gr) { gr.set_column_gap(10.0F).set_row_gap(6.0F); }
+    ).build();
 
     scene::NanSceneTree tree;
     tree.set_root(g);
@@ -466,5 +485,7 @@ TEST_CASE("grid with cross_alignment lays out children correctly", "[authoring][
     // Both children exist and are in the same row.
     REQUIRE(left_label != nullptr);
     REQUIRE(right_label != nullptr);
-    REQUIRE(left_label->global_bounds().get_y() == Catch::Approx(right_label->global_bounds().get_y()));
+    REQUIRE(
+        left_label->global_bounds().get_y() == Catch::Approx(right_label->global_bounds().get_y())
+    );
 }

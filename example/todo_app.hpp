@@ -8,12 +8,14 @@
 #include "app/nan_page.hpp"
 #include "app/nan_store.hpp"
 #include "reactive/computed.hpp"
+#include "reactive/event.hpp"
 #include "reactive/signal.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
 #include "widget/declarative.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
+#include "widget/list_view.hpp"
 #include "widget/scroll_view.hpp"
 #include "widget/text_field.hpp"
 
@@ -61,6 +63,8 @@ namespace nandina::examples::todo
 
         TodoRow(reactive::Graph& graph, theme::NanTheme theme, Action toggle, Action remove);
         void update(const TodoItem& item, const theme::NanTheme& theme);
+        [[nodiscard]] auto toggle_button() -> widget::Button&;
+        [[nodiscard]] auto remove_button() -> widget::Button&;
         void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
@@ -68,6 +72,7 @@ namespace nandina::examples::todo
         Action remove_;
         std::shared_ptr<widget::Label> label_;
         std::shared_ptr<widget::Button> toggle_button_;
+        std::shared_ptr<widget::Button> remove_button_;
         std::uint64_t id_ = 0;
         bool completed_ = false;
     };
@@ -125,28 +130,38 @@ namespace nandina::examples::todo
         std::shared_ptr<widget::Button> add_button_;
     };
 
-    class TodoList final: public widget::Expanded {
+    class TodoTasks final: public widget::Expanded {
     public:
-        TodoList(
+        using Action = std::function<void(std::uint64_t)>;
+
+        TodoTasks(
             reactive::Graph& graph,
             reactive::Computed<bool>& empty,
             TodoStore& store,
             theme::NanTheme theme
         );
 
+        void on_toggle(Action action);
+        void on_remove(Action action);
         void request_scroll_to_end();
         [[nodiscard]] auto row_count() const -> std::size_t;
+        [[nodiscard]] auto row(std::uint64_t id) -> TodoRow*;
         [[nodiscard]] auto scroll_view() -> widget::ScrollView&;
         void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
-        using Rows = widget::ForEach<TodoItem, std::uint64_t, TodoRow>;
+        using Rows = widget::ListView<TodoItem, std::uint64_t, TodoRow>;
 
-        TodoStore* store_;
         theme::NanTheme theme_;
+        reactive::Event<std::uint64_t> toggle_requested_;
+        reactive::Event<std::uint64_t> remove_requested_;
+        reactive::Subscription toggle_subscription_;
+        reactive::Subscription remove_subscription_;
         std::shared_ptr<widget::ScrollView> list_view_;
         std::shared_ptr<Rows> rows_;
     };
+
+    using TodoList = TodoTasks;
 
     class TodoWorkspace final: public scene::NanControl {
     public:

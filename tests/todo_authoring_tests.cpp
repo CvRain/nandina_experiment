@@ -52,8 +52,7 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
         nullptr,
         &dispatcher
     };
-    auto& imperative =
-        router.push<ImperativeTodoPage>(TodoPageParams {.source = "测试入口"});
+    auto& imperative = router.push<ImperativeTodoPage>(TodoPageParams {.source = "测试入口"});
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
@@ -67,10 +66,29 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
     REQUIRE(imperative.workspace()->header().parameter_text().contains("第 1 次"));
     REQUIRE(imperative.workspace()->list().row_count() == 3);
 
+    auto* first_row = imperative.workspace()->list().row(1);
+    REQUIRE(first_row != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        first_row->toggle_button().semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(store.items.peek()[0].completed == false);
+
+    auto* second_row = imperative.workspace()->list().row(2);
+    REQUIRE(second_row != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        second_row->remove_button().semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(store.items.peek().size() == 2);
+    REQUIRE(imperative.workspace()->list().row_count() == 2);
+
     imperative.workspace()->composer().input().set_value("命令式页面新增");
     REQUIRE(imperative.workspace()->composer().submit());
-    REQUIRE(store.items.peek().size() == 4);
-    REQUIRE(imperative.workspace()->list().row_count() == 4);
+    REQUIRE(store.items.peek().size() == 3);
+    REQUIRE(imperative.workspace()->list().row_count() == 3);
 
     activate(tree, dispatcher, imperative.workspace()->header().navigation_button());
     REQUIRE(router.depth() == 1);
@@ -83,13 +101,13 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
     REQUIRE(dsl->name() == "todo-dsl-root");
     REQUIRE(dsl->header().parameter_text().contains("命令式页面"));
     REQUIRE(dsl->header().parameter_text().contains("第 2 次"));
-    REQUIRE(dsl->list().row_count() == 4);
+    REQUIRE(dsl->list().row_count() == 3);
 
     dsl->composer().input().set_value("DSL 页面新增");
     REQUIRE(dsl->composer().submit());
-    REQUIRE(store.items.peek().size() == 5);
-    REQUIRE(dsl->list().row_count() == 5);
-    REQUIRE(imperative.workspace()->list().row_count() == 5);
+    REQUIRE(store.items.peek().size() == 4);
+    REQUIRE(dsl->list().row_count() == 4);
+    REQUIRE(imperative.workspace()->list().row_count() == 4);
 
     activate(tree, dispatcher, dsl->header().navigation_button());
     REQUIRE(router.depth() == 2);
@@ -98,7 +116,7 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
     REQUIRE(router.current_key() == "todo-imperative");
     REQUIRE(router.host()->child_count() == 1);
     REQUIRE(imperative.workspace()->visible());
-    REQUIRE(imperative.workspace()->list().row_count() == 5);
+    REQUIRE(imperative.workspace()->list().row_count() == 4);
 
     // keep-alive 页面恢复后，其导航回调仍可再次投递。
     activate(tree, dispatcher, imperative.workspace()->header().navigation_button());

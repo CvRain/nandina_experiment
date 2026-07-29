@@ -27,7 +27,7 @@ namespace nandina::widget
     /// Reordering preserves the node, its focus/edit state, and its mounted lifecycle.
     template<typename Item, std::equality_comparable Key, typename NodeT = scene::NanControl>
         requires std::derived_from<NodeT, scene::NanControl>
-    class ForEach final: public Flex {
+    class ForEach: public Flex {
     public:
         using KeyFunction = std::function<Key(const Item&)>;
         using CreateFunction =

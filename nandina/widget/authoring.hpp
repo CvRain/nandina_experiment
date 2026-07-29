@@ -13,6 +13,7 @@
 #include "grid.hpp"
 #include "label.hpp"
 #include "layout.hpp"
+#include "list_view.hpp"
 #include "scroll_view.hpp"
 #include "text_field.hpp"
 

@@ -762,6 +762,14 @@ The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the
 
 The existing paired Todo remains the low-level retained-widget equivalence fixture. A compact Todo will become the recommended example as A15-A18 move context, ownership, binding, and keyed authoring responsibilities into the framework.
 
+### A15. Typed List Model And Commands
+
+Status: active; the first list-model increment is implemented.
+
+`widget::ListDataModelSource<Source, Item>` is a structural protocol: a source only needs a tracked `get()` returning `const std::vector<Item>&`; it does not inherit a framework model base. `widget::ListView<Item, Key, NodeT>` is a thin application-facing shell over the existing `ForEach` keyed reconciliation runtime and exposes `set_model(source)` without moving row creation, reuse, reorder, or teardown into application pages.
+
+The Todo example now has a `TodoTasks` component backed by `ListView`. Its rows emit typed toggle/remove intents, while the page connects named handlers to `TodoStore`. Model synchronization and business commands are therefore separate, and the same source protocol can later support read-only, paged, remote, and tree-specific adapters without imposing CRUD inheritance.
+
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.

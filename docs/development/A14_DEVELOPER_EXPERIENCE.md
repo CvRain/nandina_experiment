@@ -40,41 +40,67 @@ The application runner owns the application, default window, root page, UI conte
 
 ## Imperative Todo Target
 
-The imperative form uses concrete retained widgets and setters. It does not receive or forward a `Graph`, `NanTheme`, `ReactiveScope`, or `UiDispatcher`.
+The imperative form uses concrete retained widgets and setters. It does not receive or forward a `Graph`, `NanTheme`, `ReactiveScope`, or `UiDispatcher`. Collection coordination belongs to a named `TodoTasks` component, so page code stays flat and resembles Qt's Model/View split:
+
+| Todo role | Nandina responsibility | Qt-style analogy |
+| --- | --- | --- |
+| `TodoStore` | owns items and mutations | model |
+| `TodoTasks` | binds the model and coordinates keyed rows | view / delegate host |
+| `TodoRow` | renders one item and emits user intent | delegate/editor |
+| `TodoPage` | composes controls and handles intents | controller/presenter |
 
 ```cpp
+using TodoId = std::uint64_t;
+
+class TodoTasks final: public ui::ListView<TodoItem> {
+public:
+    reactive::Event<TodoId> toggle_requested;
+    reactive::Event<TodoId> remove_requested;
+
+    void set_model(TodoStore::Items& items) {
+        bind_items(items, &TodoItem::id);
+    }
+};
+
 class TodoPage final: public ui::Page<TodoPageParams> {
 public:
     auto build(ui::BuildContext& ui) -> ui::View override {
         auto input = ui.text_field({.placeholder = "添加一个任务"});
-        auto tasks = ui.list<TodoItem>();
-        tasks->bind_items(
-            store().items,
-            &TodoItem::id,
-            [this](ui::BuildContext& item_ui, const TodoItem& item) {
-                auto row = item_ui.row({.gap = 8});
-                row->add(item_ui.label(item.title).expand());
-                row->add(item_ui.button(item.completed ? "撤销" : "完成")
-                             .on_click([this, id = item.id] { store().toggle(id); }));
-                row->add(item_ui.button("删除")
-                             .on_click([this, id = item.id] { store().remove(id); }));
-                return row;
-            }
-        );
+        auto tasks = ui.make<TodoTasks>();
+
+        tasks->set_model(store().items);
+        tasks->toggle_requested.subscribe([this](TodoId id) { toggle_task(id); });
+        tasks->remove_requested.subscribe([this](TodoId id) { remove_task(id); });
+
+        auto add = ui.button("添加");
+        add->on_click([this, input] { add_task(input->value()); });
 
         auto root = ui.column({.gap = 10, .padding = 16});
         root->add(ui.label("待办事项").style("title"));
-        root->add(ui.row(input.expand(), ui.button("添加").on_click([this, input] {
-            store().add(input->value());
-        })));
+        root->add(ui.row(input.expand(), add));
         root->add(tasks->expand());
         input->request_focus();
         return root;
     }
+
+private:
+    void add_task(std::string_view title) { store().add(title); }
+    void toggle_task(TodoId id) { store().toggle(id); }
+    void remove_task(TodoId id) { store().remove(id); }
 };
 ```
 
-`ui::Page` owns its component scope. Bindings, callbacks, item scopes, and delayed focus/scroll requests are disconnected automatically when the page is dropped.
+`TodoTasks` contains the row delegate. Its row buttons emit `toggle_requested` and `remove_requested`; they do not capture the page or mutate the store. The page only binds the model and connects three named intents. The event subscriptions, item scopes, and delayed focus/scroll requests are owned by the page/component scope and disconnected automatically when the page is dropped.
+
+### What `bind_items` means
+
+`bind_items(store().items, &TodoItem::id)` does not pass a snapshot to the widget and does not define button behavior:
+
+- `store().items` is a read-only reactive source containing `std::vector<TodoItem>`; changes schedule a list synchronization.
+- `&TodoItem::id` is the stable identity extractor. It lets the list reuse an existing row when an item moves or its title/status changes.
+- The list component owns row creation, update, reorder, and teardown. The model owns data and business operations.
+
+The current low-level `ForEach::bind(source)` plus key/create/update callbacks remains available for framework and advanced component authors. It is not the recommended application-facing spelling.
 
 ## DSL Todo Target
 
@@ -121,7 +147,7 @@ The existing paired Todo remains a low-level equivalence and regression fixture 
 ## Delivery Order
 
 1. A14 establishes this contract, line budgets, forbidden dependencies, and `run_page()`.
-2. A15 introduces an ambient `BuildContext`, context-aware widget factories, safe router commands, and focus/layout intents.
+2. A15 introduces typed list-model adapters and named commands first, then an ambient `BuildContext`, context-aware widget factories, safe router commands, and focus/layout intents.
 3. A16 introduces the component/page ownership model and automatic reactive/lifecycle cleanup.
 4. A17 completes bindable widget properties and theme-token propagation.
 5. A18 adds concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.

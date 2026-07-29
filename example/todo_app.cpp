@@ -34,12 +34,9 @@ namespace nandina::examples::todo
                 + " completed / 已完成";
         }
 
-        [[nodiscard]] auto parameter_summary(
-            const TodoPageParams& params,
-            const std::uint64_t visit
-        ) -> std::string {
-            return "页面参数：来自 " + params.source + " · 第 " + std::to_string(visit)
-                + " 次访问";
+        [[nodiscard]] auto
+        parameter_summary(const TodoPageParams& params, const std::uint64_t visit) -> std::string {
+            return "页面参数：来自 " + params.source + " · 第 " + std::to_string(visit) + " 次访问";
         }
 
         struct PageParts {
@@ -63,6 +60,8 @@ namespace nandina::examples::todo
                 return parameter_summary(params, store.visits.get());
             });
             auto list = std::make_shared<TodoList>(context.graph(), empty, store, context.theme());
+            list->on_toggle([&store](const std::uint64_t id) { store.toggle(id); });
+            list->on_remove([&store](const std::uint64_t id) { store.remove(id); });
             auto composer = std::make_shared<TodoComposer>(
                 context.theme(),
                 [&store, weak = std::weak_ptr<TodoList>(list)](const std::string_view title) {
@@ -146,10 +145,10 @@ namespace nandina::examples::todo
             toggle_(id_);
         });
 
-        auto remove_button = widget::Button::create("删除", theme);
-        remove_button->set_tone(theme::ButtonTone::secondary);
-        remove_button->set_treatment(theme::ButtonTreatment::outlined);
-        remove_button->set_on_click([this] { remove_(id_); });
+        remove_button_ = widget::Button::create("删除", theme);
+        remove_button_->set_tone(theme::ButtonTone::secondary);
+        remove_button_->set_treatment(theme::ButtonTreatment::outlined);
+        remove_button_->set_on_click([this] { remove_(id_); });
 
         auto label_item = widget::FlexItem::create(
             scene::LayoutFlexPolicy {
@@ -163,7 +162,7 @@ namespace nandina::examples::todo
             .set_cross_alignment(widget::LayoutAlignment::stretch)
             .add(label_item)
             .add(toggle_button_)
-            .add(remove_button);
+            .add(remove_button_);
     }
 
     void TodoRow::update(const TodoItem& item, const theme::NanTheme& theme) {
@@ -181,6 +180,14 @@ namespace nandina::examples::todo
                 .value = item.completed ? "已完成" : "未完成",
             }
         );
+    }
+
+    auto TodoRow::toggle_button() -> widget::Button& {
+        return *toggle_button_;
+    }
+
+    auto TodoRow::remove_button() -> widget::Button& {
+        return *remove_button_;
     }
 
     void TodoRow::on_theme_changed(const theme::ThemeManager& manager) {
@@ -340,13 +347,12 @@ namespace nandina::examples::todo
         return true;
     }
 
-    TodoList::TodoList(
+    TodoTasks::TodoTasks(
         reactive::Graph& graph,
         reactive::Computed<bool>& empty,
         TodoStore& store,
         theme::NanTheme theme
     ):
-        store_(&store),
         theme_(theme) {
         list_view_ = widget::ScrollView::create(widget::ScrollAxis::vertical);
         list_view_->set_wheel_step(36.0F);
@@ -369,14 +375,14 @@ namespace nandina::examples::todo
                 return std::make_shared<TodoRow>(
                     graph,
                     theme_,
-                    [this](const std::uint64_t id) { store_->toggle(id); },
-                    [this](const std::uint64_t id) { store_->remove(id); }
+                    [this](const std::uint64_t id) { toggle_requested_.emit(id); },
+                    [this](const std::uint64_t id) { remove_requested_.emit(id); }
                 );
             },
             [this](TodoRow& row, const TodoItem& item) { row.update(item, theme_); }
         );
         rows_->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
-        rows_->bind(store.items);
+        rows_->set_model(store.items);
 
         auto content = widget::Column::create();
         content->set_cross_alignment(widget::LayoutAlignment::stretch).add(empty_region).add(rows_);
@@ -384,7 +390,15 @@ namespace nandina::examples::todo
         set_child(list_view_);
     }
 
-    void TodoList::request_scroll_to_end() {
+    void TodoTasks::on_toggle(Action action) {
+        toggle_subscription_ = toggle_requested_.subscribe(std::move(action));
+    }
+
+    void TodoTasks::on_remove(Action action) {
+        remove_subscription_ = remove_requested_.subscribe(std::move(action));
+    }
+
+    void TodoTasks::request_scroll_to_end() {
         if (!is_inside_tree()) {
             return;
         }
@@ -395,15 +409,19 @@ namespace nandina::examples::todo
         });
     }
 
-    auto TodoList::row_count() const -> std::size_t {
+    auto TodoTasks::row_count() const -> std::size_t {
         return rows_->child_count();
     }
 
-    auto TodoList::scroll_view() -> widget::ScrollView& {
+    auto TodoTasks::row(const std::uint64_t id) -> TodoRow* {
+        return rows_->node_for(id);
+    }
+
+    auto TodoTasks::scroll_view() -> widget::ScrollView& {
         return *list_view_;
     }
 
-    void TodoList::on_theme_changed(const theme::ThemeManager& manager) {
+    void TodoTasks::on_theme_changed(const theme::ThemeManager& manager) {
         Expanded::on_theme_changed(manager);
         theme_ = manager.theme();
     }
@@ -458,12 +476,11 @@ namespace nandina::examples::todo
 
     auto ImperativeTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         auto& router = context.router();
-        auto parts =
-            make_page_parts(context, params(), "命令式构建", "查看 DSL 版本", [&router] {
-                router.push<DslTodoPage>(TodoPageParams {
-                    .source = "命令式页面",
-                });
+        auto parts = make_page_parts(context, params(), "命令式构建", "查看 DSL 版本", [&router] {
+            router.push<DslTodoPage>(TodoPageParams {
+                .source = "命令式页面",
             });
+        });
 
         auto content = widget::Column::create();
         content->set_gap(10.0F)
@@ -501,34 +518,29 @@ namespace nandina::examples::todo
     auto DslTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         using namespace widget::authoring;
         auto& router = context.router();
-        auto parts =
-            make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router] {
-                if (!router.pop_to("todo-imperative")) {
-                    router.push<ImperativeTodoPage>(TodoPageParams {
-                        .source = "DSL 页面",
-                    });
-                }
-            });
+        auto parts = make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router] {
+            if (!router.pop_to("todo-imperative")) {
+                router.push<ImperativeTodoPage>(TodoPageParams {
+                    .source = "DSL 页面",
+                });
+            }
+        });
 
-        auto content = column()
-                           .configure([](widget::Column& c) {
-                               c.set_gap(10.0F)
-                                   .set_cross_alignment(widget::LayoutAlignment::stretch);
-                           })
-                           .children(parts.header, parts.composer, parts.list)
-                           .build();
+        auto content =
+            column()
+                .configure([](widget::Column& c) {
+                    c.set_gap(10.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
+                })
+                .children(parts.header, parts.composer, parts.list)
+                .build();
         auto pad = padding(foundation::NanInsets::all(16.0F)).child(content).build();
-        workspace_ = make<TodoWorkspace>(
-                         context.theme_manager(),
-                         parts.header,
-                         parts.composer,
-                         parts.list
-        )
-                         .configure([&](TodoWorkspace& w) {
-                             w.set_name("todo-dsl-root");
-                             w.set_content(pad);
-                         })
-                         .build();
+        workspace_ =
+            make<TodoWorkspace>(context.theme_manager(), parts.header, parts.composer, parts.list)
+                .configure([&](TodoWorkspace& w) {
+                    w.set_name("todo-dsl-root");
+                    w.set_content(pad);
+                })
+                .build();
         return workspace_;
     }
 
