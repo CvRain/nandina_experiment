@@ -5,7 +5,6 @@
 #include "todo_app.hpp"
 
 #include "app/nan_application.hpp"
-#include "app/nan_window.hpp"
 #include "text/font_family.hpp"
 #include "theme/nan_style.hpp"
 #include "theme/theme.hpp"
@@ -15,21 +14,6 @@
 #include <utility>
 
 using namespace nandina;
-
-namespace
-{
-    class TodoWindow final: public app::NanWindow {
-    public:
-        using NanWindow::NanWindow;
-
-    protected:
-        void on_setup() override {
-            use_router().push<examples::todo::ImperativeTodoPage>(
-                examples::todo::TodoPageParams {.source = "应用启动"}
-            );
-        }
-    };
-} // namespace
 
 auto main() -> int {
     app::NanApplication application(app::NanApplicationConfig::for_process("org.nandina.todo"));
@@ -79,8 +63,7 @@ auto main() -> int {
     (void)themes.activate_family("todo");
     themes.set_preference(theme::ThemePreference::system);
 
-    TodoWindow window {
-        application,
+    return application.run_page<examples::todo::ImperativeTodoPage>(
         app::WindowConfig {
             .title = "Nandina - Todo Authoring Demo",
             .width = 760,
@@ -92,7 +75,6 @@ auto main() -> int {
             .vsync = false,
             .background = application.theme().palette.background,
         },
-    };
-
-    return application.run(window);
+        examples::todo::TodoPageParams {.source = "应用启动"}
+    );
 }

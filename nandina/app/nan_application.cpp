@@ -15,6 +15,26 @@ namespace nandina::app
 
     namespace
     {
+        class ConfiguredWindow final: public NanWindow {
+        public:
+            ConfiguredWindow(
+                NanApplication& application,
+                WindowConfig config,
+                std::move_only_function<void(NanRouter&)> setup
+            ):
+                NanWindow(application, std::move(config)),
+                setup_(std::move(setup)) {}
+
+        protected:
+            void on_setup() override {
+                auto setup = std::move(setup_);
+                std::invoke(setup, use_router());
+            }
+
+        private:
+            std::move_only_function<void(NanRouter&)> setup_;
+        };
+
         void install_builtin_services(
             resource::ResourceManager& resources,
             std::vector<std::shared_ptr<resource::IResourceBackend>>& backends,
@@ -163,6 +183,14 @@ namespace nandina::app
         window.close();
         log::get("app.application").info("NanApplication: exited");
         return 0;
+    }
+
+    auto NanApplication::run_configured(WindowConfig config, WindowSetup setup) -> int {
+        if (!setup) {
+            throw std::invalid_argument("NanApplication::run_page: setup is empty");
+        }
+        ConfiguredWindow window {*this, std::move(config), std::move(setup)};
+        return run(window);
     }
 
 } // namespace nandina::app

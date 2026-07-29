@@ -246,7 +246,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A10 are implemented through the paired imperative/DSL Todo acceptance pages. The next main-line selection begins from the deferred application capabilities below, with router lifecycle/history as the leading candidate. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. A14 is now the active main line: it defines and enforces the compact application experience required before 1.0. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -751,6 +751,16 @@ Layout protocol:
 Tests cover: type identity, row/column ordering with 2 columns, single-column stacking, zero-child safety, and cross-axis alignment (5 new test cases).
 
 The deferred "richer Grid/Anchor layout" item is partially addressed; Anchor layout remains deferred.
+
+### A14. Developer Experience Contract
+
+Status: active; the target contract and `NanApplication::run_page()` bootstrap are implemented.
+
+The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the ideal minimum-window, imperative Todo, and DSL Todo forms. It also establishes measurable line budgets and forbids ordinary page code from directly coordinating scene phases, dispatch queues, reactive scopes, per-frame rendering, and theme propagation.
+
+`NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. Applications no longer need a one-off `NanWindow` subclass merely to implement `on_setup()`. Explicit window subclasses remain the advanced path for custom frame/setup/teardown behavior.
+
+The existing paired Todo remains the low-level retained-widget equivalence fixture. A compact Todo will become the recommended example as A15-A18 move context, ownership, binding, and keyed authoring responsibilities into the framework.
 
 ### Deferred After Authoring Core
 

@@ -26,10 +26,13 @@
 #include "../theme/style_document.hpp"
 #include "application_config.hpp"
 #include "nan_page.hpp"
+#include "nan_router.hpp"
 #include "nan_store.hpp"
 #include "ui_dispatcher.hpp"
+#include "window_config.hpp"
 
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <utility>
@@ -94,7 +97,34 @@ namespace nandina::app
         /// 进入阻塞主循环: 打开窗口, 每帧 tick, 直到窗口关闭。返回进程退出码。
         auto run(NanWindow& window) -> int;
 
+        /// 用指定 Page 创建普通路由窗口并进入主循环，无需为一次性 setup 继承 NanWindow。
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+            && std::default_initializable<PageT>
+        auto run_page(WindowConfig config) -> int {
+            return run_configured(std::move(config), [](NanRouter& router) {
+                router.template push<PageT>();
+            });
+        }
+
+        /// 带强类型参数启动首页。高级窗口钩子仍通过显式 NanWindow 子类提供。
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+            && std::constructible_from<PageT, typename PageT::Params>
+        auto run_page(WindowConfig config, typename PageT::Params params) -> int {
+            return run_configured(
+                std::move(config),
+                [params = std::move(params)](NanRouter& router) mutable {
+                    router.template push<PageT>(std::move(params));
+                }
+            );
+        }
+
     private:
+        using WindowSetup = std::move_only_function<void(NanRouter&)>;
+
+        auto run_configured(WindowConfig config, WindowSetup setup) -> int;
+
         UiDispatcher dispatcher_;
         BackgroundExecutor background_executor_;
         reactive::Graph graph_;

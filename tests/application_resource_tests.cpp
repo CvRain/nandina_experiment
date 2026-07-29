@@ -33,7 +33,34 @@ namespace
             return std::make_shared<scene::NanControl>();
         }
     };
-}
+
+    class DefaultStartupPage final: public app::NanPageT<app::NoParams> {
+    public:
+        DefaultStartupPage() = default;
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "startup";
+        }
+        [[nodiscard]] auto build(app::PageContext&) -> std::shared_ptr<scene::NanNode2D> override {
+            return std::make_shared<scene::NanControl>();
+        }
+    };
+
+    static_assert(requires(app::NanApplication& application, app::WindowConfig config) {
+        { application.run_page<DefaultStartupPage>(std::move(config)) } -> std::same_as<int>;
+    });
+    static_assert(
+        requires(app::NanApplication& application, app::WindowConfig config, ServiceParams params) {
+            { application.run_page<ServicePage>(std::move(config), params) } -> std::same_as<int>;
+        }
+    );
+
+    [[maybe_unused]] auto compile_default_page_runner(
+        app::NanApplication& application,
+        app::WindowConfig config
+    ) -> int {
+        return application.run_page<DefaultStartupPage>(std::move(config));
+    }
+} // namespace
 
 TEST_CASE("NanApplication always installs builtin resource and font services", "[app][resource]") {
     app::NanApplication application;
