@@ -11,6 +11,7 @@
 #include "reactive/event.hpp"
 #include "reactive/signal.hpp"
 #include "theme/theme_manager.hpp"
+#include "widget/build_context.hpp"
 #include "widget/button.hpp"
 #include "widget/declarative.hpp"
 #include "widget/label.hpp"
@@ -61,7 +62,7 @@ namespace nandina::examples::todo
     public:
         using Action = std::function<void(std::uint64_t)>;
 
-        TodoRow(reactive::Graph& graph, theme::NanTheme theme, Action toggle, Action remove);
+        TodoRow(widget::BuildContext ui, Action toggle, Action remove);
         void update(const TodoItem& item, const theme::NanTheme& theme);
         [[nodiscard]] auto toggle_button() -> widget::Button&;
         [[nodiscard]] auto remove_button() -> widget::Button&;
@@ -79,19 +80,18 @@ namespace nandina::examples::todo
 
     class TodoEmptyState final: public widget::Label {
     public:
-        TodoEmptyState(reactive::Graph& graph, theme::NanTheme theme);
+        explicit TodoEmptyState(widget::BuildContext ui);
         void on_theme_changed(const theme::ThemeManager& manager) override;
     };
 
     class TodoHeader final: public widget::Column {
     public:
         TodoHeader(
-            reactive::Graph& graph,
+            widget::BuildContext ui,
             reactive::Computed<std::string>& status,
             reactive::Computed<std::string>& visit_text,
             std::string authoring_label,
             std::string navigation_label,
-            theme::ThemeManager& themes,
             app::UiDispatcher& dispatcher,
             std::function<void()> navigate
         );
@@ -117,7 +117,7 @@ namespace nandina::examples::todo
     public:
         using Submit = std::function<bool(std::string_view)>;
 
-        TodoComposer(theme::NanTheme theme, Submit submit);
+        TodoComposer(widget::BuildContext ui, Submit submit);
         [[nodiscard]] auto input() -> widget::TextField&;
         [[nodiscard]] auto add_button() -> widget::Button&;
         [[nodiscard]] auto submit() -> bool;
@@ -134,12 +134,7 @@ namespace nandina::examples::todo
     public:
         using Action = std::function<void(std::uint64_t)>;
 
-        TodoTasks(
-            reactive::Graph& graph,
-            reactive::Computed<bool>& empty,
-            TodoStore& store,
-            theme::NanTheme theme
-        );
+        TodoTasks(widget::BuildContext ui, reactive::Computed<bool>& empty, TodoStore& store);
 
         void on_toggle(Action action);
         void on_remove(Action action);
@@ -166,7 +161,7 @@ namespace nandina::examples::todo
     class TodoWorkspace final: public scene::NanControl {
     public:
         TodoWorkspace(
-            theme::ThemeManager& themes,
+            widget::BuildContext ui,
             std::shared_ptr<TodoHeader> header,
             std::shared_ptr<TodoComposer> composer,
             std::shared_ptr<TodoList> list

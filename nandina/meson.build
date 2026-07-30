@@ -135,6 +135,7 @@ module_text = files(
 
 module_widget = files(
     'widget/authoring.hpp',
+    'widget/build_context.hpp',
     'widget/reactive_control.hpp',
     'widget/bindable_rect.hpp',
     'widget/declarative.hpp',

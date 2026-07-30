@@ -764,11 +764,15 @@ The existing paired Todo remains the low-level retained-widget equivalence fixtu
 
 ### A15. Typed List Model And Commands
 
-Status: active; the first list-model increment is implemented.
+Status: active; the list-model/command bridge and explicit build-context increments are implemented.
 
 `widget::ListDataModelSource<Source, Item>` is a structural protocol: a source only needs a tracked `get()` returning `const std::vector<Item>&`; it does not inherit a framework model base. `widget::ListView<Item, Key, NodeT>` is a thin application-facing shell over the existing `ForEach` keyed reconciliation runtime and exposes `set_model(source)` without moving row creation, reuse, reorder, or teardown into application pages.
 
 The Todo example now has a `TodoTasks` component backed by `ListView`. Its rows emit typed toggle/remove intents, while the page connects named handlers to `TodoStore`. Model synchronization and business commands are therefore separate, and the same source protocol can later support read-only, paged, remote, and tree-specific adapters without imposing CRUD inheritance.
+
+`widget::BuildContext` is a lightweight, non-owning bundle of the current `Graph`, `ReactiveScope`, and `ThemeManager`. `PageContext::ui()` creates the page context, while `with_scope()` derives an item or conditional-region context without changing the page-wide graph and theme services. Its context-aware factories reuse the stable `NodeBuilder<T>` API and always read the currently active theme when constructing a widget; no global or thread-local authoring state is introduced.
+
+The paired Todo components now accept `BuildContext` instead of separately threading graph and theme arguments. `ListView` row factories derive a context from the row-owned scope, preserving keyed row cleanup and establishing the same construction contract for the later A16 ownership work. Routing, stores, and dispatch remain explicit `PageContext` services rather than becoming widget dependencies.
 
 ### Deferred After Authoring Core
 

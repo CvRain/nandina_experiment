@@ -7,6 +7,7 @@
 #include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
 #include "widget/authoring.hpp"
+#include "widget/build_context.hpp"
 #include "widget/button.hpp"
 #include "widget/declarative.hpp"
 #include "widget/grid.hpp"
@@ -275,6 +276,33 @@ TEST_CASE("free function factories produce same types as make<T>", "[authoring][
         static_assert(std::same_as<decltype(tf), std::shared_ptr<widget::TextField>>);
         REQUIRE(tf->value() == "val");
     }
+}
+
+TEST_CASE("BuildContext carries page services into context factories", "[authoring][context]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope page_scope {graph};
+    reactive::ReactiveScope item_scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, page_scope, themes};
+
+    REQUIRE(&ui.graph() == &graph);
+    REQUIRE(&ui.scope() == &page_scope);
+    REQUIRE(&ui.theme_manager() == &themes);
+
+    auto item_ui = ui.with_scope(item_scope);
+    REQUIRE(&item_ui.graph() == &graph);
+    REQUIRE(&item_ui.scope() == &item_scope);
+    REQUIRE(&item_ui.theme_manager() == &themes);
+
+    auto current = theme::default_theme();
+    current.palette.primary = theme::nan_color(0.75F, 0.12F, 140.0F);
+    themes.set_theme(current);
+    auto action = ui.button("Run").build();
+    auto title = item_ui.label("Scoped").build();
+
+    REQUIRE(action->text() == "Run");
+    REQUIRE(title->text() == "Scoped");
+    REQUIRE(action->theme_ref().palette.primary.oklch().light == Catch::Approx(0.75F));
 }
 
 TEST_CASE("free function DSL trees match imperative construction", "[authoring][factory][layout]") {

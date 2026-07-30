@@ -15,6 +15,7 @@
 #include "../resource/resource_manager.hpp"
 #include "../scene/node2d.hpp"
 #include "../theme/theme.hpp"
+#include "../widget/build_context.hpp"
 #include "async_scope.hpp"
 #include "nan_store.hpp"
 
@@ -105,6 +106,10 @@ namespace nandina::app
                 throw std::runtime_error("PageContext::theme_manager: service is unavailable");
             }
             return *theme_manager_;
+        }
+
+        [[nodiscard]] auto ui() -> widget::BuildContext {
+            return widget::BuildContext(graph(), scope(), theme_manager());
         }
 
         [[nodiscard]] auto has_store() const -> bool {

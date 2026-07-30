@@ -147,7 +147,7 @@ The existing paired Todo remains a low-level equivalence and regression fixture 
 ## Delivery Order
 
 1. A14 establishes this contract, line budgets, forbidden dependencies, and `run_page()`.
-2. A15 introduces typed list-model adapters and named commands first, then an ambient `BuildContext`, context-aware widget factories, safe router commands, and focus/layout intents.
+2. A15 introduces typed list-model adapters and named commands first, then an explicit `BuildContext` carrying ambient build services, context-aware widget factories, safe router commands, and focus/layout intents.
 3. A16 introduces the component/page ownership model and automatic reactive/lifecycle cleanup.
 4. A17 completes bindable widget properties and theme-token propagation.
 5. A18 adds concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
