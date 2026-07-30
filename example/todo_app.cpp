@@ -54,34 +54,38 @@ namespace nandina::examples::todo
         ) -> PageParts {
             auto ui = context.ui();
             auto& store = context.store<TodoStore>();
-            auto& status = ui.scope().computed([&store] { return status_for(store); });
-            auto& empty = ui.scope().computed([&store] { return store.items.get().empty(); });
-            auto& visit_text = ui.scope().computed([&store, &params] {
+            auto& status = ui.computed([&store] { return status_for(store); });
+            auto& empty = ui.computed([&store] { return store.items.get().empty(); });
+            auto& visit_text = ui.computed([&store, &params] {
                 return parameter_summary(params, store.visits.get());
             });
-            auto list = std::make_shared<TodoList>(ui, empty, store);
-            list->on_toggle([&store](const std::uint64_t id) { store.toggle(id); });
-            list->on_remove([&store](const std::uint64_t id) { store.remove(id); });
-            auto composer = std::make_shared<TodoComposer>(
-                ui,
-                [&store, weak = std::weak_ptr<TodoList>(list)](const std::string_view title) {
-                    if (!store.add(title)) {
-                        return false;
-                    }
-                    if (const auto current = weak.lock()) {
-                        current->request_scroll_to_end();
-                    }
-                    return true;
-                }
-            );
-            auto header = std::make_shared<TodoHeader>(
-                ui,
-                status,
-                visit_text,
-                std::move(authoring_label),
-                std::move(navigation_label),
-                std::forward<Navigate>(navigate)
-            );
+            auto list = ui.make<TodoList>(empty, store).build();
+            ui.connect(list->toggle_requested(), [&store](const std::uint64_t id) {
+                store.toggle(id);
+            });
+            ui.connect(list->remove_requested(), [&store](const std::uint64_t id) {
+                store.remove(id);
+            });
+            auto composer =
+                ui.make<TodoComposer>(
+                      [&store, weak = std::weak_ptr<TodoList>(list)](const std::string_view title) {
+                          if (!store.add(title)) {
+                              return false;
+                          }
+                          if (const auto current = weak.lock()) {
+                              current->request_scroll_to_end();
+                          }
+                          return true;
+                      }
+                ).build();
+            auto header = ui.make<TodoHeader>(
+                                status,
+                                visit_text,
+                                std::move(authoring_label),
+                                std::move(navigation_label),
+                                std::forward<Navigate>(navigate)
+            )
+                              .build();
             return {
                 .header = std::move(header),
                 .composer = std::move(composer),
@@ -349,7 +353,7 @@ namespace nandina::examples::todo
         auto empty_region = widget::IfRegion<TodoEmptyState>::create(
             ui.graph(),
             [ui](reactive::ReactiveScope& scope) {
-                return std::make_shared<TodoEmptyState>(ui.with_scope(scope));
+                return ui.with_scope(scope).make<TodoEmptyState>().build();
             }
         );
         empty_region->bind(empty);
@@ -358,11 +362,12 @@ namespace nandina::examples::todo
             ui.graph(),
             [](const TodoItem& item) { return item.id; },
             [this, ui](reactive::ReactiveScope& scope, const TodoItem&) {
-                return std::make_shared<TodoRow>(
-                    ui.with_scope(scope),
-                    [this](const std::uint64_t id) { toggle_requested_.emit(id); },
-                    [this](const std::uint64_t id) { remove_requested_.emit(id); }
-                );
+                return ui.with_scope(scope)
+                    .make<TodoRow>(
+                        [this](const std::uint64_t id) { toggle_requested_.emit(id); },
+                        [this](const std::uint64_t id) { remove_requested_.emit(id); }
+                    )
+                    .build();
             },
             [this](TodoRow& row, const TodoItem& item) { row.update(item, theme_); }
         );
@@ -375,12 +380,12 @@ namespace nandina::examples::todo
         set_child(list_view_);
     }
 
-    void TodoTasks::on_toggle(Action action) {
-        toggle_subscription_ = toggle_requested_.subscribe(std::move(action));
+    auto TodoTasks::toggle_requested() const -> const reactive::Event<std::uint64_t>& {
+        return toggle_requested_;
     }
 
-    void TodoTasks::on_remove(Action action) {
-        remove_subscription_ = remove_requested_.subscribe(std::move(action));
+    auto TodoTasks::remove_requested() const -> const reactive::Event<std::uint64_t>& {
+        return remove_requested_;
     }
 
     void TodoTasks::request_scroll_to_end() {
@@ -463,7 +468,7 @@ namespace nandina::examples::todo
             .add(parts.composer)
             .add(parts.list);
         auto padding = ui.padding(foundation::NanInsets::all(16.0F)).child(content).build();
-        workspace_ = std::make_shared<TodoWorkspace>(ui, parts.header, parts.composer, parts.list);
+        workspace_ = ui.make<TodoWorkspace>(parts.header, parts.composer, parts.list).build();
         workspace_->set_name("todo-imperative-root");
         workspace_->set_content(padding);
         return workspace_;
@@ -511,13 +516,12 @@ namespace nandina::examples::todo
                 .children(parts.header, parts.composer, parts.list)
                 .build();
         auto pad = ui.padding(foundation::NanInsets::all(16.0F)).child(content).build();
-        workspace_ =
-            widget::authoring::make<TodoWorkspace>(ui, parts.header, parts.composer, parts.list)
-                .configure([&](TodoWorkspace& w) {
-                    w.set_name("todo-dsl-root");
-                    w.set_content(pad);
-                })
-                .build();
+        workspace_ = ui.make<TodoWorkspace>(parts.header, parts.composer, parts.list)
+                         .configure([&](TodoWorkspace& w) {
+                             w.set_name("todo-dsl-root");
+                             w.set_content(pad);
+                         })
+                         .build();
         return workspace_;
     }
 

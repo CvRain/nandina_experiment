@@ -10,7 +10,10 @@
 #include "../theme/theme_manager.hpp"
 #include "authoring.hpp"
 
+#include <concepts>
+#include <memory>
 #include <string>
+#include <type_traits>
 #include <utility>
 
 namespace nandina::widget
@@ -47,6 +50,55 @@ namespace nandina::widget
         [[nodiscard]] auto with_scope(reactive::ReactiveScope& scope) const noexcept
             -> BuildContext {
             return BuildContext(*graph_, scope, *themes_);
+        }
+
+        template<typename T, typename... Args>
+        [[nodiscard]] auto signal(Args&&... args) const -> reactive::Signal<T>& {
+            return scope_->signal<T>(std::forward<Args>(args)...);
+        }
+
+        template<typename T>
+        [[nodiscard]] auto signal_value(T initial) const -> reactive::Signal<T>& {
+            return scope_->signal_value(std::move(initial));
+        }
+
+        template<typename Fn>
+            requires std::invocable<Fn>
+        [[nodiscard]] auto computed(Fn&& fn) const
+            -> reactive::Computed<std::invoke_result_t<Fn>>& {
+            return scope_->computed(std::forward<Fn>(fn));
+        }
+
+        template<typename Fn>
+            requires std::invocable<Fn>
+        [[nodiscard]] auto effect(Fn&& fn) const -> reactive::Effect& {
+            return scope_->effect(std::forward<Fn>(fn));
+        }
+
+        template<typename... Args, typename Handler>
+        void connect(const reactive::Event<Args...>& event, Handler&& handler) const {
+            scope_->connect(event, std::forward<Handler>(handler));
+        }
+
+        /// Construct a custom component with its own reactive lifetime. The component
+        /// receives the derived context and releases its subscriptions/effects before
+        /// the concrete node is destroyed.
+        template<typename Node, typename... Args>
+            requires std::derived_from<Node, scene::NanNode>
+            && std::constructible_from<Node, BuildContext, Args...>
+        [[nodiscard]] auto make(Args&&... args) const -> authoring::NodeBuilder<Node> {
+            auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
+            auto component =
+                std::unique_ptr<Node>(new Node(with_scope(*scope), std::forward<Args>(args)...));
+            auto owned = std::shared_ptr<Node>(
+                component.release(),
+                [scope = std::move(scope)](Node* node) mutable {
+                    scope->clear();
+                    delete node;
+                    scope.reset();
+                }
+            );
+            return authoring::from(std::move(owned));
         }
 
         [[nodiscard]] auto row() const -> authoring::NodeBuilder<Row> {

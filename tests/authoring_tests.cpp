@@ -37,6 +37,13 @@ namespace
         int key;
         std::string value;
     };
+
+    class ScopedComponent final: public scene::NanControl {
+    public:
+        ScopedComponent(widget::BuildContext ui, const reactive::Event<int>& event, int& observed) {
+            ui.connect(event, [&observed](const int value) { observed += value; });
+        }
+    };
 } // namespace
 
 TEST_CASE("authoring builders preserve concrete widget identity", "[authoring][widget]") {
@@ -303,6 +310,26 @@ TEST_CASE("BuildContext carries page services into context factories", "[authori
     REQUIRE(action->text() == "Run");
     REQUIRE(title->text() == "Scoped");
     REQUIRE(action->theme_ref().palette.primary.oklch().light == Catch::Approx(0.75F));
+}
+
+TEST_CASE("BuildContext owns custom component subscriptions", "[authoring][context][lifecycle]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope page_scope {graph};
+    reactive::Event<int> event;
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, page_scope, themes};
+    int observed = 0;
+
+    auto component = ui.make<ScopedComponent>(event, observed).build();
+    REQUIRE_FALSE(component->weak_from_this().expired());
+    REQUIRE(event.subscriber_count() == 1);
+    event.emit(2);
+    REQUIRE(observed == 2);
+
+    component.reset();
+    REQUIRE(event.subscriber_count() == 0);
+    event.emit(3);
+    REQUIRE(observed == 2);
 }
 
 TEST_CASE("free function DSL trees match imperative construction", "[authoring][factory][layout]") {

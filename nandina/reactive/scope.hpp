@@ -7,6 +7,7 @@
 
 #include "computed.hpp"
 #include "effect.hpp"
+#include "event.hpp"
 #include "signal.hpp"
 
 #include <functional>
@@ -63,7 +64,16 @@ namespace nandina::reactive
             return *e;
         }
 
+        template<typename... Args, typename Handler>
+            requires std::constructible_from<typename Event<Args...>::Handler, Handler>
+        void connect(const Event<Args...>& event, Handler&& handler) {
+            subscriptions_.push_back(event.subscribe(std::forward<Handler>(handler)));
+        }
+
         void clear() {
+            // 先断开外部事件，避免后续资源拆除期间再次进入当前作用域。
+            subscriptions_.clear();
+
             for (auto* e: effects_) {
                 e->dispose();
             }
@@ -89,6 +99,10 @@ namespace nandina::reactive
             return effects_.size();
         }
 
+        [[nodiscard]] auto subscription_count() const -> std::size_t {
+            return subscriptions_.size();
+        }
+
     private:
         struct SignalHolderBase {
             virtual ~SignalHolderBase() = default;
@@ -106,6 +120,7 @@ namespace nandina::reactive
         std::vector<std::unique_ptr<SignalHolderBase>> signals_;
         std::vector<std::function<void()>> computeds_;
         std::vector<Effect*> effects_;
+        std::vector<Subscription> subscriptions_;
     };
 
 } // namespace nandina::reactive

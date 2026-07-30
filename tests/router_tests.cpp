@@ -138,6 +138,28 @@ namespace
         }
     };
 
+    struct ScopedEventParams {
+        const reactive::Event<int>* event = nullptr;
+        int* observed = nullptr;
+    };
+
+    class ScopedEventPage final: public app::NanPageT<ScopedEventParams> {
+    public:
+        explicit ScopedEventPage(ScopedEventParams params): NanPageT(params) {}
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "scoped-event";
+        }
+
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
+            context.ui().connect(*params().event, [observed = params().observed](const int value) {
+                *observed += value;
+            });
+            return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
+
     struct AsyncPageParams {
         std::atomic_bool* started = nullptr;
         std::atomic_bool* cancelled = nullptr;
@@ -432,6 +454,30 @@ TEST_CASE("router clears page reactive scope when a frame is popped", "[app][rou
     store.count.set(9);
     REQUIRE(log.observed == 5);
     REQUIRE(log.runs == 2);
+}
+
+TEST_CASE(
+    "router disconnects page event subscriptions when a frame is popped",
+    "[app][router][scope]"
+) {
+    reactive::Graph graph;
+    reactive::Event<int> event;
+    TestStore store {graph};
+    int observed = 0;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes, &store, app::nan_type_key<TestStore>()};
+
+    router.push<HomePage>(HomeParams {.user_id = 1});
+    router.push<ScopedEventPage>(ScopedEventParams {.event = &event, .observed = &observed});
+    REQUIRE(event.subscriber_count() == 1);
+
+    event.emit(2);
+    REQUIRE(observed == 2);
+    REQUIRE(router.pop());
+    REQUIRE(event.subscriber_count() == 0);
+
+    event.emit(3);
+    REQUIRE(observed == 2);
 }
 
 struct LifecycleLog {

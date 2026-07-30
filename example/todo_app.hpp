@@ -131,12 +131,10 @@ namespace nandina::examples::todo
 
     class TodoTasks final: public widget::Expanded {
     public:
-        using Action = std::function<void(std::uint64_t)>;
-
         TodoTasks(widget::BuildContext ui, reactive::Computed<bool>& empty, TodoStore& store);
 
-        void on_toggle(Action action);
-        void on_remove(Action action);
+        [[nodiscard]] auto toggle_requested() const -> const reactive::Event<std::uint64_t>&;
+        [[nodiscard]] auto remove_requested() const -> const reactive::Event<std::uint64_t>&;
         void request_scroll_to_end();
         [[nodiscard]] auto row_count() const -> std::size_t;
         [[nodiscard]] auto row(std::uint64_t id) -> TodoRow*;
@@ -149,8 +147,6 @@ namespace nandina::examples::todo
         theme::NanTheme theme_;
         reactive::Event<std::uint64_t> toggle_requested_;
         reactive::Event<std::uint64_t> remove_requested_;
-        reactive::Subscription toggle_subscription_;
-        reactive::Subscription remove_subscription_;
         std::shared_ptr<widget::ScrollView> list_view_;
         std::shared_ptr<Rows> rows_;
     };

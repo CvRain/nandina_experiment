@@ -776,6 +776,16 @@ The paired Todo components now accept `BuildContext` instead of separately threa
 
 `NanRouter::request_push()`, `request_replace()`, `request_pop()`, and `request_pop_to()` are traversal-safe commands layered over the immediate router API. Commands execute in the next UI task phase and carry a router lifetime guard, so destroying a router invalidates its queued work. `NanNode2D::request_focus()` and `ScrollView::request_scroll_to_end()` similarly express post-layout intent, including before mounting, without exposing `NanSceneTree` scheduling to application components. The Todo example now uses these APIs and no longer includes `scene_tree.hpp`, receives `UiDispatcher`, or overrides `on_ready()` for routine focus.
 
+### A16. Component And Page Ownership
+
+Status: initial component scopes and automatic subscription cleanup implemented.
+
+`BuildContext::make<Component>(args...)` constructs a concrete custom widget with a derived `ReactiveScope`. The scope shares the page graph and theme services, remains alive for exactly as long as the component's `shared_ptr` control block, and clears subscriptions and reactive work before destroying the component. It preserves normal `shared_from_this()` behavior and returns the same stable `NodeBuilder<Component>` used by ordinary authoring factories.
+
+`BuildContext::signal()`, `computed()`, `effect()`, and `connect()` register work in the current page, component, item, or conditional scope. `ReactiveScope::connect()` owns the returned event subscription and disconnects it before effects, computed values, and signals are torn down. The Todo components are now created through `ui.make<T>()`; page-to-list commands use `ui.connect()` and no component stores manual `Subscription` members.
+
+The low-level `BuildContext::scope()` and `with_scope()` APIs remain available for framework regions and advanced integrations. Completing A16 still requires applying the same ownership contract to concise page/component entry points and auditing teardown order across routed, conditional, and keyed roots.
+
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.

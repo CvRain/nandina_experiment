@@ -568,6 +568,26 @@ TEST_CASE("ReactiveScope owns signals computed values and effects", "[reactive][
     }
 }
 
+TEST_CASE("ReactiveScope disconnects owned event subscriptions", "[reactive][scope][event]") {
+    Graph graph;
+    Event<int> event;
+    int observed = 0;
+
+    ReactiveScope scope {graph};
+    scope.connect(event, [&](const int value) { observed += value; });
+    REQUIRE(scope.subscription_count() == 1);
+    REQUIRE(event.subscriber_count() == 1);
+
+    event.emit(3);
+    REQUIRE(observed == 3);
+
+    scope.clear();
+    REQUIRE(scope.subscription_count() == 0);
+    REQUIRE(event.subscriber_count() == 0);
+    event.emit(4);
+    REQUIRE(observed == 3);
+}
+
 TEST_CASE("Undisposed effect is released by Graph destruction", "[reactive][lifetime]") {
     // No leak / crash: effect and computed outlive their handles but the Graph
     // owns them and tears down cleanly. (Signal must outlive the Graph.)
