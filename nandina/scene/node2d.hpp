@@ -8,6 +8,8 @@
 #include "../foundation/transform2d.hpp"
 #include "node.hpp"
 
+#include <cstdint>
+
 namespace nandina::scene
 {
 
@@ -105,6 +107,10 @@ namespace nandina::scene
             return this;
         }
 
+        /// Request focus after the node is mounted and the current layout completes.
+        /// Calls made while detached are remembered until the next tree entry.
+        void request_focus();
+
         // ---- hit testing ----
 
         /// Check whether a point in local space is inside this node.
@@ -134,6 +140,8 @@ namespace nandina::scene
         /// Invalidate global transform on this node and all descendants.
         void _propagate_invalidate_global();
 
+        void schedule_focus_request();
+
     private:
         foundation::NanTransform2D transform_;
         bool visible_ = true;
@@ -141,6 +149,9 @@ namespace nandina::scene
 
         mutable foundation::NanTransform2D cached_global_;
         mutable bool global_invalid_ = true;
+        bool focus_requested_ = false;
+        bool focus_request_scheduled_ = false;
+        std::uint64_t focus_request_generation_ = 0;
     };
 
 } // namespace nandina::scene

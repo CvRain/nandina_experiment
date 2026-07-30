@@ -1904,6 +1904,35 @@ TEST_CASE("ScrollView clamps offsets and translates content", "[widget][scroll]"
     REQUIRE(content->position() == foundation::NanPoint(0.0F, -120.0F));
 }
 
+TEST_CASE("focus and scroll intents wait for mounting and layout", "[widget][intent]") {
+    SECTION("focus") {
+        auto field = widget::TextField::create("", "Name");
+        field->request_focus();
+        scene::NanSceneTree tree;
+        tree.set_root(field);
+
+        REQUIRE(tree.focused_node() == nullptr);
+        REQUIRE(tree.layout_root(foundation::NanSize(160.0F, 48.0F)) == 1);
+        REQUIRE(tree.focused_node() == field.get());
+    }
+
+    SECTION("scroll to end") {
+        auto content = std::make_shared<scene::NanControl>(
+            foundation::NanSize(100.0F, 240.0F)
+        );
+        auto scroll = widget::ScrollView::create();
+        scroll->set_child(content);
+        scroll->request_scroll_to_end();
+        scene::NanSceneTree tree;
+        tree.set_root(scroll);
+
+        REQUIRE(scroll->scroll_offset() == foundation::NanPoint::zero());
+        REQUIRE(tree.layout_root(foundation::NanSize(100.0F, 80.0F)) == 1);
+        REQUIRE(scroll->scroll_offset() == foundation::NanPoint(0.0F, 160.0F));
+        REQUIRE(content->position() == foundation::NanPoint(0.0F, -160.0F));
+    }
+}
+
 TEST_CASE("ScrollView replaces content safely during process", "[widget][scroll][scheduler]") {
     auto scroll = widget::ScrollView::create(widget::ScrollAxis::vertical);
     auto initial = std::make_shared<scene::NanControl>(foundation::NanSize(100.0F, 100.0F));

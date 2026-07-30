@@ -154,6 +154,18 @@ namespace nandina::app
         }
     }
 
+    auto NanRouter::request_pop() -> bool {
+        return post_command([this] { (void)pop(); });
+    }
+
+    auto NanRouter::request_pop_to(std::string route_key) -> bool {
+        return post_command([this, route_key = std::move(route_key)] { (void)pop_to(route_key); });
+    }
+
+    auto NanRouter::request_clear() -> bool {
+        return post_command([this] { clear(); });
+    }
+
     void NanRouter::push_page(std::unique_ptr<NanPage> page) {
         if (!page) {
             throw std::runtime_error("NanRouter::push_page: page is null");
@@ -258,6 +270,19 @@ namespace nandina::app
         if (frame.scope != nullptr) {
             frame.scope->clear();
         }
+    }
+
+    auto NanRouter::post_command(std::move_only_function<void()> command) -> bool {
+        if (dispatcher_ == nullptr) {
+            return false;
+        }
+        auto lifetime = std::weak_ptr<void>(command_lifetime_);
+        return dispatcher_->post([lifetime = std::move(lifetime),
+                                  command = std::move(command)]() mutable {
+            if (const auto alive = lifetime.lock()) {
+                command();
+            }
+        });
     }
 
     auto NanRouter::make_context_for(Frame& frame) -> PageContext {

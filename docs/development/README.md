@@ -670,7 +670,7 @@ Status: complete.
 
 Todo is split into semantic `TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, and `TodoEmptyState` components backed by one application-owned `TodoStore`. `ImperativeTodoPage` composes those concrete components with ordinary setters and `add()`, while `DslTodoPage` composes the same types through `widget::authoring`; neither page has a separate state, binding, style, reconciliation, or lifecycle path.
 
-The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and a reactive visit counter driven by the shared `TodoStore::visits` signal. Navigation is posted through `PageContext::dispatcher()` and runs in the next UI task phase, after the active input callback and outside scene traversal. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
+The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and a reactive visit counter driven by the shared `TodoStore::visits` signal. Navigation uses the router's `request_*` commands and runs in the next UI task phase, after the active input callback and outside scene traversal; application callbacks no longer coordinate `UiDispatcher` directly. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
 
 ### A11. Page Activate/Deactivate Lifecycle
 
@@ -764,7 +764,7 @@ The existing paired Todo remains the low-level retained-widget equivalence fixtu
 
 ### A15. Typed List Model And Commands
 
-Status: active; the list-model/command bridge and explicit build-context increments are implemented.
+Status: complete; list models, named commands, explicit build context, safe router commands, and post-layout intents are implemented.
 
 `widget::ListDataModelSource<Source, Item>` is a structural protocol: a source only needs a tracked `get()` returning `const std::vector<Item>&`; it does not inherit a framework model base. `widget::ListView<Item, Key, NodeT>` is a thin application-facing shell over the existing `ForEach` keyed reconciliation runtime and exposes `set_model(source)` without moving row creation, reuse, reorder, or teardown into application pages.
 
@@ -773,6 +773,8 @@ The Todo example now has a `TodoTasks` component backed by `ListView`. Its rows 
 `widget::BuildContext` is a lightweight, non-owning bundle of the current `Graph`, `ReactiveScope`, and `ThemeManager`. `PageContext::ui()` creates the page context, while `with_scope()` derives an item or conditional-region context without changing the page-wide graph and theme services. Its context-aware factories reuse the stable `NodeBuilder<T>` API and always read the currently active theme when constructing a widget; no global or thread-local authoring state is introduced.
 
 The paired Todo components now accept `BuildContext` instead of separately threading graph and theme arguments. `ListView` row factories derive a context from the row-owned scope, preserving keyed row cleanup and establishing the same construction contract for the later A16 ownership work. Routing, stores, and dispatch remain explicit `PageContext` services rather than becoming widget dependencies.
+
+`NanRouter::request_push()`, `request_replace()`, `request_pop()`, and `request_pop_to()` are traversal-safe commands layered over the immediate router API. Commands execute in the next UI task phase and carry a router lifetime guard, so destroying a router invalidates its queued work. `NanNode2D::request_focus()` and `ScrollView::request_scroll_to_end()` similarly express post-layout intent, including before mounting, without exposing `NanSceneTree` scheduling to application components. The Todo example now uses these APIs and no longer includes `scene_tree.hpp`, receives `UiDispatcher`, or overrides `on_ready()` for routine focus.
 
 ### Deferred After Authoring Core
 

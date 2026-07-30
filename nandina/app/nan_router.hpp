@@ -18,6 +18,7 @@
 #include "async_scope.hpp"
 
 #include <cstddef>
+#include <functional>
 #include <memory>
 #include <stdexcept>
 #include <string>
@@ -87,6 +88,14 @@ namespace nandina::app
             return *raw;
         }
 
+        template<typename PageT, typename ParamsT>
+            requires std::derived_from<PageT, NanPageT<ParamsT>>
+        [[nodiscard]] auto request_push(ParamsT params) -> bool {
+            return post_command([this, params = std::move(params)]() mutable {
+                (void)push<PageT>(std::move(params));
+            });
+        }
+
         template<typename PageT>
             requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
             && std::default_initializable<PageT>
@@ -97,13 +106,29 @@ namespace nandina::app
             return *raw;
         }
 
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+            && std::default_initializable<PageT>
+        [[nodiscard]] auto request_push() -> bool {
+            return post_command([this] { (void)push<PageT>(); });
+        }
+
         template<typename PageT, typename ParamsT>
             requires std::derived_from<PageT, NanPageT<ParamsT>>
         auto replace(ParamsT params) -> PageT& {
             if (!frames_.empty()) {
-                pop();
+                drop_frame(frames_.back());
+                frames_.pop_back();
             }
             return push<PageT>(std::move(params));
+        }
+
+        template<typename PageT, typename ParamsT>
+            requires std::derived_from<PageT, NanPageT<ParamsT>>
+        [[nodiscard]] auto request_replace(ParamsT params) -> bool {
+            return post_command([this, params = std::move(params)]() mutable {
+                (void)replace<PageT>(std::move(params));
+            });
         }
 
         template<typename PageT>
@@ -111,14 +136,26 @@ namespace nandina::app
             && std::default_initializable<PageT>
         auto replace() -> PageT& {
             if (!frames_.empty()) {
-                pop();
+                drop_frame(frames_.back());
+                frames_.pop_back();
             }
             return push<PageT>();
+        }
+
+        template<typename PageT>
+            requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+            && std::default_initializable<PageT>
+        [[nodiscard]] auto request_replace() -> bool {
+            return post_command([this] { (void)replace<PageT>(); });
         }
 
         auto pop() -> bool;
         auto pop_to(std::string_view route_key) -> bool;
         void clear();
+
+        [[nodiscard]] auto request_pop() -> bool;
+        [[nodiscard]] auto request_pop_to(std::string route_key) -> bool;
+        [[nodiscard]] auto request_clear() -> bool;
 
     private:
         using NodePtr = std::shared_ptr<scene::NanNode>;
@@ -137,6 +174,7 @@ namespace nandina::app
         void attach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void detach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void drop_frame(Frame& frame);
+        [[nodiscard]] auto post_command(std::move_only_function<void()> command) -> bool;
         [[nodiscard]] auto make_context_for(Frame& frame) -> PageContext;
 
         reactive::Graph* graph_;
@@ -151,6 +189,7 @@ namespace nandina::app
         BackgroundExecutor* background_executor_ = nullptr;
         std::shared_ptr<scene::NanControl> host_;
         std::vector<Frame> frames_;
+        std::shared_ptr<void> command_lifetime_ = std::make_shared<int>(0);
     };
 
 } // namespace nandina::app

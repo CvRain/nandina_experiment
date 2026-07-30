@@ -7,7 +7,6 @@
 #include "app/nan_router.hpp"
 #include "foundation/geometry.hpp"
 #include "foundation/nan_logger.hpp"
-#include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
 #include "widget/authoring.hpp"
 
@@ -81,7 +80,6 @@ namespace nandina::examples::todo
                 visit_text,
                 std::move(authoring_label),
                 std::move(navigation_label),
-                context.dispatcher(),
                 std::forward<Navigate>(navigate)
             );
             return {
@@ -215,7 +213,6 @@ namespace nandina::examples::todo
         reactive::Computed<std::string>& visit_text,
         std::string authoring_label,
         std::string navigation_label,
-        app::UiDispatcher& dispatcher,
         std::function<void()> navigate
     ):
         themes_(&ui.theme_manager()) {
@@ -225,11 +222,7 @@ namespace nandina::examples::todo
 
         navigation_button_ = ui.button(std::move(navigation_label)).build();
         navigation_button_->set_tone(theme::ButtonTone::secondary);
-        navigation_button_->set_on_click([dispatcher = &dispatcher,
-                                          navigate = std::move(navigate)] {
-            // 页面切换会转移节点所有权，必须离开当前输入/遍历回调后再执行。
-            (void)dispatcher->post(navigate);
-        });
+        navigation_button_->set_on_click(std::move(navigate));
 
         theme_button_ = ui.button(preference_label(themes_->preference())).build();
         theme_button_->set_treatment(theme::ButtonTreatment::outlined);
@@ -306,6 +299,7 @@ namespace nandina::examples::todo
 
     TodoComposer::TodoComposer(widget::BuildContext ui, Submit submit): submit_(std::move(submit)) {
         input_ = ui.text_field("", "添加一个任务").build();
+        input_->request_focus();
         input_->set_on_submit([this](const std::string_view value) { (void)submit_value(value); });
         add_button_ = ui.button("添加").build();
         add_button_->set_tone(theme::ButtonTone::secondary);
@@ -390,14 +384,7 @@ namespace nandina::examples::todo
     }
 
     void TodoTasks::request_scroll_to_end() {
-        if (!is_inside_tree()) {
-            return;
-        }
-        get_tree()->post_layout([weak = std::weak_ptr<widget::ScrollView>(list_view_)] {
-            if (const auto list = weak.lock()) {
-                list->set_scroll_offset(list->maximum_scroll_offset());
-            }
-        });
+        list_view_->request_scroll_to_end();
     }
 
     auto TodoTasks::row_count() const -> std::size_t {
@@ -445,11 +432,6 @@ namespace nandina::examples::todo
         return *list_;
     }
 
-    void TodoWorkspace::on_ready() {
-        scene::NanControl::on_ready();
-        get_tree()->set_focus(&composer_->input());
-    }
-
     void TodoWorkspace::on_theme_changed(const theme::ThemeManager& manager) {
         scene::NanControl::on_theme_changed(manager);
         set_background(manager.theme().palette.background);
@@ -469,7 +451,7 @@ namespace nandina::examples::todo
         auto ui = context.ui();
         auto& router = context.router();
         auto parts = make_page_parts(context, params(), "命令式构建", "查看 DSL 版本", [&router] {
-            router.push<DslTodoPage>(TodoPageParams {
+            (void)router.request_push<DslTodoPage>(TodoPageParams {
                 .source = "命令式页面",
             });
         });
@@ -504,13 +486,22 @@ namespace nandina::examples::todo
     auto DslTodoPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         auto ui = context.ui();
         auto& router = context.router();
-        auto parts = make_page_parts(context, params(), "DSL 构建", "返回命令式版本", [&router] {
-            if (!router.pop_to("todo-imperative")) {
-                router.push<ImperativeTodoPage>(TodoPageParams {
+        const bool returns_to_imperative = router.current_key() == "todo-imperative";
+        auto parts = make_page_parts(
+            context,
+            params(),
+            "DSL 构建",
+            "返回命令式版本",
+            [&router, returns_to_imperative] {
+                if (returns_to_imperative) {
+                    (void)router.request_pop_to("todo-imperative");
+                    return;
+                }
+                (void)router.request_push<ImperativeTodoPage>(TodoPageParams {
                     .source = "DSL 页面",
                 });
             }
-        });
+        );
 
         auto content =
             ui.column()

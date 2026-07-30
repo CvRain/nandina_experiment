@@ -5,11 +5,13 @@
 #include "scroll_view.hpp"
 
 #include "../scene/input_event.hpp"
+#include "../scene/scene_tree.hpp"
 
 #include <algorithm>
 #include <cmath>
 #include <limits>
 #include <stdexcept>
+#include <utility>
 
 namespace nandina::widget
 {
@@ -56,6 +58,11 @@ namespace nandina::widget
         }
         wheel_step_ = step;
         return *this;
+    }
+
+    void ScrollView::request_scroll_to_end() {
+        scroll_to_end_requested_ = true;
+        schedule_scroll_to_end();
     }
 
     auto ScrollView::child() const -> scene::NanControl* {
@@ -107,6 +114,18 @@ namespace nandina::widget
             return true;
         }
         return false;
+    }
+
+    void ScrollView::on_enter_tree() {
+        scene::NanControl::on_enter_tree();
+        schedule_scroll_to_end();
+    }
+
+    void ScrollView::on_exit_tree() {
+        scroll_to_end_requested_ = false;
+        scroll_to_end_scheduled_ = false;
+        ++scroll_request_generation_;
+        scene::NanControl::on_exit_tree();
     }
 
     auto ScrollView::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
@@ -163,5 +182,28 @@ namespace nandina::widget
         if (auto current = child_.lock()) {
             current->set_position(foundation::NanPoint(-offset_.get_x(), -offset_.get_y()));
         }
+    }
+
+    void ScrollView::schedule_scroll_to_end() {
+        if (!scroll_to_end_requested_ || scroll_to_end_scheduled_ || !is_inside_tree()) {
+            return;
+        }
+        auto* tree = get_tree();
+        auto weak =
+            std::weak_ptr<ScrollView>(std::static_pointer_cast<ScrollView>(shared_from_this()));
+        const auto generation = scroll_request_generation_;
+        scroll_to_end_scheduled_ = true;
+        tree->post_layout([weak = std::move(weak), tree, generation] {
+            const auto view = weak.lock();
+            if (!view || view->scroll_request_generation_ != generation) {
+                return;
+            }
+            view->scroll_to_end_scheduled_ = false;
+            if (!view->scroll_to_end_requested_ || view->get_tree() != tree) {
+                return;
+            }
+            view->scroll_to_end_requested_ = false;
+            view->set_scroll_offset(view->maximum_scroll_offset());
+        });
     }
 } // namespace nandina::widget

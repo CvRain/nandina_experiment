@@ -10,8 +10,8 @@
 #include "scene/control.hpp"
 #include "theme/theme.hpp"
 
-#include <catch2/catch_test_macros.hpp>
 #include <catch2/catch_approx.hpp>
+#include <catch2/catch_test_macros.hpp>
 
 #include <atomic>
 #include <chrono>
@@ -45,7 +45,8 @@ namespace
             return "home";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto root = std::make_shared<scene::NanControl>(foundation::NanSize(320, 200));
             root->set_name("home-root");
             root->set_position(foundation::NanPoint(static_cast<float>(params().user_id), 0.0F));
@@ -62,7 +63,8 @@ namespace
             return "detail";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto root = std::make_shared<scene::NanControl>(foundation::NanSize(200, 100));
             root->set_name("detail-root");
             context.store<TestStore>().count.set(params().blog_id);
@@ -78,7 +80,8 @@ namespace
             return "plain";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             auto root = std::make_shared<scene::NanControl>(foundation::NanSize(100, 50));
             root->set_background(context.theme().palette.primary);
             return root;
@@ -98,7 +101,8 @@ namespace
             return "dispatcher-probe";
         }
 
-        [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> override {
+        [[nodiscard]] auto build(app::PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> override {
             *params().available = context.has_dispatcher();
             *params().dispatcher = &context.dispatcher();
             return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
@@ -219,6 +223,75 @@ TEST_CASE("router exposes its UI dispatcher through page context", "[app][router
     REQUIRE(observed == &dispatcher);
 }
 
+TEST_CASE("router commands defer stack mutations to the UI task phase", "[app][router][command]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    TestStore store {graph};
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {
+        graph,
+        theme,
+        &store,
+        app::nan_type_key<TestStore>(),
+        nullptr,
+        nullptr,
+        nullptr,
+        &dispatcher
+    };
+    router.push<HomePage>(HomeParams {.user_id = 1});
+
+    REQUIRE(router.request_push<DetailPage>(DetailParams {.blog_id = 7}));
+    REQUIRE(router.depth() == 1);
+    REQUIRE(dispatcher.pending_count() == 1);
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.depth() == 2);
+    REQUIRE(router.current_key() == "detail");
+
+    REQUIRE(router.request_pop());
+    REQUIRE(router.depth() == 2);
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.depth() == 1);
+
+    REQUIRE(router.request_push<DetailPage>(DetailParams {.blog_id = 8}));
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.request_pop_to("home"));
+    REQUIRE(router.depth() == 2);
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.depth() == 1);
+    REQUIRE(router.current_key() == "home");
+
+    REQUIRE(router.request_replace<PlainPage>());
+    REQUIRE(router.current_key() == "home");
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.depth() == 1);
+    REQUIRE(router.current_key() == "plain");
+
+    REQUIRE(router.request_clear());
+    REQUIRE_FALSE(router.empty());
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(router.empty());
+}
+
+TEST_CASE("queued router commands expire with their router", "[app][router][command]") {
+    reactive::Graph graph;
+    const auto theme = theme::default_theme();
+    app::UiDispatcher dispatcher;
+    {
+        app::NanRouter
+            router {graph, theme, nullptr, nullptr, nullptr, nullptr, nullptr, &dispatcher};
+        REQUIRE(router.request_push<PlainPage>());
+    }
+
+    REQUIRE(dispatcher.pending_count() == 1);
+    std::size_t drained = 0;
+    REQUIRE_NOTHROW(drained = dispatcher.drain());
+    REQUIRE(drained == 1);
+
+    app::NanRouter immediate_only {graph, theme};
+    REQUIRE_FALSE(immediate_only.request_push<PlainPage>());
+    REQUIRE(immediate_only.empty());
+}
+
 TEST_CASE("router frame cancellation suppresses page async completion", "[app][router][async]") {
     using namespace std::chrono_literals;
 
@@ -300,7 +373,10 @@ TEST_CASE("store updates propagate to keep-alive page effects", "[app][router][s
     }
 }
 
-TEST_CASE("router supports no-params pages and passes theme through context", "[app][router][theme]") {
+TEST_CASE(
+    "router supports no-params pages and passes theme through context",
+    "[app][router][theme]"
+) {
     reactive::Graph graph;
     auto app_theme = theme::default_theme();
     app_theme.palette.primary = theme::nan_color(0.72F, 0.12F, 120.0F);

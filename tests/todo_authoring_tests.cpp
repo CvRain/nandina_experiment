@@ -56,7 +56,9 @@ TEST_CASE("imperative and DSL Todo pages share components and state", "[todo][au
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
-    REQUIRE(tree.layout_root(foundation::NanSize(760.0F, 420.0F)) == 1);
+    const auto initial_layout_passes = tree.layout_root(foundation::NanSize(760.0F, 420.0F));
+    REQUIRE(initial_layout_passes >= 1);
+    REQUIRE(initial_layout_passes <= 2);
 
     static_assert(
         std::same_as<decltype(imperative.workspace()), const std::shared_ptr<TodoWorkspace>&>
@@ -144,7 +146,9 @@ TEST_CASE("DSL Todo page can pass params to a new imperative page", "[todo][para
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
-    REQUIRE(tree.layout_root(foundation::NanSize(760.0F, 420.0F)) == 1);
+    const auto initial_layout_passes = tree.layout_root(foundation::NanSize(760.0F, 420.0F));
+    REQUIRE(initial_layout_passes >= 1);
+    REQUIRE(initial_layout_passes <= 2);
 
     REQUIRE(dsl.workspace()->header().parameter_text().contains("直接入口"));
     activate(tree, dispatcher, dsl.workspace()->header().navigation_button());

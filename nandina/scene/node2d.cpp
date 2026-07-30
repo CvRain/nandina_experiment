@@ -5,6 +5,7 @@
 #include "node2d.hpp"
 #include "../render/draw_context.hpp"
 #include "canvas_layer.hpp"
+#include "scene_tree.hpp"
 
 namespace nandina::scene
 {
@@ -161,6 +162,11 @@ namespace nandina::scene
         z_index_ = z;
     }
 
+    void NanNode2D::request_focus() {
+        focus_requested_ = true;
+        schedule_focus_request();
+    }
+
     // ---- hit testing ----
 
     auto NanNode2D::contains_point(foundation::NanPoint /*local_point*/) const -> bool {
@@ -189,10 +195,37 @@ namespace nandina::scene
     void NanNode2D::on_enter_tree() {
         NanNode::on_enter_tree();
         global_invalid_ = true; // Force recompute now that we have a parent chain.
+        schedule_focus_request();
     }
 
     void NanNode2D::on_exit_tree() {
+        focus_requested_ = false;
+        focus_request_scheduled_ = false;
+        ++focus_request_generation_;
         NanNode::on_exit_tree();
+    }
+
+    void NanNode2D::schedule_focus_request() {
+        if (!focus_requested_ || focus_request_scheduled_ || !is_inside_tree()) {
+            return;
+        }
+        auto* tree = get_tree();
+        auto weak =
+            std::weak_ptr<NanNode2D>(std::static_pointer_cast<NanNode2D>(shared_from_this()));
+        const auto generation = focus_request_generation_;
+        focus_request_scheduled_ = true;
+        tree->post_layout([weak = std::move(weak), tree, generation] {
+            const auto node = weak.lock();
+            if (!node || node->focus_request_generation_ != generation) {
+                return;
+            }
+            node->focus_request_scheduled_ = false;
+            if (!node->focus_requested_ || node->get_tree() != tree) {
+                return;
+            }
+            node->focus_requested_ = false;
+            tree->set_focus(node.get());
+        });
     }
 
     void NanNode2D::on_draw(render::DrawContext& ctx) {

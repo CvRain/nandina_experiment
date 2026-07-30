@@ -92,7 +92,6 @@ namespace nandina::examples::todo
             reactive::Computed<std::string>& visit_text,
             std::string authoring_label,
             std::string navigation_label,
-            app::UiDispatcher& dispatcher,
             std::function<void()> navigate
         );
 
@@ -171,7 +170,6 @@ namespace nandina::examples::todo
         [[nodiscard]] auto header() -> TodoHeader&;
         [[nodiscard]] auto composer() -> TodoComposer&;
         [[nodiscard]] auto list() -> TodoList&;
-        void on_ready() override;
         void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
