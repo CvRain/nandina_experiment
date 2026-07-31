@@ -31,6 +31,7 @@ namespace nandina::widget
             if (on_change_) {
                 on_change_(value);
             }
+            value_changed_.emit(value);
         });
         apply_theme();
         (void)measure_layout(scene::LayoutConstraints::loose());
@@ -78,6 +79,10 @@ namespace nandina::widget
 
     void TextField::set_on_submit(std::function<void(std::string_view)> callback) {
         on_submit_ = std::move(callback);
+    }
+
+    auto TextField::value_changed() const -> const reactive::Event<std::string_view>& {
+        return value_changed_;
     }
 
     void TextField::set_read_only(const bool value) {

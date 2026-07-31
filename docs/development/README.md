@@ -248,7 +248,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. A14 is now the active main line: it defines and enforces the compact application experience required before 1.0. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. The A14 developer-experience line is implemented through A17 binding and live theme-token propagation; A18 concise conditional and keyed collection authoring is next. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -780,13 +780,23 @@ The paired Todo components now accept `BuildContext` instead of separately threa
 
 ### A16. Component And Page Ownership
 
-Status: initial component scopes and automatic subscription cleanup implemented.
+Status: complete; page, component, conditional, and keyed scopes use automatic cleanup.
 
 `BuildContext::make<Component>(args...)` constructs a concrete custom widget with a derived `ReactiveScope`. The scope shares the page graph and theme services, remains alive for exactly as long as the component's `shared_ptr` control block, and clears subscriptions and reactive work before destroying the component. It preserves normal `shared_from_this()` behavior and returns the same stable `NodeBuilder<Component>` used by ordinary authoring factories.
 
 `BuildContext::signal()`, `computed()`, `effect()`, and `connect()` register work in the current page, component, item, or conditional scope. `ReactiveScope::connect()` owns the returned event subscription and disconnects it before effects, computed values, and signals are torn down. The Todo components are now created through `ui.make<T>()`; page-to-list commands use `ui.connect()` and no component stores manual `Subscription` members.
 
-The low-level `BuildContext::scope()` and `with_scope()` APIs remain available for framework regions and advanced integrations. Completing A16 still requires applying the same ownership contract to concise page/component entry points and auditing teardown order across routed, conditional, and keyed roots.
+The low-level `BuildContext::scope()` and `with_scope()` APIs remain available for framework regions and advanced integrations. `PageContext::ui()` supplies the router-owned page scope, custom components derive their own scope through `ui.make<T>()`, and conditional/keyed regions derive scopes through `with_scope()`. Lifecycle tests cover component destruction, routed page removal, keyed row removal, and conditional branch replacement so subscriptions are cleared before their captured nodes and state are destroyed.
+
+### A17. Bindable Properties And Theme Tokens
+
+Status: complete for the v1 authoring contract; additional widget factories may add convenience overloads without introducing widget-specific binding lifetimes.
+
+`BuildContext::bind(target, setter, source)` connects any tracked source exposing `get()` to an ordinary concrete-widget setter. The current page, component, item, or conditional scope owns the effect, and the binding retains only a weak widget reference. `Signal`, read-only signal views, `Computed`, and compatible properties therefore share one binding path while detached controls are not kept alive by reactive work. `ui.label(source)` and `ui.button(source)` are concise forms over this same contract; literal values continue to use the ordinary string factories and setters.
+
+`ui.text_field(signal, placeholder)` adds the v1 two-way string binding: source changes call the normal `TextField::set_value()` path, while committed user edits are published through `TextField::value_changed()` and written back to the signal. The existing callback setters remain available for commands and validation, and no control-owned reactive scope is added.
+
+`Label::set_color_token()` and the `Surface` theme-color fill/border overloads retain semantic `ColorToken` references rather than resolved snapshots. Attached scene trees already receive every `ThemeManager` revision, so these values are re-resolved automatically alongside Button and TextField styles. The Todo components now use context-owned text bindings and semantic colors and no longer override theme callbacks merely to refresh labels, rows, or the page background. The older `Label::bind_text()` entry point remains source-compatible but is no longer the recommended authoring path.
 
 ### Deferred After Authoring Core
 

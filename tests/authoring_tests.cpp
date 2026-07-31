@@ -4,6 +4,7 @@
 #include "reactive/graph.hpp"
 #include "reactive/signal.hpp"
 #include "scene/canvas_layer.hpp"
+#include "scene/input_event.hpp"
 #include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
 #include "widget/authoring.hpp"
@@ -13,6 +14,7 @@
 #include "widget/grid.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
+#include "widget/text_field.hpp"
 
 #include <memory>
 #include <string>
@@ -330,6 +332,53 @@ TEST_CASE("BuildContext owns custom component subscriptions", "[authoring][conte
     REQUIRE(event.subscriber_count() == 0);
     event.emit(3);
     REQUIRE(observed == 2);
+}
+
+TEST_CASE(
+    "BuildContext binds tracked values through ordinary widget setters",
+    "[authoring][binding]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    reactive::Signal<std::string> text {graph, "Ready"};
+
+    auto label = ui.label(text).build();
+    auto button = ui.button(text).build();
+    REQUIRE(label->text() == "Ready");
+    REQUIRE(button->text() == "Ready");
+
+    text.set("Running");
+    REQUIRE(label->text() == "Running");
+    REQUIRE(button->text() == "Running");
+
+    label.reset();
+    text.set("Done");
+    REQUIRE(button->text() == "Done");
+}
+
+TEST_CASE(
+    "BuildContext text fields synchronize writable string signals",
+    "[authoring][binding]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    reactive::Signal<std::string> draft {graph, "Task"};
+    auto field = ui.text_field(draft, "Add a task").build();
+
+    REQUIRE(field->value() == "Task");
+    draft.set("Updated");
+    REQUIRE(field->value() == "Updated");
+
+    scene::NanSceneTree tree;
+    tree.set_root(field);
+    tree.set_focus(field.get());
+    field->editable_text().set_caret(field->value().size());
+    tree.dispatch_text_input(scene::TextInputEvent("!"));
+    REQUIRE(draft.peek() == "Updated!");
 }
 
 TEST_CASE("free function DSL trees match imperative construction", "[authoring][factory][layout]") {

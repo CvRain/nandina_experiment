@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_TEXT_FIELD_HPP
 #define NANDINA_EXPERIMENT_WIDGET_TEXT_FIELD_HPP
 
+#include "../reactive/event.hpp"
 #include "../theme/theme.hpp"
 #include "../theme/text_field_style.hpp"
 #include "primitives/editable_text.hpp"
@@ -44,6 +45,7 @@ namespace nandina::widget
 
         void set_on_change(std::function<void(std::string_view)> callback);
         void set_on_submit(std::function<void(std::string_view)> callback);
+        [[nodiscard]] auto value_changed() const -> const reactive::Event<std::string_view>&;
 
         void set_read_only(bool value);
         [[nodiscard]] auto read_only() const -> bool;
@@ -110,6 +112,7 @@ namespace nandina::widget
         bool invalid_ = false;
         std::function<void(std::string_view)> on_change_;
         std::function<void(std::string_view)> on_submit_;
+        reactive::Event<std::string_view> value_changed_;
     };
 
 } // namespace nandina::widget

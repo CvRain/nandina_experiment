@@ -79,6 +79,7 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto semantics_properties() const -> semantics::Properties override;
         void apply_component_color(foundation::NanColor color);
         void apply_component_font_size(float size);
+        void clear_explicit_color() noexcept;
 
     private:
         void apply_text(const std::string& text);

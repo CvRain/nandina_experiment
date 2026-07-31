@@ -11,6 +11,7 @@
 #include "authoring.hpp"
 
 #include <concepts>
+#include <functional>
 #include <memory>
 #include <string>
 #include <type_traits>
@@ -80,6 +81,23 @@ namespace nandina::widget
             scope_->connect(event, std::forward<Handler>(handler));
         }
 
+        /// Bind a tracked source to an ordinary widget setter. The current build
+        /// scope owns the effect, while a weak target prevents detached widgets
+        /// from being kept alive solely by a binding.
+        template<typename Node, typename Setter, typename Source>
+            requires requires(Node& node, Setter setter, Source& source) {
+                std::invoke(setter, node, source.get());
+            }
+        void bind(const std::shared_ptr<Node>& target, Setter setter, Source& source) const {
+            scope_->effect(
+                [weak = std::weak_ptr<Node>(target), setter = std::move(setter), &source] {
+                    if (const auto current = weak.lock()) {
+                        std::invoke(setter, *current, source.get());
+                    }
+                }
+            );
+        }
+
         /// Construct a custom component with its own reactive lifetime. The component
         /// receives the derived context and releases its subscriptions/effects before
         /// the concrete node is destroyed.
@@ -145,8 +163,28 @@ namespace nandina::widget
             return authoring::label(*graph_, std::move(text), themes_->theme());
         }
 
+        template<typename Source>
+            requires requires(Source& source) {
+                { source.get() } -> std::convertible_to<const std::string&>;
+            }
+        [[nodiscard]] auto label(Source& source) const -> authoring::NodeBuilder<Label> {
+            auto result = label(std::string(source.get()));
+            bind(result.build(), &Label::set_text, source);
+            return result;
+        }
+
         [[nodiscard]] auto button(std::string text) const -> authoring::NodeBuilder<Button> {
             return authoring::button(std::move(text), themes_->theme());
+        }
+
+        template<typename Source>
+            requires requires(Source& source) {
+                { source.get() } -> std::convertible_to<const std::string&>;
+            }
+        [[nodiscard]] auto button(Source& source) const -> authoring::NodeBuilder<Button> {
+            auto result = button(std::string(source.get()));
+            bind(result.build(), &Button::set_text, source);
+            return result;
         }
 
         [[nodiscard]] auto text_field(std::string value, std::string placeholder) const
@@ -156,6 +194,19 @@ namespace nandina::widget
                 std::move(placeholder),
                 themes_->theme()
             );
+        }
+
+        [[nodiscard]] auto text_field(reactive::Signal<std::string>& value, std::string placeholder)
+            const -> authoring::NodeBuilder<TextField> {
+            auto result = text_field(std::string(value.get()), std::move(placeholder));
+            const auto field = result.build();
+            bind(field, &TextField::set_value, value);
+            connect(field->value_changed(), [&value](const std::string_view current) {
+                if (value.peek() != current) {
+                    value.set(std::string(current));
+                }
+            });
+            return result;
         }
 
     private:

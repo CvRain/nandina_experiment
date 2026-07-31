@@ -9,7 +9,7 @@
 #include "../reactive/effect.hpp"
 #include "../reactive/graph.hpp"
 #include "../reactive/signal.hpp"
-#include "../theme/theme.hpp"
+#include "../theme/nan_style.hpp"
 #include "primitives/text.hpp"
 
 #include <concepts>
@@ -34,6 +34,9 @@ namespace nandina::widget
             theme::NanTheme theme = theme::default_theme()
         ) -> std::shared_ptr<Label>;
 
+        void set_color_token(theme::ColorToken token);
+        [[nodiscard]] auto color_token() const noexcept -> theme::ColorToken;
+
         template<typename Source>
             requires requires(Source& source) {
                 { source.get() } -> std::convertible_to<const std::string&>;
@@ -55,10 +58,12 @@ namespace nandina::widget
 
     private:
         void activate_binding();
+        void apply_color_token();
 
         reactive::EffectScope scope_;
         std::function<void(reactive::EffectScope&, primitives::Text&)> binding_;
         theme::NanTheme theme_;
+        theme::ColorToken color_token_ = theme::ColorToken::on_surface;
     };
 
 } // namespace nandina::widget

@@ -168,12 +168,11 @@ namespace nandina::examples::todo
             .add(remove_button_);
     }
 
-    void TodoRow::update(const TodoItem& item, const theme::NanTheme& theme) {
+    void TodoRow::update(const TodoItem& item) {
         id_ = item.id;
-        completed_ = item.completed;
         label_->set_text((item.completed ? "[已完成] " : "[待办] ") + item.title);
-        label_->set_color(
-            item.completed ? theme.palette.on_surface_variant : theme.palette.on_surface
+        label_->set_color_token(
+            item.completed ? theme::ColorToken::on_surface_variant : theme::ColorToken::on_surface
         );
         toggle_button_->set_text(item.completed ? "撤销" : "完成");
         set_semantics_override(
@@ -193,22 +192,9 @@ namespace nandina::examples::todo
         return *remove_button_;
     }
 
-    void TodoRow::on_theme_changed(const theme::ThemeManager& manager) {
-        Row::on_theme_changed(manager);
-        label_->set_color(
-            completed_ ? manager.theme().palette.on_surface_variant
-                       : manager.theme().palette.on_surface
-        );
-    }
-
     TodoEmptyState::TodoEmptyState(widget::BuildContext ui):
         Label(ui.graph(), "暂无任务", ui.theme()) {
-        set_color(ui.theme().palette.on_surface_variant);
-    }
-
-    void TodoEmptyState::on_theme_changed(const theme::ThemeManager& manager) {
-        Label::on_theme_changed(manager);
-        set_color(manager.theme().palette.on_surface_variant);
+        set_color_token(theme::ColorToken::on_surface_variant);
     }
 
     TodoHeader::TodoHeader(
@@ -247,12 +233,10 @@ namespace nandina::examples::todo
             .add(title_expanded)
             .add(actions);
 
-        parameters_ = ui.label().build();
-        parameters_->set_color(ui.theme().palette.on_surface_variant);
-        parameters_->bind_text(visit_text);
-        status_ = ui.label().build();
-        status_->set_color(ui.theme().palette.on_surface_variant);
-        status_->bind_text(status);
+        parameters_ = ui.label(visit_text).build();
+        parameters_->set_color_token(theme::ColorToken::on_surface_variant);
+        status_ = ui.label(status).build();
+        status_->set_color_token(theme::ColorToken::on_surface_variant);
 
         set_gap(6.0F)
             .set_cross_alignment(widget::LayoutAlignment::stretch)
@@ -267,13 +251,6 @@ namespace nandina::examples::todo
 
     auto TodoHeader::parameter_text() const -> std::string_view {
         return parameters_->text();
-    }
-
-    void TodoHeader::on_theme_changed(const theme::ThemeManager& manager) {
-        Column::on_theme_changed(manager);
-        parameters_->set_color(manager.theme().palette.on_surface_variant);
-        status_->set_color(manager.theme().palette.on_surface_variant);
-        theme_button_->set_text(preference_label(manager.preference()));
     }
 
     auto TodoHeader::next_preference(const theme::ThemePreference preference)
@@ -342,8 +319,7 @@ namespace nandina::examples::todo
         widget::BuildContext ui,
         reactive::Computed<bool>& empty,
         TodoStore& store
-    ):
-        theme_(ui.theme()) {
+    ) {
         list_view_ = ui.scroll_view(widget::ScrollAxis::vertical).build();
         list_view_->set_wheel_step(36.0F);
         list_view_->set_semantics_override(
@@ -369,7 +345,7 @@ namespace nandina::examples::todo
                     )
                     .build();
             },
-            [this](TodoRow& row, const TodoItem& item) { row.update(item, theme_); }
+            [](TodoRow& row, const TodoItem& item) { row.update(item); }
         );
         rows_->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
         rows_->set_model(store.items);
@@ -404,11 +380,6 @@ namespace nandina::examples::todo
         return *list_view_;
     }
 
-    void TodoTasks::on_theme_changed(const theme::ThemeManager& manager) {
-        Expanded::on_theme_changed(manager);
-        theme_ = manager.theme();
-    }
-
     TodoWorkspace::TodoWorkspace(
         widget::BuildContext ui,
         std::shared_ptr<TodoHeader> header,
@@ -418,7 +389,7 @@ namespace nandina::examples::todo
         header_(std::move(header)),
         composer_(std::move(composer)),
         list_(std::move(list)) {
-        set_background(ui.theme().palette.background);
+        set_fill(theme::ThemeColor::token(theme::ColorToken::background));
     }
 
     void TodoWorkspace::set_content(std::shared_ptr<scene::NanControl> content) {
@@ -435,11 +406,6 @@ namespace nandina::examples::todo
 
     auto TodoWorkspace::list() -> TodoList& {
         return *list_;
-    }
-
-    void TodoWorkspace::on_theme_changed(const theme::ThemeManager& manager) {
-        scene::NanControl::on_theme_changed(manager);
-        set_background(manager.theme().palette.background);
     }
 
     ImperativeTodoPage::ImperativeTodoPage(TodoPageParams params): NanPageT(std::move(params)) {}

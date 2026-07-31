@@ -17,6 +17,7 @@
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
 #include "widget/list_view.hpp"
+#include "widget/primitives/surface.hpp"
 #include "widget/scroll_view.hpp"
 #include "widget/text_field.hpp"
 
@@ -63,10 +64,9 @@ namespace nandina::examples::todo
         using Action = std::function<void(std::uint64_t)>;
 
         TodoRow(widget::BuildContext ui, Action toggle, Action remove);
-        void update(const TodoItem& item, const theme::NanTheme& theme);
+        void update(const TodoItem& item);
         [[nodiscard]] auto toggle_button() -> widget::Button&;
         [[nodiscard]] auto remove_button() -> widget::Button&;
-        void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
         Action toggle_;
@@ -75,13 +75,11 @@ namespace nandina::examples::todo
         std::shared_ptr<widget::Button> toggle_button_;
         std::shared_ptr<widget::Button> remove_button_;
         std::uint64_t id_ = 0;
-        bool completed_ = false;
     };
 
     class TodoEmptyState final: public widget::Label {
     public:
         explicit TodoEmptyState(widget::BuildContext ui);
-        void on_theme_changed(const theme::ThemeManager& manager) override;
     };
 
     class TodoHeader final: public widget::Column {
@@ -97,7 +95,6 @@ namespace nandina::examples::todo
 
         [[nodiscard]] auto navigation_button() -> widget::Button&;
         [[nodiscard]] auto parameter_text() const -> std::string_view;
-        void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
         [[nodiscard]] static auto next_preference(theme::ThemePreference preference)
@@ -139,12 +136,10 @@ namespace nandina::examples::todo
         [[nodiscard]] auto row_count() const -> std::size_t;
         [[nodiscard]] auto row(std::uint64_t id) -> TodoRow*;
         [[nodiscard]] auto scroll_view() -> widget::ScrollView&;
-        void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
         using Rows = widget::ListView<TodoItem, std::uint64_t, TodoRow>;
 
-        theme::NanTheme theme_;
         reactive::Event<std::uint64_t> toggle_requested_;
         reactive::Event<std::uint64_t> remove_requested_;
         std::shared_ptr<widget::ScrollView> list_view_;
@@ -153,7 +148,7 @@ namespace nandina::examples::todo
 
     using TodoList = TodoTasks;
 
-    class TodoWorkspace final: public scene::NanControl {
+    class TodoWorkspace final: public widget::primitives::Surface {
     public:
         TodoWorkspace(
             widget::BuildContext ui,
@@ -166,7 +161,6 @@ namespace nandina::examples::todo
         [[nodiscard]] auto header() -> TodoHeader&;
         [[nodiscard]] auto composer() -> TodoComposer&;
         [[nodiscard]] auto list() -> TodoList&;
-        void on_theme_changed(const theme::ThemeManager& manager) override;
 
     private:
         std::shared_ptr<TodoHeader> header_;

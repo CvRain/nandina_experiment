@@ -293,6 +293,10 @@ namespace nandina::widget::primitives
         }
     }
 
+    void Text::clear_explicit_color() noexcept {
+        color_explicit_ = false;
+    }
+
     void Text::apply_component_font_size(const float size) {
         if (font_size_explicit_ || style_.font_size == size) {
             return;
