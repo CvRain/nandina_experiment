@@ -12,6 +12,8 @@ The upper layers rebuild a desktop/frontend authoring surface: reactive state, s
 
 The current authority is the code under `nandina/` plus tests under `tests/`. Older v1/v2 material is useful for semantics and naming, but it is not the active contract.
 
+The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
+
 ## Architectural Constraints
 
 - Prefer zero RTTI wiring in framework code. Use virtual capability hooks such as `as_node2d()`, `as_control()`, `layout_flex_factor()`, or event type tags before `dynamic_cast`-style solutions.
