@@ -326,29 +326,22 @@ namespace nandina::examples::todo
             semantics::Properties {.role = semantics::Role::list, .label = "待办事项"}
         );
 
-        auto empty_region = widget::IfRegion<TodoEmptyState>::create(
-            ui.graph(),
-            [ui](reactive::ReactiveScope& scope) {
-                return ui.with_scope(scope).make<TodoEmptyState>().build();
-            }
-        );
-        empty_region->bind(empty);
+        auto empty_region = ui.when(empty, [](widget::BuildContext branch) {
+            return branch.make<TodoEmptyState>();
+        }).build();
 
-        rows_ = Rows::create(
-            ui.graph(),
-            [](const TodoItem& item) { return item.id; },
-            [this, ui](reactive::ReactiveScope& scope, const TodoItem&) {
-                return ui.with_scope(scope)
-                    .make<TodoRow>(
-                        [this](const std::uint64_t id) { toggle_requested_.emit(id); },
-                        [this](const std::uint64_t id) { remove_requested_.emit(id); }
-                    )
-                    .build();
+        rows_ = ui.for_each(
+            store.items,
+            &TodoItem::id,
+            [this](widget::BuildContext item, const TodoItem&) {
+                return item.make<TodoRow>(
+                    [this](const std::uint64_t id) { toggle_requested_.emit(id); },
+                    [this](const std::uint64_t id) { remove_requested_.emit(id); }
+                );
             },
             [](TodoRow& row, const TodoItem& item) { row.update(item); }
-        );
+        ).build();
         rows_->set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
-        rows_->set_model(store.items);
 
         auto content = ui.column().build();
         content->set_cross_alignment(widget::LayoutAlignment::stretch).add(empty_region).add(rows_);

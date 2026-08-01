@@ -46,6 +46,26 @@ namespace
             ui.connect(event, [&observed](const int value) { observed += value; });
         }
     };
+
+    class ScopedItemControl final: public scene::NanControl {
+    public:
+        ScopedItemControl(
+            widget::BuildContext ui,
+            const reactive::Event<int>& selected,
+            int key,
+            int& selections
+        ):
+            key(key) {
+            ui.connect(selected, [this, &selections](const int selected_key) {
+                if (selected_key == this->key) {
+                    ++selections;
+                }
+            });
+        }
+
+        int key;
+        std::string value;
+    };
 } // namespace
 
 TEST_CASE("authoring builders preserve concrete widget identity", "[authoring][widget]") {
@@ -221,6 +241,85 @@ TEST_CASE("ListView binds a structural model without inheritance", "[widget][lis
     REQUIRE(view->node_for(1) == retained);
     REQUIRE(retained->value == "retained");
     REQUIRE(view->get_child(1) == retained);
+}
+
+TEST_CASE("BuildContext authors scoped conditional and keyed regions", "[authoring][region]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    reactive::Signal<bool> visible {graph, false};
+    reactive::Event<int> selected;
+    int branch_events = 0;
+
+    auto conditional = ui.when(visible, [&](widget::BuildContext branch) {
+        return branch.make<ScopedComponent>(selected, branch_events);
+    }).build();
+    scene::NanSceneTree conditional_tree;
+    conditional_tree.set_root(conditional);
+    REQUIRE(conditional->active_node() == nullptr);
+
+    visible.set(true);
+    REQUIRE(conditional->active_node() != nullptr);
+    selected.emit(4);
+    REQUIRE(branch_events == 4);
+    visible.set(false);
+    selected.emit(4);
+    REQUIRE(branch_events == 4);
+
+    reactive::Signal<bool> choose_label {graph, false};
+    auto choice = ui.when(
+        choose_label,
+        [](widget::BuildContext branch) { return branch.label("true branch"); },
+        [](widget::BuildContext branch) { return branch.button("false branch"); }
+    ).build();
+    scene::NanSceneTree choice_tree;
+    choice_tree.set_root(choice);
+    REQUIRE(dynamic_cast<widget::Button*>(choice->active_node()) != nullptr);
+    choose_label.set(true);
+    REQUIRE(dynamic_cast<widget::Label*>(choice->active_node()) != nullptr);
+
+    reactive::Signal<std::vector<Item>> items {
+        graph,
+        {{.key = 1, .value = "one"}, {.key = 2, .value = "two"}},
+    };
+    int selections = 0;
+    auto rows = ui.for_each(
+        items,
+        &Item::key,
+        [&](widget::BuildContext item, const Item& value) {
+            return item.make<ScopedItemControl>(selected, value.key, selections);
+        },
+        [](ScopedItemControl& row, const Item& value) { row.value = value.value; }
+    ).build();
+    scene::NanSceneTree rows_tree;
+    rows_tree.set_root(rows);
+    auto* retained = rows->node_for(1);
+    REQUIRE(retained != nullptr);
+    REQUIRE(retained->value == "one");
+
+    items.set({{.key = 2, .value = "updated"}, {.key = 1, .value = "retained"}});
+    REQUIRE(rows->node_for(1) == retained);
+    REQUIRE(retained->value == "retained");
+    REQUIRE(rows->get_child(1) == retained);
+
+    selected.emit(1);
+    REQUIRE(selections == 1);
+    items.set({{.key = 2, .value = "remaining"}});
+    selected.emit(1);
+    REQUIRE(selections == 1);
+
+    auto simple_rows = ui.for_each(
+        items,
+        &Item::key,
+        [](widget::BuildContext, const Item& value) {
+            return widget::authoring::make<ItemControl>(value.key);
+        }
+    ).build();
+    scene::NanSceneTree simple_tree;
+    simple_tree.set_root(simple_rows);
+    REQUIRE(simple_rows->item_count() == 1);
+    REQUIRE(simple_rows->node_for(2) != nullptr);
 }
 
 TEST_CASE("authoring configures existing canvas factories", "[authoring][canvas]") {

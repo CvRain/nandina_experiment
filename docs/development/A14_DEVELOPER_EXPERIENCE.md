@@ -150,6 +150,8 @@ The existing paired Todo remains a low-level equivalence and regression fixture 
 2. A15 introduces typed list-model adapters and named commands first, then an explicit `BuildContext` carrying ambient build services, context-aware widget factories, safe router commands, and focus/layout intents.
 3. A16 introduces the component/page ownership model and automatic reactive/lifecycle cleanup.
 4. A17 completes generic setter binding, two-way text-field state, and live theme-token propagation.
-5. A18 adds concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
+5. A18 adds `BuildContext::when()` and `for_each()` as concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
 
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
+
+The A14 authoring API delivery order is complete through A18. The remaining A14 acceptance work is to extract the compact recommended Todo from the paired low-level regression fixture and verify its source budgets without weakening the imperative/DSL equivalence tests.

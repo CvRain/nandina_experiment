@@ -248,7 +248,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. The A14 developer-experience line is implemented through A17 binding and live theme-token propagation; A18 concise conditional and keyed collection authoring is next. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. The A14 developer-experience API line is implemented through A18 concise conditional and keyed collection authoring; compact-example extraction and source-budget verification are the remaining A14 acceptance work. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -797,6 +797,16 @@ Status: complete for the v1 authoring contract; additional widget factories may 
 `ui.text_field(signal, placeholder)` adds the v1 two-way string binding: source changes call the normal `TextField::set_value()` path, while committed user edits are published through `TextField::value_changed()` and written back to the signal. The existing callback setters remain available for commands and validation, and no control-owned reactive scope is added.
 
 `Label::set_color_token()` and the `Surface` theme-color fill/border overloads retain semantic `ColorToken` references rather than resolved snapshots. Attached scene trees already receive every `ThemeManager` revision, so these values are re-resolved automatically alongside Button and TextField styles. The Todo components now use context-owned text bindings and semantic colors and no longer override theme callbacks merely to refresh labels, rows, or the page background. The older `Label::bind_text()` entry point remains source-compatible but is no longer the recommended authoring path.
+
+### A18. Conditional And Keyed Collection Authoring
+
+Status: complete for the v1 authoring API; compact-example extraction and source-budget verification remain as A14 acceptance work.
+
+`BuildContext::when(source, when_true[, when_false])` constructs the existing `IfRegion<scene::NanControl>`, binds the tracked condition, and passes each branch factory a context derived from that branch's runtime-owned scope. Application code no longer passes a `Graph`, handles a `ReactiveScope`, or sequences `create()` and `bind()`. Branch factories return ordinary `NodeBuilder<T>` or `shared_ptr<T>` values, so conditional authoring continues to materialize concrete controls without a parallel view type.
+
+`BuildContext::for_each(source, key, create[, update])` infers the item, key, and concrete row types, creates the existing typed `ListView<Item, Key, Node>`, binds the structural vector source, and passes row factories their keyed item context. Stable keys still preserve node identity, focus, edit state, and ordering; removed rows still clear their subscriptions and reactive work before destruction. The optional update callback remains separate from creation so retained rows receive changed model values without rebuilding their component.
+
+The paired Todo `TodoTasks` component now spells its empty state and keyed rows through these two APIs. The low-level `IfRegion::create()` / `bind()` and `ForEach` / `ListView` constructors remain available for framework internals and advanced users who need explicit scope or runtime control.
 
 ### Deferred After Authoring Core
 

@@ -16,9 +16,18 @@
 #include <string>
 #include <type_traits>
 #include <utility>
+#include <vector>
 
 namespace nandina::widget
 {
+    namespace build_context_detail
+    {
+        template<typename Source>
+        using list_item_t = typename std::remove_cvref_t<decltype(
+            std::declval<Source&>().get()
+        )>::value_type;
+    } // namespace build_context_detail
+
     /// Lightweight, non-owning services passed through page and component construction.
     /// A derived region replaces only the reactive scope; graph and theme stay page-wide.
     class BuildContext {
@@ -209,7 +218,110 @@ namespace nandina::widget
             return result;
         }
 
+        template<typename Source, typename TrueFactory>
+            requires requires(Source& source) {
+                { source.get() } -> std::convertible_to<bool>;
+            } && std::invocable<TrueFactory&, BuildContext>
+        [[nodiscard]] auto when(Source& source, TrueFactory&& when_true) const
+            -> authoring::NodeBuilder<IfRegion<scene::NanControl>> {
+            using Region = IfRegion<scene::NanControl>;
+            auto region =
+                Region::create(*graph_, make_branch_factory(std::forward<TrueFactory>(when_true)));
+            region->bind(source);
+            return authoring::from(std::move(region));
+        }
+
+        template<typename Source, typename TrueFactory, typename FalseFactory>
+            requires requires(Source& source) {
+                { source.get() } -> std::convertible_to<bool>;
+            }
+            && std::invocable<TrueFactory&, BuildContext> && std::invocable<
+                FalseFactory&,
+                BuildContext>
+        [[nodiscard]] auto
+        when(Source& source, TrueFactory&& when_true, FalseFactory&& when_false) const
+            -> authoring::NodeBuilder<IfRegion<scene::NanControl>> {
+            using Region = IfRegion<scene::NanControl>;
+            auto region = Region::create(
+                *graph_,
+                make_branch_factory(std::forward<TrueFactory>(when_true)),
+                make_branch_factory(std::forward<FalseFactory>(when_false))
+            );
+            region->bind(source);
+            return authoring::from(std::move(region));
+        }
+
+        template<
+            typename Source,
+            typename KeyFunction,
+            typename CreateFunction,
+            typename UpdateFunction = std::nullptr_t>
+            requires ListDataModelSource<Source, build_context_detail::list_item_t<Source>>
+            && std::invocable<KeyFunction&, const build_context_detail::list_item_t<Source>&>
+            && std::invocable<
+                CreateFunction&,
+                BuildContext,
+                const build_context_detail::list_item_t<Source>&>
+        [[nodiscard]] auto for_each(
+            Source& source,
+            KeyFunction&& key,
+            CreateFunction&& create,
+            UpdateFunction&& update = nullptr
+        ) const {
+            using Item = build_context_detail::list_item_t<Source>;
+            using Key = std::remove_cvref_t<std::invoke_result_t<KeyFunction&, const Item&>>;
+            using CreateResult = std::invoke_result_t<CreateFunction&, BuildContext, const Item&>;
+            using NodePointer =
+                decltype(authoring::detail::materialize(std::declval<CreateResult>()));
+            using Node = typename NodePointer::element_type;
+            static_assert(std::derived_from<Node, scene::NanControl>);
+            using View = ListView<Item, Key, Node>;
+
+            typename View::UpdateFunction update_node;
+            if constexpr (!std::same_as<std::remove_cvref_t<UpdateFunction>, std::nullptr_t>) {
+                static_assert(std::invocable<UpdateFunction&, Node&, const Item&>);
+                update_node = [update = std::forward<UpdateFunction>(update)](
+                                  Node& node,
+                                  const Item& item
+                              ) mutable { std::invoke(update, node, item); };
+            }
+
+            auto view = View::create(
+                *graph_,
+                [key = std::forward<KeyFunction>(key)](const Item& item) mutable {
+                    return std::invoke(key, item);
+                },
+                [ui = *this, create = std::forward<CreateFunction>(create)](
+                    reactive::ReactiveScope& scope,
+                    const Item& item
+                ) mutable {
+                    return authoring::detail::materialize(
+                        std::invoke(create, ui.with_scope(scope), item)
+                    );
+                },
+                std::move(update_node)
+            );
+            view->set_model(source);
+            return authoring::from(std::move(view));
+        }
+
     private:
+        template<typename Factory>
+        [[nodiscard]] auto make_branch_factory(Factory&& factory) const
+            -> typename IfRegion<scene::NanControl>::CreateFunction {
+            return [ui = *this, factory = std::forward<Factory>(factory)](
+                       reactive::ReactiveScope& scope
+                   ) mutable -> std::shared_ptr<scene::NanControl> {
+                auto node = authoring::detail::materialize(
+                    std::invoke(factory, ui.with_scope(scope))
+                );
+                static_assert(
+                    std::derived_from<typename decltype(node)::element_type, scene::NanControl>
+                );
+                return node;
+            };
+        }
+
         reactive::Graph* graph_;
         reactive::ReactiveScope* scope_;
         theme::ThemeManager* themes_;
