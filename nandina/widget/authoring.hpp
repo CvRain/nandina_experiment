@@ -68,6 +68,80 @@ namespace nandina::widget::authoring
             return *this;
         }
 
+        template<typename Handler>
+            requires requires(Node& node, Handler&& handler) {
+                node.set_on_click(std::forward<Handler>(handler));
+            }
+        auto on_click(Handler&& handler) -> NodeBuilder& {
+            node_->set_on_click(std::forward<Handler>(handler));
+            return *this;
+        }
+
+        template<typename Handler>
+            requires requires(Node& node, Handler&& handler) {
+                node.set_on_submit(std::forward<Handler>(handler));
+            }
+        auto on_submit(Handler&& handler) -> NodeBuilder& {
+            node_->set_on_submit(std::forward<Handler>(handler));
+            return *this;
+        }
+
+        auto tone(theme::ButtonTone tone) -> NodeBuilder&
+            requires requires(Node& node) { node.set_tone(tone); }
+        {
+            node_->set_tone(tone);
+            return *this;
+        }
+
+        auto treatment(theme::ButtonTreatment treatment) -> NodeBuilder&
+            requires requires(Node& node) { node.set_treatment(treatment); }
+        {
+            node_->set_treatment(treatment);
+            return *this;
+        }
+
+        auto gap(float gap) -> NodeBuilder&
+            requires requires(Node& node) { node.set_gap(gap); }
+        {
+            node_->set_gap(gap);
+            return *this;
+        }
+
+        auto cross_alignment(LayoutAlignment alignment) -> NodeBuilder&
+            requires requires(Node& node) { node.set_cross_alignment(alignment); }
+        {
+            node_->set_cross_alignment(alignment);
+            return *this;
+        }
+
+        auto font_size(float size) -> NodeBuilder&
+            requires requires(Node& node) { node.set_font_size(size); }
+        {
+            node_->set_font_size(size);
+            return *this;
+        }
+
+        auto color_token(theme::ColorToken token) -> NodeBuilder&
+            requires requires(Node& node) { node.set_color_token(token); }
+        {
+            node_->set_color_token(token);
+            return *this;
+        }
+
+        auto wheel_step(float step) -> NodeBuilder&
+            requires requires(Node& node) { node.set_wheel_step(step); }
+        {
+            node_->set_wheel_step(step);
+            return *this;
+        }
+
+        auto autofocus() -> NodeBuilder&
+            requires requires(Node& node) { node.request_focus(); }
+        {
+            node_->request_focus();
+            return *this;
+        }
+
         template<typename... Child>
             requires(detail::AddableChild<Node, Child> && ...)
         auto children(Child&&... child) -> NodeBuilder& {

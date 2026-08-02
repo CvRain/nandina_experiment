@@ -73,6 +73,19 @@ todo_authoring_tests = executable(
 )
 test('todo-authoring', todo_authoring_tests)
 
+compact_todo_tests = executable(
+    'compact_todo_tests',
+    files('compact_todo_tests.cpp'),
+    dependencies : [compact_todo_example_dep, catch2_with_main_dep],
+)
+test('compact-todo', compact_todo_tests)
+
+test(
+    'a14-source-budget',
+    python,
+    args: [files('a14_source_budget_test.py'), meson.project_source_root()],
+)
+
 router_tests = executable(
     'router_tests',
     files('router_tests.cpp'),

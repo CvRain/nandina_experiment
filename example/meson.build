@@ -15,6 +15,17 @@ todo_example_dep = declare_dependency(
     dependencies : [nandina_dep],
 )
 
+compact_todo_example_library = static_library(
+    'nandina_compact_todo_components',
+    files('compact_todo.cpp', 'compact_todo.hpp'),
+    dependencies : [nandina_dep],
+)
+compact_todo_example_dep = declare_dependency(
+    link_with : compact_todo_example_library,
+    include_directories : include_directories('.'),
+    dependencies : [nandina_dep],
+)
+
 nanres_policy = files('resources.toml')
 resource_nanres = nandina_resource_toolchain['nanres']
 resource_build_helper = nandina_resource_toolchain['build_helper']
@@ -44,6 +55,13 @@ executable('nandina_example',
     example_sources,
     dependencies : [todo_example_dep, raylib_dep],
     install : true
+)
+
+executable(
+    'nandina_compact_todo_example',
+    files('compact_main.cpp'),
+    dependencies : [compact_todo_example_dep, raylib_dep],
+    install : false,
 )
 
 if box2d_dep.found()

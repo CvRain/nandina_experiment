@@ -248,7 +248,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 are implemented through page lifecycle, authoring factories, and Grid. The A14 developer-experience API line is implemented through A18 concise conditional and keyed collection authoring; compact-example extraction and source-budget verification are the remaining A14 acceptance work. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 and the A14 developer-experience line are complete through the compact reference application: common builder modifiers, scoped components, binding, theme tokens, concise conditional/keyed authoring, and the source-budget acceptance target. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -756,13 +756,13 @@ The deferred "richer Grid/Anchor layout" item is partially addressed; Anchor lay
 
 ### A14. Developer Experience Contract
 
-Status: active; the target contract and `NanApplication::run_page()` bootstrap are implemented.
+Status: complete; the target contract, compact reference application, and source budgets are implemented.
 
 The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the ideal minimum-window, imperative Todo, and DSL Todo forms. It also establishes measurable line budgets and forbids ordinary page code from directly coordinating scene phases, dispatch queues, reactive scopes, per-frame rendering, and theme propagation.
 
 `NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. Applications no longer need a one-off `NanWindow` subclass merely to implement `on_setup()`. Explicit window subclasses remain the advanced path for custom frame/setup/teardown behavior.
 
-The existing paired Todo remains the low-level retained-widget equivalence fixture. A compact Todo will become the recommended example as A15-A18 move context, ownership, binding, and keyed authoring responsibilities into the framework.
+The existing paired Todo remains the low-level retained-widget equivalence fixture. `nandina_compact_todo_example` is the recommended application starting point: its 20-line bootstrap and 220 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
 
 ### A15. Typed List Model And Commands
 
@@ -800,13 +800,17 @@ Status: complete for the v1 authoring contract; additional widget factories may 
 
 ### A18. Conditional And Keyed Collection Authoring
 
-Status: complete for the v1 authoring API; compact-example extraction and source-budget verification remain as A14 acceptance work.
+Status: complete for the v1 authoring API and compact-reference acceptance.
 
 `BuildContext::when(source, when_true[, when_false])` constructs the existing `IfRegion<scene::NanControl>`, binds the tracked condition, and passes each branch factory a context derived from that branch's runtime-owned scope. Application code no longer passes a `Graph`, handles a `ReactiveScope`, or sequences `create()` and `bind()`. Branch factories return ordinary `NodeBuilder<T>` or `shared_ptr<T>` values, so conditional authoring continues to materialize concrete controls without a parallel view type.
 
 `BuildContext::for_each(source, key, create[, update])` infers the item, key, and concrete row types, creates the existing typed `ListView<Item, Key, Node>`, binds the structural vector source, and passes row factories their keyed item context. Stable keys still preserve node identity, focus, edit state, and ordering; removed rows still clear their subscriptions and reactive work before destruction. The optional update callback remains separate from creation so retained rows receive changed model values without rebuilding their component.
 
 The paired Todo `TodoTasks` component now spells its empty state and keyed rows through these two APIs. The low-level `IfRegion::create()` / `bind()` and `ForEach` / `ListView` constructors remain available for framework internals and advanced users who need explicit scope or runtime control.
+
+`NodeBuilder` also forwards the common authoring modifiers used by the compact reference: click and submit handlers, button tone/treatment, layout gap/alignment, label font/color tokens, scroll wheel step, and autofocus intent. Each modifier is constrained by the concrete widget's existing setter and stores no parallel property state.
+
+The compact Todo deliberately has no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless acceptance test enters text, adds a task, toggles completion, and deletes a row through real controls. The paired imperative/DSL Todo remains available for the broader routing, keep-alive, parameter, and concrete-widget equivalence surface.
 
 ### Deferred After Authoring Core
 

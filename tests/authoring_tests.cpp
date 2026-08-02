@@ -517,6 +517,44 @@ TEST_CASE("free function DSL trees match imperative construction", "[authoring][
     REQUIRE(dsl->gap() == Catch::Approx(imp->gap()));
 }
 
+TEST_CASE("NodeBuilder forwards common widget modifiers", "[authoring][modifier]") {
+    reactive::Graph graph;
+    int clicks = 0;
+    auto button = widget::authoring::button("Save")
+                      .tone(theme::ButtonTone::secondary)
+                      .treatment(theme::ButtonTreatment::outlined)
+                      .on_click([&] { ++clicks; })
+                      .build();
+    auto label = widget::authoring::label(graph, "Heading")
+                     .font_size(22.0F)
+                     .color_token(theme::ColorToken::on_surface_variant)
+                     .build();
+    auto field = widget::authoring::text_field("", "Task").autofocus().build();
+    auto column = widget::authoring::column()
+                      .gap(9.0F)
+                      .cross_alignment(widget::LayoutAlignment::stretch)
+                      .children(label, field, button)
+                      .build();
+
+    REQUIRE(column->gap() == Catch::Approx(9.0F));
+    REQUIRE(column->cross_alignment() == widget::LayoutAlignment::stretch);
+    REQUIRE(label->font_size() == Catch::Approx(22.0F));
+    REQUIRE(label->color_token() == theme::ColorToken::on_surface_variant);
+    REQUIRE(button->tone() == theme::ButtonTone::secondary);
+    REQUIRE(button->treatment() == theme::ButtonTreatment::outlined);
+
+    scene::NanSceneTree tree;
+    tree.set_root(column);
+    REQUIRE(tree.layout_root(foundation::NanSize(240.0F, 120.0F)) >= 1);
+    REQUIRE(tree.focused_node() == field.get());
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        button->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(clicks == 1);
+}
+
 TEST_CASE("free function factories compose nested layout trees", "[authoring][factory][layout]") {
     using namespace widget::authoring;
     reactive::Graph graph;
