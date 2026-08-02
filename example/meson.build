@@ -1,19 +1,4 @@
-# example executable
-
-example_sources = files(
-    'main.cpp',
-)
-
-todo_example_library = static_library(
-    'nandina_todo_example',
-    files('todo_app.cpp'),
-    dependencies : [nandina_dep],
-)
-todo_example_dep = declare_dependency(
-    link_with : todo_example_library,
-    include_directories : include_directories('.'),
-    dependencies : [nandina_dep],
-)
+# Recommended application example and optional diagnostics.
 
 compact_todo_example_library = static_library(
     'nandina_compact_todo_components',
@@ -51,17 +36,11 @@ meson.add_install_script(
     get_option('datadir'),
 )
 
-executable('nandina_example',
-    example_sources,
-    dependencies : [todo_example_dep, raylib_dep],
-    install : true
-)
-
 executable(
-    'nandina_compact_todo_example',
+    'nandina_example',
     files('compact_main.cpp'),
     dependencies : [compact_todo_example_dep, raylib_dep],
-    install : false,
+    install : true,
 )
 
 if box2d_dep.found()

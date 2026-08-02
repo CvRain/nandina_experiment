@@ -216,18 +216,9 @@ Text limitations:
 
 ## App Authoring State
 
-The current example is a Todo page using:
+The canonical `nandina_example` is a single functional-root application. It uses an application-owned Store, semantic controls, two-way input, conditional and keyed regions, scrolling, automatic component/page scopes, and the resource-backed text pipeline without declaring a window or page subclass.
 
-- `NanApplication` with app-level `NanTheme`.
-- `NanWindow` and `NanRouter`.
-- paired `ImperativeTodoPage` and `DslTodoPage` routes with typed `TodoPageParams`.
-- an application-owned `TodoStore` shared by both keep-alive pages.
-- semantic `Label`, `Button`, and `TextField` controls sharing one resource-backed text pipeline.
-- interactive add/complete/remove actions, a dynamic ScrollView list, and resize-sensitive Flex layout.
-- automatic SQLite/builtin resource discovery and window-owned default font pipeline inheritance.
-- explicit low-level layout composition for the application UI.
-
-The Todo application configures only `org.nandina.todo`. Meson builds its SQLite package beside the executable, `NanApplication` discovers and mounts it, and `NanWindow` supplies the inherited default text pipeline. The page and widgets contain no backend paths, resource-service assembly, or per-control pipeline wiring.
+The earlier paired imperative/DSL Todo was a delivery fixture for page parameters, keep-alive navigation, Store sharing, safe routed commands, and authoring equivalence. Those contracts now live in focused router, authoring, lifecycle, and compact-application tests, so the duplicate application and its test-only accessors are no longer shipped under `example/`.
 
 Example code is not sacred. It can be refactored when it helps validate framework APIs, unless a task explicitly asks to preserve it.
 
@@ -664,15 +655,15 @@ auto form = widget::authoring::make<widget::Column>()
 
 There is no DSL-owned node, binding scope, lifecycle callback, renderer, style resolver, or state store. The builder disappears after composition; scene ownership and teardown remain unchanged. The generic `from()` path also keeps canvas and optional physics authoring on their existing concrete APIs instead of introducing parallel helper types.
 
-The A9 acceptance tests pair imperative and authored construction and verify equivalent concrete widget access, mutation, binding lifetime, keyed reuse, layout, input, style, semantics, and teardown. A10 adds the paired Todo example forms over extracted application components.
+The A9 acceptance tests pair imperative and authored construction and verify equivalent concrete widget access, mutation, binding lifetime, keyed reuse, layout, input, style, semantics, and teardown. A10 originally added paired Todo forms as an integration fixture; that duplicate application was retired after A19 while the focused equivalence tests remain.
 
 ### A10. Todo Refactor And Component Extraction
 
-Status: complete.
+Status: complete; historical integration fixture retired after A19.
 
-Todo is split into semantic `TodoHeader`, `TodoComposer`, `TodoList`, `TodoRow`, and `TodoEmptyState` components backed by one application-owned `TodoStore`. `ImperativeTodoPage` composes those concrete components with ordinary setters and `add()`, while `DslTodoPage` composes the same types through `widget::authoring`; neither page has a separate state, binding, style, reconciliation, or lifecycle path.
+The A10 delivery fixture split Todo into semantic header, composer, list, row, and empty-state components backed by one application-owned Store. Its imperative page composed concrete controls with setters and `add()`, while its DSL page composed the same types through `widget::authoring`; neither page had a separate state, binding, style, reconciliation, or lifecycle path.
 
-The running example starts on the imperative page and navigates to the DSL page, which returns through the keep-alive router stack. Both pages display their strongly typed `TodoPageParams` source and a reactive visit counter driven by the shared `TodoStore::visits` signal. Navigation uses the router's `request_*` commands and runs in the next UI task phase, after the active input callback and outside scene traversal; application callbacks no longer coordinate `UiDispatcher` directly. Headless acceptance tests activate the real semantic buttons, verify this deferred navigation boundary and both parameter directions, add items from both authoring forms, and confirm that the shared keyed list remains synchronized while the imperative page is hidden.
+The fixture validated strongly typed route parameters, a reactive visit counter, shared Store state, keep-alive restoration, and traversal-safe `request_*` navigation. Dedicated router and lifecycle tests now retain those guarantees without keeping a second Todo application or exposing its internal widgets solely for tests.
 
 ### A11. Page Activate/Deactivate Lifecycle
 
@@ -685,7 +676,7 @@ Status: complete.
 
 The router tracks a per-frame `active` flag and constructs a `PageContext` for the frame from its stored scope, async scope, and the router's shared services. Deactivation fires before activation on the same transition (`deactivate(old) → activate(new)`).
 
-The Todo example uses `on_activate` to drive a reactive `TodoStore::visits` signal. Each activation bumps the visit counter, and the page header binds a `Computed<std::string>` that displays the source parameter together with the current visit count. This replaces the previous pattern of passing a static visit number through `TodoPageParams`, which could not update when `pop_to` restored a keep-alive page.
+The former paired Todo used `on_activate` to drive a reactive visit signal, proving that a restored keep-alive page observes fresh state rather than a static route snapshot. Router lifecycle tests now cover this contract directly.
 
 Tests cover: initial push activation, push-on-top deactivation, pop reactivation, pop_to reactivation, and clear-then-deactivate. All router tests (13 cases, 77 assertions) pass.
 
@@ -727,7 +718,7 @@ auto page = column()
     .build();
 ```
 
-The `DslTodoPage` example now uses these factories. Authoring tests cover type identity, layout equivalence with imperative construction, nested tree composition, and `expose`/`configure` on factory-produced builders (4 new test cases). The `make<T>()` entry point remains valid and is the underlying mechanism; the factories are thin inline wrappers.
+The former DSL Todo page used these factories during delivery. Authoring tests continue to cover type identity, layout equivalence with imperative construction, nested tree composition, and `expose`/`configure` on factory-produced builders. The `make<T>()` entry point remains valid and is the underlying mechanism; the factories are thin inline wrappers.
 
 The A9 section previously marked `NodeBuilder<T>` as "temporary" — this label is removed. `NodeBuilder<T>` together with the free-function factories is the v1 stable authoring API.
 
@@ -762,7 +753,7 @@ The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the
 
 `NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. A19 additionally provides functional root runners for single-page applications, so the compact reference no longer declares a page class merely to implement `route_key()` and `build()`. Explicit page and window subclasses remain the advanced path for named routes and custom frame/setup/teardown behavior.
 
-The existing paired Todo remains the low-level retained-widget equivalence fixture. `nandina_compact_todo_example` is the recommended application starting point: its 23-line bootstrap and 215 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
+The earlier paired Todo fixture has been retired. `nandina_example` is the recommended application starting point: its 23-line bootstrap and 215 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
 
 ### A15. Typed List Model And Commands
 
@@ -774,7 +765,7 @@ The Todo example now has a `TodoTasks` component backed by `ListView`. Its rows 
 
 `widget::BuildContext` is a lightweight, non-owning bundle of the current `Graph`, `ReactiveScope`, and `ThemeManager`. `PageContext::ui()` creates the page context, while `with_scope()` derives an item or conditional-region context without changing the page-wide graph and theme services. Its context-aware factories reuse the stable `NodeBuilder<T>` API and always read the currently active theme when constructing a widget; no global or thread-local authoring state is introduced.
 
-The paired Todo components now accept `BuildContext` instead of separately threading graph and theme arguments. `ListView` row factories derive a context from the row-owned scope, preserving keyed row cleanup and establishing the same construction contract for the later A16 ownership work. Routing, stores, and dispatch remain explicit `PageContext` services rather than becoming widget dependencies.
+The A15 Todo fixture accepted `BuildContext` instead of separately threading graph and theme arguments. `ListView` row factories derive a context from the row-owned scope, preserving keyed row cleanup and establishing the same construction contract for later ownership work. Routing, stores, and dispatch remain explicit `PageContext` services rather than becoming widget dependencies.
 
 `NanRouter::request_push()`, `request_replace()`, `request_pop()`, and `request_pop_to()` are traversal-safe commands layered over the immediate router API. Commands execute in the next UI task phase and carry a router lifetime guard, so destroying a router invalidates its queued work. `NanNode2D::request_focus()` and `ScrollView::request_scroll_to_end()` similarly express post-layout intent, including before mounting, without exposing `NanSceneTree` scheduling to application components. The Todo example now uses these APIs and no longer includes `scene_tree.hpp`, receives `UiDispatcher`, or overrides `on_ready()` for routine focus.
 
@@ -806,11 +797,11 @@ Status: complete for the v1 authoring API and compact-reference acceptance.
 
 `BuildContext::for_each(source, key, create[, update])` infers the item, key, and concrete row types, creates the existing typed `ListView<Item, Key, Node>`, binds the structural vector source, and passes row factories their keyed item context. Stable keys still preserve node identity, focus, edit state, and ordering; removed rows still clear their subscriptions and reactive work before destruction. The optional update callback remains separate from creation so retained rows receive changed model values without rebuilding their component.
 
-The paired Todo `TodoTasks` component now spells its empty state and keyed rows through these two APIs. The low-level `IfRegion::create()` / `bind()` and `ForEach` / `ListView` constructors remain available for framework internals and advanced users who need explicit scope or runtime control.
+The A18 Todo fixture spelled its empty state and keyed rows through these two APIs; the compact canonical example retains the same coverage. The low-level `IfRegion::create()` / `bind()` and `ForEach` / `ListView` constructors remain available for framework internals and advanced users who need explicit scope or runtime control.
 
 `NodeBuilder` also forwards the common authoring modifiers used by the compact reference: click and submit handlers, button tone/treatment, layout gap/alignment, label font/color tokens, scroll wheel step, and autofocus intent. Each modifier is constrained by the concrete widget's existing setter and stores no parallel property state.
 
-The compact Todo deliberately has no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless acceptance test enters text, adds a task, toggles completion, and deletes a row through real controls. The paired imperative/DSL Todo remains available for the broader routing, keep-alive, parameter, and concrete-widget equivalence surface.
+The compact Todo deliberately has no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless acceptance test enters text, adds a task, toggles completion, and deletes a row through real controls. Broader routing, keep-alive, parameter, and concrete-widget equivalence remain covered by focused framework tests.
 
 ### A19. Functional Root Application Runner
 

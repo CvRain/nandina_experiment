@@ -142,7 +142,7 @@ The canonical Todo application must eventually satisfy all of these limits:
 - navigation invoked by an event is safe without explicit task/post-layout scheduling;
 - focus, scroll-to-end, keyed list teardown, and binding cleanup are expressed as intent.
 
-The existing paired Todo remains a low-level equivalence and regression fixture while the compact Todo becomes the recommended application example.
+The paired imperative/DSL Todo served as the delivery fixture through A18. After A19 acceptance, its reusable contracts remain covered by focused authoring, router, lifecycle, and compact-application tests rather than a second shipped Todo implementation.
 
 ## Delivery Order
 
@@ -154,11 +154,11 @@ The existing paired Todo remains a low-level equivalence and regression fixture 
 
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
 
-The A14 authoring API delivery order is complete through A18. The compact recommended Todo is implemented separately from the paired low-level regression fixture, so ordinary application code stays focused on its Store, row component, page composition, and bootstrap while the larger fixture continues to verify imperative/DSL equivalence and page parameters.
+The A14 authoring API delivery order is complete through A18. The compact recommended Todo keeps ordinary application code focused on its Store, row component, page composition, and bootstrap. The earlier paired low-level fixture was retired after the same imperative/DSL equivalence, page-parameter, and lifecycle contracts were established in focused framework tests.
 
 ## Compact Reference Result
 
-The `nandina_compact_todo_example` target is the recommended starting point. Counts use all non-blank source lines, including includes and declarations, rather than excluding framework-facing syntax:
+The `nandina_example` target is the recommended starting point. Counts use all non-blank source lines, including includes and declarations, rather than excluding framework-facing syntax:
 
 | Budget | Result | Limit |
 | --- | ---: | ---: |
