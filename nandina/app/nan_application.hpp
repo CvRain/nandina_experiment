@@ -22,12 +22,13 @@
 #include "../resource/resource_manager.hpp"
 #include "../text/font_family.hpp"
 #include "../text/font_loader.hpp"
-#include "../theme/theme_manager.hpp"
 #include "../theme/style_document.hpp"
+#include "../theme/theme_manager.hpp"
 #include "application_config.hpp"
 #include "nan_page.hpp"
 #include "nan_router.hpp"
 #include "nan_store.hpp"
+#include "root_view.hpp"
 #include "ui_dispatcher.hpp"
 #include "window_config.hpp"
 
@@ -120,6 +121,18 @@ namespace nandina::app
             );
         }
 
+        /// Run an ordinary single-window application from a root view factory.
+        /// PageContext factories can use routing and stores; BuildContext factories
+        /// are the compact path for a self-contained view.
+        template<typename Factory>
+            requires RootViewFactory<std::decay_t<Factory>>
+        auto run(WindowConfig config, Factory&& factory) -> int {
+            return run_page<detail::RootViewPage>(
+                std::move(config),
+                detail::make_root_view_params(std::forward<Factory>(factory))
+            );
+        }
+
     private:
         using WindowSetup = std::move_only_function<void(NanRouter&)>;
 
@@ -137,6 +150,20 @@ namespace nandina::app
         std::unique_ptr<NanStore> store_;
         NanTypeKey store_key_ = nullptr;
     };
+
+    struct RunConfig {
+        std::string id;
+        WindowConfig window;
+    };
+
+    /// Minimal process entry point. Explicit NanApplication remains available
+    /// when startup needs stores, resource registration, or theme configuration.
+    template<typename Factory>
+        requires RootViewFactory<std::decay_t<Factory>>
+    auto run(RunConfig config, Factory&& factory) -> int {
+        NanApplication application(NanApplicationConfig::for_process(std::move(config.id)));
+        return application.run(std::move(config.window), std::forward<Factory>(factory));
+    }
 
 } // namespace nandina::app
 

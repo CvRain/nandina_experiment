@@ -119,11 +119,7 @@ namespace nandina::examples::compact_todo
         });
     }
 
-    auto Page::route_key() const -> std::string_view {
-        return "compact-todo";
-    }
-
-    auto Page::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+    auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
         auto ui = context.ui();
         auto& store = context.store<Store>();
         auto& draft = ui.signal<std::string>();

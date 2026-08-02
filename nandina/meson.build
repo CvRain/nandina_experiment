@@ -176,6 +176,7 @@ module_app = files(
     'app/window_config.hpp',
     'app/nan_store.hpp',
     'app/nan_page.hpp',
+    'app/root_view.hpp',
     'app/nan_router.hpp',
     'app/nan_router.cpp',
     'app/nan_application.hpp',

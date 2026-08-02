@@ -38,12 +38,7 @@ namespace nandina::examples::compact_todo
         std::uint64_t next_id_ = 3;
     };
 
-    class Page final: public app::NanPageT<app::NoParams> {
-    public:
-        [[nodiscard]] auto route_key() const -> std::string_view override;
-        [[nodiscard]] auto build(app::PageContext& context)
-            -> std::shared_ptr<scene::NanNode2D> override;
-    };
+    [[nodiscard]] auto build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D>;
 } // namespace nandina::examples::compact_todo
 
 #endif // NANDINA_EXPERIMENT_EXAMPLE_COMPACT_TODO_HPP

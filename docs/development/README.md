@@ -248,7 +248,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13 and the A14 developer-experience line are complete through the compact reference application: common builder modifiers, scoped components, binding, theme tokens, concise conditional/keyed authoring, and the source-budget acceptance target. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, and the A19 functional root runner are complete through the compact reference application: common builder modifiers, scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -760,9 +760,9 @@ Status: complete; the target contract, compact reference application, and source
 
 The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the ideal minimum-window, imperative Todo, and DSL Todo forms. It also establishes measurable line budgets and forbids ordinary page code from directly coordinating scene phases, dispatch queues, reactive scopes, per-frame rendering, and theme propagation.
 
-`NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. Applications no longer need a one-off `NanWindow` subclass merely to implement `on_setup()`. Explicit window subclasses remain the advanced path for custom frame/setup/teardown behavior.
+`NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. A19 additionally provides functional root runners for single-page applications, so the compact reference no longer declares a page class merely to implement `route_key()` and `build()`. Explicit page and window subclasses remain the advanced path for named routes and custom frame/setup/teardown behavior.
 
-The existing paired Todo remains the low-level retained-widget equivalence fixture. `nandina_compact_todo_example` is the recommended application starting point: its 20-line bootstrap and 220 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
+The existing paired Todo remains the low-level retained-widget equivalence fixture. `nandina_compact_todo_example` is the recommended application starting point: its 23-line bootstrap and 215 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
 
 ### A15. Typed List Model And Commands
 
@@ -811,6 +811,16 @@ The paired Todo `TodoTasks` component now spells its empty state and keyed rows 
 `NodeBuilder` also forwards the common authoring modifiers used by the compact reference: click and submit handlers, button tone/treatment, layout gap/alignment, label font/color tokens, scroll wheel step, and autofocus intent. Each modifier is constrained by the concrete widget's existing setter and stores no parallel property state.
 
 The compact Todo deliberately has no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless acceptance test enters text, adds a task, toggles completion, and deletes a row through real controls. The paired imperative/DSL Todo remains available for the broader routing, keep-alive, parameter, and concrete-widget equivalence surface.
+
+### A19. Functional Root Application Runner
+
+Status: complete for ordinary single-window applications.
+
+`NanApplication::run(window, factory)` creates the same configured window and router frame as `run_page()`, but adapts a root factory through an internal `NanPageT`. A factory may accept `PageContext&` when it needs the installed Store, router, resources, or other page services, or accept only `BuildContext&` for a self-contained view. It may return either a concrete-node `shared_ptr` or the existing `NodeBuilder<T>`; no new view object or renderer is introduced.
+
+The free `app::run({.id, .window}, factory)` is the minimum process entry point and owns `NanApplication` construction and shutdown. Applications that install a Store or configure resource and theme services first retain an explicit `NanApplication`, then call the member runner. The compact Todo uses this second form and now exports a plain root build function instead of a `NanPageT` subclass.
+
+The internal functional frame has the fixed route key `root`. Multiple named routes, typed route parameters, keep-alive navigation, and lifecycle activation hooks continue to use explicit `NanPageT` classes; the functional runner removes single-page ceremony rather than weakening the router contract.
 
 ### Deferred After Authoring Core
 

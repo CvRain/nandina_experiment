@@ -53,6 +53,20 @@ namespace
             { application.run_page<ServicePage>(std::move(config), params) } -> std::same_as<int>;
         }
     );
+    static_assert(requires(app::NanApplication& application, app::WindowConfig config) {
+        {
+            application.run(std::move(config), [](widget::BuildContext& ui) {
+                return ui.label("Hello");
+            })
+        } -> std::same_as<int>;
+    });
+    static_assert(requires(app::RunConfig config) {
+        {
+            app::run(std::move(config), [](widget::BuildContext& ui) {
+                return ui.label("Hello");
+            })
+        } -> std::same_as<int>;
+    });
 
     [[maybe_unused]] auto compile_default_page_runner(
         app::NanApplication& application,
@@ -70,6 +84,39 @@ TEST_CASE("NanApplication always installs builtin resource and font services", "
     auto family = application.font_families().resolve({}, application.font_loader());
     REQUIRE(family.has_value());
     REQUIRE(family->faces.size() == 1);
+}
+
+TEST_CASE("functional root views use existing page context and concrete nodes", "[app][view]") {
+    app::NanApplication application;
+    app::NanRouter router {application.graph(), application.theme_manager()};
+    bool received_page_context = false;
+    auto params = app::detail::make_root_view_params([&](app::PageContext& context) {
+        received_page_context = true;
+        return context.ui().label("Functional root");
+    });
+
+    (void)router.push<app::detail::RootViewPage>(std::move(params));
+
+    REQUIRE(received_page_context);
+    REQUIRE(router.depth() == 1);
+    REQUIRE(router.current_key() == "root");
+    REQUIRE(router.host()->child_count() == 1);
+    REQUIRE(dynamic_cast<widget::Label*>(router.host()->get_child(0)) != nullptr);
+}
+
+TEST_CASE("functional root views accept BuildContext-only factories", "[app][view]") {
+    app::NanApplication application;
+    app::NanRouter router {application.graph(), application.theme_manager()};
+    bool received_build_context = false;
+    auto params = app::detail::make_root_view_params([&](widget::BuildContext& ui) {
+        received_build_context = true;
+        return ui.button("Continue");
+    });
+
+    (void)router.push<app::detail::RootViewPage>(std::move(params));
+
+    REQUIRE(received_build_context);
+    REQUIRE(dynamic_cast<widget::Button*>(router.host()->get_child(0)) != nullptr);
 }
 
 TEST_CASE("NanApplication discovers executable-relative SQLite packages", "[app][resource]") {

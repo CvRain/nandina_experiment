@@ -23,20 +23,20 @@ auto main() -> int {
 
 Applications only inherit `NanWindow` when they need advanced window-level frame, setup, or teardown hooks.
 
-## 1.0 Minimum Window Target
+## 1.0 Minimum Window Result
 
-The final common-case entry point should not require a page class either:
+The A19 common-case entry point does not require a page class:
 
 ```cpp
 auto main() -> int {
     return app::run(
         {.id = "org.example.hello", .window = {.title = "Hello"}},
-        [](ui::BuildContext& ui) { return ui.label("Hello, Nandina!"); }
+        [](widget::BuildContext& ui) { return ui.label("Hello, Nandina!"); }
     );
 }
 ```
 
-The application runner owns the application, default window, root page, UI context, and shutdown order. Explicit `NanApplication`, `NanWindow`, and `NanPageT` remain available for applications that need their lifetime boundaries.
+The application runner owns the application, default window, internal root page, UI context, and shutdown order. A root factory may accept only `BuildContext&`, or accept `PageContext&` when it needs page services. Applications that configure a Store, resources, or themes before opening the window use the equivalent `NanApplication::run(window, factory)` member. Explicit `NanApplication`, `NanWindow`, and `NanPageT` remain available for applications that need their lifetime boundaries or multiple named routes.
 
 ## Imperative Todo Target
 
@@ -162,9 +162,9 @@ The `nandina_compact_todo_example` target is the recommended starting point. Cou
 
 | Budget | Result | Limit |
 | --- | ---: | ---: |
-| Bootstrap (`compact_main.cpp`) | 20 | 30 |
+| Bootstrap (`compact_main.cpp`) | 23 | 30 |
 | Data model and operations | 50 | 100 |
-| Complete authoring form | 115 | 150 |
-| Complete single-form Todo | 220 | 300 |
+| Complete authoring form | 108 | 150 |
+| Complete single-form Todo | 215 | 300 |
 
-The compact page directly composes `Signal`, `Computed`, two-way text input, `when()`, keyed `for_each()`, focus and scroll intents, and concrete widgets. It does not include scene-tree, dispatcher, frame-scheduler, or reactive-scope headers; override frame, layout, drawing, or theme lifecycle; or expose test-only widget getters. Headless acceptance locates and activates the real controls through the retained tree and semantics APIs.
+The compact root factory directly composes `Signal`, `Computed`, two-way text input, `when()`, keyed `for_each()`, focus and scroll intents, and concrete widgets. It does not declare a page class or route key; include scene-tree, dispatcher, frame-scheduler, or reactive-scope headers; override frame, layout, drawing, or theme lifecycle; or expose test-only widget getters. Headless acceptance locates and activates the real controls through the retained tree and semantics APIs.

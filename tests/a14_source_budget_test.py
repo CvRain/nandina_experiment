@@ -34,6 +34,8 @@ for forbidden in (
     "on_layout(",
     "on_draw(",
     "on_theme_changed(",
+    "NanPageT<",
+    "route_key(",
 ):
     if forbidden in source:
         raise SystemExit(f"compact Todo uses forbidden application plumbing: {forbidden}")

@@ -13,12 +13,15 @@ auto main() -> int {
         app::NanApplicationConfig::for_process("org.nandina.compact-todo")
     );
     (void)application.use_store<examples::compact_todo::Store>();
-    return application.run_page<examples::compact_todo::Page>(app::WindowConfig {
-        .title = "Nandina Compact Todo",
-        .width = 720,
-        .height = 420,
-        .target_fps = 120,
-        .resizable = true,
-        .vsync = true,
-    });
+    return application.run(
+        app::WindowConfig {
+            .title = "Nandina Compact Todo",
+            .width = 720,
+            .height = 420,
+            .target_fps = 120,
+            .resizable = true,
+            .vsync = true,
+        },
+        examples::compact_todo::build
+    );
 }

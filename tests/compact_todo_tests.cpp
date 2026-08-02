@@ -1,6 +1,7 @@
 #include "compact_todo.hpp"
 
 #include "app/nan_router.hpp"
+#include "app/root_view.hpp"
 #include "app/ui_dispatcher.hpp"
 #include "foundation/geometry.hpp"
 #include "scene/input_event.hpp"
@@ -56,7 +57,7 @@ TEST_CASE("compact Todo keeps application code free of lifecycle plumbing", "[to
         nullptr,
         &dispatcher
     };
-    (void)router.push<Page>();
+    (void)router.push<app::detail::RootViewPage>(app::detail::make_root_view_params(build));
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
