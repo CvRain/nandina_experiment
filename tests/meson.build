@@ -66,17 +66,17 @@ authoring_tests = executable(
 )
 test('authoring', authoring_tests)
 
-compact_todo_tests = executable(
-    'compact_todo_tests',
-    files('compact_todo_tests.cpp'),
-    dependencies : [compact_todo_example_dep, catch2_with_main_dep],
+settings_example_tests = executable(
+    'settings_example_tests',
+    files('settings_example_tests.cpp'),
+    dependencies : [settings_example_dep, catch2_with_main_dep],
 )
-test('compact-todo', compact_todo_tests)
+test('settings-example', settings_example_tests)
 
 test(
-    'a14-source-budget',
+    'example-source-budget',
     python,
-    args: [files('a14_source_budget_test.py'), meson.project_source_root()],
+    args: [files('example_source_budget_test.py'), meson.project_source_root()],
 )
 
 router_tests = executable(
@@ -99,6 +99,13 @@ button_tests = executable(
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('button', button_tests)
+
+checkbox_tests = executable(
+    'checkbox_tests',
+    files('checkbox_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('checkbox', checkbox_tests)
 
 resource_tests = executable(
     'resource_tests',

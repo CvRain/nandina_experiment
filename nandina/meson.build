@@ -106,6 +106,8 @@ module_theme = files(
     'theme/style_context.hpp',
     'theme/button_style.hpp',
     'theme/button_style.cpp',
+    'theme/checkbox_style.hpp',
+    'theme/checkbox_style.cpp',
     'theme/text_field_style.hpp',
     'theme/text_field_style.cpp',
     'theme/nan_style.hpp',
@@ -162,6 +164,8 @@ module_widget = files(
     'widget/scroll_view.cpp',
     'widget/button.hpp',
     'widget/button.cpp',
+    'widget/checkbox.hpp',
+    'widget/checkbox.cpp',
     'widget/text_field.hpp',
     'widget/text_field.cpp',
 )

@@ -196,6 +196,24 @@ namespace nandina::widget
             return result;
         }
 
+        [[nodiscard]] auto checkbox(std::string label, bool checked = false) const
+            -> authoring::NodeBuilder<Checkbox> {
+            return authoring::checkbox(std::move(label), checked, themes_->theme());
+        }
+
+        [[nodiscard]] auto checkbox(reactive::Signal<bool>& checked, std::string label) const
+            -> authoring::NodeBuilder<Checkbox> {
+            auto result = checkbox(std::move(label), checked.get());
+            const auto control = result.build();
+            bind(control, &Checkbox::set_checked, checked);
+            connect(control->checked_changed(), [&checked](const bool current) {
+                if (checked.peek() != current) {
+                    checked.set(current);
+                }
+            });
+            return result;
+        }
+
         [[nodiscard]] auto text_field(std::string value, std::string placeholder) const
             -> authoring::NodeBuilder<TextField> {
             return authoring::text_field(

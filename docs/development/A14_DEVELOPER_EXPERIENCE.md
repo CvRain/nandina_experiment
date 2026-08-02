@@ -156,9 +156,9 @@ Each stage must shorten the canonical example and retain direct access to the ex
 
 The A14 authoring API delivery order is complete through A18. The compact recommended Todo keeps ordinary application code focused on its Store, row component, page composition, and bootstrap. The earlier paired low-level fixture was retired after the same imperative/DSL equivalence, page-parameter, and lifecycle contracts were established in focused framework tests.
 
-## Compact Reference Result
+## Compact Reference Acceptance Snapshot
 
-The `nandina_example` target is the recommended starting point. Counts use all non-blank source lines, including includes and declarations, rather than excluding framework-facing syntax:
+At A14/A19 acceptance, the compact Todo established the following counts using all non-blank source lines, including includes and declarations. The fixture was retired when A20 moved the canonical example to a Settings interface; these numbers remain the authoring-layer acceptance record rather than a promise that historical Todo files stay in the repository.
 
 | Budget | Result | Limit |
 | --- | ---: | ---: |
@@ -167,4 +167,4 @@ The `nandina_example` target is the recommended starting point. Counts use all n
 | Complete authoring form | 108 | 150 |
 | Complete single-form Todo | 215 | 300 |
 
-The compact root factory directly composes `Signal`, `Computed`, two-way text input, `when()`, keyed `for_each()`, focus and scroll intents, and concrete widgets. It does not declare a page class or route key; include scene-tree, dispatcher, frame-scheduler, or reactive-scope headers; override frame, layout, drawing, or theme lifecycle; or expose test-only widget getters. Headless acceptance locates and activates the real controls through the retained tree and semantics APIs.
+The compact root factory directly composed `Signal`, `Computed`, two-way text input, `when()`, keyed `for_each()`, focus and scroll intents, and concrete widgets. It did not declare a page class or route key; include scene-tree, dispatcher, frame-scheduler, or reactive-scope headers; override frame, layout, drawing, or theme lifecycle; or expose test-only widget getters. Those authoring contracts remain covered by focused framework tests and the current canonical example.

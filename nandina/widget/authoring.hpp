@@ -10,6 +10,7 @@
 #include "../scene/control.hpp"
 #include "../theme/theme.hpp"
 #include "button.hpp"
+#include "checkbox.hpp"
 #include "grid.hpp"
 #include "label.hpp"
 #include "layout.hpp"
@@ -83,6 +84,22 @@ namespace nandina::widget::authoring
             }
         auto on_submit(Handler&& handler) -> NodeBuilder& {
             node_->set_on_submit(std::forward<Handler>(handler));
+            return *this;
+        }
+
+        template<typename Handler>
+            requires requires(Node& node, Handler&& handler) {
+                node.set_on_change(std::forward<Handler>(handler));
+            }
+        auto on_change(Handler&& handler) -> NodeBuilder& {
+            node_->set_on_change(std::forward<Handler>(handler));
+            return *this;
+        }
+
+        auto checked(bool checked) -> NodeBuilder&
+            requires requires(Node& node) { node.set_checked(checked); }
+        {
+            node_->set_checked(checked);
             return *this;
         }
 
@@ -246,6 +263,14 @@ namespace nandina::widget::authoring
         theme::NanTheme theme = theme::default_theme()
     ) -> NodeBuilder<Button> {
         return make<Button>(std::move(text), theme);
+    }
+
+    [[nodiscard]] inline auto checkbox(
+        std::string label,
+        bool checked = false,
+        theme::NanTheme theme = theme::default_theme()
+    ) -> NodeBuilder<Checkbox> {
+        return make<Checkbox>(std::move(label), checked, theme);
     }
 
     [[nodiscard]] inline auto text_field(

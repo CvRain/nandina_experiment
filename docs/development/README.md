@@ -239,7 +239,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, and the A19 functional root runner are complete through the compact reference application: common builder modifiers, scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, the A19 functional root runner, and the A20 Checkbox control are complete through the Settings reference application: scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, standard boolean selection, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -753,7 +753,7 @@ The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the
 
 `NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. A19 additionally provides functional root runners for single-page applications, so the compact reference no longer declares a page class merely to implement `route_key()` and `build()`. Explicit page and window subclasses remain the advanced path for named routes and custom frame/setup/teardown behavior.
 
-The earlier paired Todo fixture has been retired. `nandina_example` is the recommended application starting point: its 23-line bootstrap and 215 total non-blank lines stay within the A14 budgets while retaining a real Store, custom keyed row component, two-way input, conditional empty state, scrolling, semantics, and automatic lifecycle cleanup.
+The earlier paired and compact Todo fixtures have been retired after acceptance. Their 23-line bootstrap and 215 total non-blank line result remains recorded in the A14 contract. The current `nandina_example` Settings interface uses the same authoring layer with a 23-line bootstrap and 122 total non-blank lines while expanding the standard control surface.
 
 ### A15. Typed List Model And Commands
 
@@ -801,7 +801,7 @@ The A18 Todo fixture spelled its empty state and keyed rows through these two AP
 
 `NodeBuilder` also forwards the common authoring modifiers used by the compact reference: click and submit handlers, button tone/treatment, layout gap/alignment, label font/color tokens, scroll wheel step, and autofocus intent. Each modifier is constrained by the concrete widget's existing setter and stores no parallel property state.
 
-The compact Todo deliberately has no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless acceptance test enters text, adds a task, toggles completion, and deletes a row through real controls. Broader routing, keep-alive, parameter, and concrete-widget equivalence remain covered by focused framework tests.
+The compact Todo acceptance fixture deliberately had no workspace facade, event-forwarding component, page-owned widget registry, lifecycle override, or test-only accessor. Its headless test exercised real controls before the fixture was retired. Broader routing, keep-alive, parameter, and concrete-widget equivalence remain covered by focused framework tests.
 
 ### A19. Functional Root Application Runner
 
@@ -809,9 +809,19 @@ Status: complete for ordinary single-window applications.
 
 `NanApplication::run(window, factory)` creates the same configured window and router frame as `run_page()`, but adapts a root factory through an internal `NanPageT`. A factory may accept `PageContext&` when it needs the installed Store, router, resources, or other page services, or accept only `BuildContext&` for a self-contained view. It may return either a concrete-node `shared_ptr` or the existing `NodeBuilder<T>`; no new view object or renderer is introduced.
 
-The free `app::run({.id, .window}, factory)` is the minimum process entry point and owns `NanApplication` construction and shutdown. Applications that install a Store or configure resource and theme services first retain an explicit `NanApplication`, then call the member runner. The compact Todo uses this second form and now exports a plain root build function instead of a `NanPageT` subclass.
+The free `app::run({.id, .window}, factory)` is the minimum process entry point and owns `NanApplication` construction and shutdown. Applications that install a Store or configure resource and theme services first retain an explicit `NanApplication`, then call the member runner. The current Settings example uses the free form; applications with an installed Store use the equivalent member form without reintroducing a page subclass.
 
 The internal functional frame has the fixed route key `root`. Multiple named routes, typed route parameters, keep-alive navigation, and lifecycle activation hooks continue to use explicit `NanPageT` classes; the functional runner removes single-page ceremony rather than weakening the router contract.
+
+### A20. Checkbox And Settings Reference
+
+Status: complete for boolean selection and two-way authoring.
+
+`widget::Checkbox` is a concrete `Pressable` control with a label, boolean checked state, disabled/focus/hover/press visual states, theme-token-backed colors and metrics, inherited text pipeline, keyboard Space/Enter activation, and platform-independent checkbox semantics. User activation updates the stored value and emits `checked_changed`; programmatic `set_checked()` is silent so external state synchronization cannot create callback loops.
+
+`BuildContext::checkbox(signal, label)` binds any page/component-owned `Signal<bool>` in both directions using the existing weak setter binding and scope-owned event subscription. Literal construction, `authoring::checkbox()`, `.checked()`, and `.on_change()` remain thin adapters over the same concrete control.
+
+The canonical `nandina_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. Automated source checks keep the bootstrap at 23 lines, the complete application at 122 lines, and forbid page/window/frame plumbing.
 
 ### Deferred After Authoring Core
 

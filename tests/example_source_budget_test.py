@@ -5,11 +5,11 @@ import sys
 
 
 root = Path(sys.argv[1])
-bootstrap = root / "example" / "compact_main.cpp"
+bootstrap = root / "example" / "settings_main.cpp"
 application = [
     bootstrap,
-    root / "example" / "compact_todo.hpp",
-    root / "example" / "compact_todo.cpp",
+    root / "example" / "settings_example.hpp",
+    root / "example" / "settings_example.cpp",
 ]
 
 
@@ -20,9 +20,9 @@ def nonblank_lines(path: Path) -> int:
 bootstrap_lines = nonblank_lines(bootstrap)
 application_lines = sum(nonblank_lines(path) for path in application)
 if bootstrap_lines > 30:
-    raise SystemExit(f"compact bootstrap exceeds A14 budget: {bootstrap_lines} > 30")
-if application_lines > 300:
-    raise SystemExit(f"compact Todo exceeds A14 budget: {application_lines} > 300")
+    raise SystemExit(f"example bootstrap exceeds budget: {bootstrap_lines} > 30")
+if application_lines > 220:
+    raise SystemExit(f"settings example exceeds budget: {application_lines} > 220")
 
 source = "\n".join(path.read_text(encoding="utf-8") for path in application)
 for forbidden in (
@@ -38,6 +38,6 @@ for forbidden in (
     "route_key(",
 ):
     if forbidden in source:
-        raise SystemExit(f"compact Todo uses forbidden application plumbing: {forbidden}")
+        raise SystemExit(f"settings example uses forbidden application plumbing: {forbidden}")
 
-print(f"A14 source budgets: bootstrap={bootstrap_lines}, application={application_lines}")
+print(f"example source budgets: bootstrap={bootstrap_lines}, application={application_lines}")
