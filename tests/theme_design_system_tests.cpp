@@ -13,6 +13,7 @@
 #include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
 #include "widget/slider.hpp"
+#include "widget/text_field.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -332,4 +333,25 @@ TEST_CASE("focused button draws a normalized focus ring", "[theme][painter]") {
     for (const auto& call: dev.rects) {
         REQUIRE_FALSE(call.outline);
     }
+}
+
+TEST_CASE("text field draws rounded fill and outline through BoxPainter", "[theme][painter]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto field = std::make_shared<widget::TextField>("value");
+    tree.set_root(field);
+    tree.draw(dev);
+
+    bool fill = false;
+    bool outline = false;
+    for (const auto& call: dev.rects) {
+        if (call.outline) {
+            outline = true;
+        }
+        else {
+            fill = true;
+        }
+    }
+    REQUIRE(fill);
+    REQUIRE(outline);
 }

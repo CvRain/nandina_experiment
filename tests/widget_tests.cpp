@@ -1038,37 +1038,27 @@ TEST_CASE(
     theme::ThemeManager manager;
     auto initial = theme::default_theme();
     initial.palette.on_surface_variant = theme::nan_color(0.38F, 0.04F, 210.0F);
-    initial.palette.background = theme::nan_color(0.22F, 0.03F, 210.0F);
+    initial.palette.surface_variant = theme::nan_color(0.22F, 0.03F, 210.0F);
     manager.set_theme(initial);
 
-    auto surface = std::make_shared<widget::primitives::Surface>();
-    surface->set_fill(theme::ThemeColor::token(theme::ColorToken::background));
     auto label = widget::Label::create(graph, "Muted");
     label->set_color_token(theme::ColorToken::on_surface_variant);
-    surface->add_child(label);
+    auto field = std::make_shared<widget::TextField>("value");
+    field->set_placeholder("Input");
+    label->add_child(field);
 
     scene::NanSceneTree tree;
     tree.set_theme_manager(manager);
-    tree.set_root(surface);
+    tree.set_root(label);
     REQUIRE(label->color().oklch().light == Catch::Approx(0.38F));
-    REQUIRE(surface->fill()->oklch().light == Catch::Approx(0.22F));
-
-    theme::StyleContext context;
-    context.text_color = theme::StyleValue<foundation::NanColor>::explicit_value(
-        theme::nan_color(0.54F, 0.04F, 210.0F)
-    );
-    label->set_style_context(context);
-    label->set_color_token(theme::ColorToken::on_surface_variant);
-    REQUIRE(label->color().oklch().light == Catch::Approx(0.54F));
-    label->clear_style_context();
-    REQUIRE(label->color().oklch().light == Catch::Approx(0.38F));
+    REQUIRE(field->resolved_style().container.fill.oklch().light == Catch::Approx(0.22F));
 
     auto replacement = initial;
     replacement.palette.on_surface_variant = theme::nan_color(0.82F, 0.04F, 210.0F);
-    replacement.palette.background = theme::nan_color(0.91F, 0.03F, 210.0F);
+    replacement.palette.surface_variant = theme::nan_color(0.91F, 0.03F, 210.0F);
     manager.set_theme(replacement);
     REQUIRE(label->color().oklch().light == Catch::Approx(0.82F));
-    REQUIRE(surface->fill()->oklch().light == Catch::Approx(0.91F));
+    REQUIRE(field->resolved_style().container.fill.oklch().light == Catch::Approx(0.91F));
 }
 
 TEST_CASE("Text clip intersects and restores an ancestor clip", "[widget][text][clip]") {

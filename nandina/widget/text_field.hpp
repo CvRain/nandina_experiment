@@ -9,8 +9,8 @@
 #include "../theme/design_system.hpp"
 #include "../theme/theme.hpp"
 #include "../theme/text_field_style.hpp"
+#include "primitives/box_painter.hpp"
 #include "primitives/editable_text.hpp"
-#include "primitives/surface.hpp"
 #include "primitives/text.hpp"
 
 #include <functional>
@@ -98,7 +98,6 @@ namespace nandina::widget
             float x
         ) const -> foundation::NanPoint;
 
-        primitives::Surface surface_;
         primitives::EditableText edit_;
         primitives::Text placeholder_;
         /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。

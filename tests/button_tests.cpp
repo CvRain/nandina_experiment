@@ -11,7 +11,6 @@
 #include "widget/button.hpp"
 #include "widget/text_field.hpp"
 #include "widget/primitives/pressable.hpp"
-#include "widget/primitives/surface.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -450,22 +449,6 @@ TEST_CASE("Button instance theme and StyleContext keep their cascade priority", 
     replacement.palette.primary = theme::nan_color(0.22F, 0.1F, 40.0F);
     manager.set_theme(replacement);
     REQUIRE(button->theme_ref().palette.primary.oklch().light == Catch::Approx(0.81F));
-}
-
-TEST_CASE("surface draws rounded fill and outline", "[widget][primitive][surface]") {
-    RecordingDevice dev;
-    scene::NanSceneTree tree;
-    auto surface = std::make_shared<widget::primitives::Surface>(foundation::NanSize(40.0F, 20.0F));
-    surface->set_radius(8.0F);
-    surface->set_fill(theme::nan_color(0.5F, 0.1F, 120.0F));
-    surface->set_border(theme::nan_color(0.8F, 0.1F, 120.0F), 2.0F);
-    tree.set_root(surface);
-
-    tree.draw(dev);
-
-    REQUIRE(dev.rects.size() == 2);
-    REQUIRE(dev.rects[0].rounded);
-    REQUIRE(dev.rects[1].outline);
 }
 
 TEST_CASE("pressable tracks hover press and emits click", "[widget][primitive][pressable]") {

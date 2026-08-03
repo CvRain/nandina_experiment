@@ -4,6 +4,7 @@
 
 #include "text_field.hpp"
 
+#include "primitives/box_painter.hpp"
 #include "primitives/focus_ring_painter.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
@@ -283,9 +284,7 @@ namespace nandina::widget
     void TextField::on_draw(render::DrawContext& ctx) {
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const auto style = resolved_style();
-        surface_.set_fill(style.container.fill);
-        surface_.set_border(style.container.border, style.container.border_width);
-        surface_.set_radius(style.container.radius);
+        primitives::BoxPainter::paint(ctx, world, style.container, ctx.opacity());
         if (style.focus.width > 0.0F && style.focus.color.alpha() > 0.0F) {
             primitives::FocusRingPainter::paint(
                 ctx,
@@ -295,8 +294,6 @@ namespace nandina::widget
                 /*gap=*/0.0F
             );
         }
-        surface_.set_size(size());
-        surface_.on_draw(ctx);
 
         const float viewport_width = std::max(0.0F, world.get_width() - padding_x_ * 2.0F);
         update_scroll(viewport_width);
@@ -370,10 +367,6 @@ namespace nandina::widget
         const auto style = resolved_style();
         padding_x_ = style.metrics.padding_x;
         height_ = style.metrics.height;
-
-        surface_.set_fill(style.container.fill);
-        surface_.set_radius(style.container.radius);
-        surface_.set_border(style.container.border, style.container.border_width);
 
         const auto& context = resolved_style_context();
         const auto font = context.font_from_context && !font_explicit_ ? context.font

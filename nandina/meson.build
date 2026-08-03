@@ -147,8 +147,6 @@ module_widget = files(
     'widget/bindable_rect.hpp',
     'widget/declarative.hpp',
     'widget/list_view.hpp',
-    'widget/primitives/surface.hpp',
-    'widget/primitives/surface.cpp',
     'widget/primitives/box_painter.hpp',
     'widget/primitives/focus_ring_painter.hpp',
     'widget/primitives/pressable.hpp',
