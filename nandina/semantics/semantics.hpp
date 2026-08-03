@@ -27,6 +27,7 @@ namespace nandina::semantics
         list,
         list_item,
         checkbox,
+        slider,
     };
 
     enum class Composition : std::uint8_t {

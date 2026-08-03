@@ -10,6 +10,7 @@
 #include "widget/button.hpp"
 #include "widget/checkbox.hpp"
 #include "widget/label.hpp"
+#include "widget/slider.hpp"
 #include "widget/text_field.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -66,14 +67,17 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     auto* input = find_node<widget::TextField>(*router.host(), [](const auto&) { return true; });
     auto* save = button_named(*router.host(), "Save preferences");
     auto* reset = button_named(*router.host(), "Reset");
+    auto* scale = find_node<widget::Slider>(*router.host(), [](const auto&) { return true; });
     REQUIRE(diagnostics != nullptr);
     REQUIRE(notifications != nullptr);
     REQUIRE(input != nullptr);
     REQUIRE(save != nullptr);
     REQUIRE(reset != nullptr);
+    REQUIRE(scale != nullptr);
     REQUIRE(tree.focused_node() == input);
     REQUIRE(notifications->checked());
     REQUIRE_FALSE(diagnostics->checked());
+    REQUIRE(scale->value() == 1.0F);
 
     REQUIRE(tree.update_semantics());
     REQUIRE(tree.perform_semantics_action(
@@ -81,6 +85,11 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
         {.action = semantics::Action::activate}
     ));
     REQUIRE(diagnostics->checked());
+    REQUIRE(tree.perform_semantics_action(
+        scale->semantics_id(),
+        {.action = semantics::Action::set_value, .value = "1.25"}
+    ));
+    REQUIRE(scale->value() == 1.25F);
     REQUIRE(
         find_node<widget::Label>(
             *router.host(),
@@ -113,4 +122,5 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(input->value() == "Nandina developer");
     REQUIRE(notifications->checked());
     REQUIRE_FALSE(diagnostics->checked());
+    REQUIRE(scale->value() == 1.0F);
 }

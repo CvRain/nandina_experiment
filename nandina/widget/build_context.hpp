@@ -10,6 +10,7 @@
 #include "../theme/theme_manager.hpp"
 #include "authoring.hpp"
 
+#include <cmath>
 #include <concepts>
 #include <functional>
 #include <memory>
@@ -23,9 +24,8 @@ namespace nandina::widget
     namespace build_context_detail
     {
         template<typename Source>
-        using list_item_t = typename std::remove_cvref_t<decltype(
-            std::declval<Source&>().get()
-        )>::value_type;
+        using list_item_t =
+            typename std::remove_cvref_t<decltype(std::declval<Source&>().get())>::value_type;
     } // namespace build_context_detail
 
     /// Lightweight, non-owning services passed through page and component construction.
@@ -214,6 +214,41 @@ namespace nandina::widget
             return result;
         }
 
+        [[nodiscard]] auto slider(
+            std::string label,
+            float value = 0.0F,
+            float minimum = 0.0F,
+            float maximum = 1.0F,
+            float step = 0.01F
+        ) const -> authoring::NodeBuilder<Slider> {
+            return authoring::slider(
+                std::move(label),
+                value,
+                minimum,
+                maximum,
+                step,
+                themes_->theme()
+            );
+        }
+
+        [[nodiscard]] auto slider(
+            reactive::Signal<float>& value,
+            std::string label,
+            float minimum = 0.0F,
+            float maximum = 1.0F,
+            float step = 0.01F
+        ) const -> authoring::NodeBuilder<Slider> {
+            auto result = slider(std::move(label), value.get(), minimum, maximum, step);
+            const auto control = result.build();
+            bind(control, &Slider::set_value, value);
+            connect(control->value_changed(), [&value](const float current) {
+                if (std::abs(value.peek() - current) > foundation::nan_epsilon) {
+                    value.set(current);
+                }
+            });
+            return result;
+        }
+
         [[nodiscard]] auto text_field(std::string value, std::string placeholder) const
             -> authoring::NodeBuilder<TextField> {
             return authoring::text_field(
@@ -223,8 +258,9 @@ namespace nandina::widget
             );
         }
 
-        [[nodiscard]] auto text_field(reactive::Signal<std::string>& value, std::string placeholder)
-            const -> authoring::NodeBuilder<TextField> {
+        [[nodiscard]] auto
+        text_field(reactive::Signal<std::string>& value, std::string placeholder) const
+            -> authoring::NodeBuilder<TextField> {
             auto result = text_field(std::string(value.get()), std::move(placeholder));
             const auto field = result.build();
             bind(field, &TextField::set_value, value);
@@ -253,9 +289,7 @@ namespace nandina::widget
             requires requires(Source& source) {
                 { source.get() } -> std::convertible_to<bool>;
             }
-            && std::invocable<TrueFactory&, BuildContext> && std::invocable<
-                FalseFactory&,
-                BuildContext>
+        && std::invocable<TrueFactory&, BuildContext> && std::invocable<FalseFactory&, BuildContext>
         [[nodiscard]] auto
         when(Source& source, TrueFactory&& when_true, FalseFactory&& when_false) const
             -> authoring::NodeBuilder<IfRegion<scene::NanControl>> {
@@ -277,9 +311,9 @@ namespace nandina::widget
             requires ListDataModelSource<Source, build_context_detail::list_item_t<Source>>
             && std::invocable<KeyFunction&, const build_context_detail::list_item_t<Source>&>
             && std::invocable<
-                CreateFunction&,
-                BuildContext,
-                const build_context_detail::list_item_t<Source>&>
+                         CreateFunction&,
+                         BuildContext,
+                         const build_context_detail::list_item_t<Source>&>
         [[nodiscard]] auto for_each(
             Source& source,
             KeyFunction&& key,
@@ -325,14 +359,13 @@ namespace nandina::widget
 
     private:
         template<typename Factory>
-        [[nodiscard]] auto make_branch_factory(Factory&& factory) const
-            -> typename IfRegion<scene::NanControl>::CreateFunction {
+        [[nodiscard]] auto make_branch_factory(Factory&& factory) const ->
+            typename IfRegion<scene::NanControl>::CreateFunction {
             return [ui = *this, factory = std::forward<Factory>(factory)](
                        reactive::ReactiveScope& scope
                    ) mutable -> std::shared_ptr<scene::NanControl> {
-                auto node = authoring::detail::materialize(
-                    std::invoke(factory, ui.with_scope(scope))
-                );
+                auto node =
+                    authoring::detail::materialize(std::invoke(factory, ui.with_scope(scope)));
                 static_assert(
                     std::derived_from<typename decltype(node)::element_type, scene::NanControl>
                 );

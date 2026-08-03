@@ -23,7 +23,6 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
-#include <type_traits>
 #include <utility>
 
 namespace nandina::text

@@ -16,6 +16,7 @@
 #include "layout.hpp"
 #include "list_view.hpp"
 #include "scroll_view.hpp"
+#include "slider.hpp"
 #include "text_field.hpp"
 
 #include <concepts>
@@ -100,6 +101,27 @@ namespace nandina::widget::authoring
             requires requires(Node& node) { node.set_checked(checked); }
         {
             node_->set_checked(checked);
+            return *this;
+        }
+
+        auto value(float value) -> NodeBuilder&
+            requires requires(Node& node) { node.set_value(value); }
+        {
+            node_->set_value(value);
+            return *this;
+        }
+
+        auto range(float minimum, float maximum) -> NodeBuilder&
+            requires requires(Node& node) { node.set_range(minimum, maximum); }
+        {
+            node_->set_range(minimum, maximum);
+            return *this;
+        }
+
+        auto step(float step) -> NodeBuilder&
+            requires requires(Node& node) { node.set_step(step); }
+        {
+            node_->set_step(step);
             return *this;
         }
 
@@ -258,10 +280,9 @@ namespace nandina::widget::authoring
         return make<Label>(graph, std::move(text), theme);
     }
 
-    [[nodiscard]] inline auto button(
-        std::string text,
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<Button> {
+    [[nodiscard]] inline auto
+    button(std::string text, theme::NanTheme theme = theme::default_theme())
+        -> NodeBuilder<Button> {
         return make<Button>(std::move(text), theme);
     }
 
@@ -271,6 +292,17 @@ namespace nandina::widget::authoring
         theme::NanTheme theme = theme::default_theme()
     ) -> NodeBuilder<Checkbox> {
         return make<Checkbox>(std::move(label), checked, theme);
+    }
+
+    [[nodiscard]] inline auto slider(
+        std::string label,
+        float value = 0.0F,
+        float minimum = 0.0F,
+        float maximum = 1.0F,
+        float step = 0.01F,
+        theme::NanTheme theme = theme::default_theme()
+    ) -> NodeBuilder<Slider> {
+        return make<Slider>(std::move(label), value, minimum, maximum, step, theme);
     }
 
     [[nodiscard]] inline auto text_field(

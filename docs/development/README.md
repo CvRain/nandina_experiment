@@ -239,7 +239,7 @@ This prevents page-local computed/effect callbacks from surviving the page objec
 
 ## Development Roadmap
 
-The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, the A19 functional root runner, and the A20 Checkbox control are complete through the Settings reference application: scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, standard boolean selection, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
+The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, the A19 functional root runner, and the A20-A21 standard input controls are complete through the Settings reference application: scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, boolean and continuous numeric selection, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 
 ### Completed Milestones
 
@@ -821,7 +821,17 @@ Status: complete for boolean selection and two-way authoring.
 
 `BuildContext::checkbox(signal, label)` binds any page/component-owned `Signal<bool>` in both directions using the existing weak setter binding and scope-owned event subscription. Literal construction, `authoring::checkbox()`, `.checked()`, and `.on_change()` remain thin adapters over the same concrete control.
 
-The canonical `nandina_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. Automated source checks keep the bootstrap at 23 lines, the complete application at 122 lines, and forbid page/window/frame plumbing.
+The canonical `nandina_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. A20 established a 23-line bootstrap and 122-line application snapshot; the continuing source-budget test keeps the bootstrap below 30 lines, the complete application below 220 lines, and forbids page/window/frame plumbing.
+
+### A21. Slider And Continuous Value Binding
+
+Status: complete for bounded continuous numeric input.
+
+`widget::Slider` provides a labelled accessibility identity, finite minimum/maximum range, positive step quantization, silent programmatic `set_value()`, and user-originated `value_changed Event<float>`. Pointer presses update immediately and capture subsequent dragging outside the control; keyboard arrows, Home/End, disabled and focus states, and semantic `set_value`, `increment`, and `decrement` actions share the same normalized update path.
+
+`BuildContext::slider(signal, label, minimum, maximum, step)` adds the float counterpart to Checkbox and TextField two-way authoring. Scope-owned subscriptions publish user changes to the signal, weak setter effects reflect source changes back into the concrete control, and silent setters prevent feedback loops. Literal `authoring::slider()` construction and `.value()`, `.range()`, `.step()`, and `.on_change()` modifiers remain available without a reactive source.
+
+The Settings reference now uses Slider for an interface-scale preference and derives both its local label and overall preference summary from the bound signal. Save/reset semantics and the actual Slider accessibility actions are covered headlessly. The canonical example is now 140 non-blank lines including its 23-line bootstrap, while still containing no page, window, frame, or manual reactive-scope plumbing.
 
 ### Deferred After Authoring Core
 

@@ -34,14 +34,24 @@ namespace nandina::semantics
 
     auto role_name(const Role role) noexcept -> std::string_view {
         switch (role) {
-            case Role::none: return "none";
-            case Role::generic: return "generic";
-            case Role::button: return "button";
-            case Role::static_text: return "static-text";
-            case Role::text_field: return "text-field";
-            case Role::list: return "list";
-            case Role::list_item: return "list-item";
-            case Role::checkbox: return "checkbox";
+            case Role::none:
+                return "none";
+            case Role::generic:
+                return "generic";
+            case Role::button:
+                return "button";
+            case Role::static_text:
+                return "static-text";
+            case Role::text_field:
+                return "text-field";
+            case Role::list:
+                return "list";
+            case Role::list_item:
+                return "list-item";
+            case Role::checkbox:
+                return "checkbox";
+            case Role::slider:
+                return "slider";
         }
         return "none";
     }
