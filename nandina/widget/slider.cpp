@@ -171,6 +171,11 @@ namespace nandina::widget
         return theme_view_;
     }
 
+    void Slider::set_override(theme::SliderRecipeRule rule) {
+        override_ = std::move(rule);
+        mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::layout);
+    }
+
     auto Slider::visual_state() const -> theme::SliderVisualState {
         if (disabled_) {
             return theme::SliderVisualState::disabled;
@@ -188,7 +193,11 @@ namespace nandina::widget
     }
 
     auto Slider::resolved_style() const -> theme::ResolvedSliderStyle {
-        return theme::resolve_slider(*system_, appearance_, visual_state());
+        auto style = theme::resolve_slider(*system_, appearance_, visual_state());
+        if (override_) {
+            theme::apply_rule(*system_, appearance_, style, *override_);
+        }
+        return style;
     }
 
     void Slider::on_theme_changed(const theme::ThemeManager& manager) {

@@ -12,6 +12,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -56,6 +57,8 @@ namespace nandina::widget
         void set_theme(theme::NanTheme theme);
         /// 当前生效主题视图（tokens + 当前外观 palette），遗留读取兼容。
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
+        /// 类型化字段覆盖：只覆盖明确指定的配方字段，系统切换后保留并跟随新快照重解析。
+        void set_override(theme::SliderRecipeRule rule);
         [[nodiscard]] auto visual_state() const -> theme::SliderVisualState;
         [[nodiscard]] auto resolved_style() const -> theme::ResolvedSliderStyle;
         void on_theme_changed(const theme::ThemeManager& manager) override;
@@ -83,6 +86,8 @@ namespace nandina::widget
         theme::ColorAppearance appearance_ = theme::ColorAppearance::light;
         /// theme_ref() 兼容视图（tokens + 当前外观 palette）。
         theme::NanTheme theme_view_;
+        /// 类型化字段覆盖（每次解析时按当前系统重应用，不冻结）。
+        std::optional<theme::SliderRecipeRule> override_;
         float value_ = 0.0F;
         float minimum_ = 0.0F;
         float maximum_ = 1.0F;

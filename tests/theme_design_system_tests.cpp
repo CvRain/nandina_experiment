@@ -2,6 +2,8 @@
 // Theme DesignSystem / shared-fragment tests.
 //
 
+#include "foundation/geometry.hpp"
+#include "render/render_device.hpp"
 #include "scene/scene_tree.hpp"
 #include "theme/button_style.hpp"
 #include "theme/checkbox_style.hpp"
@@ -10,12 +12,15 @@
 #include "theme/theme.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
+#include "widget/slider.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <memory>
+#include <string>
 #include <string_view>
+#include <vector>
 
 namespace
 {
@@ -30,6 +35,44 @@ namespace
             ++changes;
         }
         void on_theme_manager_destroyed(const theme::ThemeManager& /*manager*/) noexcept override {}
+    };
+
+    /** 最小绘制录制设备：记录 rect / outline 调用。 */
+    class RecordingDevice final: public render::IRenderDevice {
+    public:
+        struct RectCall {
+            foundation::NanRect rect;
+            bool outline = false;
+        };
+
+        std::vector<RectCall> rects;
+
+        void begin_frame() override {}
+        void end_frame() override {}
+        void set_clip(const foundation::NanRect&) override {}
+        void clear_clip() override {}
+        void draw_rect(const foundation::NanRect& r, const foundation::NanColor&) override {
+            rects.push_back({.rect = r, .outline = false});
+        }
+        void draw_rect_outline(const foundation::NanRect& r, float, const foundation::NanColor&) override {
+            rects.push_back({.rect = r, .outline = true});
+        }
+        void draw_rounded_rect(const foundation::NanRect& r, float, const foundation::NanColor&) override {
+            rects.push_back({.rect = r, .outline = false});
+        }
+        void draw_line(
+            const foundation::NanPoint&,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
+        void draw_text(
+            std::string_view,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
     };
 } // namespace
 
@@ -203,4 +246,90 @@ TEST_CASE("legacy named themes and families still route through the design syste
         manager.design_system().palette(theme::ColorAppearance::dark).primary.oklch().light
         == Catch::Approx(0.38F)
     );
+}
+
+TEST_CASE("Button set_override patches fields and survives a system apply", "[theme][override]") {
+    theme::ThemeManager manager;
+    auto system = theme::default_design_system();
+    system.light.primary = theme::nan_color(0.60F, 0.10F, 200.0F);
+    manager.apply(std::make_shared<const theme::DesignSystem>(std::move(system)));
+
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(manager);
+    auto button = std::make_shared<widget::Button>("Override");
+    theme::ButtonRecipeRule rule;
+    rule.container_radius = theme::ThemeScalar::literal(99.0F);
+    rule.label_color = theme::ThemeColor::token(theme::ColorToken::error);
+    button->set_override(std::move(rule));
+    tree.set_root(button);
+
+    // 覆盖字段生效，未覆盖字段跟随当前系统。
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(99.0F));
+    REQUIRE(
+        button->resolved_style().label.color.oklch().light
+        == Catch::Approx(manager.theme().palette.error.oklch().light)
+    );
+    REQUIRE(button->resolved_style().container.fill.oklch().light == Catch::Approx(0.60F));
+
+    // 系统切换：覆盖保留且跟随新快照重解析，未覆盖字段跟随新系统（不冻结）。
+    auto next = theme::default_design_system();
+    next.light.primary = theme::nan_color(0.30F, 0.10F, 200.0F);
+    next.light.error = theme::nan_color(0.44F, 0.10F, 20.0F);
+    manager.apply(std::make_shared<const theme::DesignSystem>(std::move(next)));
+
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(99.0F));
+    REQUIRE(button->resolved_style().label.color.oklch().light == Catch::Approx(0.44F));
+    REQUIRE(button->resolved_style().container.fill.oklch().light == Catch::Approx(0.30F));
+}
+
+TEST_CASE("Slider set_override patches thumb radius", "[theme][override]") {
+    auto slider = std::make_shared<widget::Slider>("Scale", 0.5F, 0.0F, 1.0F, 0.05F);
+    theme::SliderRecipeRule rule;
+    rule.thumb_radius = theme::ThemeScalar::literal(12.0F);
+    slider->set_override(std::move(rule));
+    REQUIRE(slider->resolved_style().thumb.box.radius == Catch::Approx(12.0F));
+}
+
+TEST_CASE("detached widget resolves against its fallback design system", "[theme][override]") {
+    auto button = std::make_shared<widget::Button>("Detached");
+    const auto fallback = theme::default_theme();
+    REQUIRE(
+        button->theme_ref().palette.primary.oklch().light
+        == Catch::Approx(fallback.palette.primary.oklch().light)
+    );
+    const auto style = button->resolved_style();
+    REQUIRE(
+        style.container.fill.oklch().light
+        == Catch::Approx(fallback.palette.primary.oklch().light)
+    );
+    REQUIRE(style.metrics.height == Catch::Approx(40.0F)); // medium 尺寸
+}
+
+TEST_CASE("focused button draws a normalized focus ring", "[theme][painter]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("Focus");
+    button->layout_to(foundation::NanRect::from_xywh(10.0F, 10.0F, 120.0F, 40.0F));
+    tree.set_root(button);
+    tree.set_focus(button.get());
+    tree.draw(dev);
+
+    // 唯一 outline 调用即焦点环：控件边界向外扩 (focus.width + 默认 gap 1)。
+    const auto ring = foundation::NanRect::from_xywh(10.0F, 10.0F, 120.0F, 40.0F)
+                          .expanded(2.0F + 1.0F);
+    bool found = false;
+    for (const auto& call: dev.rects) {
+        if (call.outline && call.rect == ring) {
+            found = true;
+        }
+    }
+    REQUIRE(found);
+
+    // 取消聚焦后不再绘制焦点环。
+    tree.set_focus(nullptr);
+    dev.rects.clear();
+    tree.draw(dev);
+    for (const auto& call: dev.rects) {
+        REQUIRE_FALSE(call.outline);
+    }
 }

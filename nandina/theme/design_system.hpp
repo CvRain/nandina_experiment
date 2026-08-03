@@ -465,6 +465,36 @@ namespace nandina::theme
         TextFieldVisualState state
     ) -> ResolvedTextFieldStyle;
 
+    // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedButtonStyle& style,
+        const ButtonRecipeRule& rule
+    );
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedCheckboxStyle& style,
+        const CheckboxRecipeRule& rule
+    );
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedSliderStyle& style,
+        const SliderRecipeRule& rule
+    );
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedTextFieldStyle& style,
+        const TextFieldRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;

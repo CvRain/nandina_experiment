@@ -105,6 +105,11 @@ namespace nandina::widget
         return theme_view_;
     }
 
+    void Checkbox::set_override(theme::CheckboxRecipeRule rule) {
+        override_ = std::move(rule);
+        mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::layout);
+    }
+
     auto Checkbox::visual_state() const -> theme::CheckboxVisualState {
         if (disabled()) {
             return theme::CheckboxVisualState::disabled;
@@ -122,7 +127,11 @@ namespace nandina::widget
     }
 
     auto Checkbox::resolved_style() const -> theme::ResolvedCheckboxStyle {
-        return theme::resolve_checkbox(*system_, appearance_, checked_, visual_state());
+        auto style = theme::resolve_checkbox(*system_, appearance_, checked_, visual_state());
+        if (override_) {
+            theme::apply_rule(*system_, appearance_, style, *override_);
+        }
+        return style;
     }
 
     void Checkbox::set_text_pipeline(primitives::TextPipeline pipeline) {

@@ -15,6 +15,7 @@
 
 #include <functional>
 #include <memory>
+#include <optional>
 #include <string>
 #include <string_view>
 
@@ -43,6 +44,8 @@ namespace nandina::widget
 
         void set_theme(theme::NanTheme theme);
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
+        /// 类型化字段覆盖：只覆盖明确指定的配方字段，系统切换后保留并跟随新快照重解析。
+        void set_override(theme::TextFieldRecipeRule rule);
 
         void set_on_change(std::function<void(std::string_view)> callback);
         void set_on_submit(std::function<void(std::string_view)> callback);
@@ -103,6 +106,8 @@ namespace nandina::widget
         theme::ColorAppearance appearance_ = theme::ColorAppearance::light;
         /// theme_ref() 兼容视图（tokens + 当前外观 palette）。
         theme::NanTheme theme_view_;
+        /// 类型化字段覆盖（每次解析时按当前系统重应用，不冻结）。
+        std::optional<theme::TextFieldRecipeRule> override_;
         /// set_theme(NanTheme) 整份覆盖后不再跟随系统切换。
         bool system_explicit_ = false;
         bool font_explicit_ = false;

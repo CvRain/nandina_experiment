@@ -76,6 +76,12 @@ namespace nandina::widget
         return theme_view_;
     }
 
+    void TextField::set_override(theme::TextFieldRecipeRule rule) {
+        override_ = std::move(rule);
+        apply_theme();
+        mark_layout_dirty();
+    }
+
     void TextField::set_on_change(std::function<void(std::string_view)> callback) {
         on_change_ = std::move(callback);
     }
@@ -129,7 +135,11 @@ namespace nandina::widget
     }
 
     auto TextField::resolved_style() const -> theme::ResolvedTextFieldStyle {
-        return theme::resolve_text_field(*system_, appearance_, visual_state());
+        auto style = theme::resolve_text_field(*system_, appearance_, visual_state());
+        if (override_) {
+            theme::apply_rule(*system_, appearance_, style, *override_);
+        }
+        return style;
     }
 
     auto TextField::editable_text() -> primitives::EditableText& {

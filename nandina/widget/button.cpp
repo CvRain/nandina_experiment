@@ -146,6 +146,11 @@ namespace nandina::widget
         return theme_view_;
     }
 
+    void Button::set_override(theme::ButtonRecipeRule rule) {
+        override_ = std::move(rule);
+        mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::layout);
+    }
+
     void Button::set_tone(theme::ButtonTone tone) {
         tone_ = tone;
         mark_layout_dirty();
@@ -192,9 +197,13 @@ namespace nandina::widget
     }
 
     auto Button::resolved_style() const -> theme::ResolvedButtonStyle {
-        return theme::resolve_button(
+        auto style = theme::resolve_button(
             *system_, appearance_, tone_, treatment_, size_, visual_state()
         );
+        if (override_) {
+            theme::apply_rule(*system_, appearance_, style, *override_);
+        }
+        return style;
     }
 
     void Button::on_draw(render::DrawContext& ctx) {

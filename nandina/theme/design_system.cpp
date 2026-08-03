@@ -22,6 +22,120 @@ namespace nandina::theme
             -> NanTheme {
             return NanTheme {system.tokens, system.palette(appearance)};
         }
+
+        /** 平铺 ButtonStyle → 片段组合的解析结果。 */
+        [[nodiscard]] auto compose(const ButtonStyle& flat) -> ResolvedButtonStyle {
+            return {
+                .container = ResolvedBoxStyle {
+                    .fill = flat.background,
+                    .border = flat.border_color,
+                    .border_width = flat.border_width,
+                    .radius = flat.radius,
+                },
+                .label = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
+                .focus =
+                    ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
+                .metrics = ResolvedControlMetrics {
+                    .height = flat.height,
+                    .padding_x = flat.padding_x,
+                    .gap = 0.0F,
+                    .min_height = 0.0F,
+                    .box_size = 0.0F,
+                    .preferred_width = 0.0F,
+                },
+            };
+        }
+
+        /** 平铺 CheckboxStyle → 片段组合的解析结果。 */
+        [[nodiscard]] auto compose(const CheckboxStyle& flat) -> ResolvedCheckboxStyle {
+            return {
+                .indicator = ResolvedBoxStyle {
+                    .fill = flat.box_background,
+                    .border = flat.border_color,
+                    .border_width = flat.border_width,
+                    .radius = flat.radius,
+                },
+                .check = flat.check_color,
+                .label = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
+                .focus =
+                    ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
+                .metrics = ResolvedControlMetrics {
+                    .height = 0.0F,
+                    .padding_x = 0.0F,
+                    .gap = flat.gap,
+                    .min_height = flat.min_height,
+                    .box_size = flat.box_size,
+                    .preferred_width = 0.0F,
+                },
+            };
+        }
+
+        /** 平铺 SliderStyle → 片段组合的解析结果。 */
+        [[nodiscard]] auto compose(const SliderStyle& flat) -> ResolvedSliderStyle {
+            return {
+                .inactive_track = ResolvedTrackStyle {
+                    .box = ResolvedBoxStyle {
+                        .fill = flat.inactive_track,
+                        .border = flat.inactive_track,
+                        .border_width = 0.0F,
+                        .radius = flat.track_height * 0.5F, // pill 形轨道
+                    },
+                    .thickness = flat.track_height,
+                },
+                .active_track = ResolvedTrackStyle {
+                    .box = ResolvedBoxStyle {
+                        .fill = flat.active_track,
+                        .border = flat.active_track,
+                        .border_width = 0.0F,
+                        .radius = flat.track_height * 0.5F,
+                    },
+                    .thickness = flat.track_height,
+                },
+                .thumb = ResolvedThumbStyle {
+                    .box = ResolvedBoxStyle {
+                        .fill = flat.thumb,
+                        .border = flat.thumb,
+                        .border_width = 0.0F,
+                        .radius = flat.thumb_radius,
+                    },
+                },
+                .focus = ResolvedFocusRing {.color = flat.focus_ring, .width = flat.focus_ring_width},
+                .metrics = ResolvedControlMetrics {
+                    .height = 0.0F,
+                    .padding_x = 0.0F,
+                    .gap = 0.0F,
+                    .min_height = flat.min_height,
+                    .box_size = 0.0F,
+                    .preferred_width = flat.preferred_width,
+                },
+            };
+        }
+
+        /** 平铺 TextFieldStyle → 片段组合的解析结果。 */
+        [[nodiscard]] auto compose(const TextFieldStyle& flat) -> ResolvedTextFieldStyle {
+            return {
+                .container = ResolvedBoxStyle {
+                    .fill = flat.background,
+                    .border = flat.border_color,
+                    .border_width = flat.border_width,
+                    .radius = flat.radius,
+                },
+                .value = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
+                .placeholder =
+                    ResolvedTypeStyle {.color = flat.placeholder, .font_size = flat.font_size},
+                .selection = flat.selection,
+                .focus =
+                    ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
+                .metrics = ResolvedControlMetrics {
+                    .height = flat.height,
+                    .padding_x = flat.padding_x,
+                    .gap = 0.0F,
+                    .min_height = 0.0F,
+                    .box_size = 0.0F,
+                    .preferred_width = 0.0F,
+                },
+            };
+        }
     } // namespace
 
     /**
@@ -43,60 +157,14 @@ namespace nandina::theme
         const ButtonSize size,
         const ButtonVisualState state
     ) -> ResolvedButtonStyle {
-        auto flat = resolve_button_style(theme_view(system, appearance), tone, treatment, size, state);
+        auto style =
+            compose(resolve_button_style(theme_view(system, appearance), tone, treatment, size, state));
         for (const auto& rule: system.components.button.rules) {
-            if (!rule.selector.matches(tone, treatment, size, state)) {
-                continue;
-            }
-            if (rule.container_fill) {
-                flat.background = resolve_color(system, appearance, *rule.container_fill);
-            }
-            if (rule.container_border) {
-                flat.border_color = resolve_color(system, appearance, *rule.container_border);
-            }
-            if (rule.container_border_width) {
-                flat.border_width = resolve_scalar(system, appearance, *rule.container_border_width);
-            }
-            if (rule.container_radius) {
-                flat.radius = resolve_scalar(system, appearance, *rule.container_radius);
-            }
-            if (rule.label_color) {
-                flat.foreground = resolve_color(system, appearance, *rule.label_color);
-            }
-            if (rule.label_font_size) {
-                flat.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
-            }
-            if (rule.focus_ring_color) {
-                flat.focus_ring_color = resolve_color(system, appearance, *rule.focus_ring_color);
-            }
-            if (rule.focus_ring_width) {
-                flat.focus_ring_width = resolve_scalar(system, appearance, *rule.focus_ring_width);
-            }
-            if (rule.metrics_height) {
-                flat.height = resolve_scalar(system, appearance, *rule.metrics_height);
-            }
-            if (rule.metrics_padding_x) {
-                flat.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
+            if (rule.selector.matches(tone, treatment, size, state)) {
+                apply_rule(system, appearance, style, rule);
             }
         }
-        return {
-            .container = ResolvedBoxStyle {
-                .fill = flat.background,
-                .border = flat.border_color,
-                .border_width = flat.border_width,
-                .radius = flat.radius,
-            },
-            .label = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
-            .focus = ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
-            .metrics = ResolvedControlMetrics {
-                .height = flat.height,
-                .padding_x = flat.padding_x,
-                .gap = 0.0F,
-                .min_height = 0.0F,
-                .box_size = 0.0F,
-                .preferred_width = 0.0F,
-            },
-        };
+        return style;
     }
 
     /**
@@ -114,64 +182,15 @@ namespace nandina::theme
         const bool checked,
         const CheckboxVisualState state
     ) -> ResolvedCheckboxStyle {
-        auto flat = resolve_checkbox_style(theme_view(system, appearance), checked, state);
+        auto style =
+            compose(resolve_checkbox_style(theme_view(system, appearance), checked, state));
         for (const auto& rule: system.components.checkbox.rules) {
-            if (rule.checked && *rule.checked != checked) {
+            if ((rule.checked && *rule.checked != checked) || (rule.state && *rule.state != state)) {
                 continue;
             }
-            if (rule.state && *rule.state != state) {
-                continue;
-            }
-            if (rule.indicator_fill) {
-                flat.box_background = resolve_color(system, appearance, *rule.indicator_fill);
-            }
-            if (rule.indicator_border) {
-                flat.border_color = resolve_color(system, appearance, *rule.indicator_border);
-            }
-            if (rule.indicator_border_width) {
-                flat.border_width = resolve_scalar(system, appearance, *rule.indicator_border_width);
-            }
-            if (rule.indicator_radius) {
-                flat.radius = resolve_scalar(system, appearance, *rule.indicator_radius);
-            }
-            if (rule.label_color) {
-                flat.foreground = resolve_color(system, appearance, *rule.label_color);
-            }
-            if (rule.label_font_size) {
-                flat.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
-            }
-            if (rule.focus_ring_color) {
-                flat.focus_ring_color = resolve_color(system, appearance, *rule.focus_ring_color);
-            }
-            if (rule.focus_ring_width) {
-                flat.focus_ring_width = resolve_scalar(system, appearance, *rule.focus_ring_width);
-            }
-            if (rule.metrics_gap) {
-                flat.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
-            }
-            if (rule.metrics_box_size) {
-                flat.box_size = resolve_scalar(system, appearance, *rule.metrics_box_size);
-            }
+            apply_rule(system, appearance, style, rule);
         }
-        return {
-            .indicator = ResolvedBoxStyle {
-                .fill = flat.box_background,
-                .border = flat.border_color,
-                .border_width = flat.border_width,
-                .radius = flat.radius,
-            },
-            .check = flat.check_color,
-            .label = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
-            .focus = ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
-            .metrics = ResolvedControlMetrics {
-                .height = 0.0F,
-                .padding_x = 0.0F,
-                .gap = flat.gap,
-                .min_height = flat.min_height,
-                .box_size = flat.box_size,
-                .preferred_width = 0.0F,
-            },
-        };
+        return style;
     }
 
     /**
@@ -187,70 +206,14 @@ namespace nandina::theme
         const ColorAppearance appearance,
         const SliderVisualState state
     ) -> ResolvedSliderStyle {
-        auto flat = resolve_slider_style(theme_view(system, appearance), state);
+        auto style = compose(resolve_slider_style(theme_view(system, appearance), state));
         for (const auto& rule: system.components.slider.rules) {
             if (rule.state && *rule.state != state) {
                 continue;
             }
-            if (rule.track_inactive_fill) {
-                flat.inactive_track = resolve_color(system, appearance, *rule.track_inactive_fill);
-            }
-            if (rule.track_active_fill) {
-                flat.active_track = resolve_color(system, appearance, *rule.track_active_fill);
-            }
-            if (rule.track_thickness) {
-                flat.track_height = resolve_scalar(system, appearance, *rule.track_thickness);
-            }
-            if (rule.thumb_fill) {
-                flat.thumb = resolve_color(system, appearance, *rule.thumb_fill);
-            }
-            if (rule.thumb_radius) {
-                flat.thumb_radius = resolve_scalar(system, appearance, *rule.thumb_radius);
-            }
-            if (rule.focus_ring_color) {
-                flat.focus_ring = resolve_color(system, appearance, *rule.focus_ring_color);
-            }
-            if (rule.focus_ring_width) {
-                flat.focus_ring_width = resolve_scalar(system, appearance, *rule.focus_ring_width);
-            }
+            apply_rule(system, appearance, style, rule);
         }
-        return {
-            .inactive_track = ResolvedTrackStyle {
-                .box = ResolvedBoxStyle {
-                    .fill = flat.inactive_track,
-                    .border = flat.inactive_track,
-                    .border_width = 0.0F,
-                    .radius = flat.track_height * 0.5F, // pill 形轨道
-                },
-                .thickness = flat.track_height,
-            },
-            .active_track = ResolvedTrackStyle {
-                .box = ResolvedBoxStyle {
-                    .fill = flat.active_track,
-                    .border = flat.active_track,
-                    .border_width = 0.0F,
-                    .radius = flat.track_height * 0.5F,
-                },
-                .thickness = flat.track_height,
-            },
-            .thumb = ResolvedThumbStyle {
-                .box = ResolvedBoxStyle {
-                    .fill = flat.thumb,
-                    .border = flat.thumb,
-                    .border_width = 0.0F,
-                    .radius = flat.thumb_radius,
-                },
-            },
-            .focus = ResolvedFocusRing {.color = flat.focus_ring, .width = flat.focus_ring_width},
-            .metrics = ResolvedControlMetrics {
-                .height = 0.0F,
-                .padding_x = 0.0F,
-                .gap = 0.0F,
-                .min_height = flat.min_height,
-                .box_size = 0.0F,
-                .preferred_width = flat.preferred_width,
-            },
-        };
+        return style;
     }
 
     /**
@@ -266,68 +229,139 @@ namespace nandina::theme
         const ColorAppearance appearance,
         const TextFieldVisualState state
     ) -> ResolvedTextFieldStyle {
-        auto flat = resolve_text_field_style(theme_view(system, appearance), state);
+        auto style = compose(resolve_text_field_style(theme_view(system, appearance), state));
         for (const auto& rule: system.components.text_field.rules) {
             if (rule.state && !has_text_field_state(state, *rule.state)) {
                 continue;
             }
-            if (rule.container_fill) {
-                flat.background = resolve_color(system, appearance, *rule.container_fill);
-            }
-            if (rule.container_border) {
-                flat.border_color = resolve_color(system, appearance, *rule.container_border);
-            }
-            if (rule.container_border_width) {
-                flat.border_width = resolve_scalar(system, appearance, *rule.container_border_width);
-            }
-            if (rule.container_radius) {
-                flat.radius = resolve_scalar(system, appearance, *rule.container_radius);
-            }
-            if (rule.value_color) {
-                flat.foreground = resolve_color(system, appearance, *rule.value_color);
-            }
-            if (rule.placeholder_color) {
-                flat.placeholder = resolve_color(system, appearance, *rule.placeholder_color);
-            }
-            if (rule.selection_color) {
-                flat.selection = resolve_color(system, appearance, *rule.selection_color);
-            }
-            if (rule.focus_ring_color) {
-                flat.focus_ring_color = resolve_color(system, appearance, *rule.focus_ring_color);
-            }
-            if (rule.focus_ring_width) {
-                flat.focus_ring_width = resolve_scalar(system, appearance, *rule.focus_ring_width);
-            }
-            if (rule.font_size) {
-                flat.font_size = resolve_scalar(system, appearance, *rule.font_size);
-            }
-            if (rule.metrics_height) {
-                flat.height = resolve_scalar(system, appearance, *rule.metrics_height);
-            }
-            if (rule.metrics_padding_x) {
-                flat.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
-            }
+            apply_rule(system, appearance, style, rule);
         }
-        return {
-            .container = ResolvedBoxStyle {
-                .fill = flat.background,
-                .border = flat.border_color,
-                .border_width = flat.border_width,
-                .radius = flat.radius,
-            },
-            .value = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
-            .placeholder = ResolvedTypeStyle {.color = flat.placeholder, .font_size = flat.font_size},
-            .selection = flat.selection,
-            .focus = ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
-            .metrics = ResolvedControlMetrics {
-                .height = flat.height,
-                .padding_x = flat.padding_x,
-                .gap = 0.0F,
-                .min_height = 0.0F,
-                .box_size = 0.0F,
-                .preferred_width = 0.0F,
-            },
-        };
+        return style;
+    }
+
+    // ─── apply_rule：把配方规则应用到已解析的配方（widget set_override 复用） ───
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedButtonStyle& style,
+        const ButtonRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_padding_x)
+            style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
+    }
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedCheckboxStyle& style,
+        const CheckboxRecipeRule& rule
+    ) {
+        if (rule.indicator_fill)
+            style.indicator.fill = resolve_color(system, appearance, *rule.indicator_fill);
+        if (rule.indicator_border)
+            style.indicator.border = resolve_color(system, appearance, *rule.indicator_border);
+        if (rule.indicator_border_width) {
+            style.indicator.border_width =
+                resolve_scalar(system, appearance, *rule.indicator_border_width);
+        }
+        if (rule.indicator_radius)
+            style.indicator.radius = resolve_scalar(system, appearance, *rule.indicator_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_box_size)
+            style.metrics.box_size = resolve_scalar(system, appearance, *rule.metrics_box_size);
+    }
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedSliderStyle& style,
+        const SliderRecipeRule& rule
+    ) {
+        if (rule.track_inactive_fill) {
+            style.inactive_track.box.fill =
+                resolve_color(system, appearance, *rule.track_inactive_fill);
+        }
+        if (rule.track_active_fill) {
+            style.active_track.box.fill = resolve_color(system, appearance, *rule.track_active_fill);
+        }
+        if (rule.track_thickness) {
+            style.inactive_track.thickness = resolve_scalar(system, appearance, *rule.track_thickness);
+            style.active_track.thickness = resolve_scalar(system, appearance, *rule.track_thickness);
+        }
+        if (rule.thumb_fill)
+            style.thumb.box.fill = resolve_color(system, appearance, *rule.thumb_fill);
+        if (rule.thumb_radius)
+            style.thumb.box.radius = resolve_scalar(system, appearance, *rule.thumb_radius);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+    }
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedTextFieldStyle& style,
+        const TextFieldRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.value_color)
+            style.value.color = resolve_color(system, appearance, *rule.value_color);
+        if (rule.placeholder_color)
+            style.placeholder.color = resolve_color(system, appearance, *rule.placeholder_color);
+        if (rule.selection_color)
+            style.selection = resolve_color(system, appearance, *rule.selection_color);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.font_size) {
+            style.value.font_size = resolve_scalar(system, appearance, *rule.font_size);
+            style.placeholder.font_size = resolve_scalar(system, appearance, *rule.font_size);
+        }
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_padding_x)
+            style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
     }
 
     /** @return 框架默认 Button 配方（token 引用，随 palette 变体解析）。 */
