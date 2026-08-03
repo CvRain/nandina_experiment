@@ -206,12 +206,12 @@ TEST_CASE("ThemeManager switches attached widget trees by revision", "[theme][ma
     const auto before = manager.revision();
     (void)tree.layout_root(foundation::NanSize(320.0F, 120.0F));
     REQUIRE_FALSE(button->layout_dirty());
-    REQUIRE(button->resolved_style().background.oklch().light == Catch::Approx(0.72F));
+    REQUIRE(button->resolved_style().container.fill.oklch().light == Catch::Approx(0.72F));
     REQUIRE(manager.activate("dark"));
     REQUIRE(manager.revision() == before + 1);
     REQUIRE(button->layout_dirty());
     REQUIRE(button->theme_ref().palette.primary.oklch().light == Catch::Approx(0.38F));
-    REQUIRE(button->resolved_style().background.oklch().light == Catch::Approx(0.38F));
+    REQUIRE(button->resolved_style().container.fill.oklch().light == Catch::Approx(0.38F));
 }
 
 TEST_CASE("ThemeManager resolves family variants from appearance preference", "[theme][manager]") {
@@ -282,12 +282,12 @@ TEST_CASE("TextField rules compose focused and invalid states", "[theme][text-fi
     REQUIRE(theme::has_text_field_state(
         field->visual_state(), theme::TextFieldVisualState::invalid
     ));
-    REQUIRE(field->resolved_style().height == Catch::Approx(46.0F));
+    REQUIRE(field->resolved_style().metrics.height == Catch::Approx(46.0F));
     REQUIRE(
-        field->resolved_style().border_color.oklch().light
+        field->resolved_style().container.border.oklch().light
         == Catch::Approx(manager.theme().palette.error.oklch().light)
     );
-    REQUIRE(field->resolved_style().focus_ring_width > 0.0F);
+    REQUIRE(field->resolved_style().focus.width > 0.0F);
 }
 
 TEST_CASE("SceneTree releases a destroyed ThemeManager", "[theme][manager][lifetime]") {
@@ -441,7 +441,7 @@ TEST_CASE("Button instance theme and StyleContext keep their cascade priority", 
     tree.set_root(button);
 
     REQUIRE(button->theme_ref().palette.primary.oklch().light == Catch::Approx(0.81F));
-    REQUIRE(button->resolved_style().background.oklch().light == Catch::Approx(0.81F));
+    REQUIRE(button->resolved_style().container.fill.oklch().light == Catch::Approx(0.81F));
     REQUIRE(button->text_node().font_size() == Catch::Approx(29.0F));
     REQUIRE(button->text_node().color().oklch().light == Catch::Approx(0.66F));
     REQUIRE(button->text_node().color().alpha() == Catch::Approx(0.4F));
@@ -535,7 +535,9 @@ TEST_CASE("button forwards text state through its text primitive", "[widget][but
 
     tree.draw(dev);
 
-    REQUIRE(button->text_node().font_size() == Catch::Approx(button->resolved_style().font_size));
+    REQUIRE(
+        button->text_node().font_size() == Catch::Approx(button->resolved_style().label.font_size)
+    );
     REQUIRE(button->text_node().layout_result().overflowed);
     REQUIRE(dev.texts.size() == 1);
     REQUIRE(dev.texts[0].text.ends_with("..."));

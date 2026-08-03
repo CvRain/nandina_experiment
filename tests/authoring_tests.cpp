@@ -132,8 +132,8 @@ TEST_CASE(
 
     REQUIRE(authored_button->global_bounds() == imperative_button->global_bounds());
     REQUIRE(
-        authored_button->resolved_style().border_width
-        == Catch::Approx(imperative_button->resolved_style().border_width)
+        authored_button->resolved_style().container.border_width
+        == Catch::Approx(imperative_button->resolved_style().container.border_width)
     );
     REQUIRE(authored_button->tone() == imperative_button->tone());
     REQUIRE(authored_button->treatment() == imperative_button->treatment());

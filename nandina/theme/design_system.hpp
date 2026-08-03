@@ -1,0 +1,489 @@
+/**
+ * theme/design_system — 不可变设计系统快照：共享视觉片段、组件配方与外观感知解析。
+ *
+ * 分层模型：
+ *
+ *   primitive tokens / semantic palette（light + dark）
+ *                     │
+ *                     ▼
+ *   共享视觉片段      BoxStyle / TypeStyle / FocusRingStyle /
+ *                    TrackStyle / ThumbStyle / ControlMetrics
+ *                     │
+ *                     ▼
+ *   组件配方          ButtonRecipe / CheckboxRecipe / SliderRecipe /
+ *                    TextFieldRecipe（+ selector 规则覆盖）
+ *                     │
+ *                     ▼
+ *   解析结果          ResolvedButtonStyle / …（具体值）
+ *                     │
+ *                     ▼
+ *   painter          BoxPainter / FocusRingPainter（非节点）
+ *
+ * 迁移状态：控件尚未切换到本模型；遗留的 per-component 解析器（button_style 等）
+ * 与 NanStyle 在迁移完成前仍是权威实现。详见 dev-docs-v3/phase6-theme-design-system.md。
+ */
+
+#ifndef NANDINA_EXPERIMENT_THEME_DESIGN_SYSTEM_HPP
+#define NANDINA_EXPERIMENT_THEME_DESIGN_SYSTEM_HPP
+
+#include "appearance.hpp"
+#include "checkbox_style.hpp"
+#include "nan_style.hpp"
+#include "slider_style.hpp"
+#include "text_field_style.hpp"
+#include "theme.hpp"
+
+#include <optional>
+#include <vector>
+
+namespace nandina::theme
+{
+    // ─── 共享视觉片段（声明形态：token-or-literal） ───────────────────────────
+
+    /**
+     * 矩形视觉槽位的填充 / 描边 / 圆角（按钮主体、勾选框指示器、输入框容器等）。
+     */
+    using BoxStyle = struct BoxStyle {
+        ThemeColor fill;
+        ThemeColor border;
+        ThemeScalar border_width;
+        ThemeScalar radius;
+    };
+
+    /**
+     * 文本槽位的排版。命名 `TypeStyle` 是因为 `primitives::TextStyle` 已被
+     * widget 文本 primitive 占用。
+     */
+    using TypeStyle = struct TypeStyle {
+        ThemeColor color;
+        ThemeScalar font_size;
+    };
+
+    /** 控件聚焦时绘制的焦点环。 */
+    using FocusRingStyle = struct FocusRingStyle {
+        ThemeColor color;
+        ThemeScalar width;
+    };
+
+    /** 线性轨道（slider / progress）。`box` 承载填充 / 描边 / 圆角。 */
+    using TrackStyle = struct TrackStyle {
+        BoxStyle box;
+        ThemeScalar thickness;
+    };
+
+    /** 轨道上可拖拽的拇指。 */
+    using ThumbStyle = struct ThumbStyle {
+        BoxStyle box;
+    };
+
+    /** 可选 hover/pressed 覆盖层。可推迟到 ripple 动画阶段。 */
+    using StateLayerStyle = struct StateLayerStyle {
+        ThemeColor hover;
+        ThemeColor pressed;
+    };
+
+    /**
+     * 所有控件共享的尺寸 / 间距。组件只取用自己相关的槽位，其余忽略。
+     */
+    using ControlMetrics = struct ControlMetrics {
+        ThemeScalar height;
+        ThemeScalar padding_x;
+        ThemeScalar gap;
+        ThemeScalar min_height;
+        ThemeScalar box_size;
+        ThemeScalar preferred_width;
+    };
+
+    // ─── 解析后的片段（具体值） ───────────────────────────────────────────────
+
+    /** 解析后的矩形槽位：所有字段都是具体颜色 / 数值。 */
+    using ResolvedBoxStyle = struct ResolvedBoxStyle {
+        NanColor fill;
+        NanColor border;
+        float border_width = 0.0F;
+        float radius = 0.0F;
+    };
+
+    using ResolvedTypeStyle = struct ResolvedTypeStyle {
+        NanColor color;
+        float font_size = 0.0F;
+    };
+
+    using ResolvedFocusRing = struct ResolvedFocusRing {
+        NanColor color;
+        float width = 0.0F;
+    };
+
+    using ResolvedTrackStyle = struct ResolvedTrackStyle {
+        ResolvedBoxStyle box;
+        float thickness = 0.0F;
+    };
+
+    using ResolvedThumbStyle = struct ResolvedThumbStyle {
+        ResolvedBoxStyle box;
+    };
+
+    using ResolvedControlMetrics = struct ResolvedControlMetrics {
+        float height = 0.0F;
+        float padding_x = 0.0F;
+        float gap = 0.0F;
+        float min_height = 0.0F;
+        float box_size = 0.0F;
+        float preferred_width = 0.0F;
+    };
+
+    // ─── 组件配方（片段组合） ────────────────────────────────────────────────
+
+    /** Button 配方：容器 + 文本 + 焦点环 + 度量。 */
+    using ButtonRecipe = struct ButtonRecipe {
+        BoxStyle container;
+        TypeStyle label;
+        FocusRingStyle focus;
+        ControlMetrics metrics;
+    };
+
+    /** Checkbox 配方：指示器（勾选框）+ 文本 + 焦点环 + 度量。 */
+    using CheckboxRecipe = struct CheckboxRecipe {
+        BoxStyle indicator;
+        TypeStyle label;
+        FocusRingStyle focus;
+        ControlMetrics metrics;
+    };
+
+    /** Slider 配方：活动 / 非活动轨道 + 拇指 + 焦点环 + 度量。 */
+    using SliderRecipe = struct SliderRecipe {
+        TrackStyle inactive_track;
+        TrackStyle active_track;
+        ThumbStyle thumb;
+        FocusRingStyle focus;
+        ControlMetrics metrics;
+    };
+
+    /** TextField 配方：容器 + 值 / 占位 / 选区文本 + 焦点环 + 度量。 */
+    using TextFieldRecipe = struct TextFieldRecipe {
+        BoxStyle container;
+        TypeStyle value;
+        TypeStyle placeholder;
+        ThemeColor selection;
+        FocusRingStyle focus;
+        ControlMetrics metrics;
+    };
+
+    // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
+    //
+    // 配方书 = `base`（完全指定）+ 有序规则列表。
+    // 解析：从 `base` 出发，按顺序应用所有匹配规则（后匹配者胜），再把
+    // ThemeValue 按当前外观解析为具体值。
+    // 跨切面状态变换（disabled 透明度、hover/pressed 覆盖 alpha）由解析器在
+    // 字段覆盖之前应用，与现有 resolve_*_style 的行为一致。
+
+    /** Button 状态规则：按 tone / treatment / size / state 选择，覆盖容器 / 文本 / 焦点 / 度量字段。 */
+    using ButtonRecipeRule = struct ButtonRecipeRule {
+        ButtonRuleSelector selector; // tone / treatment / size / state
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_padding_x;
+    };
+
+    /** Checkbox 规则：支持 checked 布尔选择器（未勾选 outline / 勾选 filled）。 */
+    using CheckboxRecipeRule = struct CheckboxRecipeRule {
+        std::optional<bool> checked; // nullopt = 任意
+        std::optional<CheckboxVisualState> state;
+        std::optional<ThemeColor> indicator_fill;
+        std::optional<ThemeColor> indicator_border;
+        std::optional<ThemeScalar> indicator_border_width;
+        std::optional<ThemeScalar> indicator_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_box_size;
+    };
+
+    /** Slider 规则：按状态覆盖轨道 / 拇指 / 焦点环字段。 */
+    using SliderRecipeRule = struct SliderRecipeRule {
+        std::optional<SliderVisualState> state;
+        std::optional<ThemeColor> track_inactive_fill;
+        std::optional<ThemeColor> track_active_fill;
+        std::optional<ThemeScalar> track_thickness;
+        std::optional<ThemeColor> thumb_fill;
+        std::optional<ThemeScalar> thumb_radius;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+    };
+
+    /** TextField 规则：按位掩码状态覆盖容器 / 文本 / 选区 / 焦点环字段。 */
+    using TextFieldRecipeRule = struct TextFieldRecipeRule {
+        std::optional<TextFieldVisualState> state;
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> value_color;
+        std::optional<ThemeColor> placeholder_color;
+        std::optional<ThemeColor> selection_color;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> font_size;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_padding_x;
+    };
+
+    // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
+
+    using ResolvedButtonStyle = struct ResolvedButtonStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle label;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
+    using ResolvedCheckboxStyle = struct ResolvedCheckboxStyle {
+        ResolvedBoxStyle indicator;
+        /** 勾选标记（对勾）颜色。 */
+        NanColor check;
+        ResolvedTypeStyle label;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
+    using ResolvedSliderStyle = struct ResolvedSliderStyle {
+        ResolvedTrackStyle inactive_track;
+        ResolvedTrackStyle active_track;
+        ResolvedThumbStyle thumb;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
+    using ResolvedTextFieldStyle = struct ResolvedTextFieldStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle value;
+        ResolvedTypeStyle placeholder;
+        NanColor selection;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
+    // ─── Typography 角色 ──────────────────────────────────────────────────────
+
+    /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
+    using TypographyRoles = struct TypographyRoles {
+        TypeStyle label_sm;
+        TypeStyle label_md;
+        TypeStyle label_lg;
+    };
+
+    // ─── 配方书与 DesignSystem ────────────────────────────────────────────────
+
+    using ButtonRecipes = struct ButtonRecipes {
+        ButtonRecipe base;
+        std::vector<ButtonRecipeRule> rules;
+    };
+
+    using CheckboxRecipes = struct CheckboxRecipes {
+        CheckboxRecipe base;
+        std::vector<CheckboxRecipeRule> rules;
+    };
+
+    using SliderRecipes = struct SliderRecipes {
+        SliderRecipe base;
+        std::vector<SliderRecipeRule> rules;
+    };
+
+    using TextFieldRecipes = struct TextFieldRecipes {
+        TextFieldRecipe base;
+        std::vector<TextFieldRecipeRule> rules;
+    };
+
+    using ComponentRecipes = struct ComponentRecipes {
+        ButtonRecipes button;
+        CheckboxRecipes checkbox;
+        SliderRecipes slider;
+        TextFieldRecipes text_field;
+    };
+
+    /**
+     * 不可变、与外观无关的设计系统快照。调用方修改一份拷贝后交给
+     * ThemeManager::apply() 原子替换并发布一次 revision。
+     */
+    using DesignSystem = struct DesignSystem {
+        NanTokens tokens;
+        NanColorScheme light;
+        NanColorScheme dark;
+        TypographyRoles typography;
+        ComponentRecipes components;
+
+        /** 按外观选择语义调色板变体。 */
+        [[nodiscard]] auto palette(const ColorAppearance appearance) const noexcept
+            -> const NanColorScheme& {
+            return appearance == ColorAppearance::dark ? dark : light;
+        }
+    };
+
+    // ─── 解析 ──────────────────────────────────────────────────────────────────
+
+    /**
+     * 将 ThemeColor 解析为具体颜色（按当前外观选择 light/dark palette）。
+     *
+     * @param system     目标设计系统快照
+     * @param appearance 当前外观
+     * @param value      token-or-literal 颜色值
+     * @return 解析后的 NanColor
+     */
+    [[nodiscard]] inline auto
+    resolve_color(const DesignSystem& system, const ColorAppearance appearance, const ThemeColor& value)
+        -> NanColor {
+        return resolve_theme_color(NanTheme {system.tokens, system.palette(appearance)}, value);
+    }
+
+    /**
+     * 将 ThemeScalar 解析为具体数值。
+     *
+     * @param system     目标设计系统快照
+     * @param appearance 当前外观
+     * @param value      token-or-literal 标量值
+     * @return 解析后的 float
+     */
+    [[nodiscard]] inline auto
+    resolve_scalar(const DesignSystem& system, const ColorAppearance appearance, const ThemeScalar& value)
+        -> float {
+        return resolve_theme_scalar(NanTheme {system.tokens, system.palette(appearance)}, value);
+    }
+
+    /** 解析矩形槽位片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const BoxStyle& box
+    ) -> ResolvedBoxStyle {
+        return {
+            .fill = resolve_color(system, appearance, box.fill),
+            .border = resolve_color(system, appearance, box.border),
+            .border_width = resolve_scalar(system, appearance, box.border_width),
+            .radius = resolve_scalar(system, appearance, box.radius),
+        };
+    }
+
+    /** 解析排版片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const TypeStyle& type
+    ) -> ResolvedTypeStyle {
+        return {
+            .color = resolve_color(system, appearance, type.color),
+            .font_size = resolve_scalar(system, appearance, type.font_size),
+        };
+    }
+
+    /** 解析焦点环片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const FocusRingStyle& ring
+    ) -> ResolvedFocusRing {
+        return {
+            .color = resolve_color(system, appearance, ring.color),
+            .width = resolve_scalar(system, appearance, ring.width),
+        };
+    }
+
+    /** 解析轨道片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const TrackStyle& track
+    ) -> ResolvedTrackStyle {
+        return {
+            .box = resolve(system, appearance, track.box),
+            .thickness = resolve_scalar(system, appearance, track.thickness),
+        };
+    }
+
+    /** 解析拇指片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const ThumbStyle& thumb
+    ) -> ResolvedThumbStyle {
+        return {.box = resolve(system, appearance, thumb.box)};
+    }
+
+    /** 解析度量片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const ControlMetrics& metrics
+    ) -> ResolvedControlMetrics {
+        return {
+            .height = resolve_scalar(system, appearance, metrics.height),
+            .padding_x = resolve_scalar(system, appearance, metrics.padding_x),
+            .gap = resolve_scalar(system, appearance, metrics.gap),
+            .min_height = resolve_scalar(system, appearance, metrics.min_height),
+            .box_size = resolve_scalar(system, appearance, metrics.box_size),
+            .preferred_width = resolve_scalar(system, appearance, metrics.preferred_width),
+        };
+    }
+
+    // 组件级解析（定义见 design_system.cpp）：
+    //   遗留平铺解析器给出 base 语义（tone/treatment/size/state）→
+    //   应用 DesignSystem 的规则覆盖 → 组装为片段组合的解析结果。
+
+    [[nodiscard]] auto resolve_button(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ButtonTone tone,
+        ButtonTreatment treatment,
+        ButtonSize size,
+        ButtonVisualState state
+    ) -> ResolvedButtonStyle;
+
+    [[nodiscard]] auto resolve_checkbox(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        bool checked,
+        CheckboxVisualState state
+    ) -> ResolvedCheckboxStyle;
+
+    [[nodiscard]] auto resolve_slider(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        SliderVisualState state
+    ) -> ResolvedSliderStyle;
+
+    [[nodiscard]] auto resolve_text_field(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        TextFieldVisualState state
+    ) -> ResolvedTextFieldStyle;
+
+    // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
+
+    [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
+    [[nodiscard]] auto default_checkbox_recipe() -> CheckboxRecipe;
+    [[nodiscard]] auto default_slider_recipe() -> SliderRecipe;
+    [[nodiscard]] auto default_text_field_recipe() -> TextFieldRecipe;
+
+    /**
+     * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过
+     * ThemeManager::apply() 原子提交。
+     */
+    [[nodiscard]] auto default_design_system() -> DesignSystem;
+
+    /**
+     * 从遗留 NanTheme（tokens + 单调色板）构建 DesignSystem 快照，配方沿用框架默认。
+     * 供 set_theme(NanTheme) 兼容路径与 widget 回退快照使用。
+     */
+    [[nodiscard]] auto design_system_from_theme(const NanTheme& theme) -> DesignSystem;
+
+} // namespace nandina::theme
+
+#endif // NANDINA_EXPERIMENT_THEME_DESIGN_SYSTEM_HPP

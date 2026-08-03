@@ -1,6 +1,9 @@
-//
-// theme/theme_manager — named themes, appearance-aware families, and revision notifications.
-//
+/**
+ * theme/theme_manager — 以 DesignSystem 为单一事实来源的主题管理实现。
+ *
+ * 所有状态变更收敛到 commit()：换 system_ 指针 → 刷新 theme() 视图 → 发布一次
+ * revision。遗留 named-theme / family / style API 是选择器层，不绕过原子路径。
+ */
 
 #include "theme_manager.hpp"
 
@@ -10,8 +13,73 @@
 
 namespace nandina::theme
 {
+    namespace
+    {
+        /** 把遗留 NanTheme（tokens + 单调色板）包装成 DesignSystem 快照。 */
+        [[nodiscard]] auto theme_to_design_system(const NanTheme& theme)
+            -> std::shared_ptr<const DesignSystem> {
+            return std::make_shared<const DesignSystem>(design_system_from_theme(theme));
+        }
+
+        /** 遗留 ButtonStyleRule → 配方规则（字段槽位映射）。 */
+        [[nodiscard]] auto to_recipe_rule(const ButtonStyleRule& legacy) -> ButtonRecipeRule {
+            ButtonRecipeRule rule;
+            rule.selector = legacy.selector;
+            rule.container_fill = legacy.background;
+            rule.container_border = legacy.border_color;
+            rule.container_border_width = legacy.border_width;
+            rule.container_radius = legacy.radius;
+            rule.label_color = legacy.foreground;
+            rule.label_font_size = legacy.font_size;
+            rule.focus_ring_color = legacy.focus_ring_color;
+            rule.focus_ring_width = legacy.focus_ring_width;
+            rule.metrics_height = legacy.height;
+            rule.metrics_padding_x = legacy.padding_x;
+            return rule;
+        }
+
+        /** 遗留 TextFieldStyleRule → 配方规则（字段槽位映射）。 */
+        [[nodiscard]] auto to_recipe_rule(const TextFieldStyleRule& legacy) -> TextFieldRecipeRule {
+            TextFieldRecipeRule rule;
+            rule.state = legacy.state;
+            rule.container_fill = legacy.background;
+            rule.container_border = legacy.border_color;
+            rule.container_border_width = legacy.border_width;
+            rule.container_radius = legacy.radius;
+            rule.value_color = legacy.foreground;
+            rule.placeholder_color = legacy.placeholder;
+            rule.selection_color = legacy.selection;
+            rule.focus_ring_color = legacy.focus_ring_color;
+            rule.focus_ring_width = legacy.focus_ring_width;
+            rule.font_size = legacy.font_size;
+            rule.metrics_height = legacy.height;
+            rule.metrics_padding_x = legacy.padding_x;
+            return rule;
+        }
+
+        /**
+         * 把遗留 NanStyle 规则合并进 DesignSystem 拷贝，生成「有效快照」。
+         * 迁移期新旧规则并存：设计系统自带规则 + 遗留 set_style() 规则都生效。
+         */
+        [[nodiscard]] auto merge_style(
+            const std::shared_ptr<const DesignSystem>& system,
+            const std::shared_ptr<const NanStyle>& style
+        ) -> std::shared_ptr<const DesignSystem> {
+            auto merged = std::make_shared<DesignSystem>(*system);
+            for (const auto& legacy: style->button_rules()) {
+                merged->components.button.rules.push_back(to_recipe_rule(legacy));
+            }
+            for (const auto& legacy: style->text_field_rules()) {
+                merged->components.text_field.rules.push_back(to_recipe_rule(legacy));
+            }
+            return merged;
+        }
+    } // namespace
+
     ThemeManager::ThemeManager() {
-        themes_.emplace(active_name_, default_theme());
+        system_ = std::make_shared<const DesignSystem>(default_design_system());
+        effective_ = merge_style(system_, style_);
+        theme_view_ = NanTheme {system_->tokens, system_->palette(appearance())};
     }
 
     ThemeManager::~ThemeManager() {
@@ -21,15 +89,33 @@ namespace nandina::theme
         }
     }
 
+    void ThemeManager::apply(std::shared_ptr<const DesignSystem> system) {
+        if (!system) {
+            throw std::invalid_argument("ThemeManager design system cannot be null");
+        }
+        active_family_.clear();
+        active_name_ = "application";
+        commit(std::move(system));
+    }
+
+    auto ThemeManager::design_system() const -> const DesignSystem& {
+        return *effective_;
+    }
+
+    auto ThemeManager::design_system_shared() const noexcept
+        -> std::shared_ptr<const DesignSystem> {
+        return effective_;
+    }
+
     auto ThemeManager::register_theme(std::string name, NanTheme theme) -> bool {
         if (name.empty()) {
             throw std::invalid_argument("ThemeManager theme name cannot be empty");
         }
         const bool replaced = themes_.contains(name);
         const bool replaces_active = active_name() == name;
-        themes_.insert_or_assign(std::move(name), std::move(theme));
+        themes_.insert_or_assign(std::move(name), theme_to_design_system(theme));
         if (replaces_active) {
-            publish_revision();
+            sync_to_effective();
         }
         return !replaced;
     }
@@ -46,29 +132,21 @@ namespace nandina::theme
         if (active_family_.empty() && active_name_ == name) {
             return true;
         }
-        const std::string previous(effective_theme_name());
         active_family_.clear();
         active_name_ = found->first;
-        if (previous != active_name_) {
-            publish_revision();
-        }
+        commit(found->second);
         return true;
     }
 
     void ThemeManager::set_theme(NanTheme theme) {
-        themes_.insert_or_assign("application", std::move(theme));
-        if (active_family_.empty() && active_name_ == "application") {
-            publish_revision();
-            return;
-        }
-        active_family_.clear();
-        active_name_ = "application";
-        publish_revision();
+        apply(theme_to_design_system(theme));
     }
 
-    auto
-    ThemeManager::register_family(std::string name, std::string light_theme, std::string dark_theme)
-        -> bool {
+    auto ThemeManager::register_family(
+        std::string name,
+        std::string light_theme,
+        std::string dark_theme
+    ) -> bool {
         if (name.empty()) {
             throw std::invalid_argument("ThemeManager family name cannot be empty");
         }
@@ -76,8 +154,6 @@ namespace nandina::theme
             throw std::invalid_argument("ThemeManager family variants must be registered themes");
         }
         const bool replaced = families_.contains(name);
-        const bool replaces_active = active_family_ == name;
-        const std::string previous(effective_theme_name());
         families_.insert_or_assign(
             std::move(name),
             ThemeFamily {
@@ -85,8 +161,8 @@ namespace nandina::theme
                 .dark_theme = std::move(dark_theme),
             }
         );
-        if (replaces_active && previous != effective_theme_name()) {
-            publish_revision();
+        if (active_family_ == name) {
+            sync_to_effective();
         }
         return !replaced;
     }
@@ -103,11 +179,8 @@ namespace nandina::theme
         if (active_family_ == name) {
             return true;
         }
-        const std::string previous(effective_theme_name());
         active_family_ = found->first;
-        if (previous != effective_theme_name()) {
-            publish_revision();
-        }
+        sync_to_effective();
         return true;
     }
 
@@ -115,26 +188,20 @@ namespace nandina::theme
         if (preference_ == preference) {
             return;
         }
-        const std::string previous(effective_theme_name());
         preference_ = preference;
-        if (previous != effective_theme_name()) {
-            publish_revision();
-        }
+        sync_to_effective();
     }
 
     void ThemeManager::set_system_appearance(const ColorAppearance appearance) {
         if (system_appearance_ == appearance) {
             return;
         }
-        const std::string previous(effective_theme_name());
         system_appearance_ = appearance;
-        if (previous != effective_theme_name()) {
-            publish_revision();
-        }
+        sync_to_effective();
     }
 
     auto ThemeManager::theme() const -> const NanTheme& {
-        return themes_.at(effective_theme_name());
+        return theme_view_;
     }
 
     auto ThemeManager::active_name() const noexcept -> std::string_view {
@@ -170,7 +237,7 @@ namespace nandina::theme
             throw std::invalid_argument("ThemeManager style cannot be null");
         }
         style_ = std::move(style);
-        publish_revision();
+        rebuild_effective();
     }
 
     auto ThemeManager::style() const -> const NanStyle& {
@@ -193,6 +260,36 @@ namespace nandina::theme
         }
         const auto& family = families_.at(active_family_);
         return appearance() == ColorAppearance::dark ? family.dark_theme : family.light_theme;
+    }
+
+    void ThemeManager::commit(std::shared_ptr<const DesignSystem> system) {
+        if (system_ == system) {
+            return; // 指针相同：无变化，不发布额外 revision
+        }
+        system_ = std::move(system);
+        rebuild_effective();
+    }
+
+    void ThemeManager::sync_to_effective() {
+        const auto effective = effective_theme_name();
+        const auto found = themes_.find(effective);
+        if (found != themes_.end()) {
+            commit(found->second);
+        }
+        else {
+            refresh_theme_view(); // 无名主题路径（apply / set_theme）：仅外观变体可能变化
+        }
+    }
+
+    void ThemeManager::rebuild_effective() {
+        effective_ = merge_style(system_, style_);
+        theme_view_ = NanTheme {system_->tokens, system_->palette(appearance())};
+        publish_revision();
+    }
+
+    void ThemeManager::refresh_theme_view() {
+        theme_view_ = NanTheme {system_->tokens, system_->palette(appearance())};
+        publish_revision();
     }
 
     void ThemeManager::publish_revision() {

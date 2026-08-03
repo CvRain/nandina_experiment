@@ -4,6 +4,7 @@
 
 #include "text_field.hpp"
 
+#include "primitives/focus_ring_painter.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
 #include "../scene/scene_tree.hpp"
@@ -25,8 +26,9 @@ namespace nandina::widget
 
     TextField::TextField(std::string value, std::string placeholder, theme::NanTheme theme):
         edit_(std::move(value)),
-        placeholder_(std::move(placeholder)),
-        theme_(theme) {
+        placeholder_(std::move(placeholder)) {
+        system_ = std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
+        theme_view_ = theme;
         edit_.set_on_change([this](std::string_view value) {
             if (on_change_) {
                 on_change_(value);
@@ -63,14 +65,15 @@ namespace nandina::widget
     }
 
     void TextField::set_theme(theme::NanTheme theme) {
-        theme_ = theme;
-        theme_explicit_ = true;
+        system_ = std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
+        system_explicit_ = true;
+        theme_view_ = theme;
         apply_theme();
         mark_layout_dirty();
     }
 
     auto TextField::theme_ref() const -> const theme::NanTheme& {
-        return theme_;
+        return theme_view_;
     }
 
     void TextField::set_on_change(std::function<void(std::string_view)> callback) {
@@ -125,11 +128,8 @@ namespace nandina::widget
         return state;
     }
 
-    auto TextField::resolved_style() const -> theme::TextFieldStyle {
-        if (theme_manager_ != nullptr) {
-            return theme_manager_->style().resolve_text_field(theme_, visual_state());
-        }
-        return theme::resolve_text_field_style(theme_, visual_state());
+    auto TextField::resolved_style() const -> theme::ResolvedTextFieldStyle {
+        return theme::resolve_text_field(*system_, appearance_, visual_state());
     }
 
     auto TextField::editable_text() -> primitives::EditableText& {
@@ -177,16 +177,13 @@ namespace nandina::widget
     }
 
     void TextField::on_theme_changed(const theme::ThemeManager& manager) {
-        theme_manager_ = &manager;
-        if (!theme_explicit_) {
-            theme_ = manager.theme();
+        appearance_ = manager.appearance();
+        if (!system_explicit_) {
+            system_ = manager.design_system_shared();
+            theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
         }
         apply_theme();
         mark_layout_dirty();
-    }
-
-    void TextField::on_theme_context_removed() {
-        theme_manager_ = nullptr;
     }
 
     void TextField::set_font(text::FontRequest request) {
@@ -276,14 +273,16 @@ namespace nandina::widget
     void TextField::on_draw(render::DrawContext& ctx) {
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const auto style = resolved_style();
-        surface_.set_fill(style.background);
-        surface_.set_border(style.border_color, style.border_width);
-        surface_.set_radius(style.radius);
-        if (style.focus_ring_width > 0.0F && style.focus_ring_color.alpha() > 0.0F) {
-            ctx.device().draw_rect_outline(
-                world.expanded(style.focus_ring_width),
-                style.focus_ring_width,
-                style.focus_ring_color.with_alpha(style.focus_ring_color.alpha() * ctx.opacity())
+        surface_.set_fill(style.container.fill);
+        surface_.set_border(style.container.border, style.container.border_width);
+        surface_.set_radius(style.container.radius);
+        if (style.focus.width > 0.0F && style.focus.color.alpha() > 0.0F) {
+            primitives::FocusRingPainter::paint(
+                ctx,
+                world,
+                style.focus,
+                ctx.opacity(),
+                /*gap=*/0.0F
             );
         }
         surface_.set_size(size());
@@ -359,21 +358,20 @@ namespace nandina::widget
 
     void TextField::apply_theme() {
         const auto style = resolved_style();
-        padding_x_ = style.padding_x;
-        height_ = style.height;
+        padding_x_ = style.metrics.padding_x;
+        height_ = style.metrics.height;
 
-        surface_.set_fill(style.background);
-        surface_.set_radius(style.radius);
-        surface_.set_border(style.border_color, style.border_width);
+        surface_.set_fill(style.container.fill);
+        surface_.set_radius(style.container.radius);
+        surface_.set_border(style.container.border, style.container.border_width);
 
         const auto& context = resolved_style_context();
         const auto font = context.font_from_context && !font_explicit_ ? context.font
                                                                        : edit_.style().font;
-        const auto font_size = context.font_size_from_context
-            ? context.font_size
-            : style.font_size;
+        const auto font_size =
+            context.font_size_from_context ? context.font_size : style.value.font_size;
         const auto text_color = context.text_color_from_context ? context.text_color
-                                                                 : style.foreground;
+                                                                : style.value.color;
         const primitives::TextStyle value_style {
             .color = text_color,
             .font_size = font_size,
@@ -382,7 +380,8 @@ namespace nandina::widget
             .max_lines = 1,
         };
         const primitives::TextStyle placeholder_style {
-            .color = context.text_color_from_context ? context.text_color : style.placeholder,
+            .color = context.text_color_from_context ? context.text_color
+                                                     : style.placeholder.color,
             .font_size = font_size,
             .font = font,
             .overflow = primitives::TextOverflow::ellipsis,

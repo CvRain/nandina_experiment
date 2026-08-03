@@ -4,6 +4,8 @@
 
 #include "checkbox.hpp"
 
+#include "primitives/box_painter.hpp"
+#include "primitives/focus_ring_painter.hpp"
 #include "../render/draw_context.hpp"
 #include "../theme/theme_manager.hpp"
 
@@ -38,8 +40,9 @@ namespace nandina::widget
 
     Checkbox::Checkbox(std::string label, const bool checked, theme::NanTheme theme):
         text_(std::move(label)),
-        theme_(theme),
         checked_(checked) {
+        system_ = std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
+        theme_view_ = theme;
         apply_metrics();
     }
 
@@ -91,14 +94,15 @@ namespace nandina::widget
     }
 
     void Checkbox::set_theme(theme::NanTheme theme) {
-        theme_ = theme;
-        theme_explicit_ = true;
+        system_ = std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
+        system_explicit_ = true;
+        theme_view_ = theme;
         apply_metrics();
         mark_layout_dirty();
     }
 
     auto Checkbox::theme_ref() const -> const theme::NanTheme& {
-        return theme_;
+        return theme_view_;
     }
 
     auto Checkbox::visual_state() const -> theme::CheckboxVisualState {
@@ -117,13 +121,8 @@ namespace nandina::widget
         return theme::CheckboxVisualState::normal;
     }
 
-    auto Checkbox::resolved_style() const -> theme::CheckboxStyle {
-        auto result = theme::resolve_checkbox_style(theme_, checked_, visual_state());
-        if (focused() && !disabled()) {
-            result.focus_ring_width = theme_.tokens.border.focus_ring;
-            result.focus_ring_color = theme_.palette.focus_ring;
-        }
-        return result;
+    auto Checkbox::resolved_style() const -> theme::ResolvedCheckboxStyle {
+        return theme::resolve_checkbox(*system_, appearance_, checked_, visual_state());
     }
 
     void Checkbox::set_text_pipeline(primitives::TextPipeline pipeline) {
@@ -154,66 +153,50 @@ namespace nandina::widget
     }
 
     void Checkbox::on_theme_changed(const theme::ThemeManager& manager) {
-        theme_manager_ = &manager;
-        if (!theme_explicit_) {
-            theme_ = manager.theme();
+        appearance_ = manager.appearance();
+        if (!system_explicit_) {
+            system_ = manager.design_system_shared();
+            theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
         }
         apply_metrics();
         mark_layout_dirty();
     }
 
-    void Checkbox::on_theme_context_removed() {
-        theme_manager_ = nullptr;
-    }
-
     void Checkbox::on_draw(render::DrawContext& context) {
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
-        const float box_top = world.get_top() + (world.get_height() - style.box_size) * 0.5F;
+        const float box_top = world.get_top() + (world.get_height() - style.metrics.box_size) * 0.5F;
         const auto box = foundation::NanRect::from_xywh(
             world.get_left(),
             box_top,
-            style.box_size,
-            style.box_size
+            style.metrics.box_size,
+            style.metrics.box_size
         );
         const float opacity = context.opacity();
 
-        if (style.box_background.alpha() > 0.0F) {
-            context.device().draw_rounded_rect(
-                box,
-                style.radius,
-                style.box_background.with_alpha(style.box_background.alpha() * opacity)
-            );
-        }
-        if (style.border_width > 0.0F) {
-            context.device().draw_rect_outline(
-                box,
-                style.border_width,
-                style.border_color.with_alpha(style.border_color.alpha() * opacity)
-            );
-        }
+        primitives::BoxPainter::paint(context, box, style.indicator, opacity);
         if (checked_) {
-            const auto check = style.check_color.with_alpha(style.check_color.alpha() * opacity);
+            const auto check = style.check.with_alpha(style.check.alpha() * opacity);
             context.device().draw_line(
                 foundation::NanPoint(
-                    box.get_left() + style.box_size * 0.22F,
-                    box.get_top() + style.box_size * 0.52F
+                    box.get_left() + style.metrics.box_size * 0.22F,
+                    box.get_top() + style.metrics.box_size * 0.52F
                 ),
                 foundation::NanPoint(
-                    box.get_left() + style.box_size * 0.43F,
-                    box.get_top() + style.box_size * 0.72F
+                    box.get_left() + style.metrics.box_size * 0.43F,
+                    box.get_top() + style.metrics.box_size * 0.72F
                 ),
                 2.0F,
                 check
             );
             context.device().draw_line(
                 foundation::NanPoint(
-                    box.get_left() + style.box_size * 0.43F,
-                    box.get_top() + style.box_size * 0.72F
+                    box.get_left() + style.metrics.box_size * 0.43F,
+                    box.get_top() + style.metrics.box_size * 0.72F
                 ),
                 foundation::NanPoint(
-                    box.get_left() + style.box_size * 0.80F,
-                    box.get_top() + style.box_size * 0.30F
+                    box.get_left() + style.metrics.box_size * 0.80F,
+                    box.get_top() + style.metrics.box_size * 0.30F
                 ),
                 2.0F,
                 check
@@ -222,17 +205,13 @@ namespace nandina::widget
 
         apply_text_style();
         const auto text_position = foundation::NanPoint(
-            box.get_right() + style.gap,
+            box.get_right() + style.metrics.gap,
             world.get_top() + (world.get_height() - text_.laid_out_font_size()) * 0.5F
         );
         text_.draw_at(context, text_position);
 
-        if (focused() && !disabled() && style.focus_ring_width > 0.0F) {
-            context.device().draw_rect_outline(
-                world.expanded(style.focus_ring_width + 1.0F),
-                style.focus_ring_width,
-                style.focus_ring_color.with_alpha(style.focus_ring_color.alpha() * opacity)
-            );
+        if (focused() && !disabled() && style.focus.width > 0.0F) {
+            primitives::FocusRingPainter::paint(context, world, style.focus, opacity);
         }
     }
 
@@ -240,7 +219,7 @@ namespace nandina::widget
         const auto style = resolved_style();
         apply_text_style();
         const float text_width = std::isfinite(constraints.max_width)
-            ? std::max(0.0F, constraints.max_width - style.box_size - style.gap)
+            ? std::max(0.0F, constraints.max_width - style.metrics.box_size - style.metrics.gap)
             : constraints.max_width;
         const auto text_size = text_.measure_layout(
             scene::LayoutConstraints {
@@ -250,12 +229,10 @@ namespace nandina::widget
                 .max_height = constraints.max_height,
             }
         );
-        return constraints.constrain(
-            foundation::NanSize(
-                style.box_size + style.gap + text_size.get_width(),
-                std::max(style.min_height, text_size.get_height())
-            )
-        );
+        return constraints.constrain(foundation::NanSize(
+            style.metrics.box_size + style.metrics.gap + text_size.get_width(),
+            std::max(style.metrics.min_height, text_size.get_height())
+        ));
     }
 
     void Checkbox::on_click() {
@@ -294,20 +271,19 @@ namespace nandina::widget
         apply_text_style();
         const auto style = resolved_style();
         (void)text_.measure_layout(scene::LayoutConstraints::loose());
-        set_size(
-            foundation::NanSize(
-                style.box_size + style.gap + text_.width(),
-                std::max(style.min_height, text_.height())
-            )
-        );
+        set_size(foundation::NanSize(
+            style.metrics.box_size + style.metrics.gap + text_.width(),
+            std::max(style.metrics.min_height, text_.height())
+        ));
     }
 
     void Checkbox::apply_text_style() {
         const auto style = resolved_style();
         const auto& context = resolved_style_context();
         const primitives::TextStyle text_style {
-            .color = context.text_color_from_context ? context.text_color : style.foreground,
-            .font_size = context.font_size_from_context ? context.font_size : style.font_size,
+            .color = context.text_color_from_context ? context.text_color : style.label.color,
+            .font_size =
+                context.font_size_from_context ? context.font_size : style.label.font_size,
             .font = context.font_from_context ? context.font : text_.font(),
             .overflow = primitives::TextOverflow::clip,
             .max_lines = 1,

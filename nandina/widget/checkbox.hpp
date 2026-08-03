@@ -7,6 +7,7 @@
 
 #include "../reactive/event.hpp"
 #include "../theme/checkbox_style.hpp"
+#include "../theme/design_system.hpp"
 #include "primitives/pressable.hpp"
 #include "primitives/text.hpp"
 
@@ -40,10 +41,12 @@ namespace nandina::widget
         void set_on_change(std::function<void(bool)> callback);
         [[nodiscard]] auto checked_changed() const -> const reactive::Event<bool>&;
 
+        /// 高级接口：以完整 NanTheme 覆盖控件主题（不再跟随系统切换）。
         void set_theme(theme::NanTheme theme);
+        /// 当前生效主题视图（tokens + 当前外观 palette），遗留读取兼容。
         [[nodiscard]] auto theme_ref() const -> const theme::NanTheme&;
         [[nodiscard]] auto visual_state() const -> theme::CheckboxVisualState;
-        [[nodiscard]] auto resolved_style() const -> theme::CheckboxStyle;
+        [[nodiscard]] auto resolved_style() const -> theme::ResolvedCheckboxStyle;
 
         void set_text_pipeline(primitives::TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
@@ -51,7 +54,6 @@ namespace nandina::widget
         void apply_font_context(text::FontPipelineCache& context) override;
         void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
         void on_theme_changed(const theme::ThemeManager& manager) override;
-        void on_theme_context_removed() override;
 
         auto on_draw(render::DrawContext& context) -> void override;
 
@@ -68,9 +70,13 @@ namespace nandina::widget
         void apply_text_style();
 
         primitives::Text text_;
-        theme::NanTheme theme_;
-        const theme::ThemeManager* theme_manager_ = nullptr;
-        bool theme_explicit_ = false;
+        /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。
+        std::shared_ptr<const theme::DesignSystem> system_;
+        theme::ColorAppearance appearance_ = theme::ColorAppearance::light;
+        /// theme_ref() 兼容视图（tokens + 当前外观 palette）。
+        theme::NanTheme theme_view_;
+        /// set_theme(NanTheme) 整份覆盖后不再跟随系统切换。
+        bool system_explicit_ = false;
         bool checked_ = false;
         std::function<void(bool)> on_change_;
         reactive::Event<bool> checked_changed_;

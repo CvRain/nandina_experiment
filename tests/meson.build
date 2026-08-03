@@ -100,12 +100,26 @@ button_tests = executable(
 )
 test('button', button_tests)
 
+theme_design_system_tests = executable(
+    'theme_design_system_tests',
+    files('theme_design_system_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('theme-design-system', theme_design_system_tests)
+
 checkbox_tests = executable(
     'checkbox_tests',
     files('checkbox_tests.cpp'),
     dependencies : [nandina_dep, catch2_with_main_dep],
 )
 test('checkbox', checkbox_tests)
+
+slider_tests = executable(
+    'slider_tests',
+    files('slider_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('slider', slider_tests)
 
 resource_tests = executable(
     'resource_tests',
