@@ -201,7 +201,7 @@ namespace nandina::widget
             *system_, appearance_, tone_, treatment_, size_, visual_state()
         );
         if (override_) {
-            theme::apply_rule(*system_, appearance_, style, *override_);
+            theme::apply_rule(*system_, appearance_, style, *override_, tone_);
         }
         return style;
     }

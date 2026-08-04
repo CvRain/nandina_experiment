@@ -108,8 +108,6 @@ module_theme = files(
     'theme/design_system.cpp',
     'theme/visual_state.hpp',
     'theme/style_context.hpp',
-    'theme/button_style.hpp',
-    'theme/button_style.cpp',
     'theme/nan_style.hpp',
     'theme/nan_style.cpp',
     'theme/theme_manager.hpp',

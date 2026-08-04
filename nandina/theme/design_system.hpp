@@ -19,8 +19,9 @@
  *                     ▼
  *   painter          BoxPainter / FocusRingPainter（非节点）
  *
- * 迁移状态：控件尚未切换到本模型；遗留的 per-component 解析器（button_style 等）
- * 与 NanStyle 在迁移完成前仍是权威实现。详见 dev-docs-v3/phase6-theme-design-system.md。
+ * 迁移状态：全部控件已切换到本模型；遗留 per-component 平铺解析器（button_style 等）
+ * 已退休，配方书是唯一事实来源。遗留 NanStyle 规则作为选择器层仍可合并覆盖。
+ * 详见 dev-docs-v3/phase6-theme-design-system.md。
  */
 
 #ifndef NANDINA_EXPERIMENT_THEME_DESIGN_SYSTEM_HPP
@@ -173,8 +174,8 @@ namespace nandina::theme
     // 配方书 = `base`（完全指定）+ 有序规则列表。
     // 解析：从 `base` 出发，按顺序应用所有匹配规则（后匹配者胜），再把
     // ThemeValue 按当前外观解析为具体值。
-    // 跨切面状态变换（disabled 透明度、hover/pressed 覆盖 alpha）由解析器在
-    // 字段覆盖之前应用，与现有 resolve_*_style 的行为一致。
+    // 跨切面状态变换（disabled 透明度、Button 的 hover/pressed 覆盖）由解析器在
+    // 规则循环之后应用，作为状态语义的最后一道修正（规则仍可先于变换设置 base）。
 
     /** Button 状态规则：按 tone / treatment / size / state 选择，覆盖容器 / 文本 / 焦点 / 度量字段。 */
     using ButtonRecipeRule = struct ButtonRecipeRule {
@@ -335,12 +336,16 @@ namespace nandina::theme
      * @param system     目标设计系统快照
      * @param appearance 当前外观
      * @param value      token-or-literal 颜色值
+     * @param tone       当前 Button tone（accent / on_accent 引用依赖它；缺省按 primary）
      * @return 解析后的 NanColor
      */
-    [[nodiscard]] inline auto
-    resolve_color(const DesignSystem& system, const ColorAppearance appearance, const ThemeColor& value)
-        -> NanColor {
-        return resolve_theme_color(NanTheme {system.tokens, system.palette(appearance)}, value);
+    [[nodiscard]] inline auto resolve_color(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const ThemeColor& value,
+        const std::optional<ButtonTone> tone = std::nullopt
+    ) -> NanColor {
+        return resolve_theme_color(NanTheme {system.tokens, system.palette(appearance)}, value, tone);
     }
 
     /**
@@ -466,11 +471,13 @@ namespace nandina::theme
 
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
+    /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
     void apply_rule(
         const DesignSystem& system,
         ColorAppearance appearance,
         ResolvedButtonStyle& style,
-        const ButtonRecipeRule& rule
+        const ButtonRecipeRule& rule,
+        ButtonTone tone
     );
 
     void apply_rule(

@@ -4,7 +4,6 @@
 
 #include "render/render_device.hpp"
 #include "scene/scene_tree.hpp"
-#include "theme/button_style.hpp"
 #include "theme/nan_style.hpp"
 #include "theme/style_document.hpp"
 #include "theme/theme_manager.hpp"
@@ -84,34 +83,38 @@ namespace
 
 } // namespace
 
-TEST_CASE("button style resolver keeps tone and treatment orthogonal", "[theme][button]") {
-    const auto theme = theme::default_theme();
+TEST_CASE("button resolver keeps tone and treatment orthogonal", "[theme][button]") {
+    const auto system = theme::default_design_system();
+    constexpr auto appearance = theme::ColorAppearance::light;
 
-    const auto filled = theme::resolve_button_style(
-        theme,
+    const auto filled = theme::resolve_button(
+        system,
+        appearance,
         theme::ButtonTone::primary,
         theme::ButtonTreatment::filled,
         theme::ButtonSize::medium,
         theme::ButtonVisualState::normal
     );
-    REQUIRE(filled.background.alpha() == Catch::Approx(1.0F));
-    REQUIRE(filled.border_width == Catch::Approx(0.0F));
+    REQUIRE(filled.container.fill.alpha() == Catch::Approx(1.0F));
+    REQUIRE(filled.container.border_width == Catch::Approx(0.0F));
 
-    const auto outlined = theme::resolve_button_style(
-        theme,
+    const auto outlined = theme::resolve_button(
+        system,
+        appearance,
         theme::ButtonTone::primary,
         theme::ButtonTreatment::outlined,
         theme::ButtonSize::medium,
         theme::ButtonVisualState::normal
     );
-    REQUIRE(outlined.background.alpha() == Catch::Approx(0.0F));
-    REQUIRE(outlined.border_width == Catch::Approx(theme.tokens.border.thin));
+    REQUIRE(outlined.container.fill.alpha() == Catch::Approx(0.0F));
+    REQUIRE(outlined.container.border_width == Catch::Approx(system.tokens.border.thin));
 
-    const auto danger = theme::button_color_pair(theme, theme::ButtonTone::danger);
-    REQUIRE(danger.accent.alpha() == Catch::Approx(1.0F));
+    const auto danger = theme::button_accent(system.light, theme::ButtonTone::danger);
+    REQUIRE(danger.first.alpha() == Catch::Approx(1.0F));
+    REQUIRE(danger.second.alpha() == Catch::Approx(1.0F));
 }
 
-TEST_CASE("NanStyle resolves token rules and preserves literal rules", "[theme][style]") {
+TEST_CASE("NanStyle rules bridge into the design system and resolve", "[theme][style]") {
     auto style = std::make_shared<theme::NanStyle>();
     theme::ButtonStyleRule rule;
     rule.selector.treatment = theme::ButtonTreatment::ghost;
@@ -120,11 +123,16 @@ TEST_CASE("NanStyle resolves token rules and preserves literal rules", "[theme][
     rule.padding_x = theme::ThemeScalar::token(theme::ScalarToken::spacing_xl);
     style->add_button_rule(std::move(rule));
 
+    theme::ThemeManager manager;
+    manager.set_style(style);
+
     auto first = theme::default_theme();
     first.palette.primary = theme::nan_color(0.42F, 0.1F, 120.0F);
     first.tokens.spacing.xl = 31.0F;
-    const auto first_result = style->resolve_button(
-        first,
+    manager.set_theme(first);
+    const auto first_result = theme::resolve_button(
+        manager.design_system(),
+        manager.appearance(),
         theme::ButtonTone::primary,
         theme::ButtonTreatment::ghost,
         theme::ButtonSize::medium,
@@ -134,49 +142,22 @@ TEST_CASE("NanStyle resolves token rules and preserves literal rules", "[theme][
     auto second = first;
     second.palette.primary = theme::nan_color(0.78F, 0.1F, 120.0F);
     second.tokens.spacing.xl = 37.0F;
-    const auto second_result = style->resolve_button(
-        second,
+    manager.set_theme(second);
+    const auto second_result = theme::resolve_button(
+        manager.design_system(),
+        manager.appearance(),
         theme::ButtonTone::primary,
         theme::ButtonTreatment::ghost,
         theme::ButtonSize::medium,
         theme::ButtonVisualState::normal
     );
 
-    REQUIRE(first_result.background.oklch().light == Catch::Approx(0.42F));
-    REQUIRE(second_result.background.oklch().light == Catch::Approx(0.78F));
-    REQUIRE(first_result.padding_x == Catch::Approx(31.0F));
-    REQUIRE(second_result.padding_x == Catch::Approx(37.0F));
-    REQUIRE(first_result.radius == Catch::Approx(13.0F));
-    REQUIRE(second_result.radius == Catch::Approx(13.0F));
-}
-
-TEST_CASE("NanStyle supports application-specific rule algorithms", "[theme][style]") {
-    class ApplicationStyle final: public theme::NanStyle {
-    public:
-        [[nodiscard]] auto resolve_button(
-            const theme::NanTheme& current,
-            theme::ButtonTone tone,
-            theme::ButtonTreatment treatment,
-            theme::ButtonSize size,
-            theme::ButtonVisualState state
-        ) const -> theme::ButtonStyle override {
-            auto result = NanStyle::resolve_button(current, tone, treatment, size, state);
-            if (treatment == theme::ButtonTreatment::link) {
-                result.height = 27.0F;
-            }
-            return result;
-        }
-    };
-
-    const ApplicationStyle style;
-    const auto result = style.resolve_button(
-        theme::default_theme(),
-        theme::ButtonTone::primary,
-        theme::ButtonTreatment::link,
-        theme::ButtonSize::medium,
-        theme::ButtonVisualState::normal
-    );
-    REQUIRE(result.height == Catch::Approx(27.0F));
+    REQUIRE(first_result.container.fill.oklch().light == Catch::Approx(0.42F));
+    REQUIRE(second_result.container.fill.oklch().light == Catch::Approx(0.78F));
+    REQUIRE(first_result.metrics.padding_x == Catch::Approx(31.0F));
+    REQUIRE(second_result.metrics.padding_x == Catch::Approx(37.0F));
+    REQUIRE(first_result.container.radius == Catch::Approx(13.0F));
+    REQUIRE(second_result.container.radius == Catch::Approx(13.0F));
 }
 
 TEST_CASE("ThemeManager switches attached widget trees by revision", "[theme][manager]") {
@@ -346,16 +327,17 @@ faces = [{ resource = "fonts/fallback-ui/regular", weight = 400 }]
     REQUIRE(applied.has_value());
     REQUIRE(manager.active_name() == "dark");
 
-    const auto resolved = manager.style().resolve_button(
-        manager.theme(),
+    const auto resolved = theme::resolve_button(
+        manager.design_system(),
+        manager.appearance(),
         theme::ButtonTone::primary,
         theme::ButtonTreatment::ghost,
         theme::ButtonSize::medium,
         theme::ButtonVisualState::normal
     );
-    REQUIRE(resolved.background.oklch().light == Catch::Approx(0.31F));
-    REQUIRE(resolved.padding_x == Catch::Approx(33.0F));
-    REQUIRE(resolved.radius == Catch::Approx(12.0F));
+    REQUIRE(resolved.container.fill.oklch().light == Catch::Approx(0.31F));
+    REQUIRE(resolved.metrics.padding_x == Catch::Approx(33.0F));
+    REQUIRE(resolved.container.radius == Catch::Approx(12.0F));
 
     const auto field_style = theme::resolve_text_field(
         manager.design_system(), manager.appearance(), theme::TextFieldVisualState::focused

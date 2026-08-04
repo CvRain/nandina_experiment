@@ -5,7 +5,6 @@
 #include "foundation/geometry.hpp"
 #include "render/render_device.hpp"
 #include "scene/scene_tree.hpp"
-#include "theme/button_style.hpp"
 #include "theme/design_system.hpp"
 #include "theme/theme.hpp"
 #include "theme/theme_manager.hpp"
@@ -82,8 +81,10 @@ TEST_CASE("design system resolves fragment tokens against the active palette", "
         theme::ColorAppearance::light,
         system.components.button.base.container
     );
-    REQUIRE(box.fill.oklch().light == Catch::Approx(system.light.primary.oklch().light));
-    REQUIRE(box.radius == Catch::Approx(system.tokens.radius.md));
+    // base 容器：surface 透明 + radius.sm（treatment 规则在此之上覆盖）
+    REQUIRE(box.fill.oklch().light == Catch::Approx(system.light.surface.oklch().light));
+    REQUIRE(box.fill.alpha() == Catch::Approx(0.0F));
+    REQUIRE(box.radius == Catch::Approx(system.tokens.radius.sm));
 
     const auto focus = theme::resolve(
         system,
@@ -93,7 +94,7 @@ TEST_CASE("design system resolves fragment tokens against the active palette", "
     REQUIRE(focus.width == Catch::Approx(system.tokens.border.focus_ring));
 }
 
-TEST_CASE("resolve_button matches the legacy flat resolver with empty rules", "[theme][design-system]") {
+TEST_CASE("resolve_button produces recipe-driven values for filled medium normal", "[theme][design-system]") {
     const auto system = theme::default_design_system();
     constexpr auto appearance = theme::ColorAppearance::light;
     const auto resolved = theme::resolve_button(
@@ -104,19 +105,16 @@ TEST_CASE("resolve_button matches the legacy flat resolver with empty rules", "[
         theme::ButtonSize::medium,
         theme::ButtonVisualState::normal
     );
-    const auto legacy = theme::resolve_button_style(
-        theme::NanTheme {system.tokens, system.light},
-        theme::ButtonTone::primary,
-        theme::ButtonTreatment::filled,
-        theme::ButtonSize::medium,
-        theme::ButtonVisualState::normal
-    );
-    REQUIRE(resolved.container.fill.oklch().light == Catch::Approx(legacy.background.oklch().light));
-    REQUIRE(resolved.container.border_width == Catch::Approx(legacy.border_width));
-    REQUIRE(resolved.container.radius == Catch::Approx(legacy.radius));
-    REQUIRE(resolved.label.font_size == Catch::Approx(legacy.font_size));
-    REQUIRE(resolved.metrics.height == Catch::Approx(legacy.height));
-    REQUIRE(resolved.metrics.padding_x == Catch::Approx(legacy.padding_x));
+    // filled：accent 实心 + 反色文本
+    REQUIRE(resolved.container.fill.oklch().light == Catch::Approx(system.light.primary.oklch().light));
+    REQUIRE(resolved.container.border_width == Catch::Approx(0.0F));
+    REQUIRE(resolved.label.color.oklch().light == Catch::Approx(system.light.on_primary.oklch().light));
+    // medium：40 高 / spacing.md 内边距 / label_md 字号
+    REQUIRE(resolved.metrics.height == Catch::Approx(40.0F));
+    REQUIRE(resolved.metrics.padding_x == Catch::Approx(system.tokens.spacing.md));
+    REQUIRE(resolved.label.font_size == Catch::Approx(system.tokens.typography.label_md));
+    // 焦点环始终开启（与遗留语义一致）
+    REQUIRE(resolved.focus.width == Catch::Approx(system.tokens.border.focus_ring));
 }
 
 TEST_CASE("design system button rules overlay the base resolution by selector", "[theme][design-system]") {

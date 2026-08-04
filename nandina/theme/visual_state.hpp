@@ -51,6 +51,39 @@ namespace nandina::theme
             == static_cast<unsigned char>(state);
     }
 
+    /** Button 语义色家族。 */
+    enum class ButtonTone {
+        primary,
+        secondary,
+        neutral,
+        danger,
+    };
+
+    /** Button 视觉处理方式。 */
+    enum class ButtonTreatment {
+        filled,
+        tonal,
+        outlined,
+        ghost,
+        link,
+    };
+
+    /** Button 尺寸档位。 */
+    enum class ButtonSize {
+        small,
+        medium,
+        large,
+    };
+
+    /** Button 交互状态。 */
+    enum class ButtonVisualState {
+        normal,
+        hovered,
+        pressed,
+        focused,
+        disabled,
+    };
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP

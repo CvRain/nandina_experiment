@@ -8,11 +8,22 @@ namespace nandina::theme
 {
     namespace
     {
-        /** 解析颜色操作数（字面量或颜色 token）。 */
-        [[nodiscard]] auto resolve_color_operand(const NanTheme& theme, const ColorOperand& operand)
-            -> NanColor {
+        /**
+         * 解析颜色操作数（字面量、颜色 token 或 tone 强调色引用）。
+         *
+         * @param tone 当前 Button tone；accent 引用依赖它（缺省按 primary）。
+         */
+        [[nodiscard]] auto resolve_color_operand(
+            const NanTheme& theme,
+            const ColorOperand& operand,
+            const std::optional<ButtonTone> tone = std::nullopt
+        ) -> NanColor {
             if (const auto* literal = std::get_if<NanColor>(&operand)) {
                 return *literal;
+            }
+            if (const auto* accent = std::get_if<ToneAccentRef>(&operand)) {
+                const auto [accent_color, on_accent] = button_accent(theme.palette, tone);
+                return accent->on_accent ? on_accent : accent_color;
             }
             switch (std::get<ColorToken>(operand)) {
                 case ColorToken::background:
@@ -64,20 +75,48 @@ namespace nandina::theme
     }
     } // namespace
 
-    auto resolve_theme_color(const NanTheme& theme, const ThemeColor& value) -> NanColor {
+    auto button_accent(const NanColorScheme& palette, const std::optional<ButtonTone> tone)
+        -> std::pair<NanColor, NanColor> {
+        switch (tone.value_or(ButtonTone::primary)) {
+            case ButtonTone::primary:
+                return {palette.primary, palette.on_primary};
+            case ButtonTone::secondary:
+                return {palette.secondary, palette.on_secondary};
+            case ButtonTone::neutral:
+                return {palette.surface_variant, palette.on_surface_variant};
+            case ButtonTone::danger:
+                return {palette.error, palette.on_error};
+        }
+        return {palette.primary, palette.on_primary};
+    }
+
+    auto resolve_theme_color(
+        const NanTheme& theme,
+        const ThemeColor& value,
+        const std::optional<ButtonTone> tone
+    ) -> NanColor {
         if (const auto* literal = std::get_if<NanColor>(&value.value())) {
             return *literal;
         }
+        if (const auto* accent = std::get_if<ToneAccentRef>(&value.value())) {
+            const auto [accent_color, on_accent] = button_accent(theme.palette, tone);
+            return accent->on_accent ? on_accent : accent_color;
+        }
         if (const auto* transform = std::get_if<ColorTransform>(&value.value())) {
-            const auto source = resolve_color_operand(theme, transform->source);
+            const auto lhs = resolve_color_operand(theme, transform->lhs, tone);
             switch (transform->op) {
                 case ColorTransformOp::transparent:
-                    return source.with_alpha(0.0F);
+                    return lhs.with_alpha(0.0F);
                 case ColorTransformOp::with_alpha:
-                    return source.with_alpha(resolve_theme_scalar(theme, transform->factor));
+                    return lhs.with_alpha(resolve_theme_scalar(theme, transform->factor));
+                case ColorTransformOp::mix:
+                    return lhs.mix(
+                        resolve_color_operand(theme, *transform->rhs, tone),
+                        resolve_theme_scalar(theme, transform->factor)
+                    );
             }
         }
-        return resolve_color_operand(theme, std::get<ColorToken>(value.value()));
+        return resolve_color_operand(theme, std::get<ColorToken>(value.value()), tone);
     }
 
     auto resolve_theme_scalar(const NanTheme& theme, const ThemeScalar& value) -> float {
@@ -141,44 +180,6 @@ namespace nandina::theme
 
     auto NanStyle::button_rules() const noexcept -> const std::vector<ButtonStyleRule>& {
         return button_rules_;
-    }
-
-    auto NanStyle::resolve_button(
-        const NanTheme& theme,
-        const ButtonTone tone,
-        const ButtonTreatment treatment,
-        const ButtonSize size,
-        const ButtonVisualState state
-    ) const -> ButtonStyle {
-        auto resolved = resolve_button_style(theme, tone, treatment, size, state);
-        for (const auto& rule: button_rules_) {
-            if (!rule.selector.matches(tone, treatment, size, state)) {
-                continue;
-            }
-            if (rule.background)
-                resolved.background = resolve_theme_color(theme, *rule.background);
-            if (rule.foreground)
-                resolved.foreground = resolve_theme_color(theme, *rule.foreground);
-            if (rule.border_color)
-                resolved.border_color = resolve_theme_color(theme, *rule.border_color);
-            if (rule.focus_ring_color) {
-                resolved.focus_ring_color = resolve_theme_color(theme, *rule.focus_ring_color);
-            }
-            if (rule.border_width)
-                resolved.border_width = resolve_theme_scalar(theme, *rule.border_width);
-            if (rule.radius)
-                resolved.radius = resolve_theme_scalar(theme, *rule.radius);
-            if (rule.focus_ring_width) {
-                resolved.focus_ring_width = resolve_theme_scalar(theme, *rule.focus_ring_width);
-            }
-            if (rule.height)
-                resolved.height = resolve_theme_scalar(theme, *rule.height);
-            if (rule.padding_x)
-                resolved.padding_x = resolve_theme_scalar(theme, *rule.padding_x);
-            if (rule.font_size)
-                resolved.font_size = resolve_theme_scalar(theme, *rule.font_size);
-        }
-        return resolved;
     }
 
     void NanStyle::add_text_field_rule(TextFieldStyleRule rule) {
