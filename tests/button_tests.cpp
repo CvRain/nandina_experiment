@@ -357,11 +357,11 @@ faces = [{ resource = "fonts/fallback-ui/regular", weight = 400 }]
     REQUIRE(resolved.padding_x == Catch::Approx(33.0F));
     REQUIRE(resolved.radius == Catch::Approx(12.0F));
 
-    const auto field_style = manager.style().resolve_text_field(
-        manager.theme(), theme::TextFieldVisualState::focused
+    const auto field_style = theme::resolve_text_field(
+        manager.design_system(), manager.appearance(), theme::TextFieldVisualState::focused
     );
-    REQUIRE(field_style.border_color.oklch().light == Catch::Approx(0.31F));
-    REQUIRE(field_style.height == Catch::Approx(44.0F));
+    REQUIRE(field_style.container.border.oklch().light == Catch::Approx(0.31F));
+    REQUIRE(field_style.metrics.height == Catch::Approx(44.0F));
 
     const auto invalid = theme::parse_style_document(R"toml(
 [[styles.button]]

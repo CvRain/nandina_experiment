@@ -28,7 +28,6 @@
 
 #include "appearance.hpp"
 #include "nan_style.hpp"
-#include "text_field_style.hpp"
 #include "theme.hpp"
 #include "visual_state.hpp"
 

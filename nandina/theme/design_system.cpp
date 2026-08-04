@@ -115,30 +115,36 @@ namespace nandina::theme
             scale_alpha(style.focus.color, alpha);
         }
 
-        /** 平铺 TextFieldStyle → 片段组合的解析结果。 */
-        [[nodiscard]] auto compose(const TextFieldStyle& flat) -> ResolvedTextFieldStyle {
+        /** TextFieldRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const TextFieldRecipe& recipe
+        ) -> ResolvedTextFieldStyle {
             return {
-                .container = ResolvedBoxStyle {
-                    .fill = flat.background,
-                    .border = flat.border_color,
-                    .border_width = flat.border_width,
-                    .radius = flat.radius,
-                },
-                .value = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
-                .placeholder =
-                    ResolvedTypeStyle {.color = flat.placeholder, .font_size = flat.font_size},
-                .selection = flat.selection,
-                .focus =
-                    ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
-                .metrics = ResolvedControlMetrics {
-                    .height = flat.height,
-                    .padding_x = flat.padding_x,
-                    .gap = 0.0F,
-                    .min_height = 0.0F,
-                    .box_size = 0.0F,
-                    .preferred_width = 0.0F,
-                },
+                .container = resolve(system, appearance, recipe.container),
+                .value = resolve(system, appearance, recipe.value),
+                .placeholder = resolve(system, appearance, recipe.placeholder),
+                .selection = resolve_color(system, appearance, recipe.selection),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
             };
+        }
+
+        void apply_text_field_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedTextFieldStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.container.fill, alpha);
+            scale_alpha(style.container.border, alpha);
+            scale_alpha(style.value.color, alpha);
+            scale_alpha(style.placeholder.color, alpha);
         }
     } // namespace
 
@@ -238,12 +244,15 @@ namespace nandina::theme
         const ColorAppearance appearance,
         const TextFieldVisualState state
     ) -> ResolvedTextFieldStyle {
-        auto style = compose(resolve_text_field_style(theme_view(system, appearance), state));
+        auto style = resolve_recipe(system, appearance, system.components.text_field.base);
         for (const auto& rule: system.components.text_field.rules) {
             if (rule.state && !has_text_field_state(state, *rule.state)) {
                 continue;
             }
             apply_rule(system, appearance, style, rule);
+        }
+        if (has_text_field_state(state, TextFieldVisualState::disabled)) {
+            apply_text_field_disabled(system, appearance, style);
         }
         return style;
     }
@@ -474,31 +483,34 @@ namespace nandina::theme
         };
     }
 
-    /** @return 框架默认 TextField 配方。 */
+    /** @return 框架默认 TextField 配方（normal 状态；focused/invalid 由规则覆盖）。 */
     auto default_text_field_recipe() -> TextFieldRecipe {
         return {
             .container = BoxStyle {
                 .fill = ThemeColor::token(ColorToken::surface_variant),
-                .border = ThemeColor::token(ColorToken::outline),
+                .border = ThemeColor::token(ColorToken::outline_variant),
                 .border_width = ThemeScalar::token(ScalarToken::border_thin),
-                .radius = ThemeScalar::token(ScalarToken::radius_md),
+                .radius = ThemeScalar::token(ScalarToken::radius_sm),
             },
             .value = TypeStyle {
                 .color = ThemeColor::token(ColorToken::on_surface),
                 .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
             },
             .placeholder = TypeStyle {
-                .color = ThemeColor::token(ColorToken::on_surface_variant),
+                .color = ThemeColor::with_alpha(
+                    ColorToken::on_surface_variant,
+                    ThemeScalar::literal(0.72F)
+                ),
                 .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
             },
             .selection = ThemeColor::token(ColorToken::selection),
             .focus = FocusRingStyle {
                 .color = ThemeColor::token(ColorToken::focus_ring),
-                .width = ThemeScalar::token(ScalarToken::border_focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
             },
             .metrics = ControlMetrics {
-                .height = ThemeScalar::literal(36.0F),
-                .padding_x = ThemeScalar::literal(12.0F),
+                .height = ThemeScalar::literal(40.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_md),
                 .gap = ThemeScalar::literal(0.0F),
                 .min_height = ThemeScalar::literal(32.0F),
                 .box_size = ThemeScalar::literal(0.0F),
@@ -587,7 +599,21 @@ namespace nandina::theme
                         },
                     },
                 },
-                .text_field = TextFieldRecipes {.base = default_text_field_recipe(), .rules = {}},
+                .text_field = TextFieldRecipes {
+                    .base = default_text_field_recipe(),
+                    .rules = {
+                        TextFieldRecipeRule {
+                            .state = TextFieldVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                        TextFieldRecipeRule {
+                            .state = TextFieldVisualState::invalid,
+                            .container_border = ThemeColor::token(ColorToken::error),
+                            .focus_ring_color = ThemeColor::token(ColorToken::error),
+                        },
+                    },
+                },
             },
         };
     }

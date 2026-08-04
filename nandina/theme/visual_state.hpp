@@ -27,6 +27,30 @@ namespace nandina::theme
         disabled,
     };
 
+    /** TextField 交互状态（位掩码：focused / disabled / invalid 可组合）。 */
+    enum class TextFieldVisualState : unsigned char {
+        normal = 0,
+        focused = 1 << 0,
+        disabled = 1 << 1,
+        invalid = 1 << 2,
+    };
+
+    [[nodiscard]] constexpr auto operator|(TextFieldVisualState lhs, TextFieldVisualState rhs)
+        -> TextFieldVisualState {
+        return static_cast<TextFieldVisualState>(
+            static_cast<unsigned char>(lhs) | static_cast<unsigned char>(rhs)
+        );
+    }
+
+    /** 判断位掩码状态是否包含指定状态位。 */
+    [[nodiscard]] constexpr auto
+    has_text_field_state(TextFieldVisualState value, TextFieldVisualState state) noexcept -> bool {
+        if (state == TextFieldVisualState::normal)
+            return value == state;
+        return (static_cast<unsigned char>(value) & static_cast<unsigned char>(state))
+            == static_cast<unsigned char>(state);
+    }
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP

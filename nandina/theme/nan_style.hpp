@@ -6,7 +6,7 @@
 #define NANDINA_EXPERIMENT_THEME_NAN_STYLE_HPP
 
 #include "button_style.hpp"
-#include "text_field_style.hpp"
+#include "visual_state.hpp"
 
 #include <memory>
 #include <optional>
@@ -216,9 +216,6 @@ namespace nandina::theme
         void add_text_field_rule(TextFieldStyleRule rule);
         [[nodiscard]] auto text_field_rules() const noexcept
             -> const std::vector<TextFieldStyleRule>&;
-        [[nodiscard]] virtual auto
-        resolve_text_field(const NanTheme& theme, TextFieldVisualState state) const
-            -> TextFieldStyle;
 
     private:
         std::vector<ButtonStyleRule> button_rules_;

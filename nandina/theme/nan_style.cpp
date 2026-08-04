@@ -189,40 +189,6 @@ namespace nandina::theme
         return text_field_rules_;
     }
 
-    auto NanStyle::resolve_text_field(const NanTheme& theme, const TextFieldVisualState state) const
-        -> TextFieldStyle {
-        auto resolved = resolve_text_field_style(theme, state);
-        for (const auto& rule: text_field_rules_) {
-            if (rule.state && !has_text_field_state(state, *rule.state))
-                continue;
-            if (rule.background)
-                resolved.background = resolve_theme_color(theme, *rule.background);
-            if (rule.foreground)
-                resolved.foreground = resolve_theme_color(theme, *rule.foreground);
-            if (rule.placeholder)
-                resolved.placeholder = resolve_theme_color(theme, *rule.placeholder);
-            if (rule.border_color)
-                resolved.border_color = resolve_theme_color(theme, *rule.border_color);
-            if (rule.focus_ring_color)
-                resolved.focus_ring_color = resolve_theme_color(theme, *rule.focus_ring_color);
-            if (rule.selection)
-                resolved.selection = resolve_theme_color(theme, *rule.selection);
-            if (rule.border_width)
-                resolved.border_width = resolve_theme_scalar(theme, *rule.border_width);
-            if (rule.radius)
-                resolved.radius = resolve_theme_scalar(theme, *rule.radius);
-            if (rule.focus_ring_width)
-                resolved.focus_ring_width = resolve_theme_scalar(theme, *rule.focus_ring_width);
-            if (rule.height)
-                resolved.height = resolve_theme_scalar(theme, *rule.height);
-            if (rule.padding_x)
-                resolved.padding_x = resolve_theme_scalar(theme, *rule.padding_x);
-            if (rule.font_size)
-                resolved.font_size = resolve_theme_scalar(theme, *rule.font_size);
-        }
-        return resolved;
-    }
-
     auto default_style() -> std::shared_ptr<const NanStyle> {
         static const auto style = std::make_shared<const NanStyle>();
         return style;

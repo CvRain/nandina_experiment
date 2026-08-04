@@ -110,8 +110,6 @@ module_theme = files(
     'theme/style_context.hpp',
     'theme/button_style.hpp',
     'theme/button_style.cpp',
-    'theme/text_field_style.hpp',
-    'theme/text_field_style.cpp',
     'theme/nan_style.hpp',
     'theme/nan_style.cpp',
     'theme/theme_manager.hpp',
