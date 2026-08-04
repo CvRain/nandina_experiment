@@ -5,7 +5,7 @@
 #include "reactive/scope.hpp"
 #include "scene/input_event.hpp"
 #include "scene/scene_tree.hpp"
-#include "theme/checkbox_style.hpp"
+#include "theme/design_system.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/build_context.hpp"
 #include "widget/checkbox.hpp"
@@ -16,19 +16,27 @@
 using namespace nandina;
 
 TEST_CASE("checkbox style resolves semantic theme tokens", "[checkbox][theme]") {
-    auto current = theme::default_theme();
-    current.palette.primary = theme::nan_color(0.62F, 0.16F, 250.0F);
-    current.tokens.spacing.sm = 11.0F;
+    auto design = theme::default_design_system();
+    design.light.primary = theme::nan_color(0.62F, 0.16F, 250.0F);
+    design.tokens.spacing.sm = 11.0F;
 
-    const auto checked =
-        theme::resolve_checkbox_style(current, true, theme::CheckboxVisualState::normal);
-    const auto unchecked =
-        theme::resolve_checkbox_style(current, false, theme::CheckboxVisualState::normal);
+    const auto checked = theme::resolve_checkbox(
+        design,
+        theme::ColorAppearance::light,
+        /*checked=*/true,
+        theme::CheckboxVisualState::normal
+    );
+    const auto unchecked = theme::resolve_checkbox(
+        design,
+        theme::ColorAppearance::light,
+        /*checked=*/false,
+        theme::CheckboxVisualState::normal
+    );
 
-    REQUIRE(checked.box_background.oklch().light == Catch::Approx(0.62F));
-    REQUIRE(checked.gap == Catch::Approx(11.0F));
-    REQUIRE(unchecked.box_background.alpha() == Catch::Approx(0.0F));
-    REQUIRE(unchecked.border_color.alpha() == Catch::Approx(1.0F));
+    REQUIRE(checked.indicator.fill.oklch().light == Catch::Approx(0.62F));
+    REQUIRE(checked.metrics.gap == Catch::Approx(11.0F));
+    REQUIRE(unchecked.indicator.fill.alpha() == Catch::Approx(0.0F));
+    REQUIRE(unchecked.indicator.border.alpha() == Catch::Approx(1.0F));
 }
 
 TEST_CASE("checkbox activation toggles value and semantic state", "[checkbox][semantics]") {

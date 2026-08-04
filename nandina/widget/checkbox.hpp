@@ -6,7 +6,6 @@
 #define NANDINA_EXPERIMENT_WIDGET_CHECKBOX_HPP
 
 #include "../reactive/event.hpp"
-#include "../theme/checkbox_style.hpp"
 #include "../theme/design_system.hpp"
 #include "primitives/pressable.hpp"
 #include "primitives/text.hpp"

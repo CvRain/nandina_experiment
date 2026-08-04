@@ -6,9 +6,7 @@
 #include "render/render_device.hpp"
 #include "scene/scene_tree.hpp"
 #include "theme/button_style.hpp"
-#include "theme/checkbox_style.hpp"
 #include "theme/design_system.hpp"
-#include "theme/slider_style.hpp"
 #include "theme/theme.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
@@ -354,4 +352,16 @@ TEST_CASE("text field draws rounded fill and outline through BoxPainter", "[them
     }
     REQUIRE(fill);
     REQUIRE(outline);
+}
+
+TEST_CASE("disabled state scales slider and checkbox colors by disabled opacity", "[theme][design-system]") {
+    const auto system = theme::default_design_system();
+    constexpr auto appearance = theme::ColorAppearance::light;
+    const auto slider =
+        theme::resolve_slider(system, appearance, theme::SliderVisualState::disabled);
+    REQUIRE(slider.active_track.box.fill.alpha() == Catch::Approx(system.tokens.opacity.disabled));
+
+    const auto checkbox =
+        theme::resolve_checkbox(system, appearance, /*checked=*/true, theme::CheckboxVisualState::disabled);
+    REQUIRE(checkbox.indicator.fill.alpha() == Catch::Approx(system.tokens.opacity.disabled));
 }

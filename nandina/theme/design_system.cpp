@@ -46,69 +46,73 @@ namespace nandina::theme
             };
         }
 
-        /** 平铺 CheckboxStyle → 片段组合的解析结果。 */
-        [[nodiscard]] auto compose(const CheckboxStyle& flat) -> ResolvedCheckboxStyle {
+        /** CheckboxRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const CheckboxRecipe& recipe
+        ) -> ResolvedCheckboxStyle {
             return {
-                .indicator = ResolvedBoxStyle {
-                    .fill = flat.box_background,
-                    .border = flat.border_color,
-                    .border_width = flat.border_width,
-                    .radius = flat.radius,
-                },
-                .check = flat.check_color,
-                .label = ResolvedTypeStyle {.color = flat.foreground, .font_size = flat.font_size},
-                .focus =
-                    ResolvedFocusRing {.color = flat.focus_ring_color, .width = flat.focus_ring_width},
-                .metrics = ResolvedControlMetrics {
-                    .height = 0.0F,
-                    .padding_x = 0.0F,
-                    .gap = flat.gap,
-                    .min_height = flat.min_height,
-                    .box_size = flat.box_size,
-                    .preferred_width = 0.0F,
-                },
+                .indicator = resolve(system, appearance, recipe.indicator),
+                .check = resolve_color(system, appearance, recipe.check),
+                .label = resolve(system, appearance, recipe.label),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
             };
         }
 
-        /** 平铺 SliderStyle → 片段组合的解析结果。 */
-        [[nodiscard]] auto compose(const SliderStyle& flat) -> ResolvedSliderStyle {
+        /** SliderRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const SliderRecipe& recipe
+        ) -> ResolvedSliderStyle {
             return {
-                .inactive_track = ResolvedTrackStyle {
-                    .box = ResolvedBoxStyle {
-                        .fill = flat.inactive_track,
-                        .border = flat.inactive_track,
-                        .border_width = 0.0F,
-                        .radius = flat.track_height * 0.5F, // pill 形轨道
-                    },
-                    .thickness = flat.track_height,
-                },
-                .active_track = ResolvedTrackStyle {
-                    .box = ResolvedBoxStyle {
-                        .fill = flat.active_track,
-                        .border = flat.active_track,
-                        .border_width = 0.0F,
-                        .radius = flat.track_height * 0.5F,
-                    },
-                    .thickness = flat.track_height,
-                },
-                .thumb = ResolvedThumbStyle {
-                    .box = ResolvedBoxStyle {
-                        .fill = flat.thumb,
-                        .border = flat.thumb,
-                        .border_width = 0.0F,
-                        .radius = flat.thumb_radius,
-                    },
-                },
-                .focus = ResolvedFocusRing {.color = flat.focus_ring, .width = flat.focus_ring_width},
-                .metrics = ResolvedControlMetrics {
-                    .height = 0.0F,
-                    .padding_x = 0.0F,
-                    .gap = 0.0F,
-                    .min_height = flat.min_height,
-                    .box_size = 0.0F,
-                    .preferred_width = flat.preferred_width,
-                },
+                .inactive_track = resolve(system, appearance, recipe.inactive_track),
+                .active_track = resolve(system, appearance, recipe.active_track),
+                .thumb = resolve(system, appearance, recipe.thumb),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
             };
+        }
+
+        // ─── disabled 状态变换（跨切面，由解析器按 token 应用） ──────────────
+
+        /** 按因子缩放已解析颜色的 alpha。 */
+        void scale_alpha(NanColor& color, const float factor) {
+            color = color.with_alpha(color.alpha() * factor);
+        }
+
+        void apply_checkbox_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedCheckboxStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.indicator.fill, alpha);
+            scale_alpha(style.indicator.border, alpha);
+            scale_alpha(style.check, alpha);
+            scale_alpha(style.label.color, alpha);
+        }
+
+        void apply_slider_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedSliderStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.inactive_track.box.fill, alpha);
+            scale_alpha(style.active_track.box.fill, alpha);
+            scale_alpha(style.thumb.box.fill, alpha);
+            scale_alpha(style.focus.color, alpha);
         }
 
         /** 平铺 TextFieldStyle → 片段组合的解析结果。 */
@@ -182,13 +186,15 @@ namespace nandina::theme
         const bool checked,
         const CheckboxVisualState state
     ) -> ResolvedCheckboxStyle {
-        auto style =
-            compose(resolve_checkbox_style(theme_view(system, appearance), checked, state));
+        auto style = resolve_recipe(system, appearance, system.components.checkbox.base);
         for (const auto& rule: system.components.checkbox.rules) {
             if ((rule.checked && *rule.checked != checked) || (rule.state && *rule.state != state)) {
                 continue;
             }
             apply_rule(system, appearance, style, rule);
+        }
+        if (state == CheckboxVisualState::disabled) {
+            apply_checkbox_disabled(system, appearance, style);
         }
         return style;
     }
@@ -206,12 +212,15 @@ namespace nandina::theme
         const ColorAppearance appearance,
         const SliderVisualState state
     ) -> ResolvedSliderStyle {
-        auto style = compose(resolve_slider_style(theme_view(system, appearance), state));
+        auto style = resolve_recipe(system, appearance, system.components.slider.base);
         for (const auto& rule: system.components.slider.rules) {
             if (rule.state && *rule.state != state) {
                 continue;
             }
             apply_rule(system, appearance, style, rule);
+        }
+        if (state == SliderVisualState::disabled) {
+            apply_slider_disabled(system, appearance, style);
         }
         return style;
     }
@@ -392,22 +401,23 @@ namespace nandina::theme
         };
     }
 
-    /** @return 框架默认 Checkbox 配方。 */
+    /** @return 框架默认 Checkbox 配方（未勾选：透明指示器 + outline 边框）。 */
     auto default_checkbox_recipe() -> CheckboxRecipe {
         return {
             .indicator = BoxStyle {
-                .fill = ThemeColor::token(ColorToken::surface),
+                .fill = ThemeColor::transparent(ColorToken::surface),
                 .border = ThemeColor::token(ColorToken::outline),
                 .border_width = ThemeScalar::token(ScalarToken::border_thin),
                 .radius = ThemeScalar::literal(5.0F), // 与现状 radius.sm * 0.5 一致
             },
+            .check = ThemeColor::token(ColorToken::on_primary),
             .label = TypeStyle {
                 .color = ThemeColor::token(ColorToken::on_surface),
                 .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
             },
             .focus = FocusRingStyle {
                 .color = ThemeColor::token(ColorToken::focus_ring),
-                .width = ThemeScalar::token(ScalarToken::border_focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
             },
             .metrics = ControlMetrics {
                 .height = ThemeScalar::literal(0.0F),
@@ -446,12 +456,12 @@ namespace nandina::theme
                     .fill = ThemeColor::token(ColorToken::primary),
                     .border = ThemeColor::token(ColorToken::primary),
                     .border_width = ThemeScalar::literal(0.0F),
-                    .radius = ThemeScalar::token(ScalarToken::radius_full),
+                    .radius = ThemeScalar::literal(9.0F), // dragging 11 / hovered 10 由规则覆盖
                 },
             },
             .focus = FocusRingStyle {
                 .color = ThemeColor::token(ColorToken::focus_ring),
-                .width = ThemeScalar::token(ScalarToken::border_focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
             },
             .metrics = ControlMetrics {
                 .height = ThemeScalar::literal(0.0F),
@@ -528,8 +538,55 @@ namespace nandina::theme
             },
             .components = ComponentRecipes {
                 .button = ButtonRecipes {.base = default_button_recipe(), .rules = {}},
-                .checkbox = CheckboxRecipes {.base = default_checkbox_recipe(), .rules = {}},
-                .slider = SliderRecipes {.base = default_slider_recipe(), .rules = {}},
+                .checkbox = CheckboxRecipes {
+                    .base = default_checkbox_recipe(),
+                    .rules = {
+                        CheckboxRecipeRule {
+                            .checked = true,
+                            .indicator_fill = ThemeColor::token(ColorToken::primary),
+                            .indicator_border = ThemeColor::token(ColorToken::primary),
+                        },
+                        CheckboxRecipeRule {
+                            .checked = false,
+                            .state = CheckboxVisualState::hovered,
+                            .indicator_fill = ThemeColor::with_alpha(
+                                ColorToken::primary,
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                        },
+                        CheckboxRecipeRule {
+                            .checked = false,
+                            .state = CheckboxVisualState::pressed,
+                            .indicator_fill = ThemeColor::with_alpha(
+                                ColorToken::primary,
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
+                        },
+                        CheckboxRecipeRule {
+                            .state = CheckboxVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                    },
+                },
+                .slider = SliderRecipes {
+                    .base = default_slider_recipe(),
+                    .rules = {
+                        SliderRecipeRule {
+                            .state = SliderVisualState::dragging,
+                            .thumb_radius = ThemeScalar::literal(11.0F),
+                        },
+                        SliderRecipeRule {
+                            .state = SliderVisualState::hovered,
+                            .thumb_radius = ThemeScalar::literal(10.0F),
+                        },
+                        SliderRecipeRule {
+                            .state = SliderVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                    },
+                },
                 .text_field = TextFieldRecipes {.base = default_text_field_recipe(), .rules = {}},
             },
         };

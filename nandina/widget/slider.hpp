@@ -8,7 +8,6 @@
 #include "../reactive/event.hpp"
 #include "../scene/control.hpp"
 #include "../theme/design_system.hpp"
-#include "../theme/slider_style.hpp"
 
 #include <functional>
 #include <memory>

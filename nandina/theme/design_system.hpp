@@ -27,11 +27,10 @@
 #define NANDINA_EXPERIMENT_THEME_DESIGN_SYSTEM_HPP
 
 #include "appearance.hpp"
-#include "checkbox_style.hpp"
 #include "nan_style.hpp"
-#include "slider_style.hpp"
 #include "text_field_style.hpp"
 #include "theme.hpp"
+#include "visual_state.hpp"
 
 #include <optional>
 #include <vector>
@@ -142,9 +141,10 @@ namespace nandina::theme
         ControlMetrics metrics;
     };
 
-    /** Checkbox 配方：指示器（勾选框）+ 文本 + 焦点环 + 度量。 */
+    /** Checkbox 配方：指示器（勾选框）+ 勾选标记 + 文本 + 焦点环 + 度量。 */
     using CheckboxRecipe = struct CheckboxRecipe {
         BoxStyle indicator;
+        ThemeColor check; // 勾选标记（对勾）颜色
         TypeStyle label;
         FocusRingStyle focus;
         ControlMetrics metrics;

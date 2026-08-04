@@ -6,7 +6,7 @@
 #include "scene/input_event.hpp"
 #include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
-#include "theme/slider_style.hpp"
+#include "theme/design_system.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/build_context.hpp"
 #include "widget/slider.hpp"
@@ -114,9 +114,13 @@ TEST_CASE("BuildContext slider synchronizes a float signal", "[slider][authoring
 }
 
 TEST_CASE("slider style resolves semantic theme colors", "[slider][theme]") {
-    auto current = theme::default_theme();
-    current.palette.primary = theme::nan_color(0.72F, 0.12F, 190.0F);
-    const auto style = theme::resolve_slider_style(current, theme::SliderVisualState::dragging);
-    REQUIRE(style.active_track.oklch().light == Catch::Approx(0.72F));
-    REQUIRE(style.thumb_radius == Catch::Approx(11.0F));
+    auto design = theme::default_design_system();
+    design.light.primary = theme::nan_color(0.72F, 0.12F, 190.0F);
+    const auto style = theme::resolve_slider(
+        design,
+        theme::ColorAppearance::light,
+        theme::SliderVisualState::dragging
+    );
+    REQUIRE(style.active_track.box.fill.oklch().light == Catch::Approx(0.72F));
+    REQUIRE(style.thumb.box.radius == Catch::Approx(11.0F));
 }

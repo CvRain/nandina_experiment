@@ -6,43 +6,47 @@
 
 namespace nandina::theme
 {
-    auto resolve_theme_color(const NanTheme& theme, const ThemeColor& value) -> NanColor {
-        if (const auto* literal = std::get_if<NanColor>(&value.value())) {
-            return *literal;
-        }
-        switch (std::get<ColorToken>(value.value())) {
-            case ColorToken::background:
-                return theme.palette.background;
-            case ColorToken::on_background:
-                return theme.palette.on_background;
-            case ColorToken::primary:
-                return theme.palette.primary;
-            case ColorToken::on_primary:
-                return theme.palette.on_primary;
-            case ColorToken::secondary:
-                return theme.palette.secondary;
-            case ColorToken::on_secondary:
-                return theme.palette.on_secondary;
-            case ColorToken::tertiary:
-                return theme.palette.tertiary;
-            case ColorToken::on_tertiary:
-                return theme.palette.on_tertiary;
-            case ColorToken::surface:
-                return theme.palette.surface;
-            case ColorToken::on_surface:
-                return theme.palette.on_surface;
-            case ColorToken::surface_variant:
-                return theme.palette.surface_variant;
-            case ColorToken::on_surface_variant:
-                return theme.palette.on_surface_variant;
-            case ColorToken::outline:
-                return theme.palette.outline;
-            case ColorToken::outline_variant:
-                return theme.palette.outline_variant;
-            case ColorToken::success:
-                return theme.palette.success;
-            case ColorToken::on_success:
-                return theme.palette.on_success;
+    namespace
+    {
+        /** 解析颜色操作数（字面量或颜色 token）。 */
+        [[nodiscard]] auto resolve_color_operand(const NanTheme& theme, const ColorOperand& operand)
+            -> NanColor {
+            if (const auto* literal = std::get_if<NanColor>(&operand)) {
+                return *literal;
+            }
+            switch (std::get<ColorToken>(operand)) {
+                case ColorToken::background:
+                    return theme.palette.background;
+                case ColorToken::on_background:
+                    return theme.palette.on_background;
+                case ColorToken::primary:
+                    return theme.palette.primary;
+                case ColorToken::on_primary:
+                    return theme.palette.on_primary;
+                case ColorToken::secondary:
+                    return theme.palette.secondary;
+                case ColorToken::on_secondary:
+                    return theme.palette.on_secondary;
+                case ColorToken::tertiary:
+                    return theme.palette.tertiary;
+                case ColorToken::on_tertiary:
+                    return theme.palette.on_tertiary;
+                case ColorToken::surface:
+                    return theme.palette.surface;
+                case ColorToken::on_surface:
+                    return theme.palette.on_surface;
+                case ColorToken::surface_variant:
+                    return theme.palette.surface_variant;
+                case ColorToken::on_surface_variant:
+                    return theme.palette.on_surface_variant;
+                case ColorToken::outline:
+                    return theme.palette.outline;
+                case ColorToken::outline_variant:
+                    return theme.palette.outline_variant;
+                case ColorToken::success:
+                    return theme.palette.success;
+                case ColorToken::on_success:
+                    return theme.palette.on_success;
             case ColorToken::warning:
                 return theme.palette.warning;
             case ColorToken::on_warning:
@@ -57,6 +61,23 @@ namespace nandina::theme
                 return theme.palette.selection;
         }
         return theme.palette.primary;
+    }
+    } // namespace
+
+    auto resolve_theme_color(const NanTheme& theme, const ThemeColor& value) -> NanColor {
+        if (const auto* literal = std::get_if<NanColor>(&value.value())) {
+            return *literal;
+        }
+        if (const auto* transform = std::get_if<ColorTransform>(&value.value())) {
+            const auto source = resolve_color_operand(theme, transform->source);
+            switch (transform->op) {
+                case ColorTransformOp::transparent:
+                    return source.with_alpha(0.0F);
+                case ColorTransformOp::with_alpha:
+                    return source.with_alpha(resolve_theme_scalar(theme, transform->factor));
+            }
+        }
+        return resolve_color_operand(theme, std::get<ColorToken>(value.value()));
     }
 
     auto resolve_theme_scalar(const NanTheme& theme, const ThemeScalar& value) -> float {

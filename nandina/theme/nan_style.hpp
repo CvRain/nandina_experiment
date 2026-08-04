@@ -84,8 +84,70 @@ namespace nandina::theme
         std::variant<T, Token> value_;
     };
 
-    using ThemeColor = ThemeValue<NanColor, ColorToken>;
     using ThemeScalar = ThemeValue<float, ScalarToken>;
+
+    // ─── 颜色表达式 ────────────────────────────────────────────────────────────
+    //
+    // ThemeColor 除 token / 字面量外，还支持浅层变换（with_alpha / transparent），
+    // 使配方规则能表达「primary 的 hover 覆盖层」「surface 透明」等语义。
+
+    /** 颜色变换的操作数：字面量或颜色 token。 */
+    using ColorOperand = std::variant<NanColor, ColorToken>;
+
+    /** 颜色变换类型。 */
+    enum class ColorTransformOp {
+        with_alpha,  // source.with_alpha(factor)
+        transparent, // source.with_alpha(0)
+    };
+
+    /** 浅层颜色变换（操作数不嵌套表达式）。 */
+    using ColorTransform = struct ColorTransform {
+        ColorTransformOp op;
+        ColorOperand source;
+        ThemeScalar factor; // with_alpha 的 alpha；transparent 忽略
+    };
+
+    /** 颜色值：字面量 | 颜色 token | 浅层变换。 */
+    class ThemeColor {
+    public:
+        [[nodiscard]] static auto token(ColorToken token) -> ThemeColor {
+            return ThemeColor(token);
+        }
+
+        [[nodiscard]] static auto literal(NanColor value) -> ThemeColor {
+            return ThemeColor(std::move(value));
+        }
+
+        /** @return source.with_alpha(factor) 的颜色表达式。 */
+        [[nodiscard]] static auto with_alpha(ColorToken source, ThemeScalar factor) -> ThemeColor {
+            return ThemeColor(ColorTransform {
+                .op = ColorTransformOp::with_alpha,
+                .source = source,
+                .factor = std::move(factor),
+            });
+        }
+
+        /** @return source.with_alpha(0)，即完全透明。 */
+        [[nodiscard]] static auto transparent(ColorToken source) -> ThemeColor {
+            return ThemeColor(ColorTransform {
+                .op = ColorTransformOp::transparent,
+                .source = source,
+                .factor = ThemeScalar::literal(0.0F),
+            });
+        }
+
+        [[nodiscard]] auto value() const
+            -> const std::variant<NanColor, ColorToken, ColorTransform>& {
+            return value_;
+        }
+
+    private:
+        explicit ThemeColor(ColorToken token): value_(token) {}
+        explicit ThemeColor(NanColor value): value_(std::move(value)) {}
+        explicit ThemeColor(ColorTransform transform): value_(std::move(transform)) {}
+
+        std::variant<NanColor, ColorToken, ColorTransform> value_;
+    };
 
     [[nodiscard]] auto resolve_theme_color(const NanTheme& theme, const ThemeColor& value)
         -> NanColor;
