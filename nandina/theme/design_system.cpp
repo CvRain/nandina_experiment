@@ -598,10 +598,10 @@ namespace nandina::theme
     auto default_design_system() -> DesignSystem {
         return DesignSystem {
             .tokens = NanTokens {},
-            // NOTE: 真实的 light/dark palette 属于迁移期工作；当前两者都取自遗留
-            // 默认方案，保证结构今天即可使用。
-            .light = default_theme().palette,
-            .dark = default_theme().palette,
+            // 框架默认亮/暗两套语义色（Skeleton 参考，见 phase7 文档 Step 2）：
+            // 品牌色两模式同值，明暗差异集中在中性色。
+            .light = default_light_palette(),
+            .dark = default_dark_palette(),
             .typography = TypographyRoles {
                 .label_sm = TypeStyle {
                     .color = ThemeColor::token(ColorToken::on_surface),

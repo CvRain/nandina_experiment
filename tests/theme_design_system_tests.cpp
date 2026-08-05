@@ -15,6 +15,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -201,6 +202,35 @@ TEST_CASE("one DesignSystem carries light and dark palettes switched by preferen
     REQUIRE(manager.theme().palette.primary.oklch().light == Catch::Approx(0.38F));
     manager.set_preference(theme::ThemePreference::light);
     REQUIRE(manager.theme().palette.primary.oklch().light == Catch::Approx(0.82F));
+}
+
+TEST_CASE("default light/dark palettes keep on_* contrast and flip neutrals", "[theme][palette]") {
+    const auto light = theme::default_light_palette();
+    const auto dark = theme::default_dark_palette();
+
+    // 每对 on_*/底色需拉开明度（|ΔL| ≥ 0.25），防止可读性退化。
+    const auto check_pairs = [](const theme::NanColorScheme& scheme) {
+        const auto diff = [](const foundation::NanColor& a, const foundation::NanColor& b) {
+            return std::abs(a.oklch().light - b.oklch().light);
+        };
+        REQUIRE(diff(scheme.background, scheme.on_background) >= 0.25F);
+        REQUIRE(diff(scheme.surface, scheme.on_surface) >= 0.25F);
+        REQUIRE(diff(scheme.surface_variant, scheme.on_surface_variant) >= 0.25F);
+        REQUIRE(diff(scheme.primary, scheme.on_primary) >= 0.25F);
+        REQUIRE(diff(scheme.secondary, scheme.on_secondary) >= 0.25F);
+        REQUIRE(diff(scheme.tertiary, scheme.on_tertiary) >= 0.25F);
+        REQUIRE(diff(scheme.success, scheme.on_success) >= 0.25F);
+        REQUIRE(diff(scheme.warning, scheme.on_warning) >= 0.25F);
+        REQUIRE(diff(scheme.error, scheme.on_error) >= 0.25F);
+    };
+    check_pairs(light);
+    check_pairs(dark);
+
+    // 中性色两模式显著翻转：亮=浅底深字，暗=深底浅字。
+    REQUIRE(light.background.oklch().light > dark.background.oklch().light + 0.5F);
+    REQUIRE(light.on_surface.oklch().light < dark.on_surface.oklch().light - 0.5F);
+    // 品牌色两模式同值（对齐 Skeleton brand 语义）。
+    REQUIRE(light.primary.oklch().light == Catch::Approx(dark.primary.oklch().light));
 }
 
 TEST_CASE("attached widget follows an atomic DesignSystem apply", "[theme][manager][widget]") {

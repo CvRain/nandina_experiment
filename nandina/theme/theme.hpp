@@ -64,42 +64,39 @@ namespace nandina::theme
     };
 
     struct NanColorScheme {
-        NanColor background = nan_color(0.27F, 0.025F, 275.0F);
-        NanColor on_background =
-            NanColor::from(NanHexRgb {.red = 239, .green = 241, .blue = 250, .alpha = 255});
+        // 内嵌默认 = 亮色方案（对齐 Skeleton 参考，见 dev-docs-v3/phase7 Step 2）。
+        // 品牌色两模式同值（500 档），明暗差异集中在中性色。
 
-        NanColor primary = nan_color(0.62F, 0.18F, 250.0F);
-        NanColor on_primary =
-            NanColor::from(NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255});
+        // 背景 / 文本（surface 色阶）
+        NanColor background = nan_color(1.0000F, 0.00F, 0.0F);       // surface-50
+        NanColor on_background = nan_color(0.1776F, 0.00F, 0.0F);    // surface-950
 
-        NanColor secondary = nan_color(0.68F, 0.13F, 150.0F);
-        NanColor on_secondary =
-            NanColor::from(NanHexRgb {.red = 18, .green = 28, .blue = 24, .alpha = 255});
+        NanColor primary = nan_color(0.6803F, 0.12F, 39.30F);        // primary-500
+        NanColor on_primary = nan_color(0.2949F, 0.11F, 32.48F);     // primary-950
 
-        NanColor tertiary = nan_color(0.68F, 0.16F, 330.0F);
-        NanColor on_tertiary =
-            NanColor::from(NanHexRgb {.red = 255, .green = 248, .blue = 252, .alpha = 255});
+        NanColor secondary = nan_color(0.4907F, 0.23F, 300.46F);     // secondary-500
+        NanColor on_secondary = nan_color(0.8666F, 0.05F, 300.15F);  // secondary-50
 
-        NanColor surface = nan_color(0.33F, 0.03F, 275.0F);
-        NanColor on_surface =
-            NanColor::from(NanHexRgb {.red = 239, .green = 241, .blue = 250, .alpha = 255});
+        NanColor tertiary = nan_color(0.6454F, 0.26F, 2.48F);        // tertiary-500
+        NanColor on_tertiary = nan_color(0.9073F, 0.08F, 328.92F);   // tertiary-50
 
-        NanColor surface_variant = nan_color(0.39F, 0.03F, 276.0F);
-        NanColor on_surface_variant =
-            NanColor::from(NanHexRgb {.red = 202, .green = 205, .blue = 222, .alpha = 255});
+        NanColor surface = nan_color(0.9067F, 0.00F, 0.0F);          // surface-100（轻微抬升）
+        NanColor on_surface = nan_color(0.1776F, 0.00F, 0.0F);       // surface-950
 
-        NanColor outline = nan_color(0.66F, 0.02F, 275.0F);
-        NanColor outline_variant = nan_color(0.48F, 0.02F, 275.0F);
+        NanColor surface_variant = nan_color(0.8141F, 0.00F, 0.0F);  // surface-200
+        NanColor on_surface_variant = nan_color(0.3867F, 0.00F, 0.0F); // surface-700
 
-        NanColor success = nan_color(0.72F, 0.13F, 175.0F);
-        NanColor on_success = nan_color(0.22F, 0.04F, 175.0F);
+        NanColor outline = nan_color(0.5103F, 0.00F, 0.0F);          // surface-500
+        NanColor outline_variant = nan_color(0.7155F, 0.00F, 0.0F);  // surface-300
 
-        NanColor warning = nan_color(0.82F, 0.14F, 77.0F);
-        NanColor on_warning = nan_color(0.28F, 0.06F, 65.0F);
+        NanColor success = nan_color(0.8291F, 0.13F, 174.95F);       // success-500
+        NanColor on_success = nan_color(0.2727F, 0.04F, 185.29F);    // success-950
 
-        NanColor error = nan_color(0.62F, 0.18F, 25.0F);
-        NanColor on_error =
-            NanColor::from(NanHexRgb {.red = 255, .green = 250, .blue = 248, .alpha = 255});
+        NanColor warning = nan_color(0.8246F, 0.14F, 76.71F);        // warning-500
+        NanColor on_warning = nan_color(0.5169F, 0.13F, 51.44F);     // warning-950
+
+        NanColor error = nan_color(0.6372F, 0.22F, 28.71F);          // error-500
+        NanColor on_error = nan_color(0.8999F, 0.04F, 14.04F);       // error-50
 
         NanColor focus_ring = primary;
         NanColor selection = primary.with_alpha(0.32F);
@@ -112,6 +109,28 @@ namespace nandina::theme
         NanTokens tokens;
         NanColorScheme palette;
     };
+
+    /** @return 框架默认亮色语义色板（即 NanColorScheme{} 内嵌默认）。 */
+    [[nodiscard]] inline auto default_light_palette() -> NanColorScheme {
+        return {};
+    }
+
+    /** @return 框架默认暗色语义色板（品牌色同亮色，中性色翻转）。 */
+    [[nodiscard]] inline auto default_dark_palette() -> NanColorScheme {
+        NanColorScheme palette;
+        // 背景 / 文本翻转
+        palette.background = nan_color(0.1776F, 0.00F, 0.0F);        // surface-950
+        palette.on_background = nan_color(1.0000F, 0.00F, 0.0F);     // surface-50
+        // 表面向亮抬升（暗色模式下「抬升」= 更亮）
+        palette.surface = nan_color(0.2520F, 0.00F, 0.0F);           // surface-900
+        palette.on_surface = nan_color(1.0000F, 0.00F, 0.0F);        // surface-50
+        palette.surface_variant = nan_color(0.3211F, 0.00F, 0.0F);   // surface-800
+        palette.on_surface_variant = nan_color(0.6167F, 0.00F, 0.0F); // surface-400
+        // 边框
+        palette.outline = nan_color(0.4495F, 0.00F, 0.0F);           // surface-600
+        palette.outline_variant = nan_color(0.3211F, 0.00F, 0.0F);   // surface-800
+        return palette;
+    }
 
     [[nodiscard]] inline auto default_theme() -> NanTheme {
         return {};
