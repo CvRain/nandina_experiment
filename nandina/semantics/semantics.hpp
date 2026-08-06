@@ -28,6 +28,7 @@ namespace nandina::semantics
         list_item,
         checkbox,
         slider,
+        switch_control,
     };
 
     enum class Composition : std::uint8_t {

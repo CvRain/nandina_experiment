@@ -148,6 +148,55 @@ TEST_CASE("design system button rules overlay the base resolution by selector", 
     REQUIRE(normal.container.radius != Catch::Approx(99.0F));
 }
 
+TEST_CASE("button state layer is recipe data and can be overridden", "[theme][design-system]") {
+    const auto system = theme::default_design_system();
+    constexpr auto appearance = theme::ColorAppearance::light;
+
+    // filled 的 hover 状态层 = accent.mix(on_accent, hover_overlay)（配方数据）。
+    const auto hovered = theme::resolve_button(
+        system,
+        appearance,
+        theme::ButtonTone::primary,
+        theme::ButtonTreatment::filled,
+        theme::ButtonSize::medium,
+        theme::ButtonVisualState::hovered
+    );
+    const auto accent = system.light.primary;
+    const auto on_accent = system.light.on_primary;
+    const auto expected = accent.mix(on_accent, system.tokens.opacity.hover_overlay);
+    REQUIRE(hovered.container.fill.oklch().light == Catch::Approx(expected.oklch().light));
+    REQUIRE(hovered.state_layer.hover.oklch().light == Catch::Approx(expected.oklch().light));
+    // normal 不应用状态层：填充保持 treatment 的 accent 实心。
+    const auto normal = theme::resolve_button(
+        system,
+        appearance,
+        theme::ButtonTone::primary,
+        theme::ButtonTreatment::filled,
+        theme::ButtonSize::medium,
+        theme::ButtonVisualState::normal
+    );
+    REQUIRE(normal.container.fill.oklch().light == Catch::Approx(accent.oklch().light));
+
+    // 品牌主题可覆盖某个 treatment 的 hover 状态层，无需改解析器。
+    auto branded = theme::default_design_system();
+    theme::ButtonRecipeRule override_rule;
+    override_rule.selector.treatment = theme::ButtonTreatment::filled;
+    override_rule.state_layer_hover = theme::ThemeColor::token(theme::ColorToken::error);
+    branded.components.button.rules.push_back(override_rule);
+    const auto branded_hovered = theme::resolve_button(
+        branded,
+        appearance,
+        theme::ButtonTone::primary,
+        theme::ButtonTreatment::filled,
+        theme::ButtonSize::medium,
+        theme::ButtonVisualState::hovered
+    );
+    REQUIRE(
+        branded_hovered.container.fill.oklch().light
+        == Catch::Approx(branded.light.error.oklch().light)
+    );
+}
+
 TEST_CASE("resolve_checkbox and resolve_slider produce composed fragments", "[theme][design-system]") {
     const auto system = theme::default_design_system();
     constexpr auto appearance = theme::ColorAppearance::light;

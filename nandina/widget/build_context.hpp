@@ -214,6 +214,24 @@ namespace nandina::widget
             return result;
         }
 
+        [[nodiscard]] auto switch_control(std::string label, bool checked = false) const
+            -> authoring::NodeBuilder<Switch> {
+            return authoring::switch_control(std::move(label), checked, themes_->theme());
+        }
+
+        [[nodiscard]] auto switch_control(reactive::Signal<bool>& checked, std::string label) const
+            -> authoring::NodeBuilder<Switch> {
+            auto result = switch_control(std::move(label), checked.get());
+            const auto control = result.build();
+            bind(control, &Switch::set_checked, checked);
+            connect(control->checked_changed(), [&checked](const bool current) {
+                if (checked.peek() != current) {
+                    checked.set(current);
+                }
+            });
+            return result;
+        }
+
         [[nodiscard]] auto slider(
             std::string label,
             float value = 0.0F,

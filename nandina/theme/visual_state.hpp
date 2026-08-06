@@ -84,6 +84,15 @@ namespace nandina::theme
         disabled,
     };
 
+    /** Switch 交互状态。 */
+    enum class SwitchVisualState {
+        normal,
+        hovered,
+        pressed,
+        focused,
+        disabled,
+    };
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP

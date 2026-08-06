@@ -168,6 +168,8 @@ module_widget = files(
     'widget/slider.cpp',
     'widget/text_field.hpp',
     'widget/text_field.cpp',
+    'widget/switch.hpp',
+    'widget/switch.cpp',
 )
 
 module_app = files(

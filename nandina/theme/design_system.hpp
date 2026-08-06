@@ -75,7 +75,10 @@ namespace nandina::theme
         BoxStyle box;
     };
 
-    /** 可选 hover/pressed 覆盖层。可推迟到 ripple 动画阶段。 */
+    /**
+     * 状态层（hover / pressed 覆盖色）。Button 用「替换 fill」语义应用；
+     * 真正的叠加层绘制与 ripple 留给动画阶段。
+     */
     using StateLayerStyle = struct StateLayerStyle {
         ThemeColor hover;
         ThemeColor pressed;
@@ -91,6 +94,15 @@ namespace nandina::theme
         ThemeScalar min_height;
         ThemeScalar box_size;
         ThemeScalar preferred_width;
+    };
+
+    /** Switch 度量：轨道 / 拇指尺寸（组件专属片段）。 */
+    using SwitchMetrics = struct SwitchMetrics {
+        ThemeScalar track_width;   // 轨道宽度（含拇指行程）
+        ThemeScalar track_height;  // 轨道高度（pill 直径）
+        ThemeScalar thumb_size;    // 拇指直径
+        ThemeScalar gap;           // 轨道与标签间距
+        ThemeScalar min_height;    // 整控件最小高度
     };
 
     // ─── 解析后的片段（具体值） ───────────────────────────────────────────────
@@ -131,13 +143,23 @@ namespace nandina::theme
         float preferred_width = 0.0F;
     };
 
+    /** 解析后的 Switch 度量。 */
+    using ResolvedSwitchMetrics = struct ResolvedSwitchMetrics {
+        float track_width = 0.0F;
+        float track_height = 0.0F;
+        float thumb_size = 0.0F;
+        float gap = 0.0F;
+        float min_height = 0.0F;
+    };
+
     // ─── 组件配方（片段组合） ────────────────────────────────────────────────
 
-    /** Button 配方：容器 + 文本 + 焦点环 + 度量。 */
+    /** Button 配方：容器 + 文本 + 焦点环 + 状态层 + 度量。 */
     using ButtonRecipe = struct ButtonRecipe {
         BoxStyle container;
         TypeStyle label;
         FocusRingStyle focus;
+        StateLayerStyle state_layer;
         ControlMetrics metrics;
     };
 
@@ -169,13 +191,23 @@ namespace nandina::theme
         ControlMetrics metrics;
     };
 
+    /** Switch 配方：轨道 + 拇指 + 文本 + 焦点环 + 度量。 */
+    using SwitchRecipe = struct SwitchRecipe {
+        BoxStyle track;
+        ThumbStyle thumb;
+        TypeStyle label;
+        FocusRingStyle focus;
+        SwitchMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
     // 解析：从 `base` 出发，按顺序应用所有匹配规则（后匹配者胜），再把
     // ThemeValue 按当前外观解析为具体值。
-    // 跨切面状态变换（disabled 透明度、Button 的 hover/pressed 覆盖）由解析器在
-    // 规则循环之后应用，作为状态语义的最后一道修正（规则仍可先于变换设置 base）。
+    // 跨切面状态变换（disabled 透明度）与状态层应用（Button 的 hover/pressed 覆盖，
+    // 数据来自配方 state_layer 字段）由解析器在规则循环之后应用，作为状态语义的最后
+    // 一道修正（规则仍可先于变换设置 base）。
 
     /** Button 状态规则：按 tone / treatment / size / state 选择，覆盖容器 / 文本 / 焦点 / 度量字段。 */
     using ButtonRecipeRule = struct ButtonRecipeRule {
@@ -190,6 +222,8 @@ namespace nandina::theme
         std::optional<ThemeScalar> focus_ring_width;
         std::optional<ThemeScalar> metrics_height;
         std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeColor> state_layer_hover;
+        std::optional<ThemeColor> state_layer_pressed;
     };
 
     /** Checkbox 规则：支持 checked 布尔选择器（未勾选 outline / 勾选 filled）。 */
@@ -237,12 +271,39 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_padding_x;
     };
 
+    /** Switch 规则：支持 checked 布尔选择器 + 状态选择器，覆盖轨道 / 拇指 / 文本 / 焦点环 / 度量。 */
+    using SwitchRecipeRule = struct SwitchRecipeRule {
+        std::optional<bool> checked; // nullopt = 任意
+        std::optional<SwitchVisualState> state;
+        std::optional<ThemeColor> track_fill;
+        std::optional<ThemeColor> track_border;
+        std::optional<ThemeScalar> track_border_width;
+        std::optional<ThemeScalar> track_radius;
+        std::optional<ThemeColor> thumb_fill;
+        std::optional<ThemeScalar> thumb_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_track_width;
+        std::optional<ThemeScalar> metrics_track_height;
+        std::optional<ThemeScalar> metrics_thumb_size;
+        std::optional<ThemeScalar> metrics_gap;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
+
+    /** 解析后的状态层（具体颜色；hover/focused 用 hover 色，pressed 用 pressed 色）。 */
+    using ResolvedStateLayer = struct ResolvedStateLayer {
+        NanColor hover;
+        NanColor pressed;
+    };
 
     using ResolvedButtonStyle = struct ResolvedButtonStyle {
         ResolvedBoxStyle container;
         ResolvedTypeStyle label;
         ResolvedFocusRing focus;
+        ResolvedStateLayer state_layer;
         ResolvedControlMetrics metrics;
     };
 
@@ -270,6 +331,14 @@ namespace nandina::theme
         NanColor selection;
         ResolvedFocusRing focus;
         ResolvedControlMetrics metrics;
+    };
+
+    using ResolvedSwitchStyle = struct ResolvedSwitchStyle {
+        ResolvedBoxStyle track;
+        ResolvedBoxStyle thumb;
+        ResolvedTypeStyle label;
+        ResolvedFocusRing focus;
+        ResolvedSwitchMetrics metrics;
     };
 
     // ─── Typography 角色 ──────────────────────────────────────────────────────
@@ -303,11 +372,17 @@ namespace nandina::theme
         std::vector<TextFieldRecipeRule> rules;
     };
 
+    using SwitchRecipes = struct SwitchRecipes {
+        SwitchRecipe base;
+        std::vector<SwitchRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
         SliderRecipes slider;
         TextFieldRecipes text_field;
+        SwitchRecipes switch_component;
     };
 
     /**
@@ -437,6 +512,21 @@ namespace nandina::theme
         };
     }
 
+    /** 解析 Switch 度量片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const SwitchMetrics& metrics
+    ) -> ResolvedSwitchMetrics {
+        return {
+            .track_width = resolve_scalar(system, appearance, metrics.track_width),
+            .track_height = resolve_scalar(system, appearance, metrics.track_height),
+            .thumb_size = resolve_scalar(system, appearance, metrics.thumb_size),
+            .gap = resolve_scalar(system, appearance, metrics.gap),
+            .min_height = resolve_scalar(system, appearance, metrics.min_height),
+        };
+    }
+
     // 组件级解析（定义见 design_system.cpp）：
     //   遗留平铺解析器给出 base 语义（tone/treatment/size/state）→
     //   应用 DesignSystem 的规则覆盖 → 组装为片段组合的解析结果。
@@ -469,6 +559,13 @@ namespace nandina::theme
         TextFieldVisualState state
     ) -> ResolvedTextFieldStyle;
 
+    [[nodiscard]] auto resolve_switch(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        bool checked,
+        SwitchVisualState state
+    ) -> ResolvedSwitchStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -479,6 +576,13 @@ namespace nandina::theme
         const ButtonRecipeRule& rule,
         ButtonTone tone
     );
+
+    /**
+     * 按交互状态把状态层应用到容器填充（替换 fill 语义）。
+     * hover / focused 使用 hover 色，pressed 使用 pressed 色；normal / disabled 不应用。
+     * 解析器与 widget 的 set_override 共用（override 可能覆盖 state_layer 字段）。
+     */
+    void apply_button_state_layer(ResolvedButtonStyle& style, ButtonVisualState state);
 
     void apply_rule(
         const DesignSystem& system,
@@ -501,12 +605,20 @@ namespace nandina::theme
         const TextFieldRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedSwitchStyle& style,
+        const SwitchRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
     [[nodiscard]] auto default_checkbox_recipe() -> CheckboxRecipe;
     [[nodiscard]] auto default_slider_recipe() -> SliderRecipe;
     [[nodiscard]] auto default_text_field_recipe() -> TextFieldRecipe;
+    [[nodiscard]] auto default_switch_recipe() -> SwitchRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

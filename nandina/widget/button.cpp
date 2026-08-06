@@ -202,6 +202,8 @@ namespace nandina::widget
         );
         if (override_) {
             theme::apply_rule(*system_, appearance_, style, *override_, tone_);
+            // override 可能覆盖 state_layer 字段，需按当前交互状态重新应用到填充。
+            theme::apply_button_state_layer(style, visual_state());
         }
         return style;
     }

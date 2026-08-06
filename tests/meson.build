@@ -121,6 +121,13 @@ slider_tests = executable(
 )
 test('slider', slider_tests)
 
+switch_tests = executable(
+    'switch_tests',
+    files('switch_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('switch', switch_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

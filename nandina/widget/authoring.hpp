@@ -17,6 +17,7 @@
 #include "list_view.hpp"
 #include "scroll_view.hpp"
 #include "slider.hpp"
+#include "switch.hpp"
 #include "text_field.hpp"
 
 #include <concepts>
@@ -303,6 +304,15 @@ namespace nandina::widget::authoring
         theme::NanTheme theme = theme::default_theme()
     ) -> NodeBuilder<Slider> {
         return make<Slider>(std::move(label), value, minimum, maximum, step, theme);
+    }
+
+    // `switch` 是 C++ 关键字，工厂命名为 switch_control。
+    [[nodiscard]] inline auto switch_control(
+        std::string label,
+        bool checked = false,
+        theme::NanTheme theme = theme::default_theme()
+    ) -> NodeBuilder<Switch> {
+        return make<Switch>(std::move(label), checked, theme);
     }
 
     [[nodiscard]] inline auto text_field(

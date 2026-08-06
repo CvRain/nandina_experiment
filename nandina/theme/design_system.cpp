@@ -22,12 +22,17 @@ namespace nandina::theme
         [[nodiscard]] auto resolve_recipe(
             const DesignSystem& system,
             const ColorAppearance appearance,
-            const ButtonRecipe& recipe
+            const ButtonRecipe& recipe,
+            const ButtonTone tone
         ) -> ResolvedButtonStyle {
             return {
                 .container = resolve(system, appearance, recipe.container),
                 .label = resolve(system, appearance, recipe.label),
                 .focus = resolve(system, appearance, recipe.focus),
+                .state_layer = {
+                    .hover = resolve_color(system, appearance, recipe.state_layer.hover, tone),
+                    .pressed = resolve_color(system, appearance, recipe.state_layer.pressed, tone),
+                },
                 .metrics = resolve(system, appearance, recipe.metrics),
             };
         }
@@ -133,62 +138,36 @@ namespace nandina::theme
             scale_alpha(style.placeholder.color, alpha);
         }
 
-        /**
-         * Button 的 hover / focused / pressed 覆盖变换（跨切面，由解析器按 treatment 应用）。
-         *
-         * 配方书的 treatment 规则描述 normal 态语义；交互态在此基础上叠加深浅不一的
-         * 覆盖色，各 treatment 的混合语义与遗留平铺解析器一致：
-         *   filled    accent.mix(on_accent, tint)
-         *   tonal     surface_variant.mix(accent, 0.35 + tint)
-         *   outlined  surface.mix(accent, tint)
-         *   ghost     surface.mix(accent, tint)
-         *   link      不变
-         */
-        void apply_button_tint(
+        /** SwitchRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
             const DesignSystem& system,
             const ColorAppearance appearance,
-            ResolvedButtonStyle& style,
-            const ButtonTone tone,
-            const ButtonTreatment treatment,
-            const ButtonVisualState state
-        ) {
-            float amount = 0.0F;
-            if (state == ButtonVisualState::hovered || state == ButtonVisualState::focused) {
-                amount = resolve_scalar(
-                    system,
-                    appearance,
-                    ThemeScalar::token(ScalarToken::opacity_hover_overlay)
-                );
-            }
-            else if (state == ButtonVisualState::pressed) {
-                amount = resolve_scalar(
-                    system,
-                    appearance,
-                    ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
-                );
-            }
-            if (amount <= 0.0F) {
-                return;
-            }
+            const SwitchRecipe& recipe
+        ) -> ResolvedSwitchStyle {
+            return {
+                .track = resolve(system, appearance, recipe.track),
+                .thumb = resolve(system, appearance, recipe.thumb.box),
+                .label = resolve(system, appearance, recipe.label),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
 
-            const auto [accent, on_accent] = button_accent(system.palette(appearance), tone);
-            const auto surface = resolve_color(system, appearance, ThemeColor::token(ColorToken::surface));
-            const auto surface_variant =
-                resolve_color(system, appearance, ThemeColor::token(ColorToken::surface_variant));
-            switch (treatment) {
-                case ButtonTreatment::filled:
-                    style.container.fill = accent.mix(on_accent, amount);
-                    break;
-                case ButtonTreatment::tonal:
-                    style.container.fill = surface_variant.mix(accent, 0.35F + amount);
-                    break;
-                case ButtonTreatment::outlined:
-                case ButtonTreatment::ghost:
-                    style.container.fill = surface.mix(accent, amount);
-                    break;
-                case ButtonTreatment::link:
-                    break;
-            }
+        /** Switch disabled 变换：轨道 / 拇指 / 文本颜色 ×opacity.disabled。 */
+        void apply_switch_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedSwitchStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.track.fill, alpha);
+            scale_alpha(style.track.border, alpha);
+            scale_alpha(style.thumb.fill, alpha);
+            scale_alpha(style.label.color, alpha);
         }
 
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
@@ -210,14 +189,30 @@ namespace nandina::theme
     } // namespace
 
     /**
+     * 按交互状态把状态层应用到容器填充（替换 fill 语义）。
+     *
+     * hover / focused 使用 hover 色，pressed 使用 pressed 色；normal / disabled 不应用
+     * （disabled 由 apply_button_disabled 处理）。各 treatment 的状态层表达式是配方数据
+     * （base + 规则），品牌主题可覆盖，无需改解析器。
+     */
+    void apply_button_state_layer(ResolvedButtonStyle& style, const ButtonVisualState state) {
+        if (state == ButtonVisualState::hovered || state == ButtonVisualState::focused) {
+            style.container.fill = style.state_layer.hover;
+        }
+        else if (state == ButtonVisualState::pressed) {
+            style.container.fill = style.state_layer.pressed;
+        }
+    }
+
+    /**
      * 解析 Button 配方。
      *
      * 流程：base → 配方书规则（treatment / size / tone / state，后匹配者胜）→
-     * hover/focused/pressed 覆盖变换 → disabled 变换。
+     * 状态层应用（hover/focused/pressed，数据来自配方 state_layer）→ disabled 变换。
      *
      * @param system     设计系统快照
      * @param appearance 当前外观
-     * @param tone       语义色家族（accent 引用与 tint 变换依赖）
+     * @param tone       语义色家族（accent 引用与状态层表达式依赖）
      * @param treatment  视觉处理方式
      * @param size       尺寸档位
      * @param state      交互状态
@@ -231,13 +226,13 @@ namespace nandina::theme
         const ButtonSize size,
         const ButtonVisualState state
     ) -> ResolvedButtonStyle {
-        auto style = resolve_recipe(system, appearance, system.components.button.base);
+        auto style = resolve_recipe(system, appearance, system.components.button.base, tone);
         for (const auto& rule: system.components.button.rules) {
             if (rule.selector.matches(tone, treatment, size, state)) {
                 apply_rule(system, appearance, style, rule, tone);
             }
         }
-        apply_button_tint(system, appearance, style, tone, treatment, state);
+        apply_button_state_layer(style, state);
         if (state == ButtonVisualState::disabled) {
             apply_button_disabled(system, appearance, style);
         }
@@ -324,6 +319,36 @@ namespace nandina::theme
         return style;
     }
 
+    /**
+     * 解析 Switch 配方。
+     *
+     * 流程：base → 配方书规则（checked + state 选择器，后匹配者胜）→ disabled 变换。
+     *
+     * @param system     设计系统快照
+     * @param appearance 当前外观
+     * @param checked    勾选状态（决定轨道 filled / outline）
+     * @param state      交互状态
+     * @return 片段组合的解析结果
+     */
+    auto resolve_switch(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const bool checked,
+        const SwitchVisualState state
+    ) -> ResolvedSwitchStyle {
+        auto style = resolve_recipe(system, appearance, system.components.switch_component.base);
+        for (const auto& rule: system.components.switch_component.rules) {
+            if ((rule.checked && *rule.checked != checked) || (rule.state && *rule.state != state)) {
+                continue;
+            }
+            apply_rule(system, appearance, style, rule);
+        }
+        if (state == SwitchVisualState::disabled) {
+            apply_switch_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
     // ─── apply_rule：把配方规则应用到已解析的配方（widget set_override 复用） ───
 
     void apply_rule(
@@ -355,6 +380,14 @@ namespace nandina::theme
             style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
         if (rule.metrics_padding_x)
             style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        if (rule.state_layer_hover) {
+            style.state_layer.hover =
+                resolve_color(system, appearance, *rule.state_layer_hover, tone);
+        }
+        if (rule.state_layer_pressed) {
+            style.state_layer.pressed =
+                resolve_color(system, appearance, *rule.state_layer_pressed, tone);
+        }
     }
 
     void apply_rule(
@@ -450,6 +483,50 @@ namespace nandina::theme
             style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedSwitchStyle& style,
+        const SwitchRecipeRule& rule
+    ) {
+        if (rule.track_fill)
+            style.track.fill = resolve_color(system, appearance, *rule.track_fill);
+        if (rule.track_border)
+            style.track.border = resolve_color(system, appearance, *rule.track_border);
+        if (rule.track_border_width) {
+            style.track.border_width =
+                resolve_scalar(system, appearance, *rule.track_border_width);
+        }
+        if (rule.track_radius)
+            style.track.radius = resolve_scalar(system, appearance, *rule.track_radius);
+        if (rule.thumb_fill)
+            style.thumb.fill = resolve_color(system, appearance, *rule.thumb_fill);
+        if (rule.thumb_radius)
+            style.thumb.radius = resolve_scalar(system, appearance, *rule.thumb_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_track_width) {
+            style.metrics.track_width =
+                resolve_scalar(system, appearance, *rule.metrics_track_width);
+        }
+        if (rule.metrics_track_height) {
+            style.metrics.track_height =
+                resolve_scalar(system, appearance, *rule.metrics_track_height);
+        }
+        if (rule.metrics_thumb_size) {
+            style.metrics.thumb_size =
+                resolve_scalar(system, appearance, *rule.metrics_thumb_size);
+        }
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -466,6 +543,11 @@ namespace nandina::theme
             .focus = FocusRingStyle {
                 .color = ThemeColor::token(ColorToken::focus_ring),
                 .width = ThemeScalar::token(ScalarToken::border_focus_ring),
+            },
+            // 状态层回退：无可见覆盖（treatment 规则按各自语义覆盖）。
+            .state_layer = StateLayerStyle {
+                .hover = ThemeColor::transparent(ColorToken::surface),
+                .pressed = ThemeColor::transparent(ColorToken::surface),
             },
             .metrics = ControlMetrics {
                 .height = ThemeScalar::literal(36.0F),
@@ -587,6 +669,41 @@ namespace nandina::theme
         };
     }
 
+    /** @return 框架默认 Switch 配方（未勾选：outline_variant 轨道 + surface 拇指）。 */
+    auto default_switch_recipe() -> SwitchRecipe {
+        return {
+            .track = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::outline_variant),
+                .border = ThemeColor::transparent(ColorToken::outline_variant),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .thumb = ThumbStyle {
+                .box = BoxStyle {
+                    .fill = ThemeColor::token(ColorToken::surface),
+                    .border = ThemeColor::transparent(ColorToken::surface),
+                    .border_width = ThemeScalar::literal(0.0F),
+                    .radius = ThemeScalar::token(ScalarToken::radius_full),
+                },
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .focus = FocusRingStyle {
+                .color = ThemeColor::token(ColorToken::focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
+            },
+            .metrics = SwitchMetrics {
+                .track_width = ThemeScalar::literal(40.0F),
+                .track_height = ThemeScalar::literal(24.0F),
+                .thumb_size = ThemeScalar::literal(16.0F),
+                .gap = ThemeScalar::token(ScalarToken::spacing_sm),
+                .min_height = ThemeScalar::literal(32.0F),
+            },
+        };
+    }
+
     /**
      * 框架默认设计系统。
      *
@@ -640,13 +757,26 @@ namespace nandina::theme
                             .metrics_height = ThemeScalar::literal(48.0F),
                             .metrics_padding_x = ThemeScalar::token(ScalarToken::spacing_lg),
                         },
-                        // 视觉处理方式（normal 态语义；hover/pressed 覆盖由解析器变换处理）。
-                        // accent / on_accent 引用当前 tone，随解析时的 tone 解析。
+                        // 视觉处理方式（normal 态语义 + 状态层表达式；accent/on_accent 引用
+                        // 当前 tone，随解析时的 tone 解析。hover/focused 用 hover，pressed 用
+                        // pressed，均为「替换 fill」语义。
+                        // 注：tonal 的 0.35 + overlay 无法用单标量 token 表达，展开为字面量
+                        // 0.45 / 0.51（与 opacity.hover=0.10 / pressed=0.16 对应）。
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::filled},
                             .container_fill = ThemeColor::accent(),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::on_accent(),
+                            .state_layer_hover = ThemeColor::mix(
+                                accent_ref,
+                                on_accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                            .state_layer_pressed = ThemeColor::mix(
+                                accent_ref,
+                                on_accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
                         },
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::tonal},
@@ -657,6 +787,16 @@ namespace nandina::theme
                             ),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::accent(),
+                            .state_layer_hover = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface_variant},
+                                accent_ref,
+                                ThemeScalar::literal(0.45F)
+                            ),
+                            .state_layer_pressed = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface_variant},
+                                accent_ref,
+                                ThemeScalar::literal(0.51F)
+                            ),
                         },
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::outlined},
@@ -664,12 +804,32 @@ namespace nandina::theme
                             .container_border = ThemeColor::accent(),
                             .container_border_width = ThemeScalar::token(ScalarToken::border_thin),
                             .label_color = ThemeColor::accent(),
+                            .state_layer_hover = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface},
+                                accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                            .state_layer_pressed = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface},
+                                accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
                         },
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::ghost},
                             .container_fill = ThemeColor::transparent(ColorToken::surface),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::accent(),
+                            .state_layer_hover = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface},
+                                accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                            .state_layer_pressed = ThemeColor::mix(
+                                ColorOperand {ColorToken::surface},
+                                accent_ref,
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
                         },
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::link},
@@ -677,6 +837,8 @@ namespace nandina::theme
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::accent(),
                             .metrics_padding_x = ThemeScalar::literal(0.0F),
+                            .state_layer_hover = ThemeColor::transparent(ColorToken::surface),
+                            .state_layer_pressed = ThemeColor::transparent(ColorToken::surface),
                         },
                     },
                 },
@@ -741,6 +903,62 @@ namespace nandina::theme
                             .state = TextFieldVisualState::invalid,
                             .container_border = ThemeColor::token(ColorToken::error),
                             .focus_ring_color = ThemeColor::token(ColorToken::error),
+                        },
+                    },
+                },
+                .switch_component = SwitchRecipes {
+                    .base = default_switch_recipe(),
+                    .rules = {
+                        // 勾选：primary 轨道 + surface 拇指（亮色下近白，比 on_primary 浅色更好看）。
+                        SwitchRecipeRule {
+                            .checked = true,
+                            .track_fill = ThemeColor::token(ColorToken::primary),
+                            .track_border = ThemeColor::transparent(ColorToken::primary),
+                            .thumb_fill = ThemeColor::token(ColorToken::surface),
+                        },
+                        // 未勾选交互：轨道向 primary 轻微着色。
+                        SwitchRecipeRule {
+                            .checked = false,
+                            .state = SwitchVisualState::hovered,
+                            .track_fill = ThemeColor::mix(
+                                ColorOperand {ColorToken::outline_variant},
+                                ColorOperand {ColorToken::primary},
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                        },
+                        SwitchRecipeRule {
+                            .checked = false,
+                            .state = SwitchVisualState::pressed,
+                            .track_fill = ThemeColor::mix(
+                                ColorOperand {ColorToken::outline_variant},
+                                ColorOperand {ColorToken::primary},
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
+                        },
+                        // 勾选交互：primary 轨道向 on_primary 着色（镜像 filled 状态层）。
+                        SwitchRecipeRule {
+                            .checked = true,
+                            .state = SwitchVisualState::hovered,
+                            .track_fill = ThemeColor::mix(
+                                ColorOperand {ColorToken::primary},
+                                ColorOperand {ColorToken::on_primary},
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                        },
+                        SwitchRecipeRule {
+                            .checked = true,
+                            .state = SwitchVisualState::pressed,
+                            .track_fill = ThemeColor::mix(
+                                ColorOperand {ColorToken::primary},
+                                ColorOperand {ColorToken::on_primary},
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
+                        },
+                        // 聚焦：焦点环开启（checked / unchecked 均适用）。
+                        SwitchRecipeRule {
+                            .state = SwitchVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
                         },
                     },
                 },

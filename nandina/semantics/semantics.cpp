@@ -52,6 +52,8 @@ namespace nandina::semantics
                 return "checkbox";
             case Role::slider:
                 return "slider";
+            case Role::switch_control:
+                return "switch";
         }
         return "none";
     }
