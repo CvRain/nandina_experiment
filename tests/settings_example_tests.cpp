@@ -3,6 +3,7 @@
 #include "app/nan_router.hpp"
 #include "app/root_view.hpp"
 #include "foundation/geometry.hpp"
+#include "render/render_device.hpp"
 #include "scene/input_event.hpp"
 #include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
@@ -11,6 +12,7 @@
 #include "widget/checkbox.hpp"
 #include "widget/label.hpp"
 #include "widget/slider.hpp"
+#include "widget/switch.hpp"
 #include "widget/text_field.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -21,6 +23,38 @@ using namespace nandina;
 
 namespace
 {
+    class RecordingDevice final: public render::IRenderDevice {
+    public:
+        void begin_frame() override {}
+        void end_frame() override {}
+        void set_clip(const foundation::NanRect&) override {}
+        void clear_clip() override {}
+        void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
+        void draw_rect_outline(
+            const foundation::NanRect&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_rounded_rect(
+            const foundation::NanRect&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_line(
+            const foundation::NanPoint&,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
+        void draw_text(
+            std::string_view,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+    };
+
     template<typename Node, typename Predicate>
     [[nodiscard]] auto find_node(scene::NanNode& root, Predicate&& predicate) -> Node* {
         if (auto* node = dynamic_cast<Node*>(&root); node != nullptr && predicate(*node)) {
@@ -39,6 +73,13 @@ namespace
         -> widget::Checkbox* {
         return find_node<widget::Checkbox>(root, [label](const widget::Checkbox& checkbox) {
             return checkbox.label() == label;
+        });
+    }
+
+    [[nodiscard]] auto switch_named(scene::NanNode& root, const std::string_view label)
+        -> widget::Switch* {
+        return find_node<widget::Switch>(root, [label](const widget::Switch& switch_control) {
+            return switch_control.label() == label;
         });
     }
 
@@ -63,7 +104,7 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
 
     auto* diagnostics = checkbox_named(*router.host(), "Send anonymous diagnostics");
-    auto* notifications = checkbox_named(*router.host(), "Desktop notifications");
+    auto* notifications = switch_named(*router.host(), "Desktop notifications");
     auto* input = find_node<widget::TextField>(*router.host(), [](const auto&) { return true; });
     auto* save = button_named(*router.host(), "Save preferences");
     auto* reset = button_named(*router.host(), "Reset");
@@ -123,4 +164,58 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(notifications->checked());
     REQUIRE_FALSE(diagnostics->checked());
     REQUIRE(scale->value() == 1.0F);
+}
+
+TEST_CASE("settings example survives appearance switching and redraw", "[example][settings]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    (void)router.push<app::detail::RootViewPage>(
+        app::detail::make_root_view_params(examples::settings::build)
+    );
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+
+    RecordingDevice dev;
+    themes.set_preference(theme::ThemePreference::dark);
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    tree.draw(dev);
+
+    themes.set_preference(theme::ThemePreference::light);
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    tree.draw(dev);
+}
+
+TEST_CASE("settings appearance buttons switch the theme preference", "[example][settings]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    (void)router.push<app::detail::RootViewPage>(
+        app::detail::make_root_view_params(examples::settings::build)
+    );
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+
+    // 通过语义激活真实触发按钮回调（build() 返回后回调仍持有主题管理器引用）。
+    auto* dark = button_named(*router.host(), "Dark");
+    auto* light = button_named(*router.host(), "Light");
+    REQUIRE(dark != nullptr);
+    REQUIRE(light != nullptr);
+
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        dark->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(themes.preference() == theme::ThemePreference::dark);
+
+    REQUIRE(tree.perform_semantics_action(
+        light->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(themes.preference() == theme::ThemePreference::light);
 }

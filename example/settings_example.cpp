@@ -34,10 +34,9 @@ namespace nandina::examples::settings
     } // namespace
 
     auto build(widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D> {
-        // 品牌设计系统：默认快照拷贝 → 改 primary 与圆角 → 原子应用（单次 revision）。
+        // 框架默认调色板（Skeleton 参考，见 phase7 文档）即内置主题；这里仅演示
+        // 「默认快照拷贝 → 微调 → 原子应用」的品牌主题路径，保持与默认色板协调。
         auto design = theme::default_design_system();
-        design.light.primary = theme::nan_color(0.62F, 0.16F, 255.0F);
-        design.dark.primary = theme::nan_color(0.70F, 0.14F, 255.0F);
         design.tokens.radius.md = 10.0F;
         ui.theme_manager().apply(std::make_shared<const theme::DesignSystem>(std::move(design)));
 
@@ -71,7 +70,7 @@ namespace nandina::examples::settings
                 .gap(6.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
-                    ui.checkbox(notifications, "Desktop notifications"),
+                    ui.switch_control(notifications, "Desktop notifications"),
                     ui.checkbox(diagnostics, "Send anonymous diagnostics"),
                     diagnostics_note,
                     ui.checkbox(reduced_motion, "Reduce interface motion"),
@@ -92,6 +91,27 @@ namespace nandina::examples::settings
             status.set("Preferences reset");
         });
 
+        // Light/Dark 切换：捕获 ThemeManager 指针（由应用持有，跨整个 run）。
+        // 注意：不能捕获 ui 本身——BuildContext 是每次 build 的临时对象，
+        // build() 返回后即失效，回调里再解引用会悬垂。
+        auto* themes = &ui.theme_manager();
+        auto appearance_row =
+            ui.row()
+                .gap(8.0F)
+                .children(
+                    ui.button("Light")
+                        .treatment(theme::ButtonTreatment::outlined)
+                        .on_click([themes] {
+                            themes->set_preference(theme::ThemePreference::light);
+                        }),
+                    ui.button("Dark")
+                        .treatment(theme::ButtonTreatment::outlined)
+                        .on_click([themes] {
+                            themes->set_preference(theme::ThemePreference::dark);
+                        })
+                )
+                .build();
+
         auto actions = ui.row()
                            .gap(8.0F)
                            .cross_alignment(widget::LayoutAlignment::center)
@@ -108,6 +128,8 @@ namespace nandina::examples::settings
                                profile_field,
                                ui.label("Preferences").font_size(18.0F),
                                preferences,
+                               ui.label("Appearance").font_size(18.0F),
+                               appearance_row,
                                ui.label(summary).color_token(theme::ColorToken::on_surface_variant),
                                actions,
                                ui.label(status).color_token(theme::ColorToken::primary)
