@@ -12,6 +12,7 @@
 
 #include "../foundation/nandina_color.hpp"
 
+#include <optional>
 #include <string>
 
 namespace nandina::app
@@ -33,10 +34,10 @@ namespace nandina::app
         /// 是否垂直同步 (通常配合 target_fps)。
         bool vsync = true;
 
-        /// 每帧清屏背景色。
-        foundation::NanColor background = foundation::NanColor::from(
-            foundation::NanHexRgb {.red = 30, .green = 30, .blue = 46, .alpha = 255}
-        );
+        /// 每帧清屏背景色。nullopt（默认）= 跟随当前外观的调色板背景
+        /// （`palette.background`），随 light/dark 切换实时变化；
+        /// 显式设置则固定为该色，不随主题变化。
+        std::optional<foundation::NanColor> background;
     };
 
 } // namespace nandina::app
