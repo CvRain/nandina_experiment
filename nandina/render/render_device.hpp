@@ -57,6 +57,17 @@ namespace nandina::render
         virtual void draw_rect(const NanRect& rect, const NanColor& color) = 0;
         virtual void
         draw_rect_outline(const NanRect& rect, float thickness, const NanColor& color) = 0;
+        /// 圆角矩形描边（圆角 > 0 时用，避免方框边角与圆角填充不贴合）。
+        /// 默认回退到方框描边，测试设备可不实现。
+        virtual void draw_rounded_rect_outline(
+            const NanRect& rect,
+            float radius,
+            float thickness,
+            const NanColor& color
+        ) {
+            (void)radius;
+            draw_rect_outline(rect, thickness, color);
+        }
         virtual void
         draw_rounded_rect(const NanRect& rect, float radius, const NanColor& color) = 0;
         virtual void

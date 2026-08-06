@@ -47,7 +47,8 @@ namespace nandina::widget::primitives
             }
         }
 
-        /// Rectangle outline (border).
+        /// Rectangle outline (border). 圆角 > 0 时用圆角描边，避免方框边角与
+        /// 圆角填充之间留白（如勾选框的四个角落）。
         static auto paint_outline(
             render::DrawContext& ctx,
             foundation::NanRect world,
@@ -57,11 +58,18 @@ namespace nandina::widget::primitives
             if (box.border.alpha() <= 0.0F || box.border_width <= 0.0F) {
                 return;
             }
-            ctx.device().draw_rect_outline(
-                world,
-                box.border_width,
-                box.border.with_alpha(box.border.alpha() * parent_opacity)
-            );
+            const auto color = box.border.with_alpha(box.border.alpha() * parent_opacity);
+            if (box.radius > 0.0F) {
+                ctx.device().draw_rounded_rect_outline(
+                    world,
+                    box.radius,
+                    box.border_width,
+                    color
+                );
+            }
+            else {
+                ctx.device().draw_rect_outline(world, box.border_width, color);
+            }
         }
     };
 
