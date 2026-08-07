@@ -66,6 +66,11 @@ NanReferencePalette + PaletteVariantPolicy
 Components continue consuming semantic colors only. A Material-like dark 400-tone choice is a
 variant policy rather than another component resolver.
 
+The built-in primary scale intentionally extends the warm Phase 7 brand color into eleven tones;
+the other six scales use the documented Skeleton reference values. `PaletteVariantPolicy` selects
+brand tones only (primary, secondary, and tertiary). Status colors retain their explicit 500/on-tone
+mapping so a dark-brand preference cannot silently change success, warning, or error semantics.
+
 ### D5: Static State Overlay Precedes Ripple
 
 First change StateLayerStyle from replacement fill colors to an independently painted overlay.
@@ -131,6 +136,14 @@ Suggested commit: `fix(text): 统一字形像素对齐与缩放策略`
 
 Land the eleven-stop reference data, variant policy, generator, consistency tests, and switch
 `default_design_system()` to the generated light/dark palettes in one theme-only unit.
+
+Status: implemented; awaiting code review. `default_reference_palette()` is now the single source
+for seven eleven-stop OKLCH scales, and `make_color_scheme()` derives both default appearances.
+The default policy keeps brand colors at 500 in both appearances to preserve Phase 7 visuals;
+`material_dark_tone()` is an opt-in policy that selects 400 for dark primary/secondary/tertiary.
+`NanColorScheme{}` remains equivalent to the generated light scheme for detached-widget and legacy
+API compatibility. Reference scales remain build-time authoring data and do not enlarge immutable
+DesignSystem snapshots consumed by widgets.
 
 Suggested commit: `feat(theme): 从参考色阶生成默认语义调色板`
 

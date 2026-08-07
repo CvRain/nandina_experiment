@@ -25,6 +25,46 @@ namespace
 {
     using namespace nandina;
 
+    void require_same_color(
+        const foundation::NanColor& actual,
+        const foundation::NanColor& expected
+    ) {
+        const auto actual_oklch = actual.oklch();
+        const auto expected_oklch = expected.oklch();
+        REQUIRE(actual_oklch.light == Catch::Approx(expected_oklch.light));
+        REQUIRE(actual_oklch.chroma == Catch::Approx(expected_oklch.chroma));
+        REQUIRE(actual_oklch.hue == Catch::Approx(expected_oklch.hue));
+        REQUIRE(actual_oklch.alpha == Catch::Approx(expected_oklch.alpha));
+    }
+
+    void require_same_scheme(
+        const theme::NanColorScheme& actual,
+        const theme::NanColorScheme& expected
+    ) {
+        require_same_color(actual.background, expected.background);
+        require_same_color(actual.on_background, expected.on_background);
+        require_same_color(actual.primary, expected.primary);
+        require_same_color(actual.on_primary, expected.on_primary);
+        require_same_color(actual.secondary, expected.secondary);
+        require_same_color(actual.on_secondary, expected.on_secondary);
+        require_same_color(actual.tertiary, expected.tertiary);
+        require_same_color(actual.on_tertiary, expected.on_tertiary);
+        require_same_color(actual.surface, expected.surface);
+        require_same_color(actual.on_surface, expected.on_surface);
+        require_same_color(actual.surface_variant, expected.surface_variant);
+        require_same_color(actual.on_surface_variant, expected.on_surface_variant);
+        require_same_color(actual.outline, expected.outline);
+        require_same_color(actual.outline_variant, expected.outline_variant);
+        require_same_color(actual.success, expected.success);
+        require_same_color(actual.on_success, expected.on_success);
+        require_same_color(actual.warning, expected.warning);
+        require_same_color(actual.on_warning, expected.on_warning);
+        require_same_color(actual.error, expected.error);
+        require_same_color(actual.on_error, expected.on_error);
+        require_same_color(actual.focus_ring, expected.focus_ring);
+        require_same_color(actual.selection, expected.selection);
+    }
+
     /** revision 观察探针：统计 on_theme_revision_changed 回调次数。 */
     class RevisionProbe final: public theme::ThemeObserver {
     public:
@@ -280,6 +320,92 @@ TEST_CASE("default light/dark palettes keep on_* contrast and flip neutrals", "[
     REQUIRE(light.on_surface.oklch().light < dark.on_surface.oklch().light - 0.5F);
     // 品牌色两模式同值（对齐 Skeleton brand 语义）。
     REQUIRE(light.primary.oklch().light == Catch::Approx(dark.primary.oklch().light));
+}
+
+TEST_CASE("default reference palette provides seven ordered eleven-stop scales", "[theme][palette][reference]") {
+    const auto reference = theme::default_reference_palette();
+    const std::array<const theme::NanColorScale*, 7> scales {
+        &reference.primary,
+        &reference.secondary,
+        &reference.tertiary,
+        &reference.neutral,
+        &reference.success,
+        &reference.warning,
+        &reference.error,
+    };
+
+    for (const auto* scale : scales) {
+        STATIC_REQUIRE(theme::NanColorScale::stop_count == 11);
+        for (std::size_t index = 1; index < scale->stops.size(); ++index) {
+            CAPTURE(index);
+            REQUIRE(scale->stops[index - 1].oklch().light > scale->stops[index].oklch().light);
+        }
+    }
+}
+
+TEST_CASE("semantic palette generator maps reference tones by appearance", "[theme][palette][generator]") {
+    const auto reference = theme::default_reference_palette();
+    const auto light = theme::make_color_scheme(reference, theme::ColorAppearance::light);
+    const auto dark = theme::make_color_scheme(reference, theme::ColorAppearance::dark);
+
+    require_same_color(light.background, reference.neutral.at(theme::ColorShade::shade_50));
+    require_same_color(light.surface, reference.neutral.at(theme::ColorShade::shade_100));
+    require_same_color(light.surface_variant, reference.neutral.at(theme::ColorShade::shade_200));
+    require_same_color(light.outline, reference.neutral.at(theme::ColorShade::shade_500));
+    require_same_color(light.on_surface_variant, reference.neutral.at(theme::ColorShade::shade_700));
+
+    require_same_color(dark.background, reference.neutral.at(theme::ColorShade::shade_950));
+    require_same_color(dark.surface, reference.neutral.at(theme::ColorShade::shade_900));
+    require_same_color(dark.surface_variant, reference.neutral.at(theme::ColorShade::shade_800));
+    require_same_color(dark.outline, reference.neutral.at(theme::ColorShade::shade_600));
+    require_same_color(dark.on_surface_variant, reference.neutral.at(theme::ColorShade::shade_400));
+
+    require_same_color(light.primary, reference.primary.at(theme::ColorShade::shade_500));
+    require_same_color(dark.primary, reference.primary.at(theme::ColorShade::shade_500));
+    require_same_color(light.on_primary, reference.primary.at(theme::ColorShade::shade_950));
+    require_same_color(light.success, reference.success.at(theme::ColorShade::shade_500));
+    require_same_color(light.warning, reference.warning.at(theme::ColorShade::shade_500));
+    require_same_color(light.error, reference.error.at(theme::ColorShade::shade_500));
+    require_same_color(light.focus_ring, light.primary);
+    require_same_color(light.selection, light.primary.with_alpha(0.32F));
+}
+
+TEST_CASE("palette variant policy can lift dark brand tones without changing light", "[theme][palette][policy]") {
+    const auto reference = theme::default_reference_palette();
+    const auto policy = theme::PaletteVariantPolicy::material_dark_tone();
+    const auto light = theme::make_color_scheme(reference, theme::ColorAppearance::light, policy);
+    const auto dark = theme::make_color_scheme(reference, theme::ColorAppearance::dark, policy);
+
+    require_same_color(light.primary, reference.primary.at(theme::ColorShade::shade_500));
+    require_same_color(light.secondary, reference.secondary.at(theme::ColorShade::shade_500));
+    require_same_color(light.tertiary, reference.tertiary.at(theme::ColorShade::shade_500));
+    require_same_color(dark.primary, reference.primary.at(theme::ColorShade::shade_400));
+    require_same_color(dark.secondary, reference.secondary.at(theme::ColorShade::shade_400));
+    require_same_color(dark.tertiary, reference.tertiary.at(theme::ColorShade::shade_400));
+    require_same_color(dark.focus_ring, dark.primary);
+}
+
+TEST_CASE("generated defaults preserve legacy light scheme construction", "[theme][palette][compat]") {
+    const theme::NanColorScheme constructed;
+    const auto light = theme::default_light_palette();
+    const auto dark = theme::default_dark_palette();
+    const auto reference = theme::default_reference_palette();
+
+    require_same_scheme(constructed, light);
+    require_same_scheme(
+        light,
+        theme::make_color_scheme(reference, theme::ColorAppearance::light)
+    );
+    require_same_scheme(
+        dark,
+        theme::make_color_scheme(reference, theme::ColorAppearance::dark)
+    );
+
+    // Phase 7 的默认品牌色与亮/暗中性色保持不变，避免升级后 example 视觉漂移。
+    REQUIRE(light.primary.oklch().light == Catch::Approx(0.6803F));
+    REQUIRE(light.background.oklch().light == Catch::Approx(1.0F));
+    REQUIRE(dark.background.oklch().light == Catch::Approx(0.1776F));
+    REQUIRE(dark.surface.oklch().light == Catch::Approx(0.2520F));
 }
 
 TEST_CASE("attached widget follows an atomic DesignSystem apply", "[theme][manager][widget]") {

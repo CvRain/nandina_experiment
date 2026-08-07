@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_THEME_THEME_HPP
 
 #include "../foundation/nandina_color.hpp"
+#include "appearance.hpp"
 #include "tokens.hpp"
 
 #include <array>
@@ -63,43 +64,58 @@ namespace nandina::theme
         NanColorScale error;
     };
 
+    /** 从参考色阶生成语义色时的 tone 选择。 */
+    struct PaletteVariantPolicy {
+        ColorShade light_brand = ColorShade::shade_500;
+        ColorShade dark_brand = ColorShade::shade_500;
+
+        /** Material 风格可选项：暗色外观使用更亮的 400 档品牌色。 */
+        [[nodiscard]] static constexpr auto material_dark_tone() -> PaletteVariantPolicy {
+            return {.light_brand = ColorShade::shade_500, .dark_brand = ColorShade::shade_400};
+        }
+    };
+
     struct NanColorScheme {
-        // 内嵌默认 = 亮色方案（对齐 Skeleton 参考，见 dev-docs-v3/phase7 Step 2）。
-        // 品牌色两模式同值（500 档），明暗差异集中在中性色。
+        NanColorScheme();
 
-        // 背景 / 文本（surface 色阶）
-        NanColor background = nan_color(1.0000F, 0.00F, 0.0F);       // surface-50
-        NanColor on_background = nan_color(0.1776F, 0.00F, 0.0F);    // surface-950
+        NanColor background;
+        NanColor on_background;
+        NanColor primary;
+        NanColor on_primary;
+        NanColor secondary;
+        NanColor on_secondary;
+        NanColor tertiary;
+        NanColor on_tertiary;
+        NanColor surface;
+        NanColor on_surface;
+        NanColor surface_variant;
+        NanColor on_surface_variant;
+        NanColor outline;
+        NanColor outline_variant;
+        NanColor success;
+        NanColor on_success;
+        NanColor warning;
+        NanColor on_warning;
+        NanColor error;
+        NanColor on_error;
+        NanColor focus_ring;
+        NanColor selection;
 
-        NanColor primary = nan_color(0.6803F, 0.12F, 39.30F);        // primary-500
-        NanColor on_primary = nan_color(0.2949F, 0.11F, 32.48F);     // primary-950
+    private:
+        struct GeneratedTag {};
 
-        NanColor secondary = nan_color(0.4907F, 0.23F, 300.46F);     // secondary-500
-        NanColor on_secondary = nan_color(0.8666F, 0.05F, 300.15F);  // secondary-50
+        NanColorScheme(
+            const NanReferencePalette& reference,
+            ColorAppearance appearance,
+            PaletteVariantPolicy policy,
+            GeneratedTag
+        );
 
-        NanColor tertiary = nan_color(0.6454F, 0.26F, 2.48F);        // tertiary-500
-        NanColor on_tertiary = nan_color(0.9073F, 0.08F, 328.92F);   // tertiary-50
-
-        NanColor surface = nan_color(0.9067F, 0.00F, 0.0F);          // surface-100（轻微抬升）
-        NanColor on_surface = nan_color(0.1776F, 0.00F, 0.0F);       // surface-950
-
-        NanColor surface_variant = nan_color(0.8141F, 0.00F, 0.0F);  // surface-200
-        NanColor on_surface_variant = nan_color(0.3867F, 0.00F, 0.0F); // surface-700
-
-        NanColor outline = nan_color(0.5103F, 0.00F, 0.0F);          // surface-500
-        NanColor outline_variant = nan_color(0.7155F, 0.00F, 0.0F);  // surface-300
-
-        NanColor success = nan_color(0.8291F, 0.13F, 174.95F);       // success-500
-        NanColor on_success = nan_color(0.2727F, 0.04F, 185.29F);    // success-950
-
-        NanColor warning = nan_color(0.8246F, 0.14F, 76.71F);        // warning-500
-        NanColor on_warning = nan_color(0.5169F, 0.13F, 51.44F);     // warning-950
-
-        NanColor error = nan_color(0.6372F, 0.22F, 28.71F);          // error-500
-        NanColor on_error = nan_color(0.8999F, 0.04F, 14.04F);       // error-50
-
-        NanColor focus_ring = primary;
-        NanColor selection = primary.with_alpha(0.32F);
+        friend auto make_color_scheme(
+            const NanReferencePalette& reference,
+            ColorAppearance appearance,
+            PaletteVariantPolicy policy
+        ) -> NanColorScheme;
     };
 
     // Compatibility name retained while callers migrate from palette terminology.
@@ -110,31 +126,20 @@ namespace nandina::theme
         NanColorScheme palette;
     };
 
-    /** @return 框架默认亮色语义色板（即 NanColorScheme{} 内嵌默认）。 */
-    [[nodiscard]] inline auto default_light_palette() -> NanColorScheme {
-        return {};
-    }
+    /** @return 框架内置的七组 11 档参考色阶。 */
+    [[nodiscard]] auto default_reference_palette() -> NanReferencePalette;
 
-    /** @return 框架默认暗色语义色板（品牌色同亮色，中性色翻转）。 */
-    [[nodiscard]] inline auto default_dark_palette() -> NanColorScheme {
-        NanColorScheme palette;
-        // 背景 / 文本翻转
-        palette.background = nan_color(0.1776F, 0.00F, 0.0F);        // surface-950
-        palette.on_background = nan_color(1.0000F, 0.00F, 0.0F);     // surface-50
-        // 表面向亮抬升（暗色模式下「抬升」= 更亮）
-        palette.surface = nan_color(0.2520F, 0.00F, 0.0F);           // surface-900
-        palette.on_surface = nan_color(1.0000F, 0.00F, 0.0F);        // surface-50
-        palette.surface_variant = nan_color(0.3211F, 0.00F, 0.0F);   // surface-800
-        palette.on_surface_variant = nan_color(0.6167F, 0.00F, 0.0F); // surface-400
-        // 边框
-        palette.outline = nan_color(0.4495F, 0.00F, 0.0F);           // surface-600
-        palette.outline_variant = nan_color(0.3211F, 0.00F, 0.0F);   // surface-800
-        return palette;
-    }
+    /** 由参考色阶和外观策略生成组件消费的语义色板。 */
+    [[nodiscard]] auto make_color_scheme(
+        const NanReferencePalette& reference,
+        ColorAppearance appearance,
+        PaletteVariantPolicy policy = {}
+    ) -> NanColorScheme;
 
-    [[nodiscard]] inline auto default_theme() -> NanTheme {
-        return {};
-    }
+    [[nodiscard]] auto default_light_palette() -> NanColorScheme;
+    [[nodiscard]] auto default_dark_palette() -> NanColorScheme;
+
+    [[nodiscard]] auto default_theme() -> NanTheme;
 
 } // namespace nandina::theme
 
