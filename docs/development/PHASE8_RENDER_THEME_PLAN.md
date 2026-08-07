@@ -114,6 +114,17 @@ Suggested commit: `fix(render): 修正SDF图元软边裁剪与模糊`
 Add a repeatable diagnostic surface for common sizes and scales before changing hinting, pixel
 snapping, atlas filtering, or DPI behavior.
 
+The first 1x baseline keeps FreeType grayscale AA and HarfBuzz subpixel advances, while using the
+rasterized bitmap's `bitmap_left/bitmap_top`, snapping only the final bitmap origin, and sampling
+the atlas with point filtering. This avoids applying GPU interpolation to an already-antialiased
+glyph without changing shaping, caret, wrapping, or layout widths. Fractional/high-DPI scaling
+remains a separate policy and must not silently stretch the 1x atlas.
+
+Status: implemented for the current 1x logical-pixel window path; awaiting visual review. The
+Settings example already covers 16px body/control text, 18px section labels, and a 28px heading in
+both appearances. A later DPI unit must introduce an explicit logical-to-physical scale and cache
+glyphs at the corresponding physical size before claiming 1.25x/1.5x/2x support.
+
 Suggested commit: `fix(text): 统一字形像素对齐与缩放策略`
 
 ### Step 2: Generate Semantic Palettes From Reference Scales

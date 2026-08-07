@@ -153,6 +153,10 @@ TEST_CASE("FreeTypeFontFace exposes metrics and grayscale glyphs", "[text][freet
     REQUIRE(bitmap.height > 0);
     REQUIRE(bitmap.pitch == bitmap.width);
     REQUIRE(bitmap.alpha.size() == static_cast<std::size_t>(bitmap.width * bitmap.height));
+    REQUIRE(bitmap.metrics.width == Catch::Approx(static_cast<float>(bitmap.width)));
+    REQUIRE(bitmap.metrics.height == Catch::Approx(static_cast<float>(bitmap.height)));
+    REQUIRE(bitmap.metrics.bearing_x == Catch::Approx(std::round(bitmap.metrics.bearing_x)));
+    REQUIRE(bitmap.metrics.bearing_y == Catch::Approx(std::round(bitmap.metrics.bearing_y)));
 }
 
 TEST_CASE("GlyphAtlas caches and packs FreeType glyphs", "[text][atlas]") {
@@ -197,14 +201,37 @@ TEST_CASE("GlyphAtlasTexture uploads revisions and positions glyphs", "[text][at
         REQUIRE(device.last_source.get_width() == Catch::Approx(glyph.pixel_bounds.get_width()));
         REQUIRE(device.last_source.get_height() == Catch::Approx(glyph.pixel_bounds.get_height()));
         REQUIRE(device.last_destination.get_left()
-                == Catch::Approx(10.0F + glyph.metrics.bearing_x));
+                == Catch::Approx(std::round(10.0F + glyph.metrics.bearing_x)));
         REQUIRE(device.last_destination.get_top()
-                == Catch::Approx(30.0F - glyph.metrics.bearing_y));
+                == Catch::Approx(std::round(30.0F - glyph.metrics.bearing_y)));
 
         texture.sync();
         REQUIRE(device.updates == 1);
     }
     REQUIRE(device.destroys == 1);
+}
+
+TEST_CASE("GlyphAtlasTexture snaps fractional shaped positions without resizing glyphs", "[text][atlas][render]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::GlyphAtlas atlas(face, 64, 64);
+    TextureRecordingDevice device;
+    text::GlyphAtlasTexture texture(device, atlas);
+    const auto& glyph = atlas.cache(U'a', 24.0F);
+
+    texture.draw(
+        glyph,
+        foundation::NanPoint(10.25F, 30.75F),
+        foundation::NanColor::from(foundation::NanOklch {})
+    );
+
+    REQUIRE(device.last_destination.get_left()
+            == Catch::Approx(std::round(10.25F + glyph.metrics.bearing_x)));
+    REQUIRE(device.last_destination.get_top()
+            == Catch::Approx(std::round(30.75F - glyph.metrics.bearing_y)));
+    REQUIRE(device.last_destination.get_width()
+            == Catch::Approx(glyph.pixel_bounds.get_width()));
+    REQUIRE(device.last_destination.get_height()
+            == Catch::Approx(glyph.pixel_bounds.get_height()));
 }
 
 TEST_CASE("HarfBuzz backend produces glyph runs with source clusters", "[text][harfbuzz]") {

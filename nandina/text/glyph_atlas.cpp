@@ -181,9 +181,16 @@ namespace nandina::text
             return;
         }
         sync();
+        // FreeType 已在整像素网格生成 grayscale-AA bitmap。HarfBuzz 的 advance、
+        // kerning 与 caret 仍保留亚像素精度，但最终 bitmap 左上角吸附到像素，
+        // 避免 GPU 再把一张已抗锯齿的字形分摊到相邻像素。
+        const float destination_x =
+            std::round(baseline_origin.get_x() + glyph.metrics.bearing_x);
+        const float destination_y =
+            std::round(baseline_origin.get_y() - glyph.metrics.bearing_y);
         const auto destination = foundation::NanRect::from_xywh(
-            baseline_origin.get_x() + glyph.metrics.bearing_x,
-            baseline_origin.get_y() - glyph.metrics.bearing_y,
+            destination_x,
+            destination_y,
             glyph.pixel_bounds.get_width(),
             glyph.pixel_bounds.get_height()
         );

@@ -443,7 +443,9 @@ void main() {
             if (texture.id == 0) {
                 return {};
             }
-            SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+            // alpha texture 当前用于 FreeType glyph atlas。bitmap 已包含 grayscale AA，
+            // 1:1 绘制时使用点采样，避免双线性过滤造成第二次软化与 atlas 邻区渗色。
+            SetTextureFilter(texture, TEXTURE_FILTER_POINT);
 
             const TextureHandle handle {.value = next_texture_handle_++};
             textures_.emplace(handle.value, texture);

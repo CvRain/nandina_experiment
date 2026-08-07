@@ -182,10 +182,12 @@ namespace nandina::text
                 GlyphMetrics {
                     .glyph_index = index,
                     .advance_x = pixels(glyph->advance.x),
-                    .bearing_x = pixels(glyph->metrics.horiBearingX),
-                    .bearing_y = pixels(glyph->metrics.horiBearingY),
-                    .width = pixels(glyph->metrics.width),
-                    .height = pixels(glyph->metrics.height),
+                    // rasterized bitmap 的实际原点由 bitmap_left/top 给出；轮廓
+                    // metrics 在 hinting 后不保证与 bitmap 像素框完全一致。
+                    .bearing_x = static_cast<float>(glyph->bitmap_left),
+                    .bearing_y = static_cast<float>(glyph->bitmap_top),
+                    .width = static_cast<float>(bitmap.width),
+                    .height = static_cast<float>(bitmap.rows),
                 },
             .width = static_cast<int>(bitmap.width),
             .height = static_cast<int>(bitmap.rows),
