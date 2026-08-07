@@ -6,6 +6,7 @@
 //
 
 #include "raylib_device.hpp"
+#include "sdf_primitive_geometry.hpp"
 
 #include "../../foundation/nandina_color_space.hpp"
 
@@ -78,7 +79,8 @@ in vec2 fragTexCoord;
 in vec4 fragColor;
 uniform sampler2D texture0;
 uniform vec4 colDiffuse;
-uniform vec4 uRect;    // 目标矩形（raylib 屏幕坐标，y 向下）
+uniform vec4 uShapeRect; // 图元矩形（raylib 屏幕坐标，y 向下）
+uniform vec4 uQuadRect;  // 覆盖 quad；包含图元外侧的抗锯齿过渡区
 uniform vec2 uRadius;  // x = 圆角半径；y = 线段 / 描边半宽
 uniform vec4 uColor;   // 实心颜色（RGBA 0..1）
 uniform int uMode;     // 0 = 填充（圆角矩形 / 矩形 / 圆）；1 = 描边；2 = 线段
@@ -94,27 +96,27 @@ float sdRoundRect(vec2 p, vec2 b, float r) {
 float sdSegment(vec2 p, vec2 a, vec2 b) {
     vec2 pa = p - a;
     vec2 ba = b - a;
-    float h = clamp(dot(pa, ba) / dot(ba, ba), 0.0, 1.0);
+    float h = clamp(dot(pa, ba) / max(dot(ba, ba), 1e-6), 0.0, 1.0);
     return length(pa - ba * h);
 }
 
 void main() {
-    vec2 p = uRect.xy + fragTexCoord * uRect.zw;
+    vec2 p = uQuadRect.xy + fragTexCoord * uQuadRect.zw;
     float alpha;
     if (uMode == 2) {
         float d = sdSegment(p, uA, uB);
-        float aa = fwidth(d) * 0.75;
-        alpha = 1.0 - smoothstep(uRadius.y - aa, uRadius.y + aa, d);
+        float aa = max(fwidth(d), 1e-4);
+        alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, d - uRadius.y);
     }
     else {
-        vec2 center = uRect.xy + uRect.zw * 0.5;
-        float sd = sdRoundRect(p - center, uRect.zw * 0.5, uRadius.x);
-        float aa = fwidth(sd) * 0.75;
+        vec2 center = uShapeRect.xy + uShapeRect.zw * 0.5;
+        float sd = sdRoundRect(p - center, uShapeRect.zw * 0.5, uRadius.x);
+        float aa = max(fwidth(sd), 1e-4);
         if (uMode == 1) {
-            alpha = 1.0 - smoothstep(uRadius.y - aa, uRadius.y + aa, abs(sd));
+            alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, abs(sd) - uRadius.y);
         }
         else {
-            alpha = 1.0 - smoothstep(-aa, aa, sd);
+            alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, sd);
         }
     }
     finalColor = vec4(uColor.rgb, uColor.a * alpha);
@@ -172,11 +174,21 @@ void main() {
             if (r.get_width() <= 0.0F || r.get_height() <= 0.0F) {
                 return;
             }
-            draw_aa(r, 0.0F, 0.0F, 0, to_rl(c));
+            draw_aa(r, 0.0F, 0.0F, detail::SdfPrimitiveMode::fill, to_rl(c));
         }
 
         void draw_rect_outline(const NanRect& r, float thickness, const NanColor& c) override {
-            draw_aa(r, 0.0F, thickness * 0.5F, 1, to_rl(c));
+            if (r.get_width() <= 0.0F || r.get_height() <= 0.0F || thickness <= 0.0F) {
+                return;
+            }
+            const auto outline = detail::sdf_inner_outline_geometry(r, 0.0F, thickness);
+            draw_aa(
+                outline.centerline_bounds,
+                outline.centerline_radius,
+                outline.half_width,
+                detail::SdfPrimitiveMode::outline,
+                to_rl(c)
+            );
         }
 
         void draw_rounded_rect_outline(
@@ -185,9 +197,19 @@ void main() {
             float thickness,
             const NanColor& c
         ) override {
+            if (r.get_width() <= 0.0F || r.get_height() <= 0.0F || thickness <= 0.0F) {
+                return;
+            }
             const float corner =
                 std::clamp(radius, 0.0F, std::min(r.get_width(), r.get_height()) * 0.5F);
-            draw_aa(r, corner, thickness * 0.5F, 1, to_rl(c));
+            const auto outline = detail::sdf_inner_outline_geometry(r, corner, thickness);
+            draw_aa(
+                outline.centerline_bounds,
+                outline.centerline_radius,
+                outline.half_width,
+                detail::SdfPrimitiveMode::outline,
+                to_rl(c)
+            );
         }
 
         void draw_rounded_rect(const NanRect& r, float radius, const NanColor& c) override {
@@ -196,7 +218,7 @@ void main() {
             }
             const float corner =
                 std::clamp(radius, 0.0F, std::min(r.get_width(), r.get_height()) * 0.5F);
-            draw_aa(r, corner, 0.0F, 0, to_rl(c));
+            draw_aa(r, corner, 0.0F, detail::SdfPrimitiveMode::fill, to_rl(c));
         }
 
         void draw_line(
@@ -209,15 +231,11 @@ void main() {
                 return;
             }
             const float hw = thickness * 0.5F;
-            const float min_x = std::min(a.get_x(), b.get_x()) - hw;
-            const float max_x = std::max(a.get_x(), b.get_x()) + hw;
-            const float min_y = std::min(a.get_y(), b.get_y()) - hw;
-            const float max_y = std::max(a.get_y(), b.get_y()) + hw;
             draw_aa(
-                foundation::NanRect::from_xywh(min_x, min_y, max_x - min_x, max_y - min_y),
+                detail::sdf_segment_bounds(a, b, hw),
                 0.0F,
                 hw,
-                2,
+                detail::SdfPrimitiveMode::segment,
                 to_rl(c),
                 a,
                 b
@@ -237,7 +255,7 @@ void main() {
                 ),
                 radius,
                 0.0F,
-                0,
+                detail::SdfPrimitiveMode::fill,
                 to_rl(c)
             );
         }
@@ -253,14 +271,18 @@ void main() {
             if (aa_shader_.id == 0) {
                 return;
             }
-            aa_loc_rect_ = GetShaderLocation(aa_shader_, "uRect");
+            aa_loc_shape_rect_ = GetShaderLocation(aa_shader_, "uShapeRect");
+            aa_loc_quad_rect_ = GetShaderLocation(aa_shader_, "uQuadRect");
             aa_loc_radius_ = GetShaderLocation(aa_shader_, "uRadius");
             aa_loc_color_ = GetShaderLocation(aa_shader_, "uColor");
             aa_loc_mode_ = GetShaderLocation(aa_shader_, "uMode");
             aa_loc_a_ = GetShaderLocation(aa_shader_, "uA");
             aa_loc_b_ = GetShaderLocation(aa_shader_, "uB");
             // 自定义 uniform 找不到 = 回退到了默认着色器（加载失败），标记不可用。
-            if (aa_loc_rect_ < 0 || aa_loc_radius_ < 0 || aa_loc_color_ < 0 || aa_loc_mode_ < 0) {
+            if (aa_loc_shape_rect_ < 0 || aa_loc_quad_rect_ < 0 || aa_loc_radius_ < 0
+                || aa_loc_color_ < 0 || aa_loc_mode_ < 0)
+            {
+                UnloadShader(aa_shader_);
                 aa_shader_.id = 0;
                 return;
             }
@@ -280,7 +302,7 @@ void main() {
             const NanRect& rect,
             const float radius,
             const float half_width,
-            const int mode,
+            const detail::SdfPrimitiveMode mode,
             const ::Color& color,
             const std::optional<NanPoint>& line_a,
             const std::optional<NanPoint>& line_b
@@ -288,10 +310,10 @@ void main() {
             const float shortest = std::min(rect.get_width(), rect.get_height());
             const float corner = std::clamp(radius, 0.0F, shortest * 0.5F);
             const float roundness = shortest > 0.0F ? corner * 2.0F / shortest : 0.0F;
-            if (mode == 2) {
+            if (mode == detail::SdfPrimitiveMode::segment) {
                 DrawLineEx(to_rl(*line_a), to_rl(*line_b), half_width * 2.0F, color);
             }
-            else if (mode == 1) {
+            else if (mode == detail::SdfPrimitiveMode::outline) {
                 DrawRectangleRoundedLinesEx(
                     to_rl(rect),
                     roundness,
@@ -313,7 +335,7 @@ void main() {
             const NanRect& rect,
             const float radius,
             const float half_width,
-            const int mode,
+            const detail::SdfPrimitiveMode mode,
             const ::Color& color,
             const std::optional<NanPoint>& line_a = std::nullopt,
             const std::optional<NanPoint>& line_b = std::nullopt
@@ -323,15 +345,35 @@ void main() {
                 draw_aa_fallback(rect, radius, half_width, mode, color, line_a, line_b);
                 return;
             }
-            const ::Rectangle rl = to_rl(rect);
+            const auto quad = mode == detail::SdfPrimitiveMode::segment
+                ? rect
+                : detail::sdf_quad_bounds(rect, mode, half_width);
+            const ::Rectangle shape_rl = to_rl(rect);
+            const ::Rectangle quad_rl = to_rl(quad);
             const ::Vector4 rgba = ColorNormalize(color);
-            const float rect_v[4] = {rl.x, rl.y, rl.width, rl.height};
+            const float shape_rect_v[4] = {
+                shape_rl.x,
+                shape_rl.y,
+                shape_rl.width,
+                shape_rl.height,
+            };
+            const float quad_rect_v[4] = {quad_rl.x, quad_rl.y, quad_rl.width, quad_rl.height};
             const float radius_v[2] = {radius, half_width};
             const float color_v[4] = {rgba.x, rgba.y, rgba.z, rgba.w};
+            const int mode_value = static_cast<int>(mode);
             BeginShaderMode(aa_shader_);
-            if (aa_loc_rect_ >= 0) {
-                SetShaderValue(aa_shader_, aa_loc_rect_, rect_v, SHADER_UNIFORM_VEC4);
-            }
+            SetShaderValue(
+                aa_shader_,
+                aa_loc_shape_rect_,
+                shape_rect_v,
+                SHADER_UNIFORM_VEC4
+            );
+            SetShaderValue(
+                aa_shader_,
+                aa_loc_quad_rect_,
+                quad_rect_v,
+                SHADER_UNIFORM_VEC4
+            );
             if (aa_loc_radius_ >= 0) {
                 SetShaderValue(aa_shader_, aa_loc_radius_, radius_v, SHADER_UNIFORM_VEC2);
             }
@@ -339,7 +381,7 @@ void main() {
                 SetShaderValue(aa_shader_, aa_loc_color_, color_v, SHADER_UNIFORM_VEC4);
             }
             if (aa_loc_mode_ >= 0) {
-                SetShaderValue(aa_shader_, aa_loc_mode_, &mode, SHADER_UNIFORM_INT);
+                SetShaderValue(aa_shader_, aa_loc_mode_, &mode_value, SHADER_UNIFORM_INT);
             }
             if (aa_loc_a_ >= 0 && line_a) {
                 const float a_v[2] = {line_a->get_x(), line_a->get_y()};
@@ -352,7 +394,7 @@ void main() {
             DrawTexturePro(
                 aa_white_tex_,
                 {0.0F, 0.0F, 1.0F, 1.0F},
-                rl,
+                quad_rl,
                 {0.0F, 0.0F},
                 0.0F,
                 WHITE
@@ -460,7 +502,8 @@ void main() {
         /// SDF 抗锯齿着色器与 1x1 白纹理（懒加载）。
         ::Shader aa_shader_ {};
         ::Texture2D aa_white_tex_ {};
-        int aa_loc_rect_ = -1;
+        int aa_loc_shape_rect_ = -1;
+        int aa_loc_quad_rect_ = -1;
         int aa_loc_radius_ = -1;
         int aa_loc_color_ = -1;
         int aa_loc_mode_ = -1;

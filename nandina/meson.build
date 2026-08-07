@@ -96,6 +96,7 @@ module_render = files(
     'render/render_device.hpp',
     'render/clip_stack.hpp',
     'render/draw_context.hpp',
+    'render/backends/sdf_primitive_geometry.hpp',
     'render/backends/raylib_device.hpp',
     'render/backends/raylib_device.cpp',
 )

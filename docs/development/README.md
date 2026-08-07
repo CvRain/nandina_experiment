@@ -61,12 +61,12 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 | --- | --- |
 | `foundation` | Geometry, color, color spaces, decomposed `NanTransform2D`, and the backend-neutral logging service. |
 | `scene` | `NanNode`, `NanNode2D`, `NanSceneTree`, input events, focus/hover, deferred delete, `NanControl`. |
-| `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend factory. |
+| `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend, analytic SDF UI primitives. |
 | `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, `ReactiveScope`, batching. |
 | `resource` | Stable UUID/key identities, immutable handles, bounded streams, resource URIs/platform locations, prioritized manager, builtin/memory/directory/SQLite backends. |
 | `text` | FreeType/HarfBuzz/FriBidi/utf8proc layout, fallback families, atlases, resource font loading, pipeline cache. |
-| `theme` | `NanTheme`, palette/tokens, button style resolver. |
-| `widget` | Text, Label, Button, EditableText, TextField, ScrollView, and low-level layout controls. |
+| `theme` | Immutable DesignSystem snapshots, light/dark semantic palettes, tokens, recipes, typed overrides. |
+| `widget` | Text/input controls, Button, Checkbox, Slider, Switch, ScrollView, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
 
 ### Logging Contract
@@ -238,6 +238,10 @@ Router frame teardown detaches the page root first, allowing widgets to run `on_
 This prevents page-local computed/effect callbacks from surviving the page object that they may capture.
 
 ## Development Roadmap
+
+The active post-Phase-7 plan is [Phase 8: Render Quality And Theme Evolution](PHASE8_RENDER_THEME_PLAN.md).
+It prioritizes SDF/text clarity, generated reference palettes, true state overlays, and page-scope
+lifetime closure before broad component expansion.
 
 The text, clipping, editing, layout, interactive example, and R1-R10 resource-delivery line are complete. Application authoring foundations A1a-A13, the A14 developer-experience line, the A19 functional root runner, and the A20-A21 standard input controls are complete through the Settings reference application: scoped components, binding, theme tokens, concise conditional/keyed authoring, source-budget acceptance, boolean and continuous numeric selection, and a page-class-free single-window entry point. Canvas/physics work remains supporting infrastructure, not a second product-wide game-engine roadmap.
 

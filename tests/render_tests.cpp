@@ -13,6 +13,7 @@
 #include "render/clip_stack.hpp"
 #include "render/draw_context.hpp"
 #include "render/render_device.hpp"
+#include "render/backends/sdf_primitive_geometry.hpp"
 #include "scene/control.hpp"
 #include "scene/canvas_layer.hpp"
 #include "scene/node2d.hpp"
@@ -200,6 +201,82 @@ TEST_CASE("ClipStack intersects with the parent clip", "[render][clip]") {
     // outer popped: stack empty => clear_clip issued.
     REQUIRE(clip.depth() == 0);
     REQUIRE(dev.clips.back().cleared);
+}
+
+TEST_CASE("SDF quad bounds preserve the exterior antialiasing band", "[render][sdf]") {
+    const auto shape = foundation::NanRect::from_xywh(10.0F, 20.0F, 40.0F, 24.0F);
+
+    const auto fill = render::detail::sdf_quad_bounds(
+        shape,
+        render::detail::SdfPrimitiveMode::fill
+    );
+    REQUIRE(fill.get_left() == Catch::Approx(9.0F));
+    REQUIRE(fill.get_top() == Catch::Approx(19.0F));
+    REQUIRE(fill.get_width() == Catch::Approx(42.0F));
+    REQUIRE(fill.get_height() == Catch::Approx(26.0F));
+
+    const auto outline = render::detail::sdf_quad_bounds(
+        shape,
+        render::detail::SdfPrimitiveMode::outline,
+        2.0F
+    );
+    REQUIRE(outline.get_left() == Catch::Approx(7.0F));
+    REQUIRE(outline.get_top() == Catch::Approx(17.0F));
+    REQUIRE(outline.get_width() == Catch::Approx(46.0F));
+    REQUIRE(outline.get_height() == Catch::Approx(30.0F));
+}
+
+TEST_CASE("SDF component outlines keep their full width inside bounds", "[render][sdf]") {
+    const auto outer = foundation::NanRect::from_xywh(10.0F, 20.0F, 40.0F, 24.0F);
+    const auto outline = render::detail::sdf_inner_outline_geometry(outer, 6.0F, 1.0F);
+
+    // 1px 边框的中心线内移 0.5px：外边界仍是原始 bounds，内边界恰好
+    // 落在下一条整数像素边界，避免两列半透明像素造成发虚。
+    REQUIRE(outline.centerline_bounds.get_left() == Catch::Approx(10.5F));
+    REQUIRE(outline.centerline_bounds.get_top() == Catch::Approx(20.5F));
+    REQUIRE(outline.centerline_bounds.get_width() == Catch::Approx(39.0F));
+    REQUIRE(outline.centerline_bounds.get_height() == Catch::Approx(23.0F));
+    REQUIRE(outline.centerline_radius == Catch::Approx(5.5F));
+    REQUIRE(outline.half_width == Catch::Approx(0.5F));
+
+    const auto quad = render::detail::sdf_quad_bounds(
+        outline.centerline_bounds,
+        render::detail::SdfPrimitiveMode::outline,
+        outline.half_width
+    );
+    REQUIRE(quad.get_left() == Catch::Approx(9.0F));
+    REQUIRE(quad.get_top() == Catch::Approx(19.0F));
+    REQUIRE(quad.get_right() == Catch::Approx(51.0F));
+    REQUIRE(quad.get_bottom() == Catch::Approx(45.0F));
+}
+
+TEST_CASE("SDF component outlines snap every fractional edge to whole pixels", "[render][sdf]") {
+    // 模拟 Button：位置和文本测量宽度都可能带小数。只吸附 origin 不足以让
+    // right/bottom 变成整数，必须独立吸附四条边。
+    const auto outer = foundation::NanRect::from_ltrb(12.2F, 51.1F, 82.7F, 91.2F);
+    const auto snapped = render::detail::snap_outline_bounds(outer);
+    REQUIRE(snapped.get_left() == Catch::Approx(12.0F));
+    REQUIRE(snapped.get_top() == Catch::Approx(51.0F));
+    REQUIRE(snapped.get_right() == Catch::Approx(83.0F));
+    REQUIRE(snapped.get_bottom() == Catch::Approx(91.0F));
+
+    const auto outline = render::detail::sdf_inner_outline_geometry(outer, 6.0F, 1.0F);
+    REQUIRE(outline.centerline_bounds.get_left() == Catch::Approx(12.5F));
+    REQUIRE(outline.centerline_bounds.get_top() == Catch::Approx(51.5F));
+    REQUIRE(outline.centerline_bounds.get_right() == Catch::Approx(82.5F));
+    REQUIRE(outline.centerline_bounds.get_bottom() == Catch::Approx(90.5F));
+    REQUIRE(outline.centerline_bounds.get_width() == Catch::Approx(70.0F));
+    REQUIRE(outline.centerline_bounds.get_height() == Catch::Approx(39.0F));
+}
+
+TEST_CASE("SDF segment bounds support zero-length round dots", "[render][sdf]") {
+    const foundation::NanPoint point(12.0F, 18.0F);
+    const auto bounds = render::detail::sdf_segment_bounds(point, point, 2.0F);
+
+    REQUIRE(bounds.get_left() == Catch::Approx(9.0F));
+    REQUIRE(bounds.get_top() == Catch::Approx(15.0F));
+    REQUIRE(bounds.get_width() == Catch::Approx(6.0F));
+    REQUIRE(bounds.get_height() == Catch::Approx(6.0F));
 }
 
 TEST_CASE("NanControl overflow clip applies to child drawing", "[render][clip][control]") {
