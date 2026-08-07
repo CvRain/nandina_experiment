@@ -3,8 +3,8 @@
  *
  * 解析策略：
  *   1. 从 `base` 配方出发，按 selector 顺序应用配方书规则（后匹配者胜）；
- *   2. 跨切面状态变换由解析器代码完成：Button 的 hover/focused/pressed 覆盖
- *      （tint）与 disabled 透明度，其余控件同理；
+ *   2. 跨切面状态变换由解析器代码完成；Button 的交互状态色保留为独立叠加片段，
+ *      disabled 透明度仍在解析末尾应用；
  *   3. 输出为片段组合的解析结果（ResolvedButtonStyle 等）。
  *
  * 遗留 NanStyle 规则经 ThemeManager::merge_style 转为配方规则，追加在配方书尾部，
@@ -188,27 +188,24 @@ namespace nandina::theme
         }
     } // namespace
 
-    /**
-     * 按交互状态把状态层应用到容器填充（替换 fill 语义）。
-     *
-     * hover / focused 使用 hover 色，pressed 使用 pressed 色；normal / disabled 不应用
-     * （disabled 由 apply_button_disabled 处理）。各 treatment 的状态层表达式是配方数据
-     * （base + 规则），品牌主题可覆盖，无需改解析器。
-     */
-    void apply_button_state_layer(ResolvedButtonStyle& style, const ButtonVisualState state) {
+    auto button_state_layer_color(
+        const ResolvedButtonStyle& style,
+        const ButtonVisualState state
+    ) -> NanColor {
         if (state == ButtonVisualState::hovered || state == ButtonVisualState::focused) {
-            style.container.fill = style.state_layer.hover;
+            return style.state_layer.hover;
         }
-        else if (state == ButtonVisualState::pressed) {
-            style.container.fill = style.state_layer.pressed;
+        if (state == ButtonVisualState::pressed) {
+            return style.state_layer.pressed;
         }
+        return style.state_layer.hover.with_alpha(0.0F);
     }
 
     /**
      * 解析 Button 配方。
      *
      * 流程：base → 配方书规则（treatment / size / tone / state，后匹配者胜）→
-     * 状态层应用（hover/focused/pressed，数据来自配方 state_layer）→ disabled 变换。
+     * 独立状态层保留在解析结果中（不改写 container.fill）→ disabled 变换。
      *
      * @param system     设计系统快照
      * @param appearance 当前外观
@@ -232,7 +229,6 @@ namespace nandina::theme
                 apply_rule(system, appearance, style, rule, tone);
             }
         }
-        apply_button_state_layer(style, state);
         if (state == ButtonVisualState::disabled) {
             apply_button_disabled(system, appearance, style);
         }
@@ -757,23 +753,18 @@ namespace nandina::theme
                             .metrics_height = ThemeScalar::literal(48.0F),
                             .metrics_padding_x = ThemeScalar::token(ScalarToken::spacing_lg),
                         },
-                        // 视觉处理方式（normal 态语义 + 状态层表达式；accent/on_accent 引用
-                        // 当前 tone，随解析时的 tone 解析。hover/focused 用 hover，pressed 用
-                        // pressed，均为「替换 fill」语义。
-                        // 注：tonal 的 0.35 + overlay 无法用单标量 token 表达，展开为字面量
-                        // 0.45 / 0.51（与 opacity.hover=0.10 / pressed=0.16 对应）。
+                        // 视觉处理方式（normal 态语义 + 独立状态叠加色）。filled 在强调色
+                        // 上叠加 on_accent，其余 treatment 在自身基础容器上叠加 accent。
                         ButtonRecipeRule {
                             .selector = {.treatment = ButtonTreatment::filled},
                             .container_fill = ThemeColor::accent(),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::on_accent(),
-                            .state_layer_hover = ThemeColor::mix(
-                                accent_ref,
+                            .state_layer_hover = ThemeColor::with_alpha(
                                 on_accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_hover_overlay)
                             ),
-                            .state_layer_pressed = ThemeColor::mix(
-                                accent_ref,
+                            .state_layer_pressed = ThemeColor::with_alpha(
                                 on_accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
                             ),
@@ -787,15 +778,13 @@ namespace nandina::theme
                             ),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::accent(),
-                            .state_layer_hover = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface_variant},
+                            .state_layer_hover = ThemeColor::with_alpha(
                                 accent_ref,
-                                ThemeScalar::literal(0.45F)
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
                             ),
-                            .state_layer_pressed = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface_variant},
+                            .state_layer_pressed = ThemeColor::with_alpha(
                                 accent_ref,
-                                ThemeScalar::literal(0.51F)
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
                             ),
                         },
                         ButtonRecipeRule {
@@ -804,13 +793,11 @@ namespace nandina::theme
                             .container_border = ThemeColor::accent(),
                             .container_border_width = ThemeScalar::token(ScalarToken::border_thin),
                             .label_color = ThemeColor::accent(),
-                            .state_layer_hover = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface},
+                            .state_layer_hover = ThemeColor::with_alpha(
                                 accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_hover_overlay)
                             ),
-                            .state_layer_pressed = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface},
+                            .state_layer_pressed = ThemeColor::with_alpha(
                                 accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
                             ),
@@ -820,13 +807,11 @@ namespace nandina::theme
                             .container_fill = ThemeColor::transparent(ColorToken::surface),
                             .container_border = ThemeColor::transparent(accent_ref),
                             .label_color = ThemeColor::accent(),
-                            .state_layer_hover = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface},
+                            .state_layer_hover = ThemeColor::with_alpha(
                                 accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_hover_overlay)
                             ),
-                            .state_layer_pressed = ThemeColor::mix(
-                                ColorOperand {ColorToken::surface},
+                            .state_layer_pressed = ThemeColor::with_alpha(
                                 accent_ref,
                                 ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
                             ),

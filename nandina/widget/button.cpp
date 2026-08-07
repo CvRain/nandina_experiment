@@ -202,8 +202,6 @@ namespace nandina::widget
         );
         if (override_) {
             theme::apply_rule(*system_, appearance_, style, *override_, tone_);
-            // override 可能覆盖 state_layer 字段，需按当前交互状态重新应用到填充。
-            theme::apply_button_state_layer(style, visual_state());
         }
         return style;
     }
@@ -213,7 +211,13 @@ namespace nandina::widget
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const float opacity = ctx.opacity();
 
-        primitives::BoxPainter::paint(ctx, world, style.container, opacity);
+        // 基础容器与交互反馈保持为两个图层；border 覆盖在状态层之上，避免半透明
+        // overlay 改写描边颜色。ripple 后续可插入同一图层位置而不污染配方解析。
+        primitives::BoxPainter::paint_fill(ctx, world, style.container, opacity);
+        auto state_layer = style.container;
+        state_layer.fill = theme::button_state_layer_color(style, visual_state());
+        primitives::BoxPainter::paint_fill(ctx, world, state_layer, opacity);
+        primitives::BoxPainter::paint_outline(ctx, world, style.container, opacity);
 
         apply_text_style(visual_state());
         const float content_width =

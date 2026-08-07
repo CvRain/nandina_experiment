@@ -192,7 +192,7 @@ TEST_CASE("button state layer is recipe data and can be overridden", "[theme][de
     const auto system = theme::default_design_system();
     constexpr auto appearance = theme::ColorAppearance::light;
 
-    // filled 的 hover 状态层 = accent.mix(on_accent, hover_overlay)（配方数据）。
+    // filled 保留 accent 基础填充，并把 on_accent + hover alpha 解析为独立叠加色。
     const auto hovered = theme::resolve_button(
         system,
         appearance,
@@ -203,10 +203,14 @@ TEST_CASE("button state layer is recipe data and can be overridden", "[theme][de
     );
     const auto accent = system.light.primary;
     const auto on_accent = system.light.on_primary;
-    const auto expected = accent.mix(on_accent, system.tokens.opacity.hover_overlay);
-    REQUIRE(hovered.container.fill.oklch().light == Catch::Approx(expected.oklch().light));
-    REQUIRE(hovered.state_layer.hover.oklch().light == Catch::Approx(expected.oklch().light));
-    // normal 不应用状态层：填充保持 treatment 的 accent 实心。
+    REQUIRE(hovered.container.fill.oklch().light == Catch::Approx(accent.oklch().light));
+    REQUIRE(hovered.state_layer.hover.oklch().light == Catch::Approx(on_accent.oklch().light));
+    REQUIRE(hovered.state_layer.hover.alpha() == Catch::Approx(system.tokens.opacity.hover_overlay));
+    REQUIRE(
+        theme::button_state_layer_color(hovered, theme::ButtonVisualState::hovered).alpha()
+        == Catch::Approx(system.tokens.opacity.hover_overlay)
+    );
+    // normal / disabled 不选择状态层，基础填充始终保持 treatment 的 accent 实心。
     const auto normal = theme::resolve_button(
         system,
         appearance,
@@ -216,6 +220,7 @@ TEST_CASE("button state layer is recipe data and can be overridden", "[theme][de
         theme::ButtonVisualState::normal
     );
     REQUIRE(normal.container.fill.oklch().light == Catch::Approx(accent.oklch().light));
+    REQUIRE(theme::button_state_layer_color(normal, theme::ButtonVisualState::normal).alpha() == Catch::Approx(0.0F));
 
     // 品牌主题可覆盖某个 treatment 的 hover 状态层，无需改解析器。
     auto branded = theme::default_design_system();
@@ -231,10 +236,8 @@ TEST_CASE("button state layer is recipe data and can be overridden", "[theme][de
         theme::ButtonSize::medium,
         theme::ButtonVisualState::hovered
     );
-    REQUIRE(
-        branded_hovered.container.fill.oklch().light
-        == Catch::Approx(branded.light.error.oklch().light)
-    );
+    REQUIRE(branded_hovered.container.fill.oklch().light == Catch::Approx(branded.light.primary.oklch().light));
+    REQUIRE(branded_hovered.state_layer.hover.oklch().light == Catch::Approx(branded.light.error.oklch().light));
 }
 
 TEST_CASE("resolve_checkbox and resolve_slider produce composed fragments", "[theme][design-system]") {

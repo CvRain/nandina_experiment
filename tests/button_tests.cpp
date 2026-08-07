@@ -39,6 +39,7 @@ namespace
 
         std::vector<RectCall> rects;
         std::vector<TextCall> texts;
+        std::vector<std::string> operations;
 
         void begin_frame() override {}
         void end_frame() override {}
@@ -47,14 +48,17 @@ namespace
 
         void draw_rect(const foundation::NanRect& rect, const foundation::NanColor& color) override {
             rects.push_back({.rect = rect, .alpha = color.alpha(), .outline = false, .rounded = false});
+            operations.emplace_back("fill");
         }
 
         void draw_rect_outline(const foundation::NanRect& rect, float, const foundation::NanColor& color) override {
             rects.push_back({.rect = rect, .alpha = color.alpha(), .outline = true, .rounded = false});
+            operations.emplace_back("outline");
         }
 
         void draw_rounded_rect(const foundation::NanRect& rect, float, const foundation::NanColor& color) override {
             rects.push_back({.rect = rect, .alpha = color.alpha(), .outline = false, .rounded = true});
+            operations.emplace_back("fill");
         }
 
         void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float, const foundation::NanColor&) override {}
@@ -67,6 +71,7 @@ namespace
             const foundation::NanColor& color
         ) override {
             texts.push_back({.text = std::string(text), .font_size = font_size, .alpha = color.alpha()});
+            operations.emplace_back("text");
         }
     };
 
@@ -489,6 +494,48 @@ TEST_CASE("button draws background and text and reacts to press state", "[widget
         foundation::NanPoint(20.0F, 30.0F)
     });
     REQUIRE(clicks == 1);
+}
+
+TEST_CASE("button paints state feedback as an overlay between base and content", "[widget][button][state-layer]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("Overlay");
+    tree.set_root(button);
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(20.0F, 20.0F), foundation::NanPoint::zero()
+    });
+    REQUIRE(button->hovered());
+    tree.draw(dev);
+
+    const auto style = button->resolved_style();
+    REQUIRE(dev.rects.size() == 2);
+    REQUIRE(dev.rects[0].alpha == Catch::Approx(style.container.fill.alpha()));
+    REQUIRE(dev.rects[1].alpha == Catch::Approx(style.state_layer.hover.alpha()));
+    REQUIRE(dev.operations == std::vector<std::string> {"fill", "fill", "text"});
+}
+
+TEST_CASE("button keeps outline and focus ring above the state overlay", "[widget][button][state-layer]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("Outlined");
+    button->set_treatment(theme::ButtonTreatment::outlined);
+    tree.set_root(button);
+    tree.set_focus(button.get());
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(20.0F, 20.0F), foundation::NanPoint::zero()
+    });
+
+    tree.draw(dev);
+
+    // 透明 base 不提交；状态层 → 控件描边 → 文本 → 焦点环。
+    REQUIRE(
+        dev.operations
+        == std::vector<std::string> {"fill", "outline", "text", "outline"}
+    );
+    REQUIRE(dev.rects[0].alpha == Catch::Approx(button->resolved_style().state_layer.hover.alpha()));
+    REQUIRE(dev.rects[1].outline);
+    REQUIRE(dev.rects[2].outline);
 }
 
 TEST_CASE("button forwards text state through its text primitive", "[widget][button][text]") {

@@ -152,6 +152,12 @@ Suggested commit: `feat(theme): 从参考色阶生成默认语义调色板`
 Migrate Button from replacement fill semantics to an overlay and verify base/overlay/outline/focus
 draw order with a recording render device.
 
+Status: implemented; awaiting code review. Button resolution now preserves `container.fill` for
+every interactive state and exposes the active state-layer color separately. Filled buttons overlay
+`on_accent`; tonal, outlined, and ghost buttons overlay `accent`, using the shared hover/pressed
+opacity tokens. Drawing order is base fill, same-radius state overlay, outline, content, then focus
+ring. Link state layers remain transparent, and disabled buttons do not paint an overlay.
+
 Suggested commit: `refactor(theme): 将按钮状态色改为独立叠加层`
 
 ### Step 4: Ripple And Reduced Motion

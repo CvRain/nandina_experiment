@@ -75,10 +75,7 @@ namespace nandina::theme
         BoxStyle box;
     };
 
-    /**
-     * 状态层（hover / pressed 覆盖色）。Button 用「替换 fill」语义应用；
-     * 真正的叠加层绘制与 ripple 留给动画阶段。
-     */
+    /** 状态层（hover / pressed 半透明叠加色），独立绘制在基础容器之上。 */
     using StateLayerStyle = struct StateLayerStyle {
         ThemeColor hover;
         ThemeColor pressed;
@@ -205,9 +202,8 @@ namespace nandina::theme
     // 配方书 = `base`（完全指定）+ 有序规则列表。
     // 解析：从 `base` 出发，按顺序应用所有匹配规则（后匹配者胜），再把
     // ThemeValue 按当前外观解析为具体值。
-    // 跨切面状态变换（disabled 透明度）与状态层应用（Button 的 hover/pressed 覆盖，
-    // 数据来自配方 state_layer 字段）由解析器在规则循环之后应用，作为状态语义的最后
-    // 一道修正（规则仍可先于变换设置 base）。
+    // 跨切面状态变换（disabled 透明度）由解析器在规则循环之后应用。Button 状态层
+    // 保留为独立解析片段，由 widget 根据当前交互状态绘制，不再改写基础容器。
 
     /** Button 状态规则：按 tone / treatment / size / state 选择，覆盖容器 / 文本 / 焦点 / 度量字段。 */
     using ButtonRecipeRule = struct ButtonRecipeRule {
@@ -293,7 +289,7 @@ namespace nandina::theme
 
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
-    /** 解析后的状态层（具体颜色；hover/focused 用 hover 色，pressed 用 pressed 色）。 */
+    /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
     using ResolvedStateLayer = struct ResolvedStateLayer {
         NanColor hover;
         NanColor pressed;
@@ -577,12 +573,11 @@ namespace nandina::theme
         ButtonTone tone
     );
 
-    /**
-     * 按交互状态把状态层应用到容器填充（替换 fill 语义）。
-     * hover / focused 使用 hover 色，pressed 使用 pressed 色；normal / disabled 不应用。
-     * 解析器与 widget 的 set_override 共用（override 可能覆盖 state_layer 字段）。
-     */
-    void apply_button_state_layer(ResolvedButtonStyle& style, ButtonVisualState state);
+    /** @return 当前交互状态对应的独立叠加色；normal / disabled 返回透明色。 */
+    [[nodiscard]] auto button_state_layer_color(
+        const ResolvedButtonStyle& style,
+        ButtonVisualState state
+    ) -> NanColor;
 
     void apply_rule(
         const DesignSystem& system,
