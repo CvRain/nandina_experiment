@@ -108,6 +108,31 @@ width and the physical size of cached glyphs. User accessibility scale multiplie
 control metrics before layout. These values must remain explicit rather than being collapsed into a
 single node transform.
 
+Component sizing uses one typed constraints model in both imperative and authoring APIs:
+
+```cpp
+control.set_width(240);                    // logical UI units
+control.set_width(scene::percent(50));     // 50% of the finite parent constraint
+control.set_width(scene::fill);            // all available width
+control.set_width(scene::content);         // intrinsic content width
+control.set_min_width(120);
+control.set_max_width(480);
+control.set_aspect_ratio(16.0F / 9.0F);
+
+ui.button("Save")
+    .width(percent(50))
+    .min_width(120)
+    .aspect_ratio(16.0F / 9.0F);
+```
+
+Plain numbers deliberately mean logical UI units, so application code does not need a `_dp`
+suffix. Strings such as `"50%"` are reserved for external style/configuration parsers; the C++ API
+remains compile-time typed. A percentage reserves a fraction of the parent's finite available
+axis, while `Expanded` / `FlexItem` distributes remaining main-axis space. On an unbounded axis a
+percentage or `fill` falls back to intrinsic content sizing instead of manufacturing infinity.
+QML-style arbitrary `parent.width / 2` property dependencies are not the default layout mechanism,
+which keeps measure dependencies acyclic and diagnostics local to the layout tree.
+
 ## Delivery Sequence
 
 ### Step 0: SDF Coverage Repair
@@ -180,15 +205,20 @@ size, contain/cover behavior, and two-axis anchoring. The resulting `ViewportMap
 uniform transform, content bounds, and inverse screen-to-logical conversion. It is pure geometry:
 no window backend, scene tree, or font cache behavior changes in this unit.
 
-### Step 4B: Integrate Window Scale And DPI
+### Step 4B: Add Typed Component Sizing
+
+Status: implemented; awaiting code review. `NanControl` owns a typed size specification shared by
+imperative calls and `NodeBuilder`: logical fixed values, parent percentages, fill/content,
+min/max limits, and aspect ratio. Resolution occurs in the common measurement protocol, so existing
+widgets do not duplicate sizing code. Percent and fill require a finite parent axis and otherwise
+retain intrinsic measurement. Flex remains a separate remaining-space policy.
+
+### Step 4C: Integrate Window Scale And DPI
 
 Add an opt-in fixed-design policy to WindowConfig, then apply the same mapping to root layout,
 DrawContext, clipping, input, and semantics. Introduce explicit framebuffer/DPI scale and build font
 pipelines at the corresponding physical size before claiming non-1x text support. Default windows
 remain responsive and behavior-compatible.
-
-After the window path is coherent, add `FractionallySizedBox` and `AspectRatio` as layout widgets;
-they consume parent constraints and do not use the global viewport transform.
 
 ### Step 5: Ripple And Reduced Motion
 

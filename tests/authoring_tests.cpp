@@ -386,6 +386,24 @@ TEST_CASE("free function factories produce same types as make<T>", "[authoring][
     }
 }
 
+TEST_CASE("authoring sizing uses the shared control constraints", "[authoring][layout][sizing]") {
+    using namespace widget::authoring;
+
+    auto control = make<scene::NanControl>(foundation::NanSize(40.0F, 20.0F))
+                       .width(percent(50.0F))
+                       .min_width(80.0F)
+                       .max_width(180.0F)
+                       .aspect_ratio(2.0F)
+                       .build();
+
+    const auto measured = control->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 200.0F,
+    });
+    REQUIRE(measured.get_width() == Catch::Approx(180.0F));
+    REQUIRE(measured.get_height() == Catch::Approx(90.0F));
+}
+
 TEST_CASE("BuildContext carries page services into context factories", "[authoring][context]") {
     reactive::Graph graph;
     reactive::ReactiveScope page_scope {graph};

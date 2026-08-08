@@ -29,6 +29,11 @@
 
 namespace nandina::widget::authoring
 {
+    // Authoring 代码可直接写 percent(50) / fill / content，同时底层类型仍归 scene 所有。
+    using scene::content;
+    using scene::fill;
+    using scene::percent;
+
     template<typename Node>
     class NodeBuilder;
 
@@ -144,6 +149,97 @@ namespace nandina::widget::authoring
             requires requires(Node& node) { node.set_gap(gap); }
         {
             node_->set_gap(gap);
+            return *this;
+        }
+
+        auto width(float width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_width(width);
+            return *this;
+        }
+
+        auto width(scene::PercentLength width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_width(width);
+            return *this;
+        }
+
+        auto width(scene::FillLength width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_width(width);
+            return *this;
+        }
+
+        auto width(scene::ContentLength width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_width(width);
+            return *this;
+        }
+
+        auto height(float height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_height(height);
+            return *this;
+        }
+
+        auto height(scene::PercentLength height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_height(height);
+            return *this;
+        }
+
+        auto height(scene::FillLength height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_height(height);
+            return *this;
+        }
+
+        auto height(scene::ContentLength height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_height(height);
+            return *this;
+        }
+
+        auto min_width(float width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_min_width(width);
+            return *this;
+        }
+
+        auto max_width(float width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_max_width(width);
+            return *this;
+        }
+
+        auto min_height(float height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_min_height(height);
+            return *this;
+        }
+
+        auto max_height(float height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_max_height(height);
+            return *this;
+        }
+
+        auto aspect_ratio(float ratio) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_aspect_ratio(ratio);
             return *this;
         }
 

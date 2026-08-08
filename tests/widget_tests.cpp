@@ -1688,6 +1688,71 @@ TEST_CASE("NanControl single child layout fills parent bounds", "[widget][layout
     REQUIRE(child->height() == Catch::Approx(120.0F));
 }
 
+TEST_CASE("NanControl resolves typed component dimensions", "[widget][layout][sizing]") {
+    auto control = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    control->set_width(scene::percent(50.0F)).set_min_width(80.0F).set_max_width(180.0F);
+
+    const auto measured = control->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 100.0F,
+    });
+    REQUIRE(measured.get_width() == Catch::Approx(180.0F));
+    REQUIRE(measured.get_height() == Catch::Approx(20.0F));
+
+    control->set_width(120.0F).set_height(scene::fill);
+    const auto fixed = control->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 90.0F,
+    });
+    REQUIRE(fixed.get_width() == Catch::Approx(120.0F));
+    REQUIRE(fixed.get_height() == Catch::Approx(90.0F));
+}
+
+TEST_CASE("Percentage sizing falls back to content on an unbounded axis", "[widget][layout][sizing]") {
+    scene::NanControl control(foundation::NanSize(42.0F, 18.0F));
+    control.set_width(scene::percent(50.0F));
+
+    const auto measured = control.measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(measured.get_width() == Catch::Approx(42.0F));
+    REQUIRE(measured.get_height() == Catch::Approx(18.0F));
+}
+
+TEST_CASE("Aspect ratio derives the unspecified component axis", "[widget][layout][sizing]") {
+    scene::NanControl from_width(foundation::NanSize(10.0F, 10.0F));
+    from_width.set_width(scene::percent(50.0F)).set_aspect_ratio(16.0F / 9.0F);
+    const auto landscape = from_width.measure_layout(scene::LayoutConstraints {
+        .max_width = 320.0F,
+        .max_height = 200.0F,
+    });
+    REQUIRE(landscape.get_width() == Catch::Approx(160.0F));
+    REQUIRE(landscape.get_height() == Catch::Approx(90.0F));
+
+    scene::NanControl from_height(foundation::NanSize(10.0F, 10.0F));
+    from_height.set_height(60.0F).set_aspect_ratio(2.0F);
+    const auto landscape_from_height = from_height.measure_layout(scene::LayoutConstraints {
+        .max_width = 200.0F,
+        .max_height = 100.0F,
+    });
+    REQUIRE(landscape_from_height.get_width() == Catch::Approx(120.0F));
+    REQUIRE(landscape_from_height.get_height() == Catch::Approx(60.0F));
+}
+
+TEST_CASE("Percentage sizing is distinct from flex remaining-space distribution", "[widget][layout][sizing]") {
+    auto percentage = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 10.0F));
+    percentage->set_width(scene::percent(50.0F));
+    auto expanded = widget::Expanded::create();
+    expanded->set_child(std::make_shared<scene::NanControl>(foundation::NanSize(5.0F, 10.0F)));
+
+    auto row = widget::Row::create();
+    row->set_gap(10.0F).add(percentage).add(expanded);
+    (void)row->measure_layout(scene::LayoutConstraints::tight(foundation::NanSize(200.0F, 20.0F)));
+    row->layout_to(foundation::NanRect::from_xywh(0.0F, 0.0F, 200.0F, 20.0F));
+
+    REQUIRE(percentage->width() == Catch::Approx(100.0F));
+    REQUIRE(expanded->position().get_x() == Catch::Approx(110.0F));
+    REQUIRE(expanded->width() == Catch::Approx(90.0F));
+}
+
 TEST_CASE("Row distributes remaining width across Expanded children", "[widget][layout][expanded]") {
     auto fixed = std::make_shared<scene::NanControl>(foundation::NanSize(30.0F, 10.0F));
     auto first_child = std::make_shared<scene::NanControl>(foundation::NanSize(5.0F, 10.0F));

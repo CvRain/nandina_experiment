@@ -26,6 +26,7 @@
 
 #include <limits>
 #include <optional>
+#include <variant>
 
 namespace nandina::scene
 {
@@ -54,6 +55,43 @@ namespace nandina::scene
         LayoutConstraints limits {};
     };
 
+    /// 组件尺寸的类型化表达。普通数字使用逻辑 UI 单位，百分比相对于父布局在
+    /// 对应轴提供的有限上界；fill 与 flex 不同，它请求整个可用约束而不是分配余量。
+    struct ContentLength {
+        auto operator==(const ContentLength&) const -> bool = default;
+    };
+
+    struct FillLength {
+        auto operator==(const FillLength&) const -> bool = default;
+    };
+
+    struct LogicalLength {
+        float value = 0.0F;
+        auto operator==(const LogicalLength&) const -> bool = default;
+    };
+
+    struct PercentLength {
+        float value = 0.0F;
+        auto operator==(const PercentLength&) const -> bool = default;
+    };
+
+    inline constexpr ContentLength content {};
+    inline constexpr FillLength fill {};
+
+    [[nodiscard]] auto percent(float value) -> PercentLength;
+
+    using LayoutLength = std::variant<ContentLength, LogicalLength, PercentLength, FillLength>;
+
+    struct ControlSizeSpec {
+        LayoutLength width = content;
+        LayoutLength height = content;
+        std::optional<float> min_width;
+        std::optional<float> max_width;
+        std::optional<float> min_height;
+        std::optional<float> max_height;
+        std::optional<float> aspect_ratio;
+    };
+
     /// 带尺寸的 2D 控件基类。局部矩形为 [0,0,size.w,size.h] (原点左上角)。
     class NanControl: public NanNode2D {
     public:
@@ -67,6 +105,22 @@ namespace nandina::scene
 
         [[nodiscard]] auto width() const -> float;
         [[nodiscard]] auto height() const -> float;
+
+        auto set_width(float width) -> NanControl&;
+        auto set_width(PercentLength width) -> NanControl&;
+        auto set_width(FillLength width) -> NanControl&;
+        auto set_width(ContentLength width) -> NanControl&;
+        auto set_height(float height) -> NanControl&;
+        auto set_height(PercentLength height) -> NanControl&;
+        auto set_height(FillLength height) -> NanControl&;
+        auto set_height(ContentLength height) -> NanControl&;
+        auto set_min_width(float width) -> NanControl&;
+        auto set_max_width(float width) -> NanControl&;
+        auto set_min_height(float height) -> NanControl&;
+        auto set_max_height(float height) -> NanControl&;
+        auto set_aspect_ratio(float ratio) -> NanControl&;
+        auto clear_aspect_ratio() -> NanControl&;
+        [[nodiscard]] auto size_spec() const -> const ControlSizeSpec&;
 
         /// 局部空间矩形 [0,0,w,h]。
         [[nodiscard]] auto local_rect() const -> foundation::NanRect;
@@ -131,6 +185,7 @@ namespace nandina::scene
         DirtyFlags dirty_flags_ = layout_dirty_flags | DirtyFlags::paint | DirtyFlags::semantics;
         std::optional<foundation::NanColor> background_;
         ControlOverflow overflow_ = ControlOverflow::visible;
+        ControlSizeSpec size_spec_;
     };
 
 } // namespace nandina::scene

@@ -8,6 +8,10 @@
 
 #include <algorithm>
 #include <cmath>
+#include <concepts>
+#include <stdexcept>
+#include <string>
+#include <type_traits>
 #include <vector>
 
 namespace nandina::scene
@@ -18,7 +22,56 @@ namespace nandina::scene
         [[nodiscard]] auto finite_or(float value, float fallback) -> float {
             return std::isfinite(value) ? value : fallback;
         }
+
+        void require_non_negative_finite(float value, const char* name) {
+            if (!std::isfinite(value) || value < 0.0F) {
+                throw std::invalid_argument(std::string(name) + " must be finite and non-negative");
+            }
+        }
+
+        [[nodiscard]] auto resolved_length(const LayoutLength& length, float available)
+            -> std::optional<float> {
+            return std::visit(
+                [available](const auto& value) -> std::optional<float> {
+                    using Value = std::decay_t<decltype(value)>;
+                    if constexpr (std::same_as<Value, LogicalLength>) {
+                        return value.value;
+                    }
+                    else if constexpr (std::same_as<Value, PercentLength>) {
+                        return std::isfinite(available)
+                            ? std::optional(available * value.value * 0.01F)
+                            : std::nullopt;
+                    }
+                    else if constexpr (std::same_as<Value, FillLength>) {
+                        return std::isfinite(available) ? std::optional(available) : std::nullopt;
+                    }
+                    else {
+                        return std::nullopt;
+                    }
+                },
+                length
+            );
+        }
+
+        [[nodiscard]] auto constrained_axis(
+            float parent_min,
+            float parent_max,
+            std::optional<float> own_min,
+            std::optional<float> own_max
+        ) -> std::pair<float, float> {
+            const float minimum = std::max(parent_min, own_min.value_or(0.0F));
+            const float maximum = std::max(
+                minimum,
+                std::min(parent_max, own_max.value_or(std::numeric_limits<float>::infinity()))
+            );
+            return {minimum, maximum};
+        }
     } // namespace
+
+    auto percent(float value) -> PercentLength {
+        require_non_negative_finite(value, "percentage");
+        return {.value = value};
+    }
 
     auto LayoutConstraints::loose() -> LayoutConstraints {
         return {};
@@ -79,6 +132,105 @@ namespace nandina::scene
 
     auto NanControl::height() const -> float {
         return size_.get_height();
+    }
+
+    auto NanControl::set_width(float width) -> NanControl& {
+        require_non_negative_finite(width, "width");
+        size_spec_.width = LogicalLength {width};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_width(PercentLength width) -> NanControl& {
+        require_non_negative_finite(width.value, "width percentage");
+        size_spec_.width = width;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_width(FillLength width) -> NanControl& {
+        size_spec_.width = width;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_width(ContentLength width) -> NanControl& {
+        size_spec_.width = width;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_height(float height) -> NanControl& {
+        require_non_negative_finite(height, "height");
+        size_spec_.height = LogicalLength {height};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_height(PercentLength height) -> NanControl& {
+        require_non_negative_finite(height.value, "height percentage");
+        size_spec_.height = height;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_height(FillLength height) -> NanControl& {
+        size_spec_.height = height;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_height(ContentLength height) -> NanControl& {
+        size_spec_.height = height;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_min_width(float width) -> NanControl& {
+        require_non_negative_finite(width, "minimum width");
+        size_spec_.min_width = width;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_max_width(float width) -> NanControl& {
+        require_non_negative_finite(width, "maximum width");
+        size_spec_.max_width = width;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_min_height(float height) -> NanControl& {
+        require_non_negative_finite(height, "minimum height");
+        size_spec_.min_height = height;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_max_height(float height) -> NanControl& {
+        require_non_negative_finite(height, "maximum height");
+        size_spec_.max_height = height;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_aspect_ratio(float ratio) -> NanControl& {
+        if (!std::isfinite(ratio) || ratio <= 0.0F) {
+            throw std::invalid_argument("aspect ratio must be finite and positive");
+        }
+        size_spec_.aspect_ratio = ratio;
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::clear_aspect_ratio() -> NanControl& {
+        size_spec_.aspect_ratio.reset();
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::size_spec() const -> const ControlSizeSpec& {
+        return size_spec_;
     }
 
     auto NanControl::local_rect() const -> foundation::NanRect {
@@ -151,7 +303,58 @@ namespace nandina::scene
 
     auto NanControl::measure_layout(LayoutConstraints constraints) -> foundation::NanSize {
         last_layout_constraints_ = constraints;
-        measured_size_ = constraints.constrain(on_measure(constraints));
+        auto [min_width, max_width] = constrained_axis(
+            constraints.min_width,
+            constraints.max_width,
+            size_spec_.min_width,
+            size_spec_.max_width
+        );
+        auto [min_height, max_height] = constrained_axis(
+            constraints.min_height,
+            constraints.max_height,
+            size_spec_.min_height,
+            size_spec_.max_height
+        );
+
+        auto width = resolved_length(size_spec_.width, constraints.max_width);
+        auto height = resolved_length(size_spec_.height, constraints.max_height);
+        if (width.has_value()) {
+            width = std::clamp(*width, min_width, max_width);
+        }
+        if (height.has_value()) {
+            height = std::clamp(*height, min_height, max_height);
+        }
+
+        if (size_spec_.aspect_ratio.has_value()) {
+            const float ratio = *size_spec_.aspect_ratio;
+            if (width.has_value() && !height.has_value()) {
+                height = std::clamp(*width / ratio, min_height, max_height);
+            }
+            else if (height.has_value() && !width.has_value()) {
+                width = std::clamp(*height * ratio, min_width, max_width);
+            }
+        }
+
+        LayoutConstraints effective {
+            .min_width = width.value_or(min_width),
+            .max_width = width.value_or(max_width),
+            .min_height = height.value_or(min_height),
+            .max_height = height.value_or(max_height),
+        };
+        auto measured = effective.constrain(on_measure(effective));
+
+        if (size_spec_.aspect_ratio.has_value() && !width.has_value() && !height.has_value()) {
+            const float ratio = *size_spec_.aspect_ratio;
+            float result_width = measured.get_width();
+            float result_height = result_width / ratio;
+            if (result_height < min_height || result_height > max_height) {
+                result_height = std::clamp(measured.get_height(), min_height, max_height);
+                result_width = result_height * ratio;
+            }
+            measured = effective.constrain(foundation::NanSize(result_width, result_height));
+        }
+
+        measured_size_ = constraints.constrain(measured);
         return measured_size_;
     }
 
