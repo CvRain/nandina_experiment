@@ -15,6 +15,7 @@
 #include "widget/switch.hpp"
 #include "widget/text_field.hpp"
 
+#include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
 #include <string_view>
@@ -186,6 +187,30 @@ TEST_CASE("settings example survives appearance switching and redraw", "[example
     themes.set_preference(theme::ThemePreference::light);
     REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
     tree.draw(dev);
+}
+
+TEST_CASE("settings example visibly exercises percentage sizing", "[example][settings][layout]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    (void)router.push<app::detail::RootViewPage>(
+        app::detail::make_root_view_params(examples::settings::build)
+    );
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    auto* save = button_named(*router.host(), "Save preferences");
+    REQUIRE(save != nullptr);
+    auto* actions = save->parent() != nullptr ? save->parent()->as_control() : nullptr;
+    REQUIRE(actions != nullptr);
+    REQUIRE(save->width() == Catch::Approx(actions->width() * 0.5F));
+    const float wide_width = save->width();
+
+    REQUIRE(tree.layout_root(foundation::NanSize(520.0F, 520.0F)) >= 1);
+    REQUIRE(save->width() == Catch::Approx(actions->width() * 0.5F));
+    REQUIRE(save->width() < wide_width);
 }
 
 TEST_CASE("settings appearance buttons switch the theme preference", "[example][settings]") {

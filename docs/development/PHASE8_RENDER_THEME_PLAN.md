@@ -211,7 +211,9 @@ Status: implemented; awaiting code review. `NanControl` owns a typed size specif
 imperative calls and `NodeBuilder`: logical fixed values, parent percentages, fill/content,
 min/max limits, and aspect ratio. Resolution occurs in the common measurement protocol, so existing
 widgets do not duplicate sizing code. Percent and fill require a finite parent axis and otherwise
-retain intrinsic measurement. Flex remains a separate remaining-space policy.
+retain intrinsic measurement. Flex remains a separate remaining-space policy. The Settings Save
+action uses a constrained 50% width, pairing headless geometry assertions at two window sizes with
+a directly observable resizable-window check.
 
 ### Step 4C: Integrate Window Scale And DPI
 

@@ -34,6 +34,8 @@ namespace nandina::examples::settings
     } // namespace
 
     auto build(widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D> {
+        using widget::authoring::percent;
+
         // 框架默认调色板（Skeleton 参考，见 phase7 文档）即内置主题；这里仅演示
         // 「默认快照拷贝 → 微调 → 原子应用」的品牌主题路径，保持与默认色板协调。
         auto design = theme::default_design_system();
@@ -79,9 +81,13 @@ namespace nandina::examples::settings
                 )
                 .build();
 
-        auto save = ui.button("Save preferences").tone(theme::ButtonTone::primary).on_click([&] {
-            status.set("Preferences saved for " + profile.peek());
-        });
+        auto save = ui.button("Save preferences")
+                        .tone(theme::ButtonTone::primary)
+                        .width(percent(50.0F))
+                        .min_width(180.0F)
+                        .on_click([&] {
+                            status.set("Preferences saved for " + profile.peek());
+                        });
         auto reset = ui.button("Reset").treatment(theme::ButtonTreatment::outlined).on_click([&] {
             profile.set("Nandina developer");
             notifications.set(true);
