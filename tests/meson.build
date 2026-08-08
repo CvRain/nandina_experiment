@@ -93,6 +93,13 @@ async_tests = executable(
 )
 test('async', async_tests)
 
+viewport_scaling_tests = executable(
+    'viewport_scaling_tests',
+    files('viewport_scaling_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('viewport-scaling', viewport_scaling_tests)
+
 button_tests = executable(
     'button_tests',
     files('button_tests.cpp'),

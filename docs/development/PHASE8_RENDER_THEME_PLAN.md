@@ -95,6 +95,19 @@ risk is an externally retained page root invoking callbacks after its Page Frame
 signals. The architectural fix is a shared lifetime anchor for root and scope, or uniform callback
 cleanup on unmount, with a regression test that retains a root across page pop.
 
+### D8: Layout Fractions, Viewport Scale, And DPI Are Separate
+
+Responsive Flex/Flow/Grid layout continues to consume a logical viewport. A child that occupies a
+fraction of its parent belongs to layout constraints (`FractionallySizedBox` / `AspectRatio`) and
+must not stretch its text or border geometry. Scaling an entire fixed-design interface is instead a
+uniform logical-to-screen viewport transform with contain/cover and anchoring; drawing, clipping,
+hit testing, pointer coordinates, and semantics must share its inverse mapping.
+
+DPI scale is a third value: physical framebuffer pixels per screen-space unit. It controls SDF pixel
+width and the physical size of cached glyphs. User accessibility scale multiplies typography and
+control metrics before layout. These values must remain explicit rather than being collapsed into a
+single node transform.
+
 ## Delivery Sequence
 
 ### Step 0: SDF Coverage Repair
@@ -160,23 +173,40 @@ ring. Link state layers remain transparent, and disabled buttons do not paint an
 
 Suggested commit: `refactor(theme): 将按钮状态色改为独立叠加层`
 
-### Step 4: Ripple And Reduced Motion
+### Step 4A: Define Fixed-Design Viewport Mapping
+
+Status: implemented; awaiting code review. `ViewportScalePolicy` defines a fixed logical design
+size, contain/cover behavior, and two-axis anchoring. The resulting `ViewportMapping` provides one
+uniform transform, content bounds, and inverse screen-to-logical conversion. It is pure geometry:
+no window backend, scene tree, or font cache behavior changes in this unit.
+
+### Step 4B: Integrate Window Scale And DPI
+
+Add an opt-in fixed-design policy to WindowConfig, then apply the same mapping to root layout,
+DrawContext, clipping, input, and semantics. Introduce explicit framebuffer/DPI scale and build font
+pipelines at the corresponding physical size before claiming non-1x text support. Default windows
+remain responsive and behavior-compatible.
+
+After the window path is coherent, add `FractionallySizedBox` and `AspectRatio` as layout widgets;
+they consume parent constraints and do not use the global viewport transform.
+
+### Step 5: Ripple And Reduced Motion
 
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget
 boundaries, split commits in compilable dependency order.
 
-### Step 5: Normalize The Brand Theme Example
+### Step 6: Normalize The Brand Theme Example
 
 Demonstrate paired primary/on-primary colors for both appearances, contrast constraints, and an
 optional tone policy instead of presenting a radius-only customization as the brand example.
 
-### Step 6: Freeze The Component Template
+### Step 7: Freeze The Component Template
 
 Implement one component at a time and require recipe/rules, shared painters, light/dark and override
 tests, constrained layout, pointer/keyboard/focus behavior, semantics, authoring, and any necessary
 two-way binding. The example remains a real application, not a component gallery.
 
-### Step 7: Close Page Root/Scope Lifetime
+### Step 8: Close Page Root/Scope Lifetime
 
 Keep the existing page-owned ReactiveScope. Address only the retained-root callback hazard and add
 teardown tests; do not introduce a second reactive lifetime system.

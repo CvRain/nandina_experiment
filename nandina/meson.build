@@ -175,6 +175,8 @@ module_widget = files(
 )
 
 module_app = files(
+    'app/viewport_scaling.hpp',
+    'app/viewport_scaling.cpp',
     'app/ui_dispatcher.hpp',
     'app/ui_dispatcher.cpp',
     'app/async_scope.hpp',
