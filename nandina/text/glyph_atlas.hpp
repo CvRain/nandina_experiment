@@ -89,7 +89,8 @@ namespace nandina::text
         void draw(
             const GlyphAtlasEntry& glyph,
             foundation::NanPoint baseline_origin,
-            foundation::NanColor color
+            foundation::NanColor color,
+            float screen_to_physical = 1.0F
         );
 
         [[nodiscard]] auto handle() const -> render::TextureHandle;

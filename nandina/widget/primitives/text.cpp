@@ -244,8 +244,8 @@ namespace nandina::widget::primitives
                   foundation::NanRect::from_xywh(
                       position.get_x(),
                       position.get_y(),
-                      layout_.size.get_width(),
-                      layout_.size.get_height()
+                      ctx.logical_to_screen(layout_.size.get_width()),
+                      ctx.logical_to_screen(layout_.size.get_height())
                   )
               )
             : render::ClipStack::Guard {nullptr, false};
@@ -262,11 +262,11 @@ namespace nandina::widget::primitives
                 ctx.device().draw_text(
                     line.visible_text,
                     foundation::NanPoint(position.get_x(), y),
-                    layout_.font_size,
+                    ctx.logical_to_screen(layout_.font_size),
                     color
                 );
             }
-            y += line.size.get_height();
+            y += ctx.logical_to_screen(line.size.get_height());
         }
     }
 

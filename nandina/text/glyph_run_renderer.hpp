@@ -40,7 +40,9 @@ namespace nandina::text
             const widget::primitives::TextLayoutLine& line,
             foundation::NanPoint baseline_origin,
             foundation::NanColor color,
-            float pixel_size
+            float logical_pixel_size,
+            float logical_to_screen = 1.0F,
+            float screen_to_physical = 1.0F
         );
 
     private:

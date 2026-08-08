@@ -6,6 +6,7 @@
 
 #include "../render/draw_context.hpp"
 
+#include <cmath>
 #include <stdexcept>
 #include <vector>
 
@@ -56,16 +57,21 @@ namespace nandina::text
         foundation::NanPoint position,
         foundation::NanColor color
     ) {
-        (void)context;
+        const auto scale = context.scale();
         float line_top = position.get_y();
         for (const auto& line: layout.lines) {
             draw_line(
                 line,
-                foundation::NanPoint(position.get_x(), line_top + line.baseline),
+                foundation::NanPoint(
+                    position.get_x(),
+                    line_top + context.logical_to_screen(line.baseline)
+                ),
                 color,
-                layout.font_size
+                layout.font_size,
+                scale.logical_to_screen,
+                scale.screen_to_physical
             );
-            line_top += line.size.get_height();
+            line_top += context.logical_to_screen(line.size.get_height());
         }
     }
 
@@ -73,8 +79,17 @@ namespace nandina::text
         const widget::primitives::TextLayoutLine& line,
         foundation::NanPoint baseline_origin,
         foundation::NanColor color,
-        float pixel_size
+        const float logical_pixel_size,
+        const float logical_to_screen,
+        const float screen_to_physical
     ) {
+        if (!std::isfinite(logical_to_screen) || logical_to_screen <= 0.0F
+            || !std::isfinite(screen_to_physical) || screen_to_physical <= 0.0F)
+        {
+            throw std::invalid_argument("GlyphRunRenderer scales must be finite and positive");
+        }
+        const float raster_pixel_size =
+            logical_pixel_size * logical_to_screen * screen_to_physical;
         struct CachedGlyph {
             std::size_t binding = 0;
             const GlyphAtlasEntry* entry = nullptr;
@@ -91,7 +106,10 @@ namespace nandina::text
             glyphs.push_back(
                 CachedGlyph {
                     .binding = shaped.font_index,
-                    .entry = &binding.atlas->cache_glyph(shaped.glyph_index, pixel_size),
+                    .entry = &binding.atlas->cache_glyph(
+                        shaped.glyph_index,
+                        raster_pixel_size
+                    ),
                 }
             );
             used_bindings[shaped.font_index] = true;
@@ -109,11 +127,15 @@ namespace nandina::text
             const auto& cached = glyphs[index];
             bindings_[cached.binding].texture->draw(
                 *cached.entry,
-                foundation::NanPoint(pen_x + shaped.x_offset, pen_y - shaped.y_offset),
-                color
+                foundation::NanPoint(
+                    pen_x + shaped.x_offset * logical_to_screen,
+                    pen_y - shaped.y_offset * logical_to_screen
+                ),
+                color,
+                screen_to_physical
             );
-            pen_x += shaped.x_advance;
-            pen_y -= shaped.y_advance;
+            pen_x += shaped.x_advance * logical_to_screen;
+            pen_y -= shaped.y_advance * logical_to_screen;
         }
     }
 

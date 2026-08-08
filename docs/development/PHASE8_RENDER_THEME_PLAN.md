@@ -234,8 +234,11 @@ remain responsive and behavior-compatible.
 The first render foundation is implemented and awaiting review: `DrawContext` carries separate
 logical-to-screen and screen-to-physical factors, preserves an initial viewport transform through
 CanvasLayer traversal, and shared box/focus painters scale logical radii, borders, gaps, and ring
-widths. No WindowConfig behavior changes yet; component-internal geometry and glyph rasterization
-must join this contract before enabling a non-1x viewport in the example.
+widths. Glyph layout remains in logical units, while the atlas rasterizes at logical font size ×
+viewport scale × DPI; bitmap destinations divide only by DPI to return to screen space. Baselines,
+advances, offsets, fallback drawing, line progression, and text clips convert through the viewport
+factor. No WindowConfig behavior changes yet; component-internal geometry must join this contract
+before enabling a non-1x viewport in the example.
 
 ### Step 5: Ripple And Reduced Motion
 

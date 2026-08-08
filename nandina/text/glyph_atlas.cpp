@@ -175,24 +175,35 @@ namespace nandina::text
     void GlyphAtlasTexture::draw(
         const GlyphAtlasEntry& glyph,
         foundation::NanPoint baseline_origin,
-        foundation::NanColor color
+        foundation::NanColor color,
+        const float screen_to_physical
     ) {
         if (!glyph.pixel_bounds.is_valid()) {
             return;
+        }
+        if (!std::isfinite(screen_to_physical) || screen_to_physical <= 0.0F) {
+            throw std::invalid_argument(
+                "GlyphAtlasTexture screen-to-physical scale must be finite and positive"
+            );
         }
         sync();
         // FreeType 已在整像素网格生成 grayscale-AA bitmap。HarfBuzz 的 advance、
         // kerning 与 caret 仍保留亚像素精度，但最终 bitmap 左上角吸附到像素，
         // 避免 GPU 再把一张已抗锯齿的字形分摊到相邻像素。
+        // 字形 bitmap 和 bearing 使用物理像素；目标矩形使用 screen-space 单位。
+        // 先在物理像素网格吸附，再除以 DPI，可让 2x framebuffer 得到 0.5
+        // screen-unit 的精确位置，而不是把高分屏字形错误放大两次。
+        const float physical_baseline_x = baseline_origin.get_x() * screen_to_physical;
+        const float physical_baseline_y = baseline_origin.get_y() * screen_to_physical;
         const float destination_x =
-            std::round(baseline_origin.get_x() + glyph.metrics.bearing_x);
+            std::round(physical_baseline_x + glyph.metrics.bearing_x) / screen_to_physical;
         const float destination_y =
-            std::round(baseline_origin.get_y() - glyph.metrics.bearing_y);
+            std::round(physical_baseline_y - glyph.metrics.bearing_y) / screen_to_physical;
         const auto destination = foundation::NanRect::from_xywh(
             destination_x,
             destination_y,
-            glyph.pixel_bounds.get_width(),
-            glyph.pixel_bounds.get_height()
+            glyph.pixel_bounds.get_width() / screen_to_physical,
+            glyph.pixel_bounds.get_height() / screen_to_physical
         );
         device_.draw_texture_region(texture_, glyph.pixel_bounds, destination, color);
     }

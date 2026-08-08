@@ -6,6 +6,7 @@
 #include "text/glyph_atlas.hpp"
 #include "text/glyph_run_renderer.hpp"
 #include "text/harfbuzz_text_backend.hpp"
+#include "render/draw_context.hpp"
 #include "scene/scene_tree.hpp"
 #include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
@@ -234,6 +235,34 @@ TEST_CASE("GlyphAtlasTexture snaps fractional shaped positions without resizing 
             == Catch::Approx(glyph.pixel_bounds.get_height()));
 }
 
+TEST_CASE("GlyphAtlasTexture converts physical glyphs back to screen space", "[text][atlas][dpi]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::GlyphAtlas atlas(face, 128, 128);
+    TextureRecordingDevice device;
+    text::GlyphAtlasTexture texture(device, atlas);
+    const auto& glyph = atlas.cache(U'a', 48.0F);
+
+    texture.draw(
+        glyph,
+        foundation::NanPoint(10.25F, 30.75F),
+        foundation::NanColor::from(foundation::NanOklch {}),
+        2.0F
+    );
+
+    REQUIRE(device.last_destination.get_left()
+            == Catch::Approx(
+                std::round(10.25F * 2.0F + glyph.metrics.bearing_x) / 2.0F
+            ));
+    REQUIRE(device.last_destination.get_top()
+            == Catch::Approx(
+                std::round(30.75F * 2.0F - glyph.metrics.bearing_y) / 2.0F
+            ));
+    REQUIRE(device.last_destination.get_width()
+            == Catch::Approx(glyph.pixel_bounds.get_width() / 2.0F));
+    REQUIRE(device.last_destination.get_height()
+            == Catch::Approx(glyph.pixel_bounds.get_height() / 2.0F));
+}
+
 TEST_CASE("HarfBuzz backend produces glyph runs with source clusters", "[text][harfbuzz]") {
     auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
     text::HarfBuzzTextLayoutBackend backend(face);
@@ -308,6 +337,39 @@ TEST_CASE("HarfBuzz glyph runs draw through the atlas texture", "[text][harfbuzz
     REQUIRE(device.draws == expected_draws);
     REQUIRE(device.updates >= 1);
     REQUIRE(texture.uploaded_revision() == atlas.revision());
+}
+
+TEST_CASE("GlyphRunRenderer rasterizes at viewport times DPI scale", "[text][harfbuzz][scale]") {
+    auto face = std::make_shared<text::FreeTypeFontFace>(test_font_path());
+    text::HarfBuzzTextLayoutBackend backend(face);
+    const auto layout = backend.layout(widget::primitives::TextLayoutInput {
+        .text = "a",
+        .style = widget::primitives::TextStyle {.font_size = 16.0F},
+        .constraints = scene::LayoutConstraints::loose(),
+    });
+    text::GlyphAtlas atlas(face, 128, 128);
+    TextureRecordingDevice device;
+    text::GlyphAtlasTexture texture(device, atlas);
+    text::GlyphRunRenderer renderer(atlas, texture);
+    render::DrawContext context(
+        device,
+        foundation::NanTransform2D::from_scale(1.5F),
+        {.logical_to_screen = 1.5F, .screen_to_physical = 2.0F}
+    );
+
+    renderer.draw(
+        layout,
+        context,
+        foundation::NanPoint(10.0F, 20.0F),
+        foundation::NanColor::from(foundation::NanOklch {})
+    );
+
+    const auto glyph_index = layout.lines.front().glyphs.front().glyph_index;
+    const auto* cached = atlas.find_glyph(glyph_index, 48.0F);
+    REQUIRE(cached != nullptr);
+    REQUIRE(cached->pixel_size == Catch::Approx(48.0F));
+    REQUIRE(device.last_destination.get_width()
+            == Catch::Approx(cached->pixel_bounds.get_width() / 2.0F));
 }
 
 TEST_CASE("HarfBuzz backend honors explicit line limits", "[text][harfbuzz]") {
