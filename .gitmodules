@@ -25,3 +25,6 @@
 [submodule "subprojects/box2d"]
 	path = subprojects/box2d
 	url = https://github.com/erincatto/box2d.git
+[submodule "subprojects/tomlplusplus"]
+	path = subprojects/tomlplusplus
+	url = https://github.com/marzer/tomlplusplus.git

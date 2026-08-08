@@ -188,6 +188,18 @@ teardown tests; do not introduce a second reactive lifetime system.
 - Vulkan/SDL platform work remains outside the pre-2.0 plan.
 - Large component expansion waits for Steps 0 through 3.
 
+## Build Dependency Policy
+
+Third-party libraries maintained as repository dependencies use pinned Git submodules. Prefer an
+upstream CMake project when one is available, then let Meson consume that CMake target through its
+CMake subproject adapter. This keeps one vendored source tree usable by the current Meson build and
+a future native CMake package instead of coupling consumers to a Meson wrap layout.
+
+`tomlplusplus` is pinned to upstream `v3.4.0` under `subprojects/tomlplusplus`. The build uses its
+header-only `tomlplusplus::tomlplusplus` target directly and no longer probes a system package or
+downloads a WrapDB archive. A fresh checkout therefore requires `git submodule update --init
+--recursive`, consistently with the project's other embedded dependencies.
+
 ## Phase Completion Criteria
 
 - Settings has crisp SDF corners, outlines, lines, focus rings, and control indicators in both modes.

@@ -32,10 +32,20 @@ utf8proc_options.add_cmake_defines({
     'UTF8PROC_ENABLE_TESTING': 'OFF',
 })
 
+# toml++ 是 header-only CMake 项目。固定为 Git submodule 后，Meson 和未来的
+# 顶层 CMake 构建都消费同一份官方源码，不依赖系统安装或 WrapDB 下载。
+tomlplusplus_options = cmake.subproject_options()
+tomlplusplus_options.add_cmake_defines({
+    'TOMLPLUSPLUS_BUILD_MODULES': 'OFF',
+    'tomlplusplus_INSTALL': 'OFF',
+})
+tomlplusplus_options.set_install(false)
+
 # 配置 subproject
 spdlog_subproj = cmake.subproject('spdlog', options: spdlog_options)
 raylib_subproj = cmake.subproject('raylib', options: raylib_options)
 utf8proc_subproj = cmake.subproject('utf8proc', options: utf8proc_options)
+tomlplusplus_subproj = cmake.subproject('tomlplusplus', options: tomlplusplus_options)
 freetype_subproj = subproject(
     'freetype',
     default_options: ['tests=disabled', 'harfbuzz=disabled'],
@@ -76,6 +86,9 @@ fribidi_subproj = subproject(
 spdlog_dep = spdlog_subproj.dependency('spdlog')
 raylib_dep = raylib_subproj.dependency('raylib')
 utf8proc_dep = utf8proc_subproj.dependency('utf8proc')
+# Meson 的 CMake 适配器将命名空间 target `tomlplusplus::tomlplusplus`
+# 规范化为底层实际 target 名。
+tomlplusplus_dep = tomlplusplus_subproj.dependency('tomlplusplus_tomlplusplus')
 freetype_dep = freetype_subproj.get_variable('freetype_dep')
 harfbuzz_dep = harfbuzz_subproj.get_variable('libharfbuzz_dep')
 fribidi_dep = fribidi_subproj.get_variable('libfribidi_dep')
@@ -105,11 +118,6 @@ sqlite3_dep = dependency(
     version: '>=3.37',
     fallback: ['sqlite3', 'sqlite3_dep'],
     default_options: ['default_library=static'],
-)
-tomlplusplus_dep = dependency(
-    'tomlplusplus',
-    version: '>=3.4.0',
-    fallback: ['tomlplusplus', 'tomlplusplus_dep'],
 )
 openssl_dep = dependency('openssl', version: '>=3.0')
 
