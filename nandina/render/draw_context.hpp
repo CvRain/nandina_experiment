@@ -12,6 +12,9 @@
 #include "clip_stack.hpp"
 #include "render_device.hpp"
 
+#include <cmath>
+#include <stdexcept>
+
 namespace nandina::scene
 {
     class NanNode;
@@ -24,9 +27,42 @@ namespace nandina::render
     using foundation::NanRect;
     using foundation::NanTransform2D;
 
+    /**
+     * 绘制阶段的两个独立倍率。
+     *
+     * logical_to_screen 来自固定设计视口；screen_to_physical 来自窗口 DPI / framebuffer。
+     * 用户字体或界面缩放在布局前作用于 token，不属于渲染坐标变换。
+     */
+    struct RenderScale {
+        float logical_to_screen = 1.0F;
+        float screen_to_physical = 1.0F;
+
+        [[nodiscard]] auto logical_to_physical() const -> float {
+            return logical_to_screen * screen_to_physical;
+        }
+    };
+
     class DrawContext {
     public:
         explicit DrawContext(IRenderDevice& device): device_(device), clip_(device) {}
+
+        DrawContext(
+            IRenderDevice& device,
+            NanTransform2D root_transform,
+            RenderScale scale
+        ):
+            device_(device),
+            root_transform_(root_transform),
+            world_(root_transform),
+            scale_(scale),
+            clip_(device) {
+            if (!std::isfinite(scale_.logical_to_screen) || scale_.logical_to_screen <= 0.0F
+                || !std::isfinite(scale_.screen_to_physical)
+                || scale_.screen_to_physical <= 0.0F)
+            {
+                throw std::invalid_argument("DrawContext render scales must be finite and positive");
+            }
+        }
 
         DrawContext(const DrawContext&) = delete;
         auto operator=(const DrawContext&) -> DrawContext& = delete;
@@ -48,6 +84,18 @@ namespace nandina::render
             return opacity_;
         }
 
+        [[nodiscard]] auto scale() const -> RenderScale {
+            return scale_;
+        }
+
+        [[nodiscard]] auto logical_to_screen(float value) const -> float {
+            return value * scale_.logical_to_screen;
+        }
+
+        [[nodiscard]] auto logical_to_physical(float value) const -> float {
+            return value * scale_.logical_to_physical();
+        }
+
         /// Clip stack (RAII push/pop).
         [[nodiscard]] auto clip() -> ClipStack& {
             return clip_;
@@ -60,7 +108,9 @@ namespace nandina::render
         friend class scene::CanvasLayer;
 
         IRenderDevice& device_;
+        NanTransform2D root_transform_;
         NanTransform2D world_;
+        RenderScale scale_;
         float opacity_ = 1.0F;
         ClipStack clip_;
     };

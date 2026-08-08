@@ -133,6 +133,15 @@ percentage or `fill` falls back to intrinsic content sizing instead of manufactu
 QML-style arbitrary `parent.width / 2` property dependencies are not the default layout mechanism,
 which keeps measure dependencies acyclic and diagnostics local to the layout tree.
 
+Typography does not derive from a component's percentage width. Ordinary responsive layouts keep
+the selected typography role stable while containers reflow; optional responsive type ramps may
+switch roles at explicit breakpoints. Fixed-design viewport scaling multiplies component geometry,
+font raster size, radii, borders, and spacing together. User accessibility/interface scale is
+applied to typography and control metrics before layout, so larger text can legitimately trigger
+remeasurement instead of being stretched after layout. Direct `font_size(...)` remains a local
+literal override; relative `em`-style units can be added later for inherited typography, without
+introducing a dependency on parent component width.
+
 ## Delivery Sequence
 
 ### Step 0: SDF Coverage Repair
@@ -221,6 +230,12 @@ Add an opt-in fixed-design policy to WindowConfig, then apply the same mapping t
 DrawContext, clipping, input, and semantics. Introduce explicit framebuffer/DPI scale and build font
 pipelines at the corresponding physical size before claiming non-1x text support. Default windows
 remain responsive and behavior-compatible.
+
+The first render foundation is implemented and awaiting review: `DrawContext` carries separate
+logical-to-screen and screen-to-physical factors, preserves an initial viewport transform through
+CanvasLayer traversal, and shared box/focus painters scale logical radii, borders, gaps, and ring
+widths. No WindowConfig behavior changes yet; component-internal geometry and glyph rasterization
+must join this contract before enabling a non-1x viewport in the example.
 
 ### Step 5: Ripple And Reduced Motion
 

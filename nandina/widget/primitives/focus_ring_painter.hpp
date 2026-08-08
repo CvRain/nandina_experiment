@@ -26,10 +26,10 @@ namespace nandina::widget::primitives
             if (ring.width <= 0.0F || ring.color.alpha() <= 0.0F) {
                 return;
             }
-            const auto expanded = world.expanded(ring.width + gap);
+            const auto expanded = world.expanded(ctx.logical_to_screen(ring.width + gap));
             ctx.device().draw_rect_outline(
                 expanded,
-                ring.width,
+                ctx.logical_to_screen(ring.width),
                 ring.color.with_alpha(ring.color.alpha() * parent_opacity)
             );
         }

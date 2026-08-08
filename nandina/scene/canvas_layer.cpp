@@ -81,7 +81,7 @@ namespace nandina::scene
     auto CanvasLayer::_push_draw_transform(render::DrawContext& ctx)
         -> foundation::NanTransform2D {
         auto saved = ctx.world_;
-        ctx.world_ = transform();
+        ctx.world_ = ctx.root_transform_.compose(transform());
         return saved;
     }
 

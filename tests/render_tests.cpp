@@ -18,6 +18,8 @@
 #include "scene/canvas_layer.hpp"
 #include "scene/node2d.hpp"
 #include "scene/scene_tree.hpp"
+#include "widget/primitives/box_painter.hpp"
+#include "widget/primitives/focus_ring_painter.hpp"
 
 #include <memory>
 #include <string>
@@ -45,6 +47,8 @@ public:
     std::vector<std::string> events;
     int begin_count = 0;
     int end_count = 0;
+    float last_radius = 0.0F;
+    float last_thickness = 0.0F;
 
     void begin_frame() override { ++begin_count; }
     void end_frame() override { ++end_count; }
@@ -62,12 +66,24 @@ public:
         rects.push_back({r, c.alpha()});
         events.push_back("rect");
     }
-    void draw_rect_outline(const foundation::NanRect& r, float /*t*/,
+    void draw_rect_outline(const foundation::NanRect& r, float thickness,
                            const foundation::NanColor& c) override {
+        last_thickness = thickness;
         rects.push_back({r, c.alpha()});
     }
-    void draw_rounded_rect(const foundation::NanRect& r, float /*rad*/,
+    void draw_rounded_rect(const foundation::NanRect& r, float radius,
                            const foundation::NanColor& c) override {
+        last_radius = radius;
+        rects.push_back({r, c.alpha()});
+    }
+    void draw_rounded_rect_outline(
+        const foundation::NanRect& r,
+        float radius,
+        float thickness,
+        const foundation::NanColor& c
+    ) override {
+        last_radius = radius;
+        last_thickness = thickness;
         rects.push_back({r, c.alpha()});
     }
     void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float,
@@ -112,6 +128,90 @@ TEST_CASE("draw brackets the frame exactly once", "[render][frame]") {
     REQUIRE(dev.begin_count == 1);
     REQUIRE(dev.end_count == 1);
     REQUIRE(dev.rects.size() == 1);
+}
+
+TEST_CASE("DrawContext keeps viewport and framebuffer scales separate", "[render][scale]") {
+    RecordingDevice dev;
+    render::DrawContext context(
+        dev,
+        foundation::NanTransform2D {
+            foundation::NanPoint(12.0F, 8.0F),
+            0.0F,
+            foundation::NanPoint(1.5F, 1.5F),
+        },
+        {.logical_to_screen = 1.5F, .screen_to_physical = 2.0F}
+    );
+
+    REQUIRE(context.world_transform().position().get_x() == Catch::Approx(12.0F));
+    REQUIRE(context.logical_to_screen(4.0F) == Catch::Approx(6.0F));
+    REQUIRE(context.logical_to_physical(4.0F) == Catch::Approx(12.0F));
+}
+
+TEST_CASE("shared painters scale logical visual metrics", "[render][scale][painter]") {
+    RecordingDevice dev;
+    render::DrawContext context(
+        dev,
+        foundation::NanTransform2D::from_scale(2.0F),
+        {.logical_to_screen = 2.0F}
+    );
+    const auto color = foundation::NanColor::from(
+        foundation::NanOklch {.light = 0.6F, .chroma = 0.1F, .hue = 220.0F}
+    );
+    const theme::ResolvedBoxStyle box {
+        .fill = color,
+        .border = color,
+        .border_width = 1.0F,
+        .radius = 6.0F,
+    };
+    const auto world = render::world_bounds_from_local(
+        context.world_transform(),
+        foundation::NanRect::from_xywh(0.0F, 0.0F, 40.0F, 20.0F)
+    );
+
+    widget::primitives::BoxPainter::paint(context, world, box, 1.0F);
+    REQUIRE(world.get_width() == Catch::Approx(80.0F));
+    REQUIRE(dev.last_radius == Catch::Approx(12.0F));
+    REQUIRE(dev.last_thickness == Catch::Approx(2.0F));
+
+    widget::primitives::FocusRingPainter::paint(
+        context,
+        world,
+        {.color = color, .width = 2.0F},
+        1.0F
+    );
+    REQUIRE(dev.last_thickness == Catch::Approx(4.0F));
+    REQUIRE(dev.rects.back().rect.get_left() == Catch::Approx(-6.0F));
+    REQUIRE(dev.rects.back().rect.get_width() == Catch::Approx(92.0F));
+}
+
+TEST_CASE("viewport root transform survives CanvasLayer traversal", "[render][scale][layer]") {
+    RecordingDevice dev;
+    auto content = std::make_shared<RectNode>(1.0F);
+    content->set_position(foundation::NanPoint(4.0F, 6.0F));
+    auto layer = scene::CanvasLayer::create();
+    layer->set_canvas_transform(
+        foundation::NanTransform2D::from_position(foundation::NanPoint(2.0F, 3.0F))
+    );
+    layer->add_child(content);
+    auto stack = scene::LayerStack::create();
+    stack->add_layer(layer);
+
+    scene::NanSceneTree tree;
+    tree.set_root(stack);
+    render::DrawContext context(
+        dev,
+        foundation::NanTransform2D {
+            foundation::NanPoint(10.0F, 20.0F),
+            0.0F,
+            foundation::NanPoint(2.0F, 2.0F),
+        },
+        {.logical_to_screen = 2.0F}
+    );
+    tree.render(context);
+
+    REQUIRE(dev.rects.size() == 1);
+    REQUIRE(dev.rects.front().rect.get_left() == Catch::Approx(22.0F));
+    REQUIRE(dev.rects.front().rect.get_top() == Catch::Approx(38.0F));
 }
 
 TEST_CASE("children draw in z-index order (low to high)", "[render][zorder]") {
