@@ -215,10 +215,10 @@ namespace nandina::widget::primitives
                     }
                     ctx.device().draw_rect(
                         foundation::NanRect::from_xywh(
-                            position.get_x() + std::min(left.x, right.x),
+                            position.get_x() + ctx.logical_to_screen(std::min(left.x, right.x)),
                             position.get_y(),
-                            std::abs(right.x - left.x),
-                            line.size.get_height()
+                            ctx.logical_to_screen(std::abs(right.x - left.x)),
+                            ctx.logical_to_screen(line.size.get_height())
                         ),
                         color
                     );
@@ -232,11 +232,11 @@ namespace nandina::widget::primitives
         }
 
         const auto color = text_.color().with_alpha(text_.color().alpha() * ctx.opacity());
-        const float x = position.get_x() + caret_x();
+        const float x = position.get_x() + ctx.logical_to_screen(caret_x());
         ctx.device().draw_line(
             foundation::NanPoint(x, position.get_y()),
-            foundation::NanPoint(x, position.get_y() + text_.height()),
-            caret_width,
+            foundation::NanPoint(x, position.get_y() + ctx.logical_to_screen(text_.height())),
+            ctx.logical_to_screen(caret_width),
             color
         );
     }

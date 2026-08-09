@@ -107,6 +107,7 @@ public:
     };
 
     std::vector<foundation::NanRect> rounded_rects;
+    std::vector<foundation::NanRect> rects;
     std::vector<LineCall> lines;
     std::vector<TextCall> texts;
     foundation::NanPoint circle_center;
@@ -116,7 +117,9 @@ public:
     void end_frame() override {}
     void set_clip(const foundation::NanRect&) override {}
     void clear_clip() override {}
-    void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
+    void draw_rect(const foundation::NanRect& rect, const foundation::NanColor&) override {
+        rects.push_back(rect);
+    }
     void draw_rect_outline(
         const foundation::NanRect&,
         float,
@@ -1863,6 +1866,36 @@ TEST_CASE("scaled button paint does not feed world width back into text layout",
     REQUIRE(button.last_layout_constraints().max_width == Catch::Approx(180.0F));
     REQUIRE_FALSE(device.texts.empty());
     REQUIRE(device.texts.front().font_size == Catch::Approx(32.0F));
+}
+
+TEST_CASE("scaled editable text keeps selection and caret geometry in screen space", "[widget][render][scale]") {
+    FixedTextLayoutBackend backend;
+    widget::primitives::EditableText edit("abc");
+    edit.set_text_pipeline({.backend = &backend});
+    (void)edit.measure_layout(scene::LayoutConstraints::loose());
+    edit.set_selection(widget::primitives::TextSelection {
+        .anchor = 0,
+        .focus = 1,
+    });
+
+    ScaleRecordingDevice device;
+    scene::FocusEnterEvent focus;
+    (void)edit.on_input(focus);
+    render::DrawContext context(
+        device,
+        foundation::NanTransform2D::from_scale(2.0F),
+        {.logical_to_screen = 2.0F}
+    );
+    edit.on_draw(context);
+
+    REQUIRE(device.rects.size() == 1);
+    REQUIRE(device.rects.front().get_left() == Catch::Approx(0.0F));
+    REQUIRE(device.rects.front().get_width() == Catch::Approx(10.0F));
+    REQUIRE(device.rects.front().get_height() == Catch::Approx(36.0F));
+    REQUIRE(device.lines.size() == 1);
+    REQUIRE(device.lines.front().start.get_x() == Catch::Approx(10.0F));
+    REQUIRE(device.lines.front().end.get_y() == Catch::Approx(36.0F));
+    REQUIRE(device.lines.front().thickness == Catch::Approx(2.0F));
 }
 
 TEST_CASE("Percentage sizing falls back to content on an unbounded axis", "[widget][layout][sizing]") {

@@ -94,7 +94,8 @@ namespace nandina::widget
         [[nodiscard]] auto line_origin(
             foundation::NanRect world,
             const primitives::TextLayoutResult& layout,
-            float x
+            float x,
+            float scale
         ) const -> foundation::NanPoint;
 
         primitives::EditableText edit_;

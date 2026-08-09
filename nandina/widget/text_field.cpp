@@ -295,25 +295,37 @@ namespace nandina::widget
             );
         }
 
-        const float viewport_width = std::max(0.0F, world.get_width() - padding_x_ * 2.0F);
-        update_scroll(viewport_width);
+        const float logical_viewport_width =
+            std::max(0.0F, local_rect().get_width() - padding_x_ * 2.0F);
+        update_scroll(logical_viewport_width);
+        const float padding = ctx.logical_to_screen(padding_x_);
         const auto viewport = foundation::NanRect::from_xywh(
-            world.get_left() + padding_x_,
+            world.get_left() + padding,
             world.get_top(),
-            viewport_width,
+            std::max(0.0F, world.get_width() - padding * 2.0F),
             world.get_height()
         );
         auto clip = ctx.clip().push(viewport);
         if (edit_.value().empty() && !placeholder_.text().empty()) {
             placeholder_.draw_at(
                 ctx,
-                line_origin(world, placeholder_.layout_result(), viewport.get_left())
+                line_origin(
+                    world,
+                    placeholder_.layout_result(),
+                    viewport.get_left(),
+                    ctx.logical_to_screen(1.0F)
+                )
             );
             return;
         }
         edit_.draw_at(
             ctx,
-            line_origin(world, edit_.text_node().layout_result(), viewport.get_left() - scroll_x_)
+            line_origin(
+                world,
+                edit_.text_node().layout_result(),
+                viewport.get_left() - ctx.logical_to_screen(scroll_x_),
+                ctx.logical_to_screen(1.0F)
+            )
         );
     }
 
@@ -445,10 +457,11 @@ namespace nandina::widget
     auto TextField::line_origin(
         const foundation::NanRect world,
         const primitives::TextLayoutResult& layout,
-        const float x
+        const float x,
+        const float scale
     ) const -> foundation::NanPoint {
         const float line_height =
-            layout.lines.empty() ? layout.font_size : layout.lines.front().size.get_height();
+            scale * (layout.lines.empty() ? layout.font_size : layout.lines.front().size.get_height());
         return foundation::NanPoint(
             x,
             world.get_top() + std::max(0.0F, (world.get_height() - line_height) * 0.5F)

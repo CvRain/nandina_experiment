@@ -252,6 +252,16 @@ already-scaled world width as a text measurement constraint, which previously ma
 paint mutate logical text layout. TextField/EditableText remains a separate unit because caret,
 selection, scroll offset, hit testing, and IME geometry must change together.
 
+#### TextField/EditableText closure
+
+The text-editing pair now completes the same contract. Caret and selection geometry scales from
+logical caret stops at paint time; their x offsets, heights, and caret thickness never enter text
+measurement. TextField keeps padding and horizontal scroll in logical units, converts them only for
+the viewport clip and draw origin, and centers placeholder/value baselines using the scaled line
+height. Pointer hit testing remains logical through `to_local()`, so the future window-level inverse
+viewport mapping has one owner and cannot apply the scale twice. A 2x headless regression covers
+selection width/height and caret position/thickness.
+
 ### Step 5: Ripple And Reduced Motion
 
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget
