@@ -175,34 +175,38 @@ namespace nandina::widget
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
         const float opacity = context.opacity();
+        const float track_width = context.logical_to_screen(style.metrics.track_width);
+        const float track_height = context.logical_to_screen(style.metrics.track_height);
+        const float thumb_size = context.logical_to_screen(style.metrics.thumb_size);
         const float track_top =
-            world.get_top() + (world.get_height() - style.metrics.track_height) * 0.5F;
+            world.get_top() + (world.get_height() - track_height) * 0.5F;
         const auto track = foundation::NanRect::from_xywh(
             world.get_left(),
             track_top,
-            style.metrics.track_width,
-            style.metrics.track_height
+            track_width,
+            track_height
         );
 
         primitives::BoxPainter::paint(context, track, style.track, opacity);
 
         // 拇指：贴轨道内壁，未勾选靠左、勾选靠右。
-        const float padding = (style.metrics.track_height - style.metrics.thumb_size) * 0.5F;
+        const float padding = (track_height - thumb_size) * 0.5F;
         const float thumb_left = checked_
-            ? track.get_right() - padding - style.metrics.thumb_size
+            ? track.get_right() - padding - thumb_size
             : track.get_left() + padding;
         const auto thumb = foundation::NanRect::from_xywh(
             thumb_left,
             track_top + padding,
-            style.metrics.thumb_size,
-            style.metrics.thumb_size
+            thumb_size,
+            thumb_size
         );
         primitives::BoxPainter::paint(context, thumb, style.thumb, opacity);
 
         apply_text_style();
+        const float font_size = context.logical_to_screen(text_.laid_out_font_size());
         const auto text_position = foundation::NanPoint(
-            track.get_right() + style.metrics.gap,
-            world.get_top() + (world.get_height() - text_.laid_out_font_size()) * 0.5F
+            track.get_right() + context.logical_to_screen(style.metrics.gap),
+            world.get_top() + (world.get_height() - font_size) * 0.5F
         );
         text_.draw_at(context, text_position);
 

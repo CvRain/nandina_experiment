@@ -301,8 +301,8 @@ namespace nandina::widget
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
         const float center_y = world.get_top() + world.get_height() * 0.5F;
-        const float thumb_radius = style.thumb.box.radius;
-        const float track_height = style.inactive_track.thickness;
+        const float thumb_radius = context.logical_to_screen(style.thumb.box.radius);
+        const float track_height = context.logical_to_screen(style.inactive_track.thickness);
         const float left = world.get_left() + thumb_radius;
         const float right = world.get_right() - thumb_radius;
         const float thumb_x = left + (right - left) * fraction();

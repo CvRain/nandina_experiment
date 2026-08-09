@@ -17,6 +17,7 @@
 #include "scene/scene_tree.hpp"
 #include "widget/bindable_rect.hpp"
 #include "widget/button.hpp"
+#include "widget/checkbox.hpp"
 #include "widget/declarative.hpp"
 #include "widget/label.hpp"
 #include "widget/layout.hpp"
@@ -24,6 +25,8 @@
 #include "widget/primitives/editable_text.hpp"
 #include "widget/primitives/text.hpp"
 #include "widget/scroll_view.hpp"
+#include "widget/slider.hpp"
+#include "widget/switch.hpp"
 
 #include <memory>
 #include <stdexcept>
@@ -88,6 +91,67 @@ public:
     void draw_text(std::string_view text, const foundation::NanPoint& position, float,
                    const foundation::NanColor& color) override {
         texts.push_back({std::string(text), color.alpha(), position});
+    }
+};
+
+class ScaleRecordingDevice final: public render::IRenderDevice {
+public:
+    struct LineCall {
+        foundation::NanPoint start;
+        foundation::NanPoint end;
+        float thickness = 0.0F;
+    };
+    struct TextCall {
+        foundation::NanPoint position;
+        float font_size = 0.0F;
+    };
+
+    std::vector<foundation::NanRect> rounded_rects;
+    std::vector<LineCall> lines;
+    std::vector<TextCall> texts;
+    foundation::NanPoint circle_center;
+    float circle_radius = 0.0F;
+
+    void begin_frame() override {}
+    void end_frame() override {}
+    void set_clip(const foundation::NanRect&) override {}
+    void clear_clip() override {}
+    void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
+    void draw_rect_outline(
+        const foundation::NanRect&,
+        float,
+        const foundation::NanColor&
+    ) override {}
+    void draw_rounded_rect(
+        const foundation::NanRect& rect,
+        float,
+        const foundation::NanColor&
+    ) override {
+        rounded_rects.push_back(rect);
+    }
+    void draw_line(
+        const foundation::NanPoint& start,
+        const foundation::NanPoint& end,
+        float thickness,
+        const foundation::NanColor&
+    ) override {
+        lines.push_back({.start = start, .end = end, .thickness = thickness});
+    }
+    void draw_circle(
+        const foundation::NanPoint& center,
+        float radius,
+        const foundation::NanColor&
+    ) override {
+        circle_center = center;
+        circle_radius = radius;
+    }
+    void draw_text(
+        std::string_view,
+        const foundation::NanPoint& position,
+        float font_size,
+        const foundation::NanColor&
+    ) override {
+        texts.push_back({.position = position, .font_size = font_size});
     }
 };
 
@@ -1706,6 +1770,99 @@ TEST_CASE("NanControl resolves typed component dimensions", "[widget][layout][si
     });
     REQUIRE(fixed.get_width() == Catch::Approx(120.0F));
     REQUIRE(fixed.get_height() == Catch::Approx(90.0F));
+}
+
+TEST_CASE("scaled component paint keeps logical layout unchanged", "[widget][render][scale]") {
+    constexpr float scale = 2.0F;
+    const auto transform = foundation::NanTransform2D::from_scale(scale);
+
+    ScaleRecordingDevice checkbox_device;
+    widget::Checkbox checkbox("Scaled checkbox", true);
+    const auto checkbox_size = checkbox.measure_layout(scene::LayoutConstraints::loose());
+    checkbox.layout_to(foundation::NanRect::from_origin_size(
+        foundation::NanPoint::zero(), checkbox_size
+    ));
+    render::DrawContext checkbox_context(
+        checkbox_device,
+        transform,
+        {.logical_to_screen = scale}
+    );
+    checkbox.on_draw(checkbox_context);
+    const auto checkbox_style = checkbox.resolved_style();
+    REQUIRE(checkbox.measured_size() == checkbox_size);
+    REQUIRE(checkbox_device.rounded_rects.front().get_width()
+            == Catch::Approx(checkbox_style.metrics.box_size * scale));
+    REQUIRE(checkbox_device.lines.size() == 2);
+    REQUIRE(checkbox_device.lines.front().thickness == Catch::Approx(4.0F));
+    const auto checkbox_box = checkbox_device.rounded_rects.front();
+    REQUIRE(checkbox_device.lines.front().start.get_x()
+            == Catch::Approx(checkbox_box.get_left() + checkbox_box.get_width() * 0.22F));
+    REQUIRE(checkbox_device.lines.back().end.get_x()
+            == Catch::Approx(checkbox_box.get_left() + checkbox_box.get_width() * 0.80F));
+
+    ScaleRecordingDevice switch_device;
+    widget::Switch switch_control("Scaled switch", true);
+    const auto switch_size = switch_control.measure_layout(scene::LayoutConstraints::loose());
+    switch_control.layout_to(foundation::NanRect::from_origin_size(
+        foundation::NanPoint::zero(), switch_size
+    ));
+    render::DrawContext switch_context(
+        switch_device,
+        transform,
+        {.logical_to_screen = scale}
+    );
+    switch_control.on_draw(switch_context);
+    const auto switch_style = switch_control.resolved_style();
+    REQUIRE(switch_control.measured_size() == switch_size);
+    REQUIRE(switch_device.rounded_rects.front().get_width()
+            == Catch::Approx(switch_style.metrics.track_width * scale));
+    REQUIRE(switch_device.rounded_rects.at(1).get_width()
+            == Catch::Approx(switch_style.metrics.thumb_size * scale));
+
+    ScaleRecordingDevice slider_device;
+    widget::Slider slider("Scaled slider", 0.5F);
+    const auto slider_size = slider.measure_layout(scene::LayoutConstraints {
+        .max_width = 200.0F,
+        .max_height = 40.0F,
+    });
+    slider.layout_to(foundation::NanRect::from_origin_size(
+        foundation::NanPoint::zero(), slider_size
+    ));
+    render::DrawContext slider_context(
+        slider_device,
+        transform,
+        {.logical_to_screen = scale}
+    );
+    slider.on_draw(slider_context);
+    const auto slider_style = slider.resolved_style();
+    REQUIRE(slider.measured_size() == slider_size);
+    REQUIRE(slider_device.circle_radius
+            == Catch::Approx(slider_style.thumb.box.radius * scale));
+}
+
+TEST_CASE("scaled button paint does not feed world width back into text layout", "[widget][render][scale]") {
+    widget::Button button("A button label that must remain logically constrained");
+    const auto logical_size = button.measure_layout(scene::LayoutConstraints {
+        .max_width = 180.0F,
+        .max_height = 48.0F,
+    });
+    button.layout_to(foundation::NanRect::from_origin_size(
+        foundation::NanPoint::zero(), logical_size
+    ));
+    const auto before = button.measured_size();
+
+    ScaleRecordingDevice device;
+    render::DrawContext context(
+        device,
+        foundation::NanTransform2D::from_scale(2.0F),
+        {.logical_to_screen = 2.0F}
+    );
+    button.on_draw(context);
+
+    REQUIRE(button.measured_size() == before);
+    REQUIRE(button.last_layout_constraints().max_width == Catch::Approx(180.0F));
+    REQUIRE_FALSE(device.texts.empty());
+    REQUIRE(device.texts.front().font_size == Catch::Approx(32.0F));
 }
 
 TEST_CASE("Percentage sizing falls back to content on an unbounded axis", "[widget][layout][sizing]") {

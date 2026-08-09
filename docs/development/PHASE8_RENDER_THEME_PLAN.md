@@ -240,6 +240,18 @@ advances, offsets, fallback drawing, line progression, and text clips convert th
 factor. No WindowConfig behavior changes yet; component-internal geometry must join this contract
 before enabling a non-1x viewport in the example.
 
+The component integration follows three invariants learned from the archived Zig implementation:
+
+1. measurement, text constraints, and theme tokens remain logical units;
+2. world/screen geometry is never fed back into `measure_layout()`;
+3. internal points and lengths convert only while submitting paint commands and never write scaled
+   values back to node bounds.
+
+Button, Checkbox, Switch, and Slider now follow these rules. In particular Button no longer uses its
+already-scaled world width as a text measurement constraint, which previously made a future non-1x
+paint mutate logical text layout. TextField/EditableText remains a separate unit because caret,
+selection, scroll offset, hit testing, and IME geometry must change together.
+
 ### Step 5: Ripple And Reduced Motion
 
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget

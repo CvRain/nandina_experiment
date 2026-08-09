@@ -174,12 +174,13 @@ namespace nandina::widget
     void Checkbox::on_draw(render::DrawContext& context) {
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
-        const float box_top = world.get_top() + (world.get_height() - style.metrics.box_size) * 0.5F;
+        const float box_size = context.logical_to_screen(style.metrics.box_size);
+        const float box_top = world.get_top() + (world.get_height() - box_size) * 0.5F;
         const auto box = foundation::NanRect::from_xywh(
             world.get_left(),
             box_top,
-            style.metrics.box_size,
-            style.metrics.box_size
+            box_size,
+            box_size
         );
         const float opacity = context.opacity();
 
@@ -188,34 +189,35 @@ namespace nandina::widget
             const auto check = style.check.with_alpha(style.check.alpha() * opacity);
             context.device().draw_line(
                 foundation::NanPoint(
-                    box.get_left() + style.metrics.box_size * 0.22F,
-                    box.get_top() + style.metrics.box_size * 0.52F
+                    box.get_left() + box_size * 0.22F,
+                    box.get_top() + box_size * 0.52F
                 ),
                 foundation::NanPoint(
-                    box.get_left() + style.metrics.box_size * 0.43F,
-                    box.get_top() + style.metrics.box_size * 0.72F
+                    box.get_left() + box_size * 0.43F,
+                    box.get_top() + box_size * 0.72F
                 ),
-                2.0F,
+                context.logical_to_screen(2.0F),
                 check
             );
             context.device().draw_line(
                 foundation::NanPoint(
-                    box.get_left() + style.metrics.box_size * 0.43F,
-                    box.get_top() + style.metrics.box_size * 0.72F
+                    box.get_left() + box_size * 0.43F,
+                    box.get_top() + box_size * 0.72F
                 ),
                 foundation::NanPoint(
-                    box.get_left() + style.metrics.box_size * 0.80F,
-                    box.get_top() + style.metrics.box_size * 0.30F
+                    box.get_left() + box_size * 0.80F,
+                    box.get_top() + box_size * 0.30F
                 ),
-                2.0F,
+                context.logical_to_screen(2.0F),
                 check
             );
         }
 
         apply_text_style();
+        const float font_size = context.logical_to_screen(text_.laid_out_font_size());
         const auto text_position = foundation::NanPoint(
-            box.get_right() + style.metrics.gap,
-            world.get_top() + (world.get_height() - text_.laid_out_font_size()) * 0.5F
+            box.get_right() + context.logical_to_screen(style.metrics.gap),
+            world.get_top() + (world.get_height() - font_size) * 0.5F
         );
         text_.draw_at(context, text_position);
 

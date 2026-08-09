@@ -220,20 +220,23 @@ namespace nandina::widget
         primitives::BoxPainter::paint_outline(ctx, world, style.container, opacity);
 
         apply_text_style(visual_state());
+        // 文本布局始终使用逻辑尺寸；world 已包含视口变换，不能再作为 measure 输入，
+        // 否则缩放后的文本宽度会污染下一次逻辑布局并造成组件尺寸振荡。
         const float content_width =
-            std::max(0.0F, world.get_width() - style.metrics.padding_x * 2.0F);
+            std::max(0.0F, width() - style.metrics.padding_x * 2.0F);
         (void)text_.measure_layout(
             scene::LayoutConstraints {
                 .min_width = 0.0F,
                 .max_width = content_width,
                 .min_height = 0.0F,
-                .max_height = style.metrics.height,
+                .max_height = height(),
             }
         );
-        const float text_width = text_.measured_text_width();
+        const float text_width = ctx.logical_to_screen(text_.measured_text_width());
+        const float font_size = ctx.logical_to_screen(text_.laid_out_font_size());
         const auto text_pos = foundation::NanPoint(
             world.get_left() + (world.get_width() - text_width) * 0.5F,
-            world.get_top() + (world.get_height() - text_.laid_out_font_size()) * 0.5F
+            world.get_top() + (world.get_height() - font_size) * 0.5F
         );
         text_.draw_at(ctx, text_pos);
 
