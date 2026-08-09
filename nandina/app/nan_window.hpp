@@ -28,6 +28,7 @@
 #include "../scene/scene_tree.hpp"
 #include "../text/font_pipeline.hpp"
 #include "nan_router.hpp"
+#include "viewport_scaling.hpp"
 #include "window_config.hpp"
 
 #include <memory>
@@ -110,6 +111,7 @@ namespace nandina::app
 
     private:
         void poll_and_dispatch_input();
+        void update_viewport_mapping();
 
         NanApplication& app_;
         WindowConfig config_;
@@ -120,6 +122,7 @@ namespace nandina::app
         std::shared_ptr<text::FontPipeline> default_font_pipeline_;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         bool opened_ = false;
+        std::optional<ViewportMapping> viewport_mapping_;
 
         // 上一帧鼠标位置 (用于计算 delta 与 move 事件)。
         float last_mouse_x_ = 0.0F;

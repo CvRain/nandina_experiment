@@ -11,6 +11,7 @@
 #define NANDINA_EXPERIMENT_APP_WINDOW_CONFIG_HPP
 
 #include "../foundation/nandina_color.hpp"
+#include "viewport_scaling.hpp"
 
 #include <optional>
 #include <string>
@@ -38,6 +39,9 @@ namespace nandina::app
         /// （`palette.background`），随 light/dark 切换实时变化；
         /// 显式设置则固定为该色，不随主题变化。
         std::optional<foundation::NanColor> background;
+
+        /// Optional fixed-design viewport. When unset, layout follows the window size directly.
+        std::optional<ViewportScalePolicy> viewport;
     };
 
 } // namespace nandina::app

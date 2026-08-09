@@ -262,6 +262,11 @@ height. Pointer hit testing remains logical through `to_local()`, so the future 
 viewport mapping has one owner and cannot apply the scale twice. A 2x headless regression covers
 selection width/height and caret position/thickness.
 
+The optional `WindowConfig::viewport` now activates this mapping at the window boundary: root layout
+uses the design size, `DrawContext` receives the anchored logical-to-screen transform and framebuffer
+scale, and mouse positions/deltas are inverted before scene dispatch. Leaving the option unset keeps
+the existing responsive-to-window path unchanged.
+
 ### Step 5: Ripple And Reduced Motion
 
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget

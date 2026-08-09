@@ -16,6 +16,7 @@
 
 #include <raylib.h>
 
+#include <algorithm>
 #include <utility>
 
 namespace nandina::app
@@ -158,7 +159,9 @@ namespace nandina::app
     void NanWindow::poll_and_dispatch_input() {
         const auto mx = static_cast<float>(GetMouseX());
         const auto my = static_cast<float>(GetMouseY());
-        const foundation::NanPoint pos {mx, my};
+        const foundation::NanPoint screen_pos {mx, my};
+        const auto pos = viewport_mapping_ ? viewport_mapping_->screen_to_logical(screen_pos)
+                                           : screen_pos;
 
         // Mouse move (only when actually moved).
         if (!has_mouse_) {
@@ -167,9 +170,14 @@ namespace nandina::app
             has_mouse_ = true;
         }
         if (mx != last_mouse_x_ || my != last_mouse_y_) {
+            const auto previous = viewport_mapping_
+                ? viewport_mapping_->screen_to_logical(
+                      foundation::NanPoint {last_mouse_x_, last_mouse_y_}
+                  )
+                : foundation::NanPoint {last_mouse_x_, last_mouse_y_};
             scene::MouseMoveEvent ev {
                 pos,
-                foundation::NanPoint {mx - last_mouse_x_, my - last_mouse_y_}
+                foundation::NanPoint {pos.get_x() - previous.get_x(), pos.get_y() - previous.get_y()}
             };
             tree_.dispatch_mouse_move(ev);
             last_mouse_x_ = mx;
@@ -219,8 +227,23 @@ namespace nandina::app
         }
     }
 
+    void NanWindow::update_viewport_mapping() {
+        if (!config_.viewport) {
+            viewport_mapping_.reset();
+            return;
+        }
+        viewport_mapping_ = make_viewport_mapping(
+            foundation::NanSize(
+                static_cast<float>(GetScreenWidth()),
+                static_cast<float>(GetScreenHeight())
+            ),
+            *config_.viewport
+        );
+    }
+
     void NanWindow::tick() {
         const float dt = GetFrameTime();
+        update_viewport_mapping();
         auto deferred_effects = app_.graph().defer_effects();
 
         {
@@ -259,7 +282,8 @@ namespace nandina::app
             static_cast<float>(GetScreenWidth()),
             static_cast<float>(GetScreenHeight())
         );
-        (void)tree_.layout_root(window_size);
+        const auto logical_size = viewport_mapping_ ? viewport_mapping_->logical_size : window_size;
+        (void)tree_.layout_root(logical_size);
 
         {
             auto phase = tree_.enter_phase(scene::FramePhase::semantics);
@@ -270,7 +294,16 @@ namespace nandina::app
         // 清屏背景：显式配置优先，否则跟随当前外观的调色板背景（light/dark 实时切换）。
         device_->clear(config_.background.value_or(theme().palette.background));
         {
-            render::DrawContext ctx {*device_};
+            render::DrawContext ctx {
+                *device_,
+                viewport_mapping_ ? viewport_mapping_->transform()
+                                   : foundation::NanTransform2D {},
+                {
+                    .logical_to_screen = viewport_mapping_ ? viewport_mapping_->scale : 1.0F,
+                    .screen_to_physical = static_cast<float>(GetRenderWidth())
+                        / static_cast<float>(std::max(1, GetScreenWidth()))
+                }
+            };
             tree_.render(ctx);
         }
         device_->end_frame();
