@@ -25,20 +25,30 @@ Applications only inherit `NanWindow` when they need advanced window-level frame
 
 ## 1.0 Minimum Window Result
 
-The A19 common-case entry point does not require a page class:
+The 1.0 recommended entry point always starts from a typed page. A one-page program and a routed
+application therefore use the same model:
 
 ```cpp
+class MainPage final: public app::Page<> {
+public:
+    auto build(widget::BuildContext& ui) -> widget::View override {
+        return ui.make<widget::Label>("Hello, Nandina!").build();
+    }
+};
+
 auto main() -> int {
-    return app::run(
-        {.id = "org.example.hello", .window = {.title = "Hello"}},
-        [](widget::BuildContext& ui) {
-            return ui.make<widget::Label>("Hello, Nandina!");
-        }
-    );
+    return app::run<MainPage>({
+        .id = "org.example.hello",
+        .window = {.title = "Hello"},
+    });
 }
 ```
 
-The application runner owns the application, default window, internal root page, UI context, and shutdown order. A root factory may accept only `BuildContext&`, or accept `PageContext&` when it needs page services. Applications that configure a Store, resources, or themes before opening the window use the equivalent `NanApplication::run(window, factory)` member. Explicit `NanApplication`, `NanWindow`, and `NanPageT` remain available for applications that need their lifetime boundaries or multiple named routes.
+`Page<Params>` hides route type plumbing and adapts the framework-owned `PageContext` to the one
+required `build(BuildContext&)` override. Adding navigation or parameterized pages does not change
+`main()` or migrate the root to another runtime. Lambda root factories remain compatibility/test
+helpers; tutorials and examples recommend `app::run<MainPage>()`. `NanApplication`, `NanWindow`,
+`NanPageT`, and `NanRouter` remain advanced framework APIs rather than competing entry choices.
 
 ## Imperative Todo Target
 

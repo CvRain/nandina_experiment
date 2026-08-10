@@ -165,6 +165,15 @@ namespace nandina::app
         return application.run(std::move(config.window), std::forward<Factory>(factory));
     }
 
+    /// Recommended application entry: the first page is also the future router root.
+    template<typename PageT>
+        requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
+        && std::default_initializable<PageT>
+    auto run(RunConfig config) -> int {
+        NanApplication application(NanApplicationConfig::for_process(std::move(config.id)));
+        return application.template run_page<PageT>(std::move(config.window));
+    }
+
 } // namespace nandina::app
 
 #endif // NANDINA_EXPERIMENT_APP_NAN_APPLICATION_HPP

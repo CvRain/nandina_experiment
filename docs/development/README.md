@@ -216,7 +216,10 @@ Text limitations:
 
 ## App Authoring State
 
-The canonical `nandina_settings_example` is a single functional-root application. It uses an application-owned Store, semantic controls, two-way input, conditional and keyed regions, scrolling, automatic component/page scopes, and the resource-backed text pipeline without declaring a window or page subclass.
+The canonical examples are migrating to the single recommended `app::run<MainPage>()` entry. The
+same typed page model starts a minimal one-page application and later participates in navigation,
+parameters, stores, and page lifetime without changing `main()`. Functional root factories remain
+compatibility and testing adapters, not a second application model.
 
 The earlier paired imperative/DSL Todo was a delivery fixture for page parameters, keep-alive navigation, Store sharing, safe routed commands, and authoring equivalence. Those contracts now live in focused router, authoring, lifecycle, and compact-application tests, so the duplicate application and its test-only accessors are no longer shipped under `example/`.
 

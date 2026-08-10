@@ -23,6 +23,7 @@
 #include <memory>
 #include <stdexcept>
 #include <string_view>
+#include <typeinfo>
 #include <utility>
 
 namespace nandina::text
@@ -241,6 +242,30 @@ namespace nandina::app
 
     private:
         Params params_;
+    };
+
+    /**
+     * Application-facing page base. The router still owns PageContext and the page
+     * scope; ordinary pages only implement the IDE-friendly BuildContext overload.
+     */
+    template<typename ParamsT = NoParams>
+    class Page: public NanPageT<ParamsT> {
+    public:
+        using Params = ParamsT;
+        using NanPageT<ParamsT>::NanPageT;
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            // 仅作为进程内默认身份；持久化/深链接页面应覆写为稳定字符串。
+            return typeid(*this).name();
+        }
+
+        [[nodiscard]] auto build(PageContext& context)
+            -> std::shared_ptr<scene::NanNode2D> final {
+            auto ui = context.ui();
+            return build(ui);
+        }
+
+        [[nodiscard]] virtual auto build(widget::BuildContext& ui) -> widget::View = 0;
     };
 
 } // namespace nandina::app

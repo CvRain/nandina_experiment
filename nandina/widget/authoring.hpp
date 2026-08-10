@@ -421,4 +421,11 @@ namespace nandina::widget::authoring
 
 } // namespace nandina::widget::authoring
 
+namespace nandina::widget
+{
+    /// Public root-view result. Builders remain the preferred composition type and
+    /// materialize to this retained scene node at the page boundary.
+    using View = std::shared_ptr<scene::NanNode2D>;
+}
+
 #endif // NANDINA_EXPERIMENT_WIDGET_AUTHORING_HPP

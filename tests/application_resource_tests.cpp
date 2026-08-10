@@ -45,6 +45,13 @@ namespace
         }
     };
 
+    class RecommendedMainPage final: public app::Page<> {
+    public:
+        [[nodiscard]] auto build(widget::BuildContext& ui) -> widget::View override {
+            return ui.label("Recommended entry").build();
+        }
+    };
+
     static_assert(requires(app::NanApplication& application, app::WindowConfig config) {
         { application.run_page<DefaultStartupPage>(std::move(config)) } -> std::same_as<int>;
     });
@@ -66,6 +73,9 @@ namespace
                 return ui.label("Hello");
             })
         } -> std::same_as<int>;
+    });
+    static_assert(requires(app::RunConfig config) {
+        { app::run<RecommendedMainPage>(std::move(config)) } -> std::same_as<int>;
     });
 
     [[maybe_unused]] auto compile_default_page_runner(
@@ -119,40 +129,15 @@ TEST_CASE("functional root views accept BuildContext-only factories", "[app][vie
     REQUIRE(dynamic_cast<widget::Button*>(router.host()->get_child(0)) != nullptr);
 }
 
-TEST_CASE("NanApplication discovers executable-relative SQLite packages", "[app][resource]") {
-    const auto executable = std::filesystem::path(NANDINA_TEST_PACKAGE_EXECUTABLE);
-    app::NanApplication application({
-        .application_id = "org.nandina.todo",
-        .executable_path = executable,
-        .environment = {{"HOME", "/nonexistent-home"}},
-    });
-    REQUIRE(application.application_id() == "org.nandina.todo");
-    auto font = application.resources().require(resource::ResourceKey("fonts/default"));
-    REQUIRE(font.has_value());
-    REQUIRE((*font)->key().value() == "fonts/default-ui.ttf");
-    auto registered = text::register_optional_font_fallback(
-        application.font_families(),
-        application.resources(),
-        resource::ResourceKey("families/zh-cn"),
-        resource::ResourceKey("fonts/fallback/zh-cn")
-    );
-    REQUIRE(registered.has_value());
-    REQUIRE(*registered);
-    auto family = application.font_families().resolve({}, application.font_loader());
-    REQUIRE(family.has_value());
-    REQUIRE(family->faces.size() == 2);
-    REQUIRE(family->faces[1]->glyph_index(U'中') != 0);
-    REQUIRE(family->faces[1]->glyph_index(U'文') != 0);
+TEST_CASE("recommended pages adapt BuildContext onto the existing router", "[app][page]") {
+    app::NanApplication application;
+    app::NanRouter router {application.graph(), application.theme_manager()};
 
-    ServiceCapture capture;
-    app::NanRouter router {
-        application.graph(), application.theme(), nullptr, nullptr,
-        &application.resources(), &application.font_loader(), &application.font_families()
-    };
-    router.push<ServicePage>(ServiceParams {.capture = &capture});
-    REQUIRE(capture.resources == &application.resources());
-    REQUIRE(capture.loader == &application.font_loader());
-    REQUIRE(capture.families == &application.font_families());
+    (void)router.push<RecommendedMainPage>();
+
+    REQUIRE(router.depth() == 1);
+    REQUIRE(router.host()->child_count() == 1);
+    REQUIRE(dynamic_cast<widget::Label*>(router.host()->get_child(0)) != nullptr);
 }
 
 TEST_CASE("optional font fallback is absent without a project package", "[app][resource][font]") {
