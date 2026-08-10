@@ -1,53 +1,8 @@
-# Recommended application example and optional diagnostics.
+# Recommended application examples.
+#
+# 每个示例均拆分为独立子项目，存放在各自的子目录中：
+# - base_window:       基础窗口示例子项目（占位，当前输出 Hello World）
+# - settings_example:  Settings 参考应用（组件库 + 可执行文件）
 
-settings_example_library = static_library(
-    'nandina_settings_example_components',
-    files('settings_example.cpp', 'settings_example.hpp'),
-    dependencies : [nandina_dep],
-)
-settings_example_dep = declare_dependency(
-    link_with : settings_example_library,
-    include_directories : include_directories('.'),
-    dependencies : [nandina_dep],
-)
-
-nanres_policy = files('resources.toml')
-resource_nanres = nandina_resource_toolchain['nanres']
-resource_build_helper = nandina_resource_toolchain['build_helper']
-resource_install_helper = nandina_resource_toolchain['install_helper']
-nanres_package = custom_target(
-    'nandina-example-resources',
-    input: nanres_policy,
-    output: 'resources',
-    command: [
-        resource_build_helper,
-        'build',
-        resource_nanres,
-        nanres_policy,
-        '@OUTPUT@',
-    ],
-    build_by_default: true,
-    build_always_stale: true,
-)
-meson.add_install_script(
-    resource_install_helper,
-    nanres_package,
-    nanres_policy,
-    get_option('datadir'),
-)
-
-executable(
-    'nandina_example',
-    files('settings_main.cpp'),
-    dependencies : [settings_example_dep, raylib_dep],
-    install : true,
-)
-
-if box2d_dep.found()
-    executable(
-        'nandina_physics_example',
-        files('physics_main.cpp'),
-        dependencies : [nandina_dep, raylib_dep],
-        install : false,
-    )
-endif
+subdir('base_window')
+subdir('settings_example')

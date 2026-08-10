@@ -5,11 +5,11 @@ import sys
 
 
 root = Path(sys.argv[1])
-bootstrap = root / "example" / "settings_main.cpp"
+bootstrap = root / "example" / "settings_example" / "settings_main.cpp"
 application = [
     bootstrap,
-    root / "example" / "settings_example.hpp",
-    root / "example" / "settings_example.cpp",
+    root / "example" / "settings_example" / "settings_example.hpp",
+    root / "example" / "settings_example" / "settings_example.cpp",
 ]
 
 
