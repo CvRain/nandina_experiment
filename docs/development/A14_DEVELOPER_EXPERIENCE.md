@@ -31,7 +31,9 @@ The A19 common-case entry point does not require a page class:
 auto main() -> int {
     return app::run(
         {.id = "org.example.hello", .window = {.title = "Hello"}},
-        [](widget::BuildContext& ui) { return ui.label("Hello, Nandina!"); }
+        [](widget::BuildContext& ui) {
+            return ui.make<widget::Label>("Hello, Nandina!");
+        }
     );
 }
 ```
@@ -65,20 +67,24 @@ public:
 class TodoPage final: public ui::Page<TodoPageParams> {
 public:
     auto build(ui::BuildContext& ui) -> ui::View override {
-        auto input = ui.text_field({.placeholder = "添加一个任务"});
-        auto tasks = ui.make<TodoTasks>();
+        auto input = ui.make<ui::TextField>("", "添加一个任务").build();
+        auto tasks = ui.make<TodoTasks>().build();
 
         tasks->set_model(store().items);
-        tasks->toggle_requested.subscribe([this](TodoId id) { toggle_task(id); });
-        tasks->remove_requested.subscribe([this](TodoId id) { remove_task(id); });
+        ui.connect(tasks->toggle_requested, [this](TodoId id) { toggle_task(id); });
+        ui.connect(tasks->remove_requested, [this](TodoId id) { remove_task(id); });
 
-        auto add = ui.button("添加");
+        auto add = ui.make<ui::Button>("添加").build();
         add->on_click([this, input] { add_task(input->value()); });
 
-        auto root = ui.column({.gap = 10, .padding = 16});
-        root->add(ui.label("待办事项").style("title"));
-        root->add(ui.row(input.expand(), add));
-        root->add(tasks->expand());
+        auto input_row = ui.make<ui::Row>().gap(8).build();
+        input_row->add(input);
+        input_row->add(add);
+
+        auto root = ui.make<ui::Column>().gap(10).build();
+        root->add(ui.make<ui::Label>("待办事项").font_size(24).build());
+        root->add(input_row);
+        root->add(tasks);
         input->request_focus();
         return root;
     }
@@ -104,29 +110,53 @@ The current low-level `ForEach::bind(source)` plus key/create/update callbacks r
 
 ## DSL Todo Target
 
-The DSL form creates the same concrete controls and uses the same ownership model. It is composition syntax, not a second runtime:
+The DSL form uses the same `ui.make<T>()` customization and concrete controls. A builder becomes
+composition syntax through `.children()`, `.child()`, bindings and constrained modifiers; it is not
+a second runtime or a catalog of methods added to `BuildContext`:
 
 ```cpp
 auto TodoPage::build(ui::BuildContext& ui) -> ui::View {
-    using namespace ui::dsl;
-    return column({.gap = 10, .padding = 16},
-        label("待办事项").style("title"),
-        label(computed([this] { return store().summary(); })).tone(Tone::muted),
-        row({.gap = 8},
-            text_field(draft, {.placeholder = "添加一个任务"}).expand().autofocus(),
-            button("添加").on_click([this] { store().add(std::exchange(draft, {})); })
-        ),
-        when(store().items.empty(), label("暂无任务").tone(Tone::muted)),
-        scroll_view(for_each(store().items, &TodoItem::id, [this](const TodoItem& item) {
-            return todo_row(item,
-                [this, id = item.id] { store().toggle(id); },
-                [this, id = item.id] { store().remove(id); });
-        })).expand()
+    auto& summary = ui.computed([this] { return store().summary(); });
+    auto empty = ui.when(store().items.empty(), [](ui::BuildContext branch) {
+        return branch.make<ui::Label>("暂无任务")
+            .color_token(theme::ColorToken::muted_foreground);
+    });
+    auto tasks = ui.for_each(
+        store().items,
+        &TodoItem::id,
+        [this](ui::BuildContext row, const TodoItem& item) {
+            return row.make<TodoRow>(item)
+                .configure([this, row](TodoRow& view) {
+                    row.connect(view.toggle_requested, [this](TodoId id) { store().toggle(id); });
+                    row.connect(view.remove_requested, [this](TodoId id) { store().remove(id); });
+                });
+        }
     );
+
+    return ui.make<ui::Column>()
+        .gap(10)
+        .children(
+            ui.make<ui::Label>("待办事项").font_size(24),
+            ui.make<ui::Label>(summary),
+            ui.make<ui::Row>().gap(8).children(
+                ui.make<ui::TextField>(draft, "添加一个任务").width(ui::fill).autofocus(),
+                ui.make<ui::Button>("添加").on_click(
+                    [this] { store().add(std::exchange(draft, {})); }
+                )
+            ),
+            empty,
+            ui.make<ui::ScrollView>().child(tasks).height(ui::fill)
+        );
 }
 ```
 
 Bindings accept values, `State`, `Signal`, and `Computed` without widget-specific `bind_*` plumbing. Theme tokens and semantic tones remain live across theme changes without component overrides.
+
+`make<T>()` resolves component construction through the customization declared beside `T`. For
+example, `ComponentTraits<Label>` injects the graph and active theme, while
+`ComponentTraits<TextField>` additionally recognizes a string signal and installs its two-way
+binding. Layout types use the same path. Adding `Badge` therefore adds its widget, recipe, traits,
+tests and example usage, but no `BuildContext::badge()` declaration.
 
 ## Acceptance Budget
 
@@ -151,6 +181,7 @@ The paired imperative/DSL Todo served as the delivery fixture through A18. After
 3. A16 introduces the component/page ownership model and automatic reactive/lifecycle cleanup.
 4. A17 completes generic setter binding, two-way text-field state, and live theme-token propagation.
 5. A18 adds `BuildContext::when()` and `for_each()` as concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
+6. A22 generalizes component construction through typed `make<T>()` customization and domain-layered public headers, so adding a component does not require editing `BuildContext`.
 
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
 

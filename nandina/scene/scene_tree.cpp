@@ -77,6 +77,18 @@ namespace nandina::scene
             }
         }
 
+        void transform_semantics_node(
+            semantics::Node& node,
+            const foundation::NanTransform2D& transform
+        ) {
+            if (node.bounds.is_valid()) {
+                node.bounds = render::world_bounds_from_local(transform, node.bounds);
+            }
+            for (auto& child: node.children) {
+                transform_semantics_node(child, transform);
+            }
+        }
+
         [[nodiscard]] auto build_semantics_nodes(NanNode* source) -> std::vector<semantics::Node> {
             if (source == nullptr || !source->is_visible_in_tree()
                 || source->semantics_composition() == semantics::Composition::hidden) {
@@ -289,6 +301,9 @@ namespace nandina::scene
             return false;
         }
         semantics_tree_.roots = build_semantics_nodes(root_.get());
+        for (auto& root: semantics_tree_.roots) {
+            transform_semantics_node(root, semantics_transform_);
+        }
         ++semantics_tree_.revision;
         semantics_dirty_ = false;
         return true;
@@ -296,6 +311,16 @@ namespace nandina::scene
 
     auto NanSceneTree::semantics_tree() const noexcept -> const semantics::Tree& {
         return semantics_tree_;
+    }
+
+    void NanSceneTree::set_semantics_transform(foundation::NanTransform2D transform) noexcept {
+        if (semantics_transform_.position() == transform.position()
+            && semantics_transform_.rotation() == transform.rotation()
+            && semantics_transform_.scale() == transform.scale()) {
+            return;
+        }
+        semantics_transform_ = transform;
+        mark_semantics_dirty();
     }
 
     auto NanSceneTree::perform_semantics_action(

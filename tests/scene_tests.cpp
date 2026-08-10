@@ -752,3 +752,21 @@ TEST_CASE("semantics snapshots merge and hide composed descendants", "[scene][se
     REQUIRE(tree.semantics_tree().roots.front().properties.label
             == "Todo panel, Updated child");
 }
+
+TEST_CASE("semantics bounds follow the root viewport transform", "[scene][semantics][viewport]") {
+    auto root = std::make_shared<scene::NanControl>(foundation::NanSize(20.0F, 10.0F));
+    root->set_semantics_override(
+        semantics::Properties {.role = semantics::Role::generic, .label = "Viewport root"}
+    );
+
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+    tree.set_semantics_transform(foundation::NanTransform2D {
+        foundation::NanPoint(10.0F, 20.0F),
+        0.0F,
+        foundation::NanPoint(2.0F, 2.0F),
+    });
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.semantics_tree().roots.front().bounds
+            == foundation::NanRect::from_xywh(10.0F, 20.0F, 40.0F, 20.0F));
+}

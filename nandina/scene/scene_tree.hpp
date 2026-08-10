@@ -96,6 +96,7 @@ namespace nandina::scene
         [[nodiscard]] auto semantics_dirty() const noexcept -> bool;
         [[nodiscard]] auto update_semantics() -> bool;
         [[nodiscard]] auto semantics_tree() const noexcept -> const semantics::Tree&;
+        void set_semantics_transform(foundation::NanTransform2D transform) noexcept;
         [[nodiscard]] auto perform_semantics_action(
             semantics::SemanticsId id,
             semantics::ActionRequest request
@@ -217,6 +218,7 @@ namespace nandina::scene
         text::FontPipelineCache* font_context_ = nullptr;
         theme::ThemeManager* theme_manager_ = nullptr;
         semantics::Tree semantics_tree_;
+        foundation::NanTransform2D semantics_transform_;
         bool semantics_dirty_ = true;
         FramePhase phase_ = FramePhase::idle;
     };

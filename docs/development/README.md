@@ -216,7 +216,7 @@ Text limitations:
 
 ## App Authoring State
 
-The canonical `nandina_example` is a single functional-root application. It uses an application-owned Store, semantic controls, two-way input, conditional and keyed regions, scrolling, automatic component/page scopes, and the resource-backed text pipeline without declaring a window or page subclass.
+The canonical `nandina_settings_example` is a single functional-root application. It uses an application-owned Store, semantic controls, two-way input, conditional and keyed regions, scrolling, automatic component/page scopes, and the resource-backed text pipeline without declaring a window or page subclass.
 
 The earlier paired imperative/DSL Todo was a delivery fixture for page parameters, keep-alive navigation, Store sharing, safe routed commands, and authoring equivalence. Those contracts now live in focused router, authoring, lifecycle, and compact-application tests, so the duplicate application and its test-only accessors are no longer shipped under `example/`.
 
@@ -345,7 +345,7 @@ Status: complete in `9b0933d`.
 
 Status: complete in `9b0933d`; Meson authoring simplified in the current change.
 
-The example declares one always-stale Meson custom target around `nanres_build_helper.py`. Its only source input is `resources.toml`; the helper discovers all resource files, maintains the lock, and uses the package fingerprint to make unchanged builds cheap. This avoids duplicating package ID, lock path, and every resource filename in `meson.build`. The complete package is produced beside the executable at `buildDir/example/resources`. `nanres_install.py` reads the package ID from the same policy and copies the database/sidecar tree to `get_option('datadir')/<app-id>`. On Linux, `--prefix=/usr` therefore installs under `/usr/share/<app-id>`, while `--prefix=$HOME/.local` installs under `~/.local/share/<app-id>` without checking whether the installer is root. Tests add a resource after initial packaging and verify that a second build updates both lock and SQLite package without any build-file change.
+The example previously built a SQLite resource package with an always-stale Meson custom target around `nanres_build_helper.py`. During the example restructure, resource packaging was removed from the example: each example is now a plain application without a project package, and `resources.toml`/`resources.lock.toml` plus the bundled CJK font are no longer shipped under `example/`. The `nanres` toolchain itself remains exported through `nandina_resource_toolchain` and continues to be exercised by the `nanres-cli`, `nanres-install`, `nanres-build-workflow`, and `nandina-subproject-fixture` tests.
 
 Fully offline builds use compatible system dependencies or pre-populated Meson `subprojects/packagecache` archives for the pinned wraps. Configure/build never downloads Sarasa Gothic or other optional resource packs implicitly. Generated SQLite fallback source trees, build outputs, resource databases, package fingerprints, and lock-update temporaries remain outside source control; generated `resources.lock.toml` is the intentional exception and is committed as application inventory.
 
@@ -367,9 +367,11 @@ Status: complete in `9b0933d`.
 
 The Todo example no longer contains `NANDINA_EXAMPLE_RESOURCE_DIR`, manual DirectoryBackend/resource/font services, `TodoPageParams::text_pipeline`, repetitive `set_text_pipeline()`, or manual resource teardown. The obsolete `bundled_fonts` Meson option, copy targets, and copy-specific font test are removed. R4 explicit scanning still covers loose development trees, while the application path uses the validated R7 SQLite package. Automated probes verify the generated package through `SQLiteBackend`, executable-relative portable layout, user/system datadir installation, and built-in font fallback when no optional/project package is present. Sarasa Gothic remains optional and is not downloaded or required for configure, build, startup, or tests.
 
+Note: the later example restructure removed the example's SQLite package and the packaged-application probes (`nanres-meson-package`, `nanres-chinese-font-package`, `r10-layout`, and the packaged-executable case in `application-resource`) together with the bundled CJK font; the `nanres` toolchain remains covered by the CLI, install, and build-workflow tests.
+
 ### Simplified Chinese Example Fallback
 
-The Todo example includes Sarasa Fixed SC Regular 1.0.40 under OFL 1.1. Only the 24.9 MB regular face is retained from the verified `SarasaFixedSC-TTF-1.0.40.7z` release archive; the archive and unused weights are not committed. `source.toml` records the upstream URL, version, archive SHA-256, extracted-font SHA-256, and license. The font is exposed as `fonts/fallback/zh-cn`, packaged as an external sidecar, and registered as `families/zh-cn` after `families/default-ui`. It is not marked streaming because current FreeType loading requires an immutable snapshot. The Todo interface and initial data contain mixed Simplified Chinese/Latin text, and tests verify actual `中`/`文` glyph coverage. Configure/build perform no network download; without the project package, optional registration is a no-op and the built-in default remains available.
+The example previously bundled Sarasa Fixed SC Regular 1.0.40 under OFL 1.1 as an external `fonts/fallback/zh-cn` package with a committed `source.toml` inventory. During the example restructure the bundled CJK font pack and its `resources.toml`/`resources.lock.toml` were removed from `example/`; examples now rely on the built-in default family. Without a project package, optional CJK registration is a no-op and the built-in default remains available.
 
 ### Deferred Resource And Font Work
 
@@ -482,19 +484,12 @@ Add Box2D as an optional Meson dependency/subproject from `https://github.com/er
 
 - `PhysicsWorld2D` owns `b2WorldId`, fixed-step accumulation, pixels-per-meter conversion, the formal physics phase, and a stable per-step touch-event snapshot. `PhysicsBody2D` wraps opaque Box2D body IDs, owns box/circle shapes, applies density/material/filter settings, and can bind an existing `NanNode2D` visual; dynamic bodies drive visuals after a step, while static/kinematic bodies read their transforms from scene state before a step.
 - Sensor/contact events are pulled from Box2D after each fixed step and exposed as framework-owned shape references. A handler may request body/shape destruction while events are being delivered; mutation is committed after event dispatch and before the next fixed step. Box2D transient event pointers and IDs are never exposed as the application contract.
-- Enabling `physics2d` also builds `nandina_physics_example`, an interactive LayerStack demo with a world canvas, screen-space HUD, static ramps, dynamic circles, and a sensor zone. It reuses ordinary `NanNode2D` visuals and the same scene lifecycle rather than adding a physics renderer.
+- Enabling `physics2d` currently ships no example application; the physics bridge is exercised by the `physics2d` unit tests instead.
 - `PhysicsBody2D`/shape definitions wrap opaque Box2D 3.x IDs and bind simulation transforms to ordinary `NanNode2D` visuals by composition, not inheritance from Box2D types.
 - First shapes are box/polygon and circle, plus sensor/contact begin/end events and collision category/mask filtering.
 - Body/shape creation and destruction requested during stepping/event dispatch are committed at a physics safe point.
 
-To build and run the optional visual physics example:
-
-```bash
-git submodule update --init subprojects/box2d
-meson setup buildPhysics -Dphysics2d=enabled
-meson compile -C buildPhysics nandina_physics_example
-./buildPhysics/example/nandina_physics_example
-```
+The optional physics feature is enabled with `-Dphysics2d=enabled`; it is validated by the `physics2d` unit tests rather than a separate example application.
 
 For a fresh checkout, `git clone --recurse-submodules` initializes Box2D together with the other vendored dependencies. Updating Box2D is an explicit repository change: checkout the reviewed upstream commit inside `subprojects/box2d`, then commit the changed gitlink in this repository.
 
@@ -757,7 +752,7 @@ The [A14 developer experience contract](A14_DEVELOPER_EXPERIENCE.md) defines the
 
 `NanApplication::run_page<PageT>()` creates the ordinary routed window, pushes the typed initial page, and enters the existing application loop. A19 additionally provides functional root runners for single-page applications, so the compact reference no longer declares a page class merely to implement `route_key()` and `build()`. Explicit page and window subclasses remain the advanced path for named routes and custom frame/setup/teardown behavior.
 
-The earlier paired and compact Todo fixtures have been retired after acceptance. Their 23-line bootstrap and 215 total non-blank line result remains recorded in the A14 contract. The current `nandina_example` Settings interface uses the same authoring layer with a 23-line bootstrap and 122 total non-blank lines while expanding the standard control surface.
+The earlier paired and compact Todo fixtures have been retired after acceptance. Their 23-line bootstrap and 215 total non-blank line result remains recorded in the A14 contract. The current `nandina_settings_example` Settings interface uses the same authoring layer with a 23-line bootstrap and 122 total non-blank lines while expanding the standard control surface.
 
 ### A15. Typed List Model And Commands
 
@@ -825,7 +820,7 @@ Status: complete for boolean selection and two-way authoring.
 
 `BuildContext::checkbox(signal, label)` binds any page/component-owned `Signal<bool>` in both directions using the existing weak setter binding and scope-owned event subscription. Literal construction, `authoring::checkbox()`, `.checked()`, and `.on_change()` remain thin adapters over the same concrete control.
 
-The canonical `nandina_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. A20 established a 23-line bootstrap and 122-line application snapshot; the continuing source-budget test keeps the bootstrap below 30 lines, the complete application below 220 lines, and forbids page/window/frame plumbing.
+The canonical `nandina_settings_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. A20 established a 23-line bootstrap and 122-line application snapshot; the continuing source-budget test keeps the bootstrap below 30 lines, the complete application below 220 lines, and forbids page/window/frame plumbing.
 
 ### A21. Slider And Continuous Value Binding
 
@@ -836,6 +831,19 @@ Status: complete for bounded continuous numeric input.
 `BuildContext::slider(signal, label, minimum, maximum, step)` adds the float counterpart to Checkbox and TextField two-way authoring. Scope-owned subscriptions publish user changes to the signal, weak setter effects reflect source changes back into the concrete control, and silent setters prevent feedback loops. Literal `authoring::slider()` construction and `.value()`, `.range()`, `.step()`, and `.on_change()` modifiers remain available without a reactive source.
 
 The Settings reference now uses Slider for an interface-scale preference and derives both its local label and overall preference summary from the bound signal. Save/reset semantics and the actual Slider accessibility actions are covered headlessly. The canonical example is now 140 non-blank lines including its 23-line bootstrap, while still containing no page, window, frame, or manual reactive-scope plumbing.
+
+### A22. Extensible Component Authoring
+
+Status: planned as the next authoring API unit.
+
+`BuildContext` remains a lightweight service handle rather than an ever-growing component catalog.
+The generic construction path is `ui.make<widget::Button>("Save").on_click(save).build()`.
+Each component provides a typed `ComponentTraits<T>` or equivalent ADL customization in its own
+authoring header. That customization adapts context, theme, and defaults into `NodeBuilder<T>`;
+adding a component does not require editing `BuildContext`. Runtime `std::type_index` registries are
+reserved for diagnostics and future plugins, while traits, concepts, and ADL provide the typed path
+without depending on unstable C++ static reflection. Public headers are layered into core, layout,
+controls, data, and an optional `widgets.hpp` umbrella, keeping the layout module-friendly.
 
 ### Deferred After Authoring Core
 
@@ -941,7 +949,7 @@ For normal framework changes run:
 
 ```sh
 meson test -C buildDir
-meson compile -C buildDir nandina_example
+meson compile -C buildDir nandina_settings_example
 ```
 
 Before committing, inspect status and exclude unrelated generated files such as `firebase-debug.log`.

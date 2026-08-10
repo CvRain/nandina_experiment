@@ -267,6 +267,10 @@ uses the design size, `DrawContext` receives the anchored logical-to-screen tran
 scale, and mouse positions/deltas are inverted before scene dispatch. Leaving the option unset keeps
 the existing responsive-to-window path unchanged.
 
+Semantic snapshots now receive the same root transform, so accessibility bounds remain aligned with
+the painted controls under contain/cover scaling while the default identity transform preserves
+logical window behavior.
+
 ### Step 5: Ripple And Reduced Motion
 
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget
@@ -282,6 +286,11 @@ optional tone policy instead of presenting a radius-only customization as the br
 Implement one component at a time and require recipe/rules, shared painters, light/dark and override
 tests, constrained layout, pointer/keyboard/focus behavior, semantics, authoring, and any necessary
 two-way binding. The example remains a real application, not a component gallery.
+
+The authoring entry point is being generalized separately as A22. New components must register a
+typed `ComponentTraits<T>`/ADL construction customization and must not require adding another method
+to `BuildContext`. Convenience methods remain thin compatibility adapters, keeping the component
+acceptance template strict without making the context header a monolithic catalog.
 
 ### Step 8: Close Page Root/Scope Lifetime
 

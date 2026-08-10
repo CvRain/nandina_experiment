@@ -287,6 +287,10 @@ namespace nandina::app
 
         {
             auto phase = tree_.enter_phase(scene::FramePhase::semantics);
+            tree_.set_semantics_transform(
+                viewport_mapping_ ? viewport_mapping_->transform()
+                                   : foundation::NanTransform2D::identity()
+            );
             (void)tree_.update_semantics();
         }
 
