@@ -9,6 +9,7 @@
 #include "../reactive/scope.hpp"
 #include "../theme/theme_manager.hpp"
 #include "authoring.hpp"
+#include "component_traits.hpp"
 
 #include <cmath>
 #include <concepts>
@@ -112,8 +113,32 @@ namespace nandina::widget
         /// the concrete node is destroyed.
         template<typename Node, typename... Args>
             requires std::derived_from<Node, scene::NanNode>
-            && std::constructible_from<Node, BuildContext, Args...>
-        [[nodiscard]] auto make(Args&&... args) const -> authoring::NodeBuilder<Node> {
+        [[nodiscard]] auto make(Args&&... args) const {
+            if constexpr (requires {
+                              ComponentTraits<Node>::make(
+                                  std::declval<const BuildContext&>(),
+                                  std::declval<Args>()...
+                              );
+                          }) {
+                return ComponentTraits<Node>::make(
+                    *this,
+                    std::forward<Args>(args)...
+                );
+            }
+            else {
+                static_assert(
+                    std::constructible_from<Node, BuildContext, Args...>,
+                    "Component must provide ComponentTraits<T>::make(BuildContext&, ...) "
+                    "or a BuildContext-aware constructor"
+                );
+                return make_scoped_component<Node>(std::forward<Args>(args)...);
+            }
+        }
+
+    private:
+        template<typename Node, typename... Args>
+        [[nodiscard]] auto make_scoped_component(Args&&... args) const
+            -> authoring::NodeBuilder<Node> {
             auto scope = std::make_unique<reactive::ReactiveScope>(*graph_);
             auto component =
                 std::unique_ptr<Node>(new Node(with_scope(*scope), std::forward<Args>(args)...));
@@ -127,6 +152,8 @@ namespace nandina::widget
             );
             return authoring::from(std::move(owned));
         }
+
+    public:
 
         [[nodiscard]] auto row() const -> authoring::NodeBuilder<Row> {
             return authoring::row();
@@ -397,5 +424,7 @@ namespace nandina::widget
     };
 
 } // namespace nandina::widget
+
+#include "builtin_component_traits.hpp"
 
 #endif // NANDINA_EXPERIMENT_WIDGET_BUILD_CONTEXT_HPP

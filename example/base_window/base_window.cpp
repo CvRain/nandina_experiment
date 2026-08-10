@@ -10,7 +10,7 @@ namespace nandina::example::base_window
     auto MainPage::build(widget::BuildContext& ui) -> widget::View {
         auto& button_string = ui.signal<std::string>("clicked me");
 
-        auto button = ui.button(button_string);
+        auto button = ui.make<widget::Button>(button_string);
         button.on_click([&]() { button_string.set("clicked!"); });
 
         const auto content = ui.center().child(button);

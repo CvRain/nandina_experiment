@@ -837,7 +837,7 @@ The Settings reference now uses Slider for an interface-scale preference and der
 
 ### A22. Extensible Component Authoring
 
-Status: planned as the next authoring API unit.
+Status: first typed customization slice implemented for Label and Button.
 
 `BuildContext` remains a lightweight service handle rather than an ever-growing component catalog.
 The generic construction path is `ui.make<widget::Button>("Save").on_click(save).build()`.
@@ -847,6 +847,12 @@ adding a component does not require editing `BuildContext`. Runtime `std::type_i
 reserved for diagnostics and future plugins, while traits, concepts, and ADL provide the typed path
 without depending on unstable C++ static reflection. Public headers are layered into core, layout,
 controls, data, and an optional `widgets.hpp` umbrella, keeping the layout module-friendly.
+
+The first slice introduces the incomplete `ComponentTraits<T>` customization point and routes
+`BuildContext::make<Label/Button>()` through built-in specializations. String signals retain weak
+setter bindings, while context-aware application components continue using the scoped-constructor
+fallback. `base_window` exercises `make<Button>(signal)` visually. Remaining controls and public
+header splitting stay in separate reviewable units.
 
 ### Deferred After Authoring Core
 

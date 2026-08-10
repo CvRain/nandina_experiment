@@ -451,6 +451,23 @@ TEST_CASE("BuildContext owns custom component subscriptions", "[authoring][conte
     REQUIRE(observed == 2);
 }
 
+TEST_CASE("BuildContext make uses typed built-in component traits", "[authoring][traits]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    reactive::Signal<std::string> text {graph, "Ready"};
+
+    auto label = ui.make<widget::Label>(text).build();
+    auto button = ui.make<widget::Button>(text).build();
+    REQUIRE(label->text() == "Ready");
+    REQUIRE(button->text() == "Ready");
+
+    text.set("Running");
+    REQUIRE(label->text() == "Running");
+    REQUIRE(button->text() == "Running");
+}
+
 TEST_CASE(
     "BuildContext binds tracked values through ordinary widget setters",
     "[authoring][binding]"

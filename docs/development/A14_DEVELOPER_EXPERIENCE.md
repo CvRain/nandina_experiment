@@ -193,6 +193,11 @@ The paired imperative/DSL Todo served as the delivery fixture through A18. After
 5. A18 adds `BuildContext::when()` and `for_each()` as concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
 6. A22 generalizes component construction through typed `make<T>()` customization and domain-layered public headers, so adding a component does not require editing `BuildContext`.
 
+A22 starts with `Label` and `Button`: their traits inject the current graph/theme and preserve live
+string bindings. Context-aware custom components retain the scoped constructor fallback. Other
+controls migrate one family at a time, with focused tests and an example use before compatibility
+factory methods can be retired.
+
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
 
 The A14 authoring API delivery order is complete through A18. The compact recommended Todo keeps ordinary application code focused on its Store, row component, page composition, and bootstrap. The earlier paired low-level fixture was retired after the same imperative/DSL equivalence, page-parameter, and lifecycle contracts were established in focused framework tests.
