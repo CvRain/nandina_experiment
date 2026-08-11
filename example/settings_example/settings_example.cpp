@@ -72,10 +72,10 @@ namespace nandina::examples::settings
                 .gap(6.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
-                    ui.switch_control(notifications, "Desktop notifications"),
-                    ui.checkbox(diagnostics, "Send anonymous diagnostics"),
+                    ui.make<widget::Switch>(notifications, "Desktop notifications"),
+                    ui.make<widget::Checkbox>(diagnostics, "Send anonymous diagnostics"),
                     diagnostics_note,
-                    ui.checkbox(reduced_motion, "Reduce interface motion"),
+                    ui.make<widget::Checkbox>(reduced_motion, "Reduce interface motion"),
                     ui.label(scale_label).color_token(theme::ColorToken::on_surface_variant),
                     ui.slider(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F)
                 )
@@ -85,9 +85,7 @@ namespace nandina::examples::settings
                         .tone(theme::ButtonTone::primary)
                         .width(percent(50.0F))
                         .min_width(180.0F)
-                        .on_click([&] {
-                            status.set("Preferences saved for " + profile.peek());
-                        });
+                        .on_click([&] { status.set("Preferences saved for " + profile.peek()); });
         auto reset = ui.button("Reset").treatment(theme::ButtonTreatment::outlined).on_click([&] {
             profile.set("Nandina developer");
             notifications.set(true);
@@ -101,22 +99,21 @@ namespace nandina::examples::settings
         // 注意：不能捕获 ui 本身——BuildContext 是每次 build 的临时对象，
         // build() 返回后即失效，回调里再解引用会悬垂。
         auto* themes = &ui.theme_manager();
-        auto appearance_row =
-            ui.row()
-                .gap(8.0F)
-                .children(
-                    ui.button("Light")
-                        .treatment(theme::ButtonTreatment::outlined)
-                        .on_click([themes] {
-                            themes->set_preference(theme::ThemePreference::light);
-                        }),
-                    ui.button("Dark")
-                        .treatment(theme::ButtonTreatment::outlined)
-                        .on_click([themes] {
-                            themes->set_preference(theme::ThemePreference::dark);
-                        })
-                )
-                .build();
+        auto appearance_row = ui.row()
+                                  .gap(8.0F)
+                                  .children(
+                                      ui.button("Light")
+                                          .treatment(theme::ButtonTreatment::outlined)
+                                          .on_click([themes] {
+                                              themes->set_preference(theme::ThemePreference::light);
+                                          }),
+                                      ui.button("Dark")
+                                          .treatment(theme::ButtonTreatment::outlined)
+                                          .on_click([themes] {
+                                              themes->set_preference(theme::ThemePreference::dark);
+                                          })
+                                  )
+                                  .build();
 
         auto actions = ui.row()
                            .gap(8.0F)

@@ -468,6 +468,24 @@ TEST_CASE("BuildContext make uses typed built-in component traits", "[authoring]
     REQUIRE(button->text() == "Running");
 }
 
+TEST_CASE("boolean component traits preserve two-way signal bindings", "[authoring][traits]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    reactive::Signal<bool> checked {graph, false};
+
+    auto checkbox = ui.make<widget::Checkbox>(checked, "Checkbox").build();
+    auto switch_control = ui.make<widget::Switch>(checked, "Switch").build();
+    checked.set(true);
+    REQUIRE(checkbox->checked());
+    REQUIRE(switch_control->checked());
+
+    checkbox->toggle();
+    REQUIRE_FALSE(checked.peek());
+    REQUIRE_FALSE(switch_control->checked());
+}
+
 TEST_CASE(
     "BuildContext binds tracked values through ordinary widget setters",
     "[authoring][binding]"

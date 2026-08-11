@@ -852,7 +852,9 @@ The first slice introduces the incomplete `ComponentTraits<T>` customization poi
 `BuildContext::make<Label/Button>()` through built-in specializations. String signals retain weak
 setter bindings, while context-aware application components continue using the scoped-constructor
 fallback. `base_window` exercises `make<Button>(signal)` visually. Remaining controls and public
-header splitting stay in separate reviewable units.
+header splitting stay in separate reviewable units. Checkbox and Switch are the second slice: both
+literal construction and `Signal<bool>` two-way binding now live in traits, and Settings exercises
+the new path for notification, diagnostics, and reduced-motion preferences.
 
 ### Deferred After Authoring Core
 

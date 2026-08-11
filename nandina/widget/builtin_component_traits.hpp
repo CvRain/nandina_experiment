@@ -44,6 +44,60 @@ namespace nandina::widget
             return result;
         }
     };
+
+    template<>
+    struct ComponentTraits<Checkbox> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string label,
+            const bool checked = false
+        ) -> authoring::NodeBuilder<Checkbox> {
+            return authoring::make<Checkbox>(std::move(label), checked, ui.theme());
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<bool>& checked,
+            std::string label
+        ) -> authoring::NodeBuilder<Checkbox> {
+            auto result = make(ui, std::move(label), checked.get());
+            const auto control = result.build();
+            ui.bind(control, &Checkbox::set_checked, checked);
+            ui.connect(control->checked_changed(), [&checked](const bool current) {
+                if (checked.peek() != current) {
+                    checked.set(current);
+                }
+            });
+            return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Switch> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string label,
+            const bool checked = false
+        ) -> authoring::NodeBuilder<Switch> {
+            return authoring::make<Switch>(std::move(label), checked, ui.theme());
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<bool>& checked,
+            std::string label
+        ) -> authoring::NodeBuilder<Switch> {
+            auto result = make(ui, std::move(label), checked.get());
+            const auto control = result.build();
+            ui.bind(control, &Switch::set_checked, checked);
+            ui.connect(control->checked_changed(), [&checked](const bool current) {
+                if (checked.peek() != current) {
+                    checked.set(current);
+                }
+            });
+            return result;
+        }
+    };
 }
 
 #endif // NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP
