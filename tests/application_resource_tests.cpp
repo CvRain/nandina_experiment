@@ -48,7 +48,7 @@ namespace
     class RecommendedMainPage final: public app::Page<> {
     public:
         [[nodiscard]] auto build(widget::BuildContext& ui) -> widget::View override {
-            return ui.label("Recommended entry").build();
+            return ui.make<widget::Label>("Recommended entry").build();
         }
     };
 
@@ -63,14 +63,14 @@ namespace
     static_assert(requires(app::NanApplication& application, app::WindowConfig config) {
         {
             application.run(std::move(config), [](widget::BuildContext& ui) {
-                return ui.label("Hello");
+                return ui.make<widget::Label>("Hello");
             })
         } -> std::same_as<int>;
     });
     static_assert(requires(app::RunConfig config) {
         {
             app::run(std::move(config), [](widget::BuildContext& ui) {
-                return ui.label("Hello");
+                return ui.make<widget::Label>("Hello");
             })
         } -> std::same_as<int>;
     });
@@ -102,7 +102,7 @@ TEST_CASE("functional root views use existing page context and concrete nodes", 
     bool received_page_context = false;
     auto params = app::detail::make_root_view_params([&](app::PageContext& context) {
         received_page_context = true;
-        return context.ui().label("Functional root");
+        return context.ui().make<widget::Label>("Functional root");
     });
 
     (void)router.push<app::detail::RootViewPage>(std::move(params));
@@ -120,7 +120,7 @@ TEST_CASE("functional root views accept BuildContext-only factories", "[app][vie
     bool received_build_context = false;
     auto params = app::detail::make_root_view_params([&](widget::BuildContext& ui) {
         received_build_context = true;
-        return ui.button("Continue");
+        return ui.make<widget::Button>("Continue");
     });
 
     (void)router.push<app::detail::RootViewPage>(std::move(params));

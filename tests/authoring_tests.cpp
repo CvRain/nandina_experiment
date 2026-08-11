@@ -270,8 +270,12 @@ TEST_CASE("BuildContext authors scoped conditional and keyed regions", "[authori
     reactive::Signal<bool> choose_label {graph, false};
     auto choice = ui.when(
         choose_label,
-        [](widget::BuildContext branch) { return branch.label("true branch"); },
-        [](widget::BuildContext branch) { return branch.button("false branch"); }
+        [](widget::BuildContext branch) {
+            return branch.make<widget::Label>("true branch");
+        },
+        [](widget::BuildContext branch) {
+            return branch.make<widget::Button>("false branch");
+        }
     ).build();
     scene::NanSceneTree choice_tree;
     choice_tree.set_root(choice);
@@ -372,15 +376,15 @@ TEST_CASE("free function factories produce same types as make<T>", "[authoring][
 
     // Control factories
     {
-        auto lb = label(graph, "Hello").build();
+        auto lb = make<widget::Label>(graph, "Hello").build();
         static_assert(std::same_as<decltype(lb), std::shared_ptr<widget::Label>>);
         REQUIRE(lb->text() == "Hello");
 
-        auto bt = button("Click").build();
+        auto bt = make<widget::Button>("Click").build();
         static_assert(std::same_as<decltype(bt), std::shared_ptr<widget::Button>>);
         REQUIRE(bt->text() == "Click");
 
-        auto tf = text_field("val", "placeholder").build();
+        auto tf = make<widget::TextField>("val", "placeholder").build();
         static_assert(std::same_as<decltype(tf), std::shared_ptr<widget::TextField>>);
         REQUIRE(tf->value() == "val");
     }
@@ -423,8 +427,8 @@ TEST_CASE("BuildContext carries page services into context factories", "[authori
     auto current = theme::default_theme();
     current.palette.primary = theme::nan_color(0.75F, 0.12F, 140.0F);
     themes.set_theme(current);
-    auto action = ui.button("Run").build();
-    auto title = item_ui.label("Scoped").build();
+    auto action = ui.make<widget::Button>("Run").build();
+    auto title = item_ui.make<widget::Label>("Scoped").build();
 
     REQUIRE(action->text() == "Run");
     REQUIRE(title->text() == "Scoped");
@@ -496,8 +500,8 @@ TEST_CASE(
     widget::BuildContext ui {graph, scope, themes};
     reactive::Signal<std::string> text {graph, "Ready"};
 
-    auto label = ui.label(text).build();
-    auto button = ui.button(text).build();
+    auto label = ui.make<widget::Label>(text).build();
+    auto button = ui.make<widget::Button>(text).build();
     REQUIRE(label->text() == "Ready");
     REQUIRE(button->text() == "Ready");
 
@@ -550,7 +554,7 @@ TEST_CASE("free function DSL trees match imperative construction", "[authoring][
                    .configure([](widget::Column& c) {
                        c.set_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
                    })
-                   .children(button("Save")
+                   .children(make<widget::Button>("Save")
                                  .configure([](widget::Button& b) {
                                      b.set_tone(theme::ButtonTone::primary);
                                  })
@@ -573,16 +577,16 @@ TEST_CASE("free function DSL trees match imperative construction", "[authoring][
 TEST_CASE("NodeBuilder forwards common widget modifiers", "[authoring][modifier]") {
     reactive::Graph graph;
     int clicks = 0;
-    auto button = widget::authoring::button("Save")
+    auto button = widget::authoring::make<widget::Button>("Save")
                       .tone(theme::ButtonTone::secondary)
                       .treatment(theme::ButtonTreatment::outlined)
                       .on_click([&] { ++clicks; })
                       .build();
-    auto label = widget::authoring::label(graph, "Heading")
+    auto label = widget::authoring::make<widget::Label>(graph, "Heading")
                      .font_size(22.0F)
                      .color_token(theme::ColorToken::on_surface_variant)
                      .build();
-    auto field = widget::authoring::text_field("", "Task").autofocus().build();
+    auto field = widget::authoring::make<widget::TextField>("", "Task").autofocus().build();
     auto column = widget::authoring::column()
                       .gap(9.0F)
                       .cross_alignment(widget::LayoutAlignment::stretch)
@@ -622,7 +626,7 @@ TEST_CASE("free function factories compose nested layout trees", "[authoring][fa
                         c.set_gap(8.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
                     })
                     .children(
-                        label(graph, "Settings").expose(title_label),
+                        make<widget::Label>(graph, "Settings").expose(title_label),
                         row()
                             .configure([](widget::Row& r) {
                                 r.set_gap(6.0F).set_cross_alignment(
@@ -630,8 +634,8 @@ TEST_CASE("free function factories compose nested layout trees", "[authoring][fa
                                 );
                             })
                             .children(
-                                expanded().child(label(graph, "Status")),
-                                button("Apply").expose(action_btn)
+                                expanded().child(make<widget::Label>(graph, "Status")),
+                                make<widget::Button>("Apply").expose(action_btn)
                             )
                     )
             )
@@ -659,8 +663,8 @@ TEST_CASE("free function factories support expose and configure", "[authoring][f
     std::shared_ptr<widget::Label> exposed;
     auto root = column()
                     .children(
-                        label(graph, "First"),
-                        label(graph, "Second")
+                        make<widget::Label>(graph, "First"),
+                        make<widget::Label>(graph, "Second")
                             .configure([](widget::Label& l) { l.set_font_size(18.0F); })
                             .expose(exposed)
                     )
@@ -693,10 +697,10 @@ TEST_CASE("grid layout arranges children in rows and columns", "[authoring][fact
     auto g = grid(2)
                  .configure([](widget::Grid& gr) { gr.set_column_gap(8.0F).set_row_gap(4.0F); })
                  .children(
-                     label(graph, "A").expose(a),
-                     label(graph, "B").expose(b),
-                     label(graph, "C").expose(c),
-                     label(graph, "D").expose(d)
+                     make<widget::Label>(graph, "A").expose(a),
+                     make<widget::Label>(graph, "B").expose(b),
+                     make<widget::Label>(graph, "C").expose(c),
+                     make<widget::Label>(graph, "D").expose(d)
                  )
                  .build();
 
@@ -725,7 +729,11 @@ TEST_CASE("grid with single column behaves like a column", "[authoring][factory]
                  .configure([](widget::Grid& gr) {
                      gr.set_row_gap(5.0F).set_cross_alignment(widget::LayoutAlignment::stretch);
                  })
-                 .children(label(graph, "One"), label(graph, "Two"), label(graph, "Three"))
+                 .children(
+                     make<widget::Label>(graph, "One"),
+                     make<widget::Label>(graph, "Two"),
+                     make<widget::Label>(graph, "Three")
+                 )
                  .build();
 
     scene::NanSceneTree tree;
@@ -767,8 +775,8 @@ TEST_CASE("grid with cross_alignment lays out children correctly", "[authoring][
                      gr.set_row_gap(4.0F).set_cross_alignment(widget::LayoutAlignment::center);
                  })
                  .children(
-                     label(graph, "Short").expose(left_label),
-                     label(graph, "Longer").expose(right_label)
+                     make<widget::Label>(graph, "Short").expose(left_label),
+                     make<widget::Label>(graph, "Longer").expose(right_label)
                  )
                  .build();
 

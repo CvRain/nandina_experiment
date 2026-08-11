@@ -206,6 +206,10 @@ The value-input slice migrates `TextField` and `Slider`, preserving text edit pu
 source updates, bounded float configuration, and epsilon loop prevention. At this point all
 interactive inputs in Settings use `make<T>()`, providing one visual acceptance surface for A22.
 
+Because the project is still pre-1.0, the replaced named component factories are removed rather than
+deprecated. This prevents two authoring spellings from diverging and makes new components available
+exclusively through their traits. Generic low-level `authoring::make<T>()` remains available.
+
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
 
 The A14 authoring API delivery order is complete through A18. The compact recommended Todo keeps ordinary application code focused on its Store, row component, page composition, and bootstrap. The earlier paired low-level fixture was retired after the same imperative/DSL equivalence, page-parameter, and lifecycle contracts were established in focused framework tests.

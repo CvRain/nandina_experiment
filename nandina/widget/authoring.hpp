@@ -367,58 +367,6 @@ namespace nandina::widget::authoring
         return make<Grid>(columns);
     }
 
-    // ── 控件 ──
-
-    [[nodiscard]] inline auto label(
-        reactive::Graph& graph,
-        std::string text = {},
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<Label> {
-        return make<Label>(graph, std::move(text), theme);
-    }
-
-    [[nodiscard]] inline auto
-    button(std::string text, theme::NanTheme theme = theme::default_theme())
-        -> NodeBuilder<Button> {
-        return make<Button>(std::move(text), theme);
-    }
-
-    [[nodiscard]] inline auto checkbox(
-        std::string label,
-        bool checked = false,
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<Checkbox> {
-        return make<Checkbox>(std::move(label), checked, theme);
-    }
-
-    [[nodiscard]] inline auto slider(
-        std::string label,
-        float value = 0.0F,
-        float minimum = 0.0F,
-        float maximum = 1.0F,
-        float step = 0.01F,
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<Slider> {
-        return make<Slider>(std::move(label), value, minimum, maximum, step, theme);
-    }
-
-    // `switch` 是 C++ 关键字，工厂命名为 switch_control。
-    [[nodiscard]] inline auto switch_control(
-        std::string label,
-        bool checked = false,
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<Switch> {
-        return make<Switch>(std::move(label), checked, theme);
-    }
-
-    [[nodiscard]] inline auto text_field(
-        std::string value,
-        std::string placeholder,
-        theme::NanTheme theme = theme::default_theme()
-    ) -> NodeBuilder<TextField> {
-        return make<TextField>(std::move(value), std::move(placeholder), theme);
-    }
-
 } // namespace nandina::widget::authoring
 
 namespace nandina::widget

@@ -91,7 +91,7 @@ TEST_CASE("BuildContext checkbox synchronizes a boolean signal", "[checkbox][aut
     theme::ThemeManager themes;
     widget::BuildContext ui {graph, scope, themes};
     auto& enabled = ui.signal<bool>(false);
-    auto checkbox = ui.checkbox(enabled, "Enable sync").build();
+    auto checkbox = ui.make<widget::Checkbox>(enabled, "Enable sync").build();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(checkbox);
@@ -111,7 +111,7 @@ TEST_CASE("BuildContext checkbox synchronizes a boolean signal", "[checkbox][aut
 TEST_CASE("checkbox builder forwards checked and change modifiers", "[checkbox][authoring]") {
     int changes = 0;
     bool observed = true;
-    auto checkbox = widget::authoring::checkbox("Builder option")
+    auto checkbox = widget::authoring::make<widget::Checkbox>("Builder option")
                         .checked(true)
                         .on_change([&](const bool value) {
                             ++changes;

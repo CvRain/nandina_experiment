@@ -148,7 +148,7 @@ TEST_CASE("BuildContext switch synchronizes a boolean signal", "[switch][authori
     theme::ThemeManager themes;
     widget::BuildContext ui {graph, scope, themes};
     auto& enabled = ui.signal<bool>(false);
-    auto switch_control = ui.switch_control(enabled, "Enable sync").build();
+    auto switch_control = ui.make<widget::Switch>(enabled, "Enable sync").build();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(switch_control);
@@ -168,7 +168,7 @@ TEST_CASE("BuildContext switch synchronizes a boolean signal", "[switch][authori
 TEST_CASE("switch builder forwards checked and change modifiers", "[switch][authoring]") {
     int changes = 0;
     bool observed = true;
-    auto switch_control = widget::authoring::switch_control("Builder option")
+    auto switch_control = widget::authoring::make<widget::Switch>("Builder option")
                               .checked(true)
                               .on_change([&](const bool value) {
                                   ++changes;

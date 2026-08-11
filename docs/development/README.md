@@ -858,8 +858,13 @@ the new path for notification, diagnostics, and reduced-motion preferences.
 
 TextField and Slider form the third slice. Their traits own `Signal<std::string>` and `Signal<float>`
 two-way synchronization respectively, including slider epsilon feedback suppression. Settings now
-constructs every interactive input through `make<T>()`; legacy named factories remain compatibility
-adapters until layout/data header splitting is complete.
+constructs every interactive input through `make<T>()`.
+
+The named component factories have now been removed during pre-1.0 iteration:
+`BuildContext::label/button/checkbox/switch_control/slider/text_field` and their matching
+`authoring::*` component functions no longer exist. Application code uses `ui.make<T>()`; low-level
+tests and framework composition use `authoring::make<T>()`. Layout factories and structural
+`when()/for_each()` remain because they express layout/data behavior rather than a component catalog.
 
 ### Deferred After Authoring Core
 
