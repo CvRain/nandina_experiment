@@ -519,7 +519,7 @@ TEST_CASE(
     theme::ThemeManager themes;
     widget::BuildContext ui {graph, scope, themes};
     reactive::Signal<std::string> draft {graph, "Task"};
-    auto field = ui.text_field(draft, "Add a task").build();
+    auto field = ui.make<widget::TextField>(draft, "Add a task").build();
 
     REQUIRE(field->value() == "Task");
     draft.set("Updated");

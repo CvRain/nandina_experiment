@@ -856,6 +856,11 @@ header splitting stay in separate reviewable units. Checkbox and Switch are the 
 literal construction and `Signal<bool>` two-way binding now live in traits, and Settings exercises
 the new path for notification, diagnostics, and reduced-motion preferences.
 
+TextField and Slider form the third slice. Their traits own `Signal<std::string>` and `Signal<float>`
+two-way synchronization respectively, including slider epsilon feedback suppression. Settings now
+constructs every interactive input through `make<T>()`; legacy named factories remain compatibility
+adapters until layout/data header splitting is complete.
+
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.

@@ -98,7 +98,7 @@ TEST_CASE("BuildContext slider synchronizes a float signal", "[slider][authoring
     theme::ThemeManager themes;
     widget::BuildContext ui {graph, scope, themes};
     auto& scale = ui.signal<float>(1.0F);
-    auto slider = ui.slider(scale, "Scale", 0.5F, 2.0F, 0.1F).build();
+    auto slider = ui.make<widget::Slider>(scale, "Scale", 0.5F, 2.0F, 0.1F).build();
     scene::NanSceneTree tree;
     tree.set_root(slider);
     REQUIRE(tree.layout_root(foundation::NanSize(240.0F, 32.0F)) >= 1);

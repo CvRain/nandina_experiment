@@ -61,7 +61,8 @@ namespace nandina::examples::settings
             return std::format("Interface scale · {:.0f}%", interface_scale.get() * 100.0F);
         });
 
-        auto profile_field = ui.text_field(profile, "Profile name").autofocus().build();
+        auto profile_field =
+            ui.make<widget::TextField>(profile, "Profile name").autofocus().build();
         auto diagnostics_note = ui.when(diagnostics, [](widget::BuildContext branch) {
             return branch.label("Anonymous diagnostics help improve rendering stability")
                 .color_token(theme::ColorToken::on_surface_variant);
@@ -77,7 +78,9 @@ namespace nandina::examples::settings
                     diagnostics_note,
                     ui.make<widget::Checkbox>(reduced_motion, "Reduce interface motion"),
                     ui.label(scale_label).color_token(theme::ColorToken::on_surface_variant),
-                    ui.slider(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F)
+                    ui.make<widget::Slider>(
+                        interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F
+                    )
                 )
                 .build();
 

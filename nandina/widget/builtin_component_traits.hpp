@@ -98,6 +98,70 @@ namespace nandina::widget
             return result;
         }
     };
+
+    template<>
+    struct ComponentTraits<Slider> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string label,
+            const float value = 0.0F,
+            const float minimum = 0.0F,
+            const float maximum = 1.0F,
+            const float step = 0.01F
+        ) -> authoring::NodeBuilder<Slider> {
+            return authoring::make<Slider>(
+                std::move(label), value, minimum, maximum, step, ui.theme()
+            );
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<float>& value,
+            std::string label,
+            const float minimum = 0.0F,
+            const float maximum = 1.0F,
+            const float step = 0.01F
+        ) -> authoring::NodeBuilder<Slider> {
+            auto result = make(ui, std::move(label), value.get(), minimum, maximum, step);
+            const auto control = result.build();
+            ui.bind(control, &Slider::set_value, value);
+            ui.connect(control->value_changed(), [&value](const float current) {
+                if (std::abs(value.peek() - current) > foundation::nan_epsilon) {
+                    value.set(current);
+                }
+            });
+            return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<TextField> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string value,
+            std::string placeholder
+        ) -> authoring::NodeBuilder<TextField> {
+            return authoring::make<TextField>(
+                std::move(value), std::move(placeholder), ui.theme()
+            );
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<std::string>& value,
+            std::string placeholder
+        ) -> authoring::NodeBuilder<TextField> {
+            auto result = make(ui, std::string(value.get()), std::move(placeholder));
+            const auto field = result.build();
+            ui.bind(field, &TextField::set_value, value);
+            ui.connect(field->value_changed(), [&value](const std::string_view current) {
+                if (value.peek() != current) {
+                    value.set(std::string(current));
+                }
+            });
+            return result;
+        }
+    };
 }
 
 #endif // NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP

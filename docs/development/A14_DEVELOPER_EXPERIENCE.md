@@ -202,6 +202,10 @@ The boolean-selection slice migrates `Checkbox` and `Switch` together because th
 silent setter plus user-originated event contract. Their traits own two-way `Signal<bool>` wiring;
 Settings provides the corresponding visual and interaction check.
 
+The value-input slice migrates `TextField` and `Slider`, preserving text edit publication, silent
+source updates, bounded float configuration, and epsilon loop prevention. At this point all
+interactive inputs in Settings use `make<T>()`, providing one visual acceptance surface for A22.
+
 Each stage must shorten the canonical example and retain direct access to the existing concrete widgets for advanced use.
 
 The A14 authoring API delivery order is complete through A18. The compact recommended Todo keeps ordinary application code focused on its Store, row component, page composition, and bootstrap. The earlier paired low-level fixture was retired after the same imperative/DSL equivalence, page-parameter, and lifecycle contracts were established in focused framework tests.
