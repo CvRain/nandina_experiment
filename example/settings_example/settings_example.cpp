@@ -7,6 +7,7 @@
 #include "foundation/geometry.hpp"
 #include "theme/design_system.hpp"
 #include "theme/nan_style.hpp"
+#include "widget/controls.hpp"
 #include "widget/layout.hpp"
 
 #include <format>

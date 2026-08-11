@@ -10,6 +10,7 @@
 #include "widget/authoring.hpp"
 #include "widget/build_context.hpp"
 #include "widget/button.hpp"
+#include "widget/controls.hpp"
 #include "widget/declarative.hpp"
 #include "widget/grid.hpp"
 #include "widget/label.hpp"

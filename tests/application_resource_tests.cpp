@@ -2,6 +2,7 @@
 #include "app/nan_router.hpp"
 #include "resource/resource.hpp"
 #include "scene/control.hpp"
+#include "widget/controls.hpp"
 
 #include <catch2/catch_test_macros.hpp>
 

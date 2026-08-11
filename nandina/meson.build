@@ -156,6 +156,7 @@ module_widget = files(
     'widget/primitives/editable_text.cpp',
     'widget/component_traits.hpp',
     'widget/builtin_component_traits.hpp',
+    'widget/controls.hpp',
     'widget/label.hpp',
     'widget/label.cpp',
     'widget/layout.hpp',

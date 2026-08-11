@@ -66,6 +66,13 @@ authoring_tests = executable(
 )
 test('authoring', authoring_tests)
 
+build_context_header_tests = executable(
+    'build_context_header_tests',
+    files('build_context_header_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('build-context-header', build_context_header_tests)
+
 settings_example_tests = executable(
     'settings_example_tests',
     files('settings_example_tests.cpp'),

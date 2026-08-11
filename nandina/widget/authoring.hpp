@@ -9,16 +9,10 @@
 #include "../reactive/graph.hpp"
 #include "../scene/control.hpp"
 #include "../theme/theme.hpp"
-#include "button.hpp"
-#include "checkbox.hpp"
 #include "grid.hpp"
-#include "label.hpp"
 #include "layout.hpp"
 #include "list_view.hpp"
 #include "scroll_view.hpp"
-#include "slider.hpp"
-#include "switch.hpp"
-#include "text_field.hpp"
 
 #include <concepts>
 #include <functional>

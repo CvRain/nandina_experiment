@@ -5,6 +5,14 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP
 #define NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP
 
+#include "build_context.hpp"
+#include "button.hpp"
+#include "checkbox.hpp"
+#include "label.hpp"
+#include "slider.hpp"
+#include "switch.hpp"
+#include "text_field.hpp"
+
 namespace nandina::widget
 {
     template<>

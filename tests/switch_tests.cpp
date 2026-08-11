@@ -6,6 +6,7 @@
 #include "scene/scene_tree.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/build_context.hpp"
+#include "widget/controls.hpp"
 #include "widget/switch.hpp"
 
 #include <catch2/catch_approx.hpp>

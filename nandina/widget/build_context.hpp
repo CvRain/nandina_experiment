@@ -303,6 +303,4 @@ namespace nandina::widget
 
 } // namespace nandina::widget
 
-#include "builtin_component_traits.hpp"
-
 #endif // NANDINA_EXPERIMENT_WIDGET_BUILD_CONTEXT_HPP

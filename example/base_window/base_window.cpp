@@ -4,6 +4,8 @@
 
 #include "base_window.hpp"
 
+#include "widget/controls.hpp"
+
 namespace nandina::example::base_window
 {
 

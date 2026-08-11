@@ -9,6 +9,7 @@
 #include "theme/theme_manager.hpp"
 #include "widget/build_context.hpp"
 #include "widget/checkbox.hpp"
+#include "widget/controls.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>

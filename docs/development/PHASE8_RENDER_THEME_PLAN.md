@@ -287,10 +287,12 @@ Implement one component at a time and require recipe/rules, shared painters, lig
 tests, constrained layout, pointer/keyboard/focus behavior, semantics, authoring, and any necessary
 two-way binding. The example remains a real application, not a component gallery.
 
-The authoring entry point is being generalized separately as A22. New components must register a
-typed `ComponentTraits<T>`/ADL construction customization and must not require adding another method
-to `BuildContext`. Convenience methods remain thin compatibility adapters, keeping the component
-acceptance template strict without making the context header a monolithic catalog.
+The authoring entry point is generalized by A22. New components must register a typed
+`ComponentTraits<T>` construction customization and must not require adding another method to
+`BuildContext`. The pre-1.0 named component factories have been removed. Built-in traits are exposed
+through `widget/controls.hpp`, while `widget/build_context.hpp` stays independent of the concrete
+control catalog, keeping the component acceptance template strict without making the context header
+monolithic.
 
 ### Step 8: Close Page Root/Scope Lifetime
 

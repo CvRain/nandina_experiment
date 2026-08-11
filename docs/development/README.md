@@ -821,7 +821,7 @@ Status: complete for boolean selection and two-way authoring.
 
 `widget::Checkbox` is a concrete `Pressable` control with a label, boolean checked state, disabled/focus/hover/press visual states, theme-token-backed colors and metrics, inherited text pipeline, keyboard Space/Enter activation, and platform-independent checkbox semantics. User activation updates the stored value and emits `checked_changed`; programmatic `set_checked()` is silent so external state synchronization cannot create callback loops.
 
-`BuildContext::checkbox(signal, label)` binds any page/component-owned `Signal<bool>` in both directions using the existing weak setter binding and scope-owned event subscription. Literal construction, `authoring::checkbox()`, `.checked()`, and `.on_change()` remain thin adapters over the same concrete control.
+`ui.make<widget::Checkbox>(signal, label)` binds any page/component-owned `Signal<bool>` in both directions through `ComponentTraits<Checkbox>`, using the existing weak setter binding and scope-owned event subscription. Literal construction through `authoring::make<Checkbox>()`, `.checked()`, and `.on_change()` remains a thin adapter over the same concrete control.
 
 The canonical `nandina_settings_example` is now a Settings interface rather than another Todo variant. It starts through free `app::run`, owns profile and preference signals in the root scope, and exercises TextField, Checkbox, conditional content, reactive labels, commands, focus, theme tokens, layout, and semantics. Its headless test activates real semantic controls and validates save/reset behavior without test-only component accessors. A20 established a 23-line bootstrap and 122-line application snapshot; the continuing source-budget test keeps the bootstrap below 30 lines, the complete application below 220 lines, and forbids page/window/frame plumbing.
 
@@ -831,30 +831,29 @@ Status: complete for bounded continuous numeric input.
 
 `widget::Slider` provides a labelled accessibility identity, finite minimum/maximum range, positive step quantization, silent programmatic `set_value()`, and user-originated `value_changed Event<float>`. Pointer presses update immediately and capture subsequent dragging outside the control; keyboard arrows, Home/End, disabled and focus states, and semantic `set_value`, `increment`, and `decrement` actions share the same normalized update path.
 
-`BuildContext::slider(signal, label, minimum, maximum, step)` adds the float counterpart to Checkbox and TextField two-way authoring. Scope-owned subscriptions publish user changes to the signal, weak setter effects reflect source changes back into the concrete control, and silent setters prevent feedback loops. Literal `authoring::slider()` construction and `.value()`, `.range()`, `.step()`, and `.on_change()` modifiers remain available without a reactive source.
+`ui.make<widget::Slider>(signal, label, minimum, maximum, step)` adds the float counterpart to Checkbox and TextField two-way authoring through `ComponentTraits<Slider>`. Scope-owned subscriptions publish user changes to the signal, weak setter effects reflect source changes back into the concrete control, and silent setters prevent feedback loops. Literal `authoring::make<Slider>()` construction and `.value()`, `.range()`, `.step()`, and `.on_change()` modifiers remain available without a reactive source.
 
 The Settings reference now uses Slider for an interface-scale preference and derives both its local label and overall preference summary from the bound signal. Save/reset semantics and the actual Slider accessibility actions are covered headlessly. The canonical example is now 140 non-blank lines including its 23-line bootstrap, while still containing no page, window, frame, or manual reactive-scope plumbing.
 
 ### A22. Extensible Component Authoring
 
-Status: first typed customization slice implemented for Label and Button.
+Status: complete for the built-in control traits and public header split.
 
 `BuildContext` remains a lightweight service handle rather than an ever-growing component catalog.
 The generic construction path is `ui.make<widget::Button>("Save").on_click(save).build()`.
-Each component provides a typed `ComponentTraits<T>` or equivalent ADL customization in its own
-authoring header. That customization adapts context, theme, and defaults into `NodeBuilder<T>`;
+Each component provides a typed `ComponentTraits<T>` customization in the built-in traits layer.
+That customization adapts context, theme, and defaults into `NodeBuilder<T>`;
 adding a component does not require editing `BuildContext`. Runtime `std::type_index` registries are
-reserved for diagnostics and future plugins, while traits, concepts, and ADL provide the typed path
-without depending on unstable C++ static reflection. Public headers are layered into core, layout,
-controls, data, and an optional `widgets.hpp` umbrella, keeping the layout module-friendly.
+reserved for diagnostics and future plugins, while traits and concepts provide the typed path
+without depending on unstable C++ static reflection. Public headers are layered into core,
+controls and data boundaries, keeping a future module migration straightforward.
 
 The first slice introduces the incomplete `ComponentTraits<T>` customization point and routes
 `BuildContext::make<Label/Button>()` through built-in specializations. String signals retain weak
 setter bindings, while context-aware application components continue using the scoped-constructor
-fallback. `base_window` exercises `make<Button>(signal)` visually. Remaining controls and public
-header splitting stay in separate reviewable units. Checkbox and Switch are the second slice: both
-literal construction and `Signal<bool>` two-way binding now live in traits, and Settings exercises
-the new path for notification, diagnostics, and reduced-motion preferences.
+fallback. `base_window` exercises `make<Button>(signal)` visually. Checkbox and Switch form the
+second slice: both literal construction and `Signal<bool>` two-way binding live in traits, and
+Settings exercises the new path for notification, diagnostics, and reduced-motion preferences.
 
 TextField and Slider form the third slice. Their traits own `Signal<std::string>` and `Signal<float>`
 two-way synchronization respectively, including slider epsilon feedback suppression. Settings now
@@ -865,6 +864,14 @@ The named component factories have now been removed during pre-1.0 iteration:
 `authoring::*` component functions no longer exist. Application code uses `ui.make<T>()`; low-level
 tests and framework composition use `authoring::make<T>()`. Layout factories and structural
 `when()/for_each()` remain because they express layout/data behavior rather than a component catalog.
+
+Public authoring includes now follow the same boundary. `widget/build_context.hpp` exposes core
+build services, layout/data authoring, and the scoped custom-component fallback without including
+every concrete control. Application code that constructs built-ins includes `widget/controls.hpp`,
+which deliberately adds the built-in controls and their `ComponentTraits<T>` specializations.
+Framework and low-level control code may instead include only the concrete widget and generic
+`widget/authoring.hpp`. A dedicated translation-unit test keeps custom `BuildContext::make<T>()`
+usable with the core header alone, preventing the built-in catalog from leaking back into it.
 
 ### Deferred After Authoring Core
 

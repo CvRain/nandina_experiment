@@ -168,6 +168,14 @@ example, `ComponentTraits<Label>` injects the graph and active theme, while
 binding. Layout types use the same path. Adding `Badge` therefore adds its widget, recipe, traits,
 tests and example usage, but no `BuildContext::badge()` declaration.
 
+The include boundary mirrors that responsibility split. Ordinary pages that construct built-in
+controls include `widget/controls.hpp`; it exposes `BuildContext`, the built-in control types, and
+their typed traits as one application-facing entry. Custom component and framework code can include
+only `widget/build_context.hpp`, which retains layout/data composition and scoped construction but
+does not transitively parse the complete built-in control catalog. Low-level code may pair an
+individual component header with `widget/authoring.hpp`. These layers are also the intended source
+boundaries for the later C++ modules migration.
+
 ## Acceptance Budget
 
 The canonical Todo application must eventually satisfy all of these limits:
