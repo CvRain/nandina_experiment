@@ -38,9 +38,7 @@ namespace nandina::widget
             reactive::ReactiveScope& scope,
             theme::ThemeManager& themes
         ) noexcept:
-            graph_(&graph),
-            scope_(&scope),
-            themes_(&themes) {}
+            BuildContext(graph, scope, themes, scope) {}
 
         [[nodiscard]] auto graph() const noexcept -> reactive::Graph& {
             return *graph_;
@@ -60,7 +58,7 @@ namespace nandina::widget
 
         [[nodiscard]] auto with_scope(reactive::ReactiveScope& scope) const noexcept
             -> BuildContext {
-            return BuildContext(*graph_, scope, *themes_);
+            return BuildContext(*graph_, scope, *themes_, *callback_scope_);
         }
 
         template<typename T, typename... Args>
@@ -120,10 +118,12 @@ namespace nandina::widget
                                   std::declval<Args>()...
                               );
                           }) {
-                return ComponentTraits<Node>::make(
+                auto result = ComponentTraits<Node>::make(
                     *this,
                     std::forward<Args>(args)...
                 );
+                result.guard_callbacks(callback_scope_->lifetime());
+                return result;
             }
             else {
                 static_assert(
@@ -131,11 +131,24 @@ namespace nandina::widget
                     "Component must provide ComponentTraits<T>::make(BuildContext&, ...) "
                     "or a BuildContext-aware constructor"
                 );
-                return make_scoped_component<Node>(std::forward<Args>(args)...);
+                auto result = make_scoped_component<Node>(std::forward<Args>(args)...);
+                result.guard_callbacks(callback_scope_->lifetime());
+                return result;
             }
         }
 
     private:
+        BuildContext(
+            reactive::Graph& graph,
+            reactive::ReactiveScope& scope,
+            theme::ThemeManager& themes,
+            reactive::ReactiveScope& callback_scope
+        ) noexcept:
+            graph_(&graph),
+            scope_(&scope),
+            themes_(&themes),
+            callback_scope_(&callback_scope) {}
+
         template<typename Node, typename... Args>
         [[nodiscard]] auto make_scoped_component(Args&&... args) const
             -> authoring::NodeBuilder<Node> {
@@ -299,6 +312,7 @@ namespace nandina::widget
         reactive::Graph* graph_;
         reactive::ReactiveScope* scope_;
         theme::ThemeManager* themes_;
+        reactive::ReactiveScope* callback_scope_;
     };
 
 } // namespace nandina::widget

@@ -200,6 +200,7 @@ The paired imperative/DSL Todo served as the delivery fixture through A18. After
 4. A17 completes generic setter binding, two-way text-field state, and live theme-token propagation.
 5. A18 adds `BuildContext::when()` and `for_each()` as concise conditional and keyed collection authoring over the existing `IfRegion` and `ForEach` runtime.
 6. A22 generalizes component construction through typed `make<T>()` customization and domain-layered public headers, so adding a component does not require editing `BuildContext`.
+7. A23 closes retained-root callback lifetime with ReactiveScope generation tokens propagated through `BuildContext` authoring.
 
 A22 starts with `Label` and `Button`: their traits inject the current graph/theme and preserve live
 string bindings. Context-aware custom components retain the scoped constructor fallback. Other

@@ -21,10 +21,13 @@ namespace nandina::reactive
 
     class ReactiveScope {
     public:
-        explicit ReactiveScope(Graph& graph): graph_(&graph) {}
+        explicit ReactiveScope(Graph& graph):
+            graph_(&graph),
+            lifetime_(std::make_shared<int>(0)) {}
 
         ~ReactiveScope() {
-            clear();
+            lifetime_.reset();
+            clear_owned();
         }
 
         ReactiveScope(const ReactiveScope&) = delete;
@@ -70,21 +73,15 @@ namespace nandina::reactive
             subscriptions_.push_back(event.subscribe(std::forward<Handler>(handler)));
         }
 
+        /// The current generation expires before owned reactive values are destroyed.
+        [[nodiscard]] auto lifetime() const noexcept -> std::weak_ptr<void> {
+            return lifetime_;
+        }
+
         void clear() {
-            // 先断开外部事件，避免后续资源拆除期间再次进入当前作用域。
-            subscriptions_.clear();
-
-            for (auto* e: effects_) {
-                e->dispose();
-            }
-            effects_.clear();
-
-            for (auto& dispose: computeds_) {
-                dispose();
-            }
-            computeds_.clear();
-
-            signals_.clear();
+            lifetime_.reset();
+            clear_owned();
+            lifetime_ = std::make_shared<int>(0);
         }
 
         [[nodiscard]] auto signal_count() const -> std::size_t {
@@ -104,6 +101,22 @@ namespace nandina::reactive
         }
 
     private:
+        void clear_owned() {
+            // 先断开外部事件，避免后续资源拆除期间再次进入当前作用域。
+            subscriptions_.clear();
+
+            for (auto* e: effects_) {
+                e->dispose();
+            }
+            effects_.clear();
+
+            for (auto& dispose: computeds_) {
+                dispose();
+            }
+            computeds_.clear();
+
+            signals_.clear();
+        }
         struct SignalHolderBase {
             virtual ~SignalHolderBase() = default;
         };
@@ -117,6 +130,7 @@ namespace nandina::reactive
         };
 
         Graph* graph_;
+        std::shared_ptr<void> lifetime_;
         std::vector<std::unique_ptr<SignalHolderBase>> signals_;
         std::vector<std::function<void()>> computeds_;
         std::vector<Effect*> effects_;

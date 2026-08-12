@@ -91,9 +91,12 @@ is cheap and supports derived regions; converting the facade itself to shared ow
 a lambda that captured a local BuildContext by reference.
 
 Long-lived callbacks capture only required stable services or page state. The remaining lifetime
-risk is an externally retained page root invoking callbacks after its Page Frame has cleared page
-signals. The architectural fix is a shared lifetime anchor for root and scope, or uniform callback
-cleanup on unmount, with a regression test that retains a root across page pop.
+risk was an externally retained page root invoking callbacks after its Page Frame had cleared page
+signals. The selected fix gives each ReactiveScope generation a weak lifetime token and makes
+BuildContext-authored callbacks check that token before entering application code. Clearing the page
+scope invalidates the old generation before destroying signals, while a reused scope publishes a new
+token. A retained-root regression verifies callbacks are inert after page pop without extending the
+page or its reactive state.
 
 ### D8: Layout Fractions, Viewport Scale, And DPI Are Separate
 
@@ -119,7 +122,7 @@ control.set_min_width(120);
 control.set_max_width(480);
 control.set_aspect_ratio(16.0F / 9.0F);
 
-ui.button("Save")
+ui.make<widget::Button>("Save")
     .width(percent(50))
     .min_width(120)
     .aspect_ratio(16.0F / 9.0F);
@@ -296,8 +299,11 @@ monolithic.
 
 ### Step 8: Close Page Root/Scope Lifetime
 
-Keep the existing page-owned ReactiveScope. Address only the retained-root callback hazard and add
-teardown tests; do not introduce a second reactive lifetime system.
+Complete. The existing page-owned ReactiveScope now exposes a generation lifetime token;
+BuildContext propagates the page token through derived component/region contexts, and NodeBuilder
+guards application callbacks installed through `on_click`, `on_submit`, and `on_change`. Router and
+authoring teardown tests cover both retained roots after pop and scope reuse. No second reactive
+lifetime system or page/root ownership cycle is introduced.
 
 ## Deferred Work
 

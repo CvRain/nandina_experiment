@@ -8,7 +8,9 @@
 #include "reactive/effect.hpp"
 #include "reactive/signal.hpp"
 #include "scene/control.hpp"
+#include "scene/input_event.hpp"
 #include "theme/theme.hpp"
+#include "widget/controls.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -157,6 +159,34 @@ namespace
                 *observed += value;
             });
             return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
+
+    struct RetainedCallbackParams {
+        std::shared_ptr<widget::Button>* root = nullptr;
+        int* calls = nullptr;
+        bool* destroyed = nullptr;
+    };
+
+    class RetainedCallbackPage final: public app::Page<RetainedCallbackParams> {
+    public:
+        explicit RetainedCallbackPage(RetainedCallbackParams params): Page(std::move(params)) {}
+
+        ~RetainedCallbackPage() override {
+            *params().destroyed = true;
+        }
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "retained-callback";
+        }
+
+        [[nodiscard]] auto build(widget::BuildContext& ui) -> widget::View override {
+            auto button = ui.make<widget::Button>("Retained root").on_click([this] {
+                ++*params().calls;
+            });
+            auto root = button.build();
+            *params().root = root;
+            return root;
         }
     };
 
@@ -478,6 +508,33 @@ TEST_CASE(
 
     event.emit(3);
     REQUIRE(observed == 2);
+}
+
+TEST_CASE("retained page roots cannot invoke callbacks after pop", "[app][router][lifecycle]") {
+    reactive::Graph graph;
+    TestStore store {graph};
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes, &store, app::nan_type_key<TestStore>()};
+    std::shared_ptr<widget::Button> retained;
+    int calls = 0;
+    bool destroyed = false;
+
+    router.push<HomePage>(HomeParams {.user_id = 1});
+    router.push<RetainedCallbackPage>(RetainedCallbackParams {
+        .root = &retained,
+        .calls = &calls,
+        .destroyed = &destroyed,
+    });
+
+    scene::KeyEvent active_click {257, scene::KeyEvent::Action::press};
+    REQUIRE(retained->on_input(active_click));
+    REQUIRE(calls == 1);
+
+    REQUIRE(router.pop());
+    REQUIRE(destroyed);
+    scene::KeyEvent stale_click {257, scene::KeyEvent::Action::press};
+    REQUIRE(retained->on_input(stale_click));
+    REQUIRE(calls == 1);
 }
 
 struct LifecycleLog {

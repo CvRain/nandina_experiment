@@ -783,11 +783,11 @@ The low-level `BuildContext::scope()` and `with_scope()` APIs remain available f
 
 ### A17. Bindable Properties And Theme Tokens
 
-Status: complete for the v1 authoring contract; additional widget factories may add convenience overloads without introducing widget-specific binding lifetimes.
+Status: complete for the v1 authoring contract through typed component traits.
 
-`BuildContext::bind(target, setter, source)` connects any tracked source exposing `get()` to an ordinary concrete-widget setter. The current page, component, item, or conditional scope owns the effect, and the binding retains only a weak widget reference. `Signal`, read-only signal views, `Computed`, and compatible properties therefore share one binding path while detached controls are not kept alive by reactive work. `ui.label(source)` and `ui.button(source)` are concise forms over this same contract; literal values continue to use the ordinary string factories and setters.
+`BuildContext::bind(target, setter, source)` connects any tracked source exposing `get()` to an ordinary concrete-widget setter. The current page, component, item, or conditional scope owns the effect, and the binding retains only a weak widget reference. `Signal`, read-only signal views, `Computed`, and compatible properties therefore share one binding path while detached controls are not kept alive by reactive work. `ui.make<widget::Label>(source)` and `ui.make<widget::Button>(source)` are concise forms over this same contract; literal values use the same typed construction path and ordinary setters.
 
-`ui.text_field(signal, placeholder)` adds the v1 two-way string binding: source changes call the normal `TextField::set_value()` path, while committed user edits are published through `TextField::value_changed()` and written back to the signal. The existing callback setters remain available for commands and validation, and no control-owned reactive scope is added.
+`ui.make<widget::TextField>(signal, placeholder)` adds the v1 two-way string binding: source changes call the normal `TextField::set_value()` path, while committed user edits are published through `TextField::value_changed()` and written back to the signal. The existing callback setters remain available for commands and validation, and no control-owned reactive scope is added.
 
 `Label::set_color_token()` and the `Surface` theme-color fill/border overloads retain semantic `ColorToken` references rather than resolved snapshots. Attached scene trees already receive every `ThemeManager` revision, so these values are re-resolved automatically alongside Button and TextField styles. The Todo components now use context-owned text bindings and semantic colors and no longer override theme callbacks merely to refresh labels, rows, or the page background. The older `Label::bind_text()` entry point remains source-compatible but is no longer the recommended authoring path.
 
@@ -872,6 +872,22 @@ which deliberately adds the built-in controls and their `ComponentTraits<T>` spe
 Framework and low-level control code may instead include only the concrete widget and generic
 `widget/authoring.hpp`. A dedicated translation-unit test keeps custom `BuildContext::make<T>()`
 usable with the core header alone, preventing the built-in catalog from leaking back into it.
+
+### A23. Page Callback Lifetime Closure
+
+Status: complete for callbacks installed through BuildContext authoring.
+
+Each `ReactiveScope` generation owns a lifetime token. `BuildContext` preserves the page token when
+deriving component, conditional, and keyed-item contexts, and builders returned by `ui.make<T>()`
+guard `on_click`, `on_submit`, and `on_change` handlers with its weak token. Page pop invalidates the
+token before subscriptions, effects, computed values, and signals are destroyed, so an externally
+retained page root cannot re-enter callbacks that captured page state. Clearing and reusing a scope
+publishes a fresh generation for newly authored controls while old controls remain inert.
+
+This closes the retained-root hazard without making the lightweight BuildContext owning, retaining
+an inactive page, or introducing a root/page ownership cycle. Low-level `authoring::make<T>()` stays
+unguarded by design because it has no page scope; advanced direct setter/configure code remains
+responsible for the lifetime of what it captures.
 
 ### Deferred After Authoring Core
 

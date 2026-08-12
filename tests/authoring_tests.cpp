@@ -473,6 +473,29 @@ TEST_CASE("BuildContext make uses typed built-in component traits", "[authoring]
     REQUIRE(button->text() == "Running");
 }
 
+TEST_CASE("BuildContext callbacks expire with their owning scope", "[authoring][lifecycle]") {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+    int calls = 0;
+
+    auto first = ui.make<widget::Button>("First").on_click([&calls] { ++calls; }).build();
+    scene::KeyEvent activate_first {257, scene::KeyEvent::Action::press};
+    REQUIRE(first->on_input(activate_first));
+    REQUIRE(calls == 1);
+
+    scope.clear();
+    scene::KeyEvent activate_expired {257, scene::KeyEvent::Action::press};
+    REQUIRE(first->on_input(activate_expired));
+    REQUIRE(calls == 1);
+
+    auto second = ui.make<widget::Button>("Second").on_click([&calls] { ++calls; }).build();
+    scene::KeyEvent activate_second {257, scene::KeyEvent::Action::press};
+    REQUIRE(second->on_input(activate_second));
+    REQUIRE(calls == 2);
+}
+
 TEST_CASE("boolean component traits preserve two-way signal bindings", "[authoring][traits]") {
     reactive::Graph graph;
     reactive::ReactiveScope scope {graph};

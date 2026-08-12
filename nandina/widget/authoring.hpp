@@ -17,6 +17,7 @@
 #include <concepts>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <string>
 #include <utility>
@@ -63,6 +64,13 @@ namespace nandina::widget::authoring
             }
         }
 
+        /// Prevent subsequently installed application callbacks from entering after
+        /// their owning build scope has been cleared.
+        auto guard_callbacks(std::weak_ptr<void> lifetime) -> NodeBuilder& {
+            callback_lifetime_ = std::move(lifetime);
+            return *this;
+        }
+
         template<typename... Configure>
             requires(std::invocable<Configure, Node&> && ...)
         auto configure(Configure&&... configure) -> NodeBuilder& {
@@ -75,7 +83,7 @@ namespace nandina::widget::authoring
                 node.set_on_click(std::forward<Handler>(handler));
             }
         auto on_click(Handler&& handler) -> NodeBuilder& {
-            node_->set_on_click(std::forward<Handler>(handler));
+            node_->set_on_click(guarded(std::forward<Handler>(handler)));
             return *this;
         }
 
@@ -84,7 +92,7 @@ namespace nandina::widget::authoring
                 node.set_on_submit(std::forward<Handler>(handler));
             }
         auto on_submit(Handler&& handler) -> NodeBuilder& {
-            node_->set_on_submit(std::forward<Handler>(handler));
+            node_->set_on_submit(guarded(std::forward<Handler>(handler)));
             return *this;
         }
 
@@ -93,7 +101,7 @@ namespace nandina::widget::authoring
                 node.set_on_change(std::forward<Handler>(handler));
             }
         auto on_change(Handler&& handler) -> NodeBuilder& {
-            node_->set_on_change(std::forward<Handler>(handler));
+            node_->set_on_change(guarded(std::forward<Handler>(handler)));
             return *this;
         }
 
@@ -304,7 +312,22 @@ namespace nandina::widget::authoring
         }
 
     private:
+        template<typename Handler>
+        [[nodiscard]] auto guarded(Handler&& handler) const {
+            return [lifetime = callback_lifetime_, handler = std::forward<Handler>(handler)](
+                       auto&&... args
+                   ) mutable {
+                if (lifetime.has_value() && lifetime->expired()) {
+                    return;
+                }
+                static_cast<void>(
+                    std::invoke(handler, std::forward<decltype(args)>(args)...)
+                );
+            };
+        }
+
         std::shared_ptr<Node> node_;
+        std::optional<std::weak_ptr<void>> callback_lifetime_;
     };
 
     template<typename Node, typename... Args>
