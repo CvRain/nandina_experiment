@@ -41,12 +41,19 @@ namespace nandina::theme
         float label_lg = 18.0F;
     };
 
+    struct NanMotionTokens {
+        float short_duration = 0.12F;
+        float medium_duration = 0.20F;
+        float long_duration = 0.32F;
+    };
+
     struct NanTokens {
         NanSpacingTokens spacing;
         NanRadiusTokens radius;
         NanBorderTokens border;
         NanOpacityTokens opacity;
         NanTypographyTokens typography;
+        NanMotionTokens motion;
     };
 
 } // namespace nandina::theme

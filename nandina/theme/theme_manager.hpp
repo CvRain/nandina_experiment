@@ -11,6 +11,7 @@
 
 #include "appearance.hpp"
 #include "design_system.hpp"
+#include "motion.hpp"
 #include "nan_style.hpp"
 
 #include <cstdint>
@@ -88,6 +89,10 @@ namespace nandina::theme
         [[nodiscard]] auto active_family() const noexcept -> std::string_view;
         [[nodiscard]] auto preference() const noexcept -> ThemePreference;
         [[nodiscard]] auto appearance() const noexcept -> ColorAppearance;
+        void set_motion_preference(MotionPreference preference);
+        void set_system_reduced_motion(bool reduced);
+        [[nodiscard]] auto motion_preference() const noexcept -> MotionPreference;
+        [[nodiscard]] auto reduced_motion() const noexcept -> bool;
         [[nodiscard]] auto revision() const noexcept -> std::uint64_t;
 
         void set_style(std::shared_ptr<const NanStyle> style);
@@ -110,6 +115,8 @@ namespace nandina::theme
         std::string active_family_;
         ThemePreference preference_ = ThemePreference::system;
         ColorAppearance system_appearance_ = ColorAppearance::light;
+        MotionPreference motion_preference_ = MotionPreference::system;
+        bool system_reduced_motion_ = false;
         std::shared_ptr<const NanStyle> style_ = default_style();
         std::shared_ptr<const DesignSystem> system_;
         std::shared_ptr<const DesignSystem> effective_;

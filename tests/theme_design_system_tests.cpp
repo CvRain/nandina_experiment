@@ -282,6 +282,45 @@ TEST_CASE("ThemeManager apply publishes exactly one revision", "[theme][manager]
     REQUIRE(manager.theme().palette.primary.oklch().light == Catch::Approx(0.51F));
 }
 
+TEST_CASE("motion preference resolves system and explicit reduced motion", "[theme][motion]") {
+    theme::ThemeManager manager;
+    RevisionProbe probe;
+    manager.add_observer(probe);
+
+    REQUIRE(manager.motion_preference() == theme::MotionPreference::system);
+    REQUIRE_FALSE(manager.reduced_motion());
+
+    manager.set_system_reduced_motion(true);
+    REQUIRE(manager.reduced_motion());
+    REQUIRE(probe.changes == 1);
+
+    manager.set_motion_preference(theme::MotionPreference::full);
+    REQUIRE_FALSE(manager.reduced_motion());
+    REQUIRE(probe.changes == 2);
+
+    manager.set_system_reduced_motion(false);
+    REQUIRE_FALSE(manager.reduced_motion());
+    REQUIRE(probe.changes == 2);
+
+    manager.set_motion_preference(theme::MotionPreference::reduced);
+    REQUIRE(manager.reduced_motion());
+    REQUIRE(probe.changes == 3);
+
+    manager.set_motion_preference(theme::MotionPreference::system);
+    REQUIRE_FALSE(manager.reduced_motion());
+    REQUIRE(probe.changes == 4);
+
+    manager.remove_observer(probe);
+}
+
+TEST_CASE("default design system defines reusable motion durations", "[theme][motion]") {
+    const auto system = theme::default_design_system();
+
+    REQUIRE(system.tokens.motion.short_duration == Catch::Approx(0.12F));
+    REQUIRE(system.tokens.motion.medium_duration == Catch::Approx(0.20F));
+    REQUIRE(system.tokens.motion.long_duration == Catch::Approx(0.32F));
+}
+
 TEST_CASE("one DesignSystem carries light and dark palettes switched by preference", "[theme][manager][appearance]") {
     theme::ThemeManager manager;
     auto system = theme::default_design_system();

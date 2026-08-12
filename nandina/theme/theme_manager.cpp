@@ -228,6 +228,33 @@ namespace nandina::theme
         return system_appearance_;
     }
 
+    void ThemeManager::set_motion_preference(const MotionPreference preference) {
+        const bool previous = reduced_motion();
+        motion_preference_ = preference;
+        if (reduced_motion() != previous) {
+            publish_revision();
+        }
+    }
+
+    void ThemeManager::set_system_reduced_motion(const bool reduced) {
+        if (system_reduced_motion_ == reduced) {
+            return;
+        }
+        const bool previous = reduced_motion();
+        system_reduced_motion_ = reduced;
+        if (reduced_motion() != previous) {
+            publish_revision();
+        }
+    }
+
+    auto ThemeManager::motion_preference() const noexcept -> MotionPreference {
+        return motion_preference_;
+    }
+
+    auto ThemeManager::reduced_motion() const noexcept -> bool {
+        return resolve_reduced_motion(motion_preference_, system_reduced_motion_);
+    }
+
     auto ThemeManager::revision() const noexcept -> std::uint64_t {
         return revision_;
     }

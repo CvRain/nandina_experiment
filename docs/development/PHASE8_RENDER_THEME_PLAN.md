@@ -279,6 +279,12 @@ logical window behavior.
 Add animation state and scheduling separately from recipe colors. If this crosses render and widget
 boundaries, split commits in compilable dependency order.
 
+Step 5A establishes the policy boundary before any component animation: `NanMotionTokens` carries
+short/medium/long durations, while `ThemeManager` resolves `system/full/reduced` motion preference
+and publishes a revision only when the effective reduced-motion value changes. Step 5B will add the
+Button ripple recipe, painter, press-origin animation, clipping, tests, and Settings verification;
+components must consume this shared policy rather than inventing per-widget accessibility flags.
+
 ### Step 6: Normalize The Brand Theme Example
 
 Demonstrate paired primary/on-primary colors for both appearances, contrast constraints, and an

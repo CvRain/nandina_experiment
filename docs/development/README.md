@@ -889,6 +889,18 @@ an inactive page, or introducing a root/page ownership cycle. Low-level `authori
 unguarded by design because it has no page scope; advanced direct setter/configure code remains
 responsible for the lifetime of what it captures.
 
+### A24. Motion Policy Foundation
+
+Status: complete for shared tokens and effective preference resolution; component animation follows
+as a separate review unit.
+
+`NanTokens::motion` defines reusable short, medium, and long durations in seconds. `ThemeManager`
+owns a `system/full/reduced` application preference plus the current platform reduced-motion value,
+and exposes one effective `reduced_motion()` decision. Observers receive a revision only when that
+effective decision changes, so attached components can cancel or complete animation without a
+parallel settings channel. Button ripple remains the next widget-level unit and will consume this
+policy rather than adding a Button-specific accessibility flag.
+
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.

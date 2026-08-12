@@ -103,6 +103,7 @@ module_render = files(
 
 module_theme = files(
     'theme/tokens.hpp',
+    'theme/motion.hpp',
     'theme/theme.hpp',
     'theme/theme.cpp',
     'theme/appearance.hpp',
