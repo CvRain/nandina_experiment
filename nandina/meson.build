@@ -22,6 +22,7 @@ module_fundation = files(
     'foundation/nandina_color.cpp',
     'foundation/nandina_color_space.hpp',
     'foundation/nandina_color_space.cpp',
+    'foundation/contrast.hpp',
     'foundation/geometry.hpp',
     'foundation/geometry.cpp',
     'foundation/transform2d.hpp',

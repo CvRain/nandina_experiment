@@ -7,6 +7,13 @@ foundation_tests = executable(
 )
 test('foundation', foundation_tests)
 
+contrast_tests = executable(
+    'contrast_tests',
+    files('contrast_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('contrast', contrast_tests)
+
 font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'api' / 'fonts' / 'Inconsolata-Regular.ab.ttf'
 rtl_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'shape' / 'data' / 'text-rendering-tests' / 'fonts' / 'TestShapeAran.ttf'
 arabic_mark_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'shape' / 'data' / 'in-house' / 'fonts' / '65984dfce552a785f564422aadf4715fa07795ad.ttf'
