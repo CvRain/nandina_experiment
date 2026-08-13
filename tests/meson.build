@@ -156,6 +156,13 @@ badge_tests = executable(
 )
 test('badge', badge_tests)
 
+card_tests = executable(
+    'card_tests',
+    files('card_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('card', card_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

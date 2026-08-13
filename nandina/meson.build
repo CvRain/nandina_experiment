@@ -180,6 +180,8 @@ module_widget = files(
     'widget/switch.cpp',
     'widget/badge.hpp',
     'widget/badge.cpp',
+    'widget/card.hpp',
+    'widget/card.cpp',
 )
 
 module_app = files(

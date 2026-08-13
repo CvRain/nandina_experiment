@@ -8,6 +8,7 @@
 #include "build_context.hpp"
 #include "badge.hpp"
 #include "button.hpp"
+#include "card.hpp"
 #include "checkbox.hpp"
 #include "label.hpp"
 #include "slider.hpp"
@@ -177,6 +178,13 @@ namespace nandina::widget
         [[nodiscard]] static auto make(const BuildContext& ui, std::string text)
             -> authoring::NodeBuilder<Badge> {
             return authoring::make<Badge>(std::move(text), ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Card> {
+        [[nodiscard]] static auto make(const BuildContext& ui) -> authoring::NodeBuilder<Card> {
+            return authoring::make<Card>(ui.theme());
         }
     };
 }
