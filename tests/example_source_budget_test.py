@@ -21,8 +21,10 @@ bootstrap_lines = nonblank_lines(bootstrap)
 application_lines = sum(nonblank_lines(path) for path in application)
 if bootstrap_lines > 30:
     raise SystemExit(f"example bootstrap exceeds budget: {bootstrap_lines} > 30")
-if application_lines > 220:
-    raise SystemExit(f"settings example exceeds budget: {application_lines} > 220")
+# Budget raised from 220 to 260 in Step 6: the brand theme carries three 11-stop
+# reference scales plus claymorphism token overrides, which is data, not logic.
+if application_lines > 260:
+    raise SystemExit(f"settings example exceeds budget: {application_lines} > 260")
 
 source = "\n".join(path.read_text(encoding="utf-8") for path in application)
 for forbidden in (

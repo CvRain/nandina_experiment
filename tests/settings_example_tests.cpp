@@ -2,6 +2,7 @@
 
 #include "app/nan_router.hpp"
 #include "app/root_view.hpp"
+#include "foundation/contrast.hpp"
 #include "foundation/geometry.hpp"
 #include "render/render_device.hpp"
 #include "scene/input_event.hpp"
@@ -257,4 +258,38 @@ TEST_CASE("settings appearance buttons switch the theme preference", "[example][
         {.action = semantics::Action::activate}
     ));
     REQUIRE(themes.preference() == theme::ThemePreference::light);
+}
+
+TEST_CASE("settings brand theme keeps paired contrast in both appearances", "[example][settings][contrast]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    (void)router.push<app::detail::RootViewPage>(
+        app::detail::make_root_view_params(examples::settings::build)
+    );
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+
+    const auto& design = themes.design_system();
+    const auto require_aa_text = [](const theme::NanColorScheme& scheme) {
+        REQUIRE(
+            foundation::nan_contrast_ratio(scheme.primary, scheme.on_primary)
+            >= foundation::nan_contrast_aa_text
+        );
+        REQUIRE(
+            foundation::nan_contrast_ratio(scheme.surface, scheme.on_surface)
+            >= foundation::nan_contrast_aa_text
+        );
+        REQUIRE(
+            foundation::nan_contrast_ratio(scheme.background, scheme.on_background)
+            >= foundation::nan_contrast_aa_text
+        );
+    };
+    require_aa_text(design.light);
+    require_aa_text(design.dark);
+
+    // 暗色外观走 material_dark_tone：品牌色提升到 400 档，亮暗 primary 明度不同。
+    REQUIRE(design.dark.primary.oklch().light > design.light.primary.oklch().light);
 }
