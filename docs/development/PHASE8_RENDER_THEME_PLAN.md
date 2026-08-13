@@ -342,6 +342,9 @@ via ComponentTraits, example-as-real-app). Badge is the first component complete
 `BadgeRecipe`/`BadgeRecipeRule`/`resolve_badge` in the theme layer, a static pill widget reusing
 `BoxPainter` and `primitives::Text`, `ComponentTraits<Badge>` authoring without a BuildContext
 method, `static_text` semantics, six focused test cases, and a real "Beta" badge in Settings.
+Card follows as the surface-container component: `CardRecipe`/`CardRecipeRule`/`resolve_card`,
+a single-child container reusing `BoxPainter` with recipe-driven padding, six focused test cases,
+and the Settings Preferences section wrapped in a Card.
 
 ### Step 8: Close Page Root/Scope Lifetime
 

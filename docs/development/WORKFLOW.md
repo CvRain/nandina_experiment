@@ -107,11 +107,11 @@ readable:
 - Phase 8 Step 6 committed (`000ae6c` / `930fa44` / `371699f`): contrast helpers
   and the Catppuccin Settings brand theme (Latte light / Mocha dark, Rosewater
   light primary, Peach dark primary, 12/16/24 radii, 2–3px borders).
-- Phase 8 Step 7 complete: the component template is frozen here in §4 and Badge
-  is the first component completed against it (recipe/rule resolution, shared
-  painters, override survival, constrained layout, static_text semantics, real
-  "Beta" use in Settings).
-- Test suite 28/28 green.
-- Next: continue the D6 order with Card, then ProgressBar, then RadioButton.
-  Planned follow-ups: built-in ThemeManager theme families
-  (fluent/material/creamy) and soft shadows for claymorphism elevation.
+- Phase 8 Step 7 complete: the component template is frozen here in §4. Badge
+  and Card are the first two components completed against it (recipe/rule
+  resolution, shared painters, override survival, constrained layout, static
+  semantics, real use in Settings).
+- Test suite 29/29 green.
+- Next: continue the D6 order with ProgressBar, then RadioButton. Planned
+  follow-ups: built-in ThemeManager theme families (fluent/material/creamy)
+  and soft shadows for claymorphism elevation.
