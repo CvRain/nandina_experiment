@@ -211,6 +211,19 @@ namespace nandina::theme
         ControlMetrics metrics;
     };
 
+    /** Card 度量：水平/垂直内边距与最小高度（内容驱动尺寸）。 */
+    using CardMetrics = struct CardMetrics {
+        ThemeScalar padding_x;
+        ThemeScalar padding_y;
+        ThemeScalar min_height;
+    };
+
+    /** Card 配方：surface 容器 + 度量（单子内容容器，无状态）。 */
+    using CardRecipe = struct CardRecipe {
+        BoxStyle container;
+        CardMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -315,6 +328,17 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_padding_x;
     };
 
+    /** Card 规则：无选择器（纯容器），覆盖容器 / 度量字段。 */
+    using CardRecipeRule = struct CardRecipeRule {
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_padding_y;
+        std::optional<ThemeScalar> metrics_min_height;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -377,6 +401,17 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedCardMetrics = struct ResolvedCardMetrics {
+        float padding_x = 0.0F;
+        float padding_y = 0.0F;
+        float min_height = 0.0F;
+    };
+
+    using ResolvedCardStyle = struct ResolvedCardStyle {
+        ResolvedBoxStyle container;
+        ResolvedCardMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -418,6 +453,11 @@ namespace nandina::theme
         std::vector<BadgeRecipeRule> rules;
     };
 
+    using CardRecipes = struct CardRecipes {
+        CardRecipe base;
+        std::vector<CardRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -425,6 +465,7 @@ namespace nandina::theme
         TextFieldRecipes text_field;
         SwitchRecipes switch_component;
         BadgeRecipes badge;
+        CardRecipes card;
     };
 
     /**
@@ -613,6 +654,11 @@ namespace nandina::theme
         ColorAppearance appearance
     ) -> ResolvedBadgeStyle;
 
+    [[nodiscard]] auto resolve_card(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedCardStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -665,6 +711,13 @@ namespace nandina::theme
         const BadgeRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedCardStyle& style,
+        const CardRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -673,6 +726,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_text_field_recipe() -> TextFieldRecipe;
     [[nodiscard]] auto default_switch_recipe() -> SwitchRecipe;
     [[nodiscard]] auto default_badge_recipe() -> BadgeRecipe;
+    [[nodiscard]] auto default_card_recipe() -> CardRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

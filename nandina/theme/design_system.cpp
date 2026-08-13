@@ -187,6 +187,22 @@ namespace nandina::theme
             };
         }
 
+        /** CardRecipe → 解析后的片段组合（纯容器，无状态变换）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const CardRecipe& recipe
+        ) -> ResolvedCardStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .metrics = {
+                    .padding_x = resolve_scalar(system, appearance, recipe.metrics.padding_x),
+                    .padding_y = resolve_scalar(system, appearance, recipe.metrics.padding_y),
+                    .min_height = resolve_scalar(system, appearance, recipe.metrics.min_height),
+                },
+            };
+        }
+
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
         void apply_button_disabled(
             const DesignSystem& system,
@@ -371,6 +387,20 @@ namespace nandina::theme
     ) -> ResolvedBadgeStyle {
         auto style = resolve_recipe(system, appearance, system.components.badge.base);
         for (const auto& rule: system.components.badge.rules) {
+            apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Card 配方（纯容器：base → 规则列表，后匹配者胜，无状态变换）。
+     */
+    auto resolve_card(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedCardStyle {
+        auto style = resolve_recipe(system, appearance, system.components.card.base);
+        for (const auto& rule: system.components.card.rules) {
             apply_rule(system, appearance, style, rule);
         }
         return style;
@@ -586,6 +616,36 @@ namespace nandina::theme
             style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedCardStyle& style,
+        const CardRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_padding_y) {
+            style.metrics.padding_y =
+                resolve_scalar(system, appearance, *rule.metrics_padding_y);
+        }
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -789,6 +849,23 @@ namespace nandina::theme
                 .min_height = ThemeScalar::literal(20.0F),
                 .box_size = ThemeScalar::literal(0.0F),
                 .preferred_width = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 Card 配方（surface 卡片容器，单子内容）。 */
+    auto default_card_recipe() -> CardRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface),
+                .border = ThemeColor::token(ColorToken::outline_variant),
+                .border_width = ThemeScalar::token(ScalarToken::border_thin),
+                .radius = ThemeScalar::token(ScalarToken::radius_md),
+            },
+            .metrics = CardMetrics {
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_md),
+                .padding_y = ThemeScalar::token(ScalarToken::spacing_md),
+                .min_height = ThemeScalar::literal(0.0F),
             },
         };
     }
@@ -1042,6 +1119,10 @@ namespace nandina::theme
                 },
                 .badge = BadgeRecipes {
                     .base = default_badge_recipe(),
+                    .rules = {},
+                },
+                .card = CardRecipes {
+                    .base = default_card_recipe(),
                     .rules = {},
                 },
             },
