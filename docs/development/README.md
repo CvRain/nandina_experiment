@@ -926,6 +926,22 @@ that real policy rather than maintaining a visual-only preference.
 - Native IME, clipboard/undo, UAX #14, emoji and rich text.
 - System font discovery as an explicit application feature.
 
+## Iteration Workflow
+
+Nandina develops in one-reviewable-unit increments. The complete iteration contract —
+docs-first discipline, verification gates, commit discipline, the frozen component
+template, and lifetime rules — lives in [`WORKFLOW.md`](WORKFLOW.md). Every round:
+
+1. Close any doc/status drift before writing code.
+2. Implement one logical unit; components follow the frozen template.
+3. Pass `meson compile -C buildDir`, `meson test -C buildDir --print-errorlogs`, and
+   `git diff --check`.
+4. Have the user review the running effect and the diff.
+5. Commit with `type(scope): 中文描述` and a body covering motivation / core changes /
+   verification, splitting theme/widget/render/app/example changes when dependency
+   order allows.
+6. Sync the phase doc, capability map, and this file in the same change.
+
 ## Development Workflow
 
 ### Developer Experience Roadmap
@@ -1019,11 +1035,15 @@ Review questions for every abstraction:
 For normal framework changes run:
 
 ```sh
-meson test -C buildDir
+meson compile -C buildDir
+meson test -C buildDir --print-errorlogs
+git diff --check
 meson compile -C buildDir nandina_settings_example
 ```
 
-Before committing, inspect status and exclude unrelated generated files such as `firebase-debug.log`.
+Before committing, inspect status and exclude unrelated generated files such as
+`firebase-debug.log`. The full iteration contract (docs-first discipline, commit
+discipline, component template) is in [`WORKFLOW.md`](WORKFLOW.md).
 
 For resource/font changes, also run the focused targets:
 

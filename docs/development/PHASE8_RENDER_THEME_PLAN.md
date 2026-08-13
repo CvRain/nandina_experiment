@@ -7,7 +7,9 @@ semantics, then uses new components to verify the resulting authoring template.
 
 Work continues in one-reviewable-unit increments. Every unit must compile and pass the complete
 test suite before review, and theme, widget, render, app, and example changes remain separate
-whenever their dependency order allows it.
+whenever their dependency order allows it. The full iteration contract (docs-first discipline,
+verification gates, commit format, and the frozen component template) is tracked in
+`WORKFLOW.md`.
 
 ## Audit Summary
 
