@@ -191,7 +191,14 @@ namespace nandina::examples::settings
                 .gap(12.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
-                    ui.make<widget::Label>("Nandina Settings").font_size(28.0F),
+                    ui.row()
+                        .gap(10.0F)
+                        .cross_alignment(widget::LayoutAlignment::center)
+                        .children(
+                            ui.make<widget::Label>("Nandina Settings").font_size(28.0F),
+                            ui.make<widget::Badge>("Beta")
+                        )
+                        .build(),
                     ui.make<widget::Label>(
                           "A compact application authored from components and state"
                     )
