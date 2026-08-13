@@ -104,7 +104,12 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
-- Phase 8 Step 5B / A25 complete (`b182d60`); test suite 26/26 green.
-- Next: Phase 8 Step 6 (brand theme example) — contrast tool commit first, then the
-  Settings brand theme commit, then Step 7 (freeze the component template) and the
-  first new component in the §4 order.
+- Phase 8 Step 6 implemented: `nan_relative_luminance` / `nan_contrast_ratio`
+  helpers (foundation) and the Settings brand theme (official Catppuccin
+  palette: Latte light / Mocha dark neutrals, Peach primary, Flamingo/Maroon
+  accent, 12/16/24 radii, 2–3px borders, AA contrast assertions).
+- Test suite 27/27 green; awaiting user visual review before committing.
+- Next: commit Step 6 (contrast tool and brand theme as separate commits), then
+  Step 7 (freeze the component template) and the first new component in the §4
+  order. Planned follow-ups: built-in ThemeManager theme families
+  (fluent/material/creamy) and soft shadows for claymorphism elevation.

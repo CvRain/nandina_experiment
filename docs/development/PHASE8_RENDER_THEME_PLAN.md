@@ -311,6 +311,18 @@ the manager, providing both an application example and a headless integration te
 Demonstrate paired primary/on-primary colors for both appearances, contrast constraints, and an
 optional tone policy instead of presenting a radius-only customization as the brand example.
 
+Status: implemented; awaiting user visual review. Settings applies the official Catppuccin
+palette (MIT): Latte neutrals for light (`#eff1f5` base) and Mocha neutrals for dark (`#1e1e2e`
+base), with Peach as the warm-orange primary (`#fe640b` light / `#fab387` dark via the tone
+policy) and a Flamingo/Maroon tertiary scale. `on_primary` follows the style-guide "On Accent =
+Base" rule (Mocha base), keeping AA text contrast in both appearances. Card-style radii
+(12/16/24) and 2–3px borders are expressed as token overrides; soft shadows are deferred until
+the render device has a shadow primitive. The page showcases primary, coral, variant, and
+outline semantic colors (the on-primary pairing is demonstrated by the filled Save button)
+while keeping theme switching and automatic refresh. `foundation/contrast.hpp` adds WCAG
+relative luminance and contrast ratio helpers, and the settings tests assert AA text contrast
+for primary/on_primary, surface/on_surface, and background/on_background in both appearances.
+
 ### Step 7: Freeze The Component Template
 
 Implement one component at a time and require recipe/rules, shared painters, light/dark and override
@@ -338,6 +350,14 @@ lifetime system or page/root ownership cycle is introduced.
 - RGB subpixel text waits for a display-scale and compositor policy.
 - Vulkan/SDL platform work remains outside the pre-2.0 plan.
 - Large component expansion waits for Steps 0 through 3.
+- Soft UI shadows (claymorphism double shadow stacks) wait for a render-device
+  shadow primitive with SDF soft-edge falloff, so themes like the Settings brand
+  example can add elevation without a per-widget texture pass.
+- Built-in theme families: the Settings brand theme currently lives in the
+  example. Pre-1.0 it should move into a ThemeManager-managed catalog (named
+  built-in schemes such as fluent/material/creamy) so applications select one
+  coherent platform tone by name and override it per brand, instead of copying
+  palette code out of the example.
 
 ## Build Dependency Policy
 
