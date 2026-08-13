@@ -105,12 +105,14 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
 
     auto* diagnostics = checkbox_named(*router.host(), "Send anonymous diagnostics");
+    auto* reduced_motion = checkbox_named(*router.host(), "Reduce interface motion");
     auto* notifications = switch_named(*router.host(), "Desktop notifications");
     auto* input = find_node<widget::TextField>(*router.host(), [](const auto&) { return true; });
     auto* save = button_named(*router.host(), "Save preferences");
     auto* reset = button_named(*router.host(), "Reset");
     auto* scale = find_node<widget::Slider>(*router.host(), [](const auto&) { return true; });
     REQUIRE(diagnostics != nullptr);
+    REQUIRE(reduced_motion != nullptr);
     REQUIRE(notifications != nullptr);
     REQUIRE(input != nullptr);
     REQUIRE(save != nullptr);
@@ -119,6 +121,8 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(tree.focused_node() == input);
     REQUIRE(notifications->checked());
     REQUIRE_FALSE(diagnostics->checked());
+    REQUIRE_FALSE(reduced_motion->checked());
+    REQUIRE_FALSE(themes.reduced_motion());
     REQUIRE(scale->value() == 1.0F);
 
     REQUIRE(tree.update_semantics());
@@ -127,6 +131,13 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
         {.action = semantics::Action::activate}
     ));
     REQUIRE(diagnostics->checked());
+    REQUIRE(tree.perform_semantics_action(
+        reduced_motion->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(reduced_motion->checked());
+    REQUIRE(themes.motion_preference() == theme::MotionPreference::reduced);
+    REQUIRE(themes.reduced_motion());
     REQUIRE(tree.perform_semantics_action(
         scale->semantics_id(),
         {.action = semantics::Action::set_value, .value = "1.25"}
@@ -164,6 +175,9 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(input->value() == "Nandina developer");
     REQUIRE(notifications->checked());
     REQUIRE_FALSE(diagnostics->checked());
+    REQUIRE_FALSE(reduced_motion->checked());
+    REQUIRE(themes.motion_preference() == theme::MotionPreference::system);
+    REQUIRE_FALSE(themes.reduced_motion());
     REQUIRE(scale->value() == 1.0F);
 }
 

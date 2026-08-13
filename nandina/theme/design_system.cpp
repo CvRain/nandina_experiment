@@ -33,6 +33,10 @@ namespace nandina::theme
                     .hover = resolve_color(system, appearance, recipe.state_layer.hover, tone),
                     .pressed = resolve_color(system, appearance, recipe.state_layer.pressed, tone),
                 },
+                .ripple = {
+                    .color = resolve_color(system, appearance, recipe.ripple.color, tone),
+                    .duration = resolve_scalar(system, appearance, recipe.ripple.duration),
+                },
                 .metrics = resolve(system, appearance, recipe.metrics),
             };
         }
@@ -384,6 +388,12 @@ namespace nandina::theme
             style.state_layer.pressed =
                 resolve_color(system, appearance, *rule.state_layer_pressed, tone);
         }
+        if (rule.ripple_color) {
+            style.ripple.color = resolve_color(system, appearance, *rule.ripple_color, tone);
+        }
+        if (rule.ripple_duration) {
+            style.ripple.duration = resolve_scalar(system, appearance, *rule.ripple_duration);
+        }
     }
 
     void apply_rule(
@@ -544,6 +554,12 @@ namespace nandina::theme
             .state_layer = StateLayerStyle {
                 .hover = ThemeColor::transparent(ColorToken::surface),
                 .pressed = ThemeColor::transparent(ColorToken::surface),
+            },
+            .ripple = RippleStyle {
+                .color = ThemeColor::with_alpha(
+                    on_accent_ref, ThemeScalar::literal(0.20F)
+                ),
+                .duration = ThemeScalar::token(ScalarToken::motion_medium_duration),
             },
             .metrics = ControlMetrics {
                 .height = ThemeScalar::literal(36.0F),

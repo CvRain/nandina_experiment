@@ -14,6 +14,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <cmath>
 #include <memory>
 #include <string>
 #include <string_view>
@@ -36,9 +37,17 @@ namespace
             float font_size = 0.0F;
             float alpha = 0.0F;
         };
+        struct RippleCall {
+            foundation::NanPoint center;
+            float circle_radius = 0.0F;
+            foundation::NanRect clip_rect;
+            float clip_radius = 0.0F;
+            float alpha = 0.0F;
+        };
 
         std::vector<RectCall> rects;
         std::vector<TextCall> texts;
+        std::vector<RippleCall> ripples;
         std::vector<std::string> operations;
 
         void begin_frame() override {}
@@ -63,6 +72,17 @@ namespace
 
         void draw_line(const foundation::NanPoint&, const foundation::NanPoint&, float, const foundation::NanColor&) override {}
         void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
+
+        void draw_circle_clipped_rounded_rect(
+            const foundation::NanPoint& center,
+            float circle_radius,
+            const foundation::NanRect& clip_rect,
+            float clip_radius,
+            const foundation::NanColor& color
+        ) override {
+            ripples.push_back({center, circle_radius, clip_rect, clip_radius, color.alpha()});
+            operations.emplace_back("ripple");
+        }
 
         void draw_text(
             std::string_view text,
@@ -117,6 +137,35 @@ TEST_CASE("button resolver keeps tone and treatment orthogonal", "[theme][button
     const auto danger = theme::button_accent(system.light, theme::ButtonTone::danger);
     REQUIRE(danger.first.alpha() == Catch::Approx(1.0F));
     REQUIRE(danger.second.alpha() == Catch::Approx(1.0F));
+}
+
+TEST_CASE("button recipe resolves and overrides ripple feedback", "[theme][button][ripple]") {
+    const auto system = theme::default_design_system();
+    auto resolved = theme::resolve_button(
+        system,
+        theme::ColorAppearance::light,
+        theme::ButtonTone::primary,
+        theme::ButtonTreatment::filled,
+        theme::ButtonSize::medium,
+        theme::ButtonVisualState::normal
+    );
+    REQUIRE(resolved.ripple.color.alpha() == Catch::Approx(0.20F));
+    REQUIRE(resolved.ripple.duration == Catch::Approx(system.tokens.motion.medium_duration));
+
+    theme::ButtonRecipeRule rule;
+    rule.ripple_color = theme::ThemeColor::literal(
+        theme::nan_color(0.60F, 0.10F, 120.0F, 0.35F)
+    );
+    rule.ripple_duration = theme::ThemeScalar::literal(0.75F);
+    theme::apply_rule(
+        system,
+        theme::ColorAppearance::light,
+        resolved,
+        rule,
+        theme::ButtonTone::primary
+    );
+    REQUIRE(resolved.ripple.color.alpha() == Catch::Approx(0.35F));
+    REQUIRE(resolved.ripple.duration == Catch::Approx(0.75F));
 }
 
 TEST_CASE("NanStyle rules bridge into the design system and resolve", "[theme][style]") {
@@ -513,6 +562,101 @@ TEST_CASE("button paints state feedback as an overlay between base and content",
     REQUIRE(dev.rects[0].alpha == Catch::Approx(style.container.fill.alpha()));
     REQUIRE(dev.rects[1].alpha == Catch::Approx(style.state_layer.hover.alpha()));
     REQUIRE(dev.operations == std::vector<std::string> {"fill", "fill", "text"});
+}
+
+TEST_CASE(
+    "button ripple expands from the pointer and stays below content",
+    "[widget][button][ripple]"
+) {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("Ripple");
+    button->set_position(foundation::NanPoint(10.0F, 20.0F));
+    tree.set_root(button);
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(24.0F, 32.0F), foundation::NanPoint::zero()
+    });
+    tree.dispatch_mouse_button(scene::MouseButtonEvent {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::press,
+        foundation::NanPoint(24.0F, 32.0F)
+    });
+    REQUIRE(button->ripple_active());
+    REQUIRE(button->ripple_progress() == Catch::Approx(0.0F));
+
+    const auto style = button->resolved_style();
+    tree.process(style.ripple.duration * 0.5F);
+    REQUIRE(button->ripple_progress() == Catch::Approx(0.5F));
+    tree.draw(dev);
+
+    REQUIRE(dev.ripples.size() == 1);
+    REQUIRE(dev.ripples[0].center.get_x() == Catch::Approx(24.0F));
+    REQUIRE(dev.ripples[0].center.get_y() == Catch::Approx(32.0F));
+    REQUIRE(dev.ripples[0].clip_rect.get_left() == Catch::Approx(10.0F));
+    REQUIRE(dev.ripples[0].clip_rect.get_top() == Catch::Approx(20.0F));
+    const float far_x = std::max(
+        std::abs(dev.ripples[0].center.get_x() - dev.ripples[0].clip_rect.get_left()),
+        std::abs(dev.ripples[0].clip_rect.get_right() - dev.ripples[0].center.get_x())
+    );
+    const float far_y = std::max(
+        std::abs(dev.ripples[0].center.get_y() - dev.ripples[0].clip_rect.get_top()),
+        std::abs(dev.ripples[0].clip_rect.get_bottom() - dev.ripples[0].center.get_y())
+    );
+    REQUIRE(
+        dev.ripples[0].circle_radius == Catch::Approx(std::hypot(far_x, far_y) * 0.875F)
+    );
+    REQUIRE(dev.ripples[0].alpha == Catch::Approx(style.ripple.color.alpha() * 0.5F));
+    REQUIRE(dev.ripples[0].clip_radius == Catch::Approx(style.container.radius));
+    REQUIRE(
+        dev.operations
+        == std::vector<std::string> {"fill", "fill", "ripple", "text", "outline"}
+    );
+
+    tree.process(style.ripple.duration);
+    REQUIRE_FALSE(button->ripple_active());
+    REQUIRE(button->ripple_progress() == Catch::Approx(1.0F));
+}
+
+TEST_CASE(
+    "button cancels ripple for reduced motion and disabled state",
+    "[widget][button][ripple]"
+) {
+    theme::ThemeManager manager;
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(manager);
+    auto button = std::make_shared<widget::Button>("Motion");
+    tree.set_root(button);
+
+    const auto press = [&tree] {
+        tree.dispatch_mouse_move(scene::MouseMoveEvent {
+            foundation::NanPoint(12.0F, 12.0F), foundation::NanPoint::zero()
+        });
+        tree.dispatch_mouse_button(scene::MouseButtonEvent {
+            scene::MouseButtonEvent::Button::left,
+            scene::MouseButtonEvent::Action::press,
+            foundation::NanPoint(12.0F, 12.0F)
+        });
+    };
+
+    press();
+    REQUIRE(button->ripple_active());
+    manager.set_motion_preference(theme::MotionPreference::reduced);
+    REQUIRE_FALSE(button->ripple_active());
+
+    press();
+    REQUIRE_FALSE(button->ripple_active());
+    manager.set_motion_preference(theme::MotionPreference::full);
+    scene::MouseButtonEvent release {
+        scene::MouseButtonEvent::Button::left,
+        scene::MouseButtonEvent::Action::release,
+        foundation::NanPoint(12.0F, 12.0F)
+    };
+    tree.dispatch_mouse_button(release);
+    press();
+    REQUIRE(button->ripple_active());
+    button->set_disabled(true);
+    REQUIRE_FALSE(button->ripple_active());
 }
 
 TEST_CASE("button keeps outline and focus ring above the state overlay", "[widget][button][state-layer]") {

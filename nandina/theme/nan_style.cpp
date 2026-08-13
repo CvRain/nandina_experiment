@@ -160,6 +160,12 @@ namespace nandina::theme
                 return theme.tokens.typography.label_md;
             case ScalarToken::typography_label_lg:
                 return theme.tokens.typography.label_lg;
+            case ScalarToken::motion_short_duration:
+                return theme.tokens.motion.short_duration;
+            case ScalarToken::motion_medium_duration:
+                return theme.tokens.motion.medium_duration;
+            case ScalarToken::motion_long_duration:
+                return theme.tokens.motion.long_duration;
         }
         return 0.0F;
     }

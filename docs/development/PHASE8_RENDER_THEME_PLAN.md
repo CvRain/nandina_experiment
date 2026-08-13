@@ -276,14 +276,22 @@ logical window behavior.
 
 ### Step 5: Ripple And Reduced Motion
 
-Add animation state and scheduling separately from recipe colors. If this crosses render and widget
-boundaries, split commits in compilable dependency order.
+Status: complete.
 
 Step 5A establishes the policy boundary before any component animation: `NanMotionTokens` carries
 short/medium/long durations, while `ThemeManager` resolves `system/full/reduced` motion preference
-and publishes a revision only when the effective reduced-motion value changes. Step 5B will add the
-Button ripple recipe, painter, press-origin animation, clipping, tests, and Settings verification;
-components must consume this shared policy rather than inventing per-widget accessibility flags.
+and publishes a revision only when the effective reduced-motion value changes.
+
+Step 5B adds ripple color and duration to the Button recipe and typed override path. Button records
+only the pointer-local impact origin and normalized progress; `RipplePainter` owns eased expansion,
+farthest-corner geometry, fade-out, and opacity composition. The render-device contract exposes a
+circle intersected with a rounded rectangle, implemented analytically by the raylib SDF backend, so
+the effect follows the same radius as the container without manipulating `DrawContext` clipping.
+
+Attached Buttons consume the effective `ThemeManager::reduced_motion()` value. Changing that policy
+or disabling a Button cancels an in-flight ripple, and reduced motion prevents new pointer ripples
+without changing keyboard or semantic activation. Settings binds its visible preference directly to
+the manager, providing both an application example and a headless integration test.
 
 ### Step 6: Normalize The Brand Theme Example
 

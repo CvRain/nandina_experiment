@@ -62,12 +62,16 @@ namespace nandina::widget
 
         [[nodiscard]] auto visual_state() const -> theme::ButtonVisualState;
         [[nodiscard]] auto resolved_style() const -> theme::ResolvedButtonStyle;
+        [[nodiscard]] auto ripple_active() const noexcept -> bool;
+        [[nodiscard]] auto ripple_progress() const noexcept -> float;
 
+        auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& ctx) -> void override;
 
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
             -> foundation::NanSize override;
+        void on_process(float dt) override;
         void on_pressable_state_changed() override;
         [[nodiscard]] auto semantics_properties() const -> semantics::Properties override;
         auto on_semantics_action(const semantics::ActionRequest& request) -> bool override;
@@ -91,6 +95,9 @@ namespace nandina::widget
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;
         theme::ButtonSize size_ = theme::ButtonSize::medium;
         primitives::TextOverflow text_overflow_ = primitives::TextOverflow::ellipsis;
+        std::optional<foundation::NanPoint> ripple_origin_local_;
+        float ripple_progress_ = 1.0F;
+        bool reduced_motion_ = false;
     };
 
 } // namespace nandina::widget

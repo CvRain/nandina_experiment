@@ -74,6 +74,21 @@ namespace nandina::render
         draw_line(const NanPoint& a, const NanPoint& b, float thickness, const NanColor& color) = 0;
         virtual void draw_circle(const NanPoint& center, float radius, const NanColor& color) = 0;
 
+        /// Draw a circle clipped by a rounded rectangle. Backends with analytic
+        /// primitives should implement the exact intersection; the default is an
+        /// unclipped circle for simple recording/fallback devices.
+        virtual void draw_circle_clipped_rounded_rect(
+            const NanPoint& center,
+            float circle_radius,
+            const NanRect& clip_rect,
+            float clip_radius,
+            const NanColor& color
+        ) {
+            (void)clip_rect;
+            (void)clip_radius;
+            draw_circle(center, circle_radius, color);
+        }
+
         /// Text uses a minimal "top-left anchor + backend default font" interface;
         /// full text layout is abstracted later.
         virtual void draw_text(

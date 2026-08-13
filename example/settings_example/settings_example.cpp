@@ -62,12 +62,20 @@ namespace nandina::examples::settings
             return std::format("Interface scale · {:.0f}%", interface_scale.get() * 100.0F);
         });
 
+        // 该设置直接驱动框架统一动效策略；页面销毁时 effect 随 ReactiveScope 回收。
+        auto* themes = &ui.theme_manager();
+        (void)ui.effect([themes, &reduced_motion] {
+            themes->set_motion_preference(
+                reduced_motion.get() ? theme::MotionPreference::reduced
+                                     : theme::MotionPreference::system
+            );
+        });
+
         auto profile_field =
             ui.make<widget::TextField>(profile, "Profile name").autofocus().build();
         auto diagnostics_note = ui.when(diagnostics, [](widget::BuildContext branch) {
-            return branch.make<widget::Label>(
-                "Anonymous diagnostics help improve rendering stability"
-            )
+            return branch
+                .make<widget::Label>("Anonymous diagnostics help improve rendering stability")
                 .color_token(theme::ColorToken::on_surface_variant);
         });
 
@@ -82,9 +90,7 @@ namespace nandina::examples::settings
                     ui.make<widget::Checkbox>(reduced_motion, "Reduce interface motion"),
                     ui.make<widget::Label>(scale_label)
                         .color_token(theme::ColorToken::on_surface_variant),
-                    ui.make<widget::Slider>(
-                        interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F
-                    )
+                    ui.make<widget::Slider>(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F)
                 )
                 .build();
 
@@ -96,18 +102,17 @@ namespace nandina::examples::settings
         auto reset = ui.make<widget::Button>("Reset")
                          .treatment(theme::ButtonTreatment::outlined)
                          .on_click([&] {
-            profile.set("Nandina developer");
-            notifications.set(true);
-            diagnostics.set(false);
-            reduced_motion.set(false);
-            interface_scale.set(1.0F);
-            status.set("Preferences reset");
+                             profile.set("Nandina developer");
+                             notifications.set(true);
+                             diagnostics.set(false);
+                             reduced_motion.set(false);
+                             interface_scale.set(1.0F);
+                             status.set("Preferences reset");
                          });
 
         // Light/Dark 切换：捕获 ThemeManager 指针（由应用持有，跨整个 run）。
         // 注意：不能捕获 ui 本身——BuildContext 是每次 build 的临时对象，
         // build() 返回后即失效，回调里再解引用会悬垂。
-        auto* themes = &ui.theme_manager();
         auto appearance_row = ui.row()
                                   .gap(8.0F)
                                   .children(
@@ -129,27 +134,28 @@ namespace nandina::examples::settings
                            .cross_alignment(widget::LayoutAlignment::center)
                            .children(save, reset)
                            .build();
-        auto content = ui.column()
-                           .gap(12.0F)
-                           .cross_alignment(widget::LayoutAlignment::stretch)
-                           .children(
-                               ui.make<widget::Label>("Nandina Settings").font_size(28.0F),
-                               ui.make<widget::Label>(
-                                   "A compact application authored from components and state"
-                               )
-                                   .color_token(theme::ColorToken::on_surface_variant),
-                               ui.make<widget::Label>("Profile").font_size(18.0F),
-                               profile_field,
-                               ui.make<widget::Label>("Preferences").font_size(18.0F),
-                               preferences,
-                               ui.make<widget::Label>("Appearance").font_size(18.0F),
-                               appearance_row,
-                               ui.make<widget::Label>(summary)
-                                   .color_token(theme::ColorToken::on_surface_variant),
-                               actions,
-                               ui.make<widget::Label>(status)
-                                   .color_token(theme::ColorToken::primary)
-                           );
+        auto content =
+            ui.column()
+                .gap(12.0F)
+                .cross_alignment(widget::LayoutAlignment::stretch)
+                .children(
+                    ui.make<widget::Label>("Nandina Settings").font_size(28.0F),
+                    ui.make<widget::Label>(
+                          "A compact application authored from components and state"
+                    )
+                        .color_token(theme::ColorToken::on_surface_variant),
+                    ui.make<widget::Label>("Profile").font_size(18.0F),
+                    profile_field,
+                    ui.make<widget::Label>("Preferences").font_size(18.0F),
+                    preferences,
+                    ui.make<widget::Label>("Appearance").font_size(18.0F),
+                    appearance_row,
+                    ui.make<widget::Label>(summary).color_token(
+                        theme::ColorToken::on_surface_variant
+                    ),
+                    actions,
+                    ui.make<widget::Label>(status).color_token(theme::ColorToken::primary)
+                );
         return ui.padding(foundation::NanInsets::all(20.0F)).child(content).build();
     }
 } // namespace nandina::examples::settings

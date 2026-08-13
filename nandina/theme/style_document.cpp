@@ -321,6 +321,12 @@ namespace nandina::theme
                 return ScalarToken::typography_label_md;
             if (value == "$tokens.typography.label_lg")
                 return ScalarToken::typography_label_lg;
+            if (value == "$tokens.motion.short_duration")
+                return ScalarToken::motion_short_duration;
+            if (value == "$tokens.motion.medium_duration")
+                return ScalarToken::motion_medium_duration;
+            if (value == "$tokens.motion.long_duration")
+                return ScalarToken::motion_long_duration;
             return std::nullopt;
         }
 

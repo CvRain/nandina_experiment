@@ -83,7 +83,7 @@ uniform vec4 uShapeRect; // 图元矩形（raylib 屏幕坐标，y 向下）
 uniform vec4 uQuadRect;  // 覆盖 quad；包含图元外侧的抗锯齿过渡区
 uniform vec2 uRadius;  // x = 圆角半径；y = 线段 / 描边半宽
 uniform vec4 uColor;   // 实心颜色（RGBA 0..1）
-uniform int uMode;     // 0 = 填充（圆角矩形 / 矩形 / 圆）；1 = 描边；2 = 线段
+uniform int uMode;     // 0 = fill; 1 = outline; 2 = segment; 3 = circle clipped by round rect
 uniform vec2 uA;       // 线段端点 A（模式 2）
 uniform vec2 uB;       // 线段端点 B（模式 2）
 out vec4 finalColor;
@@ -112,7 +112,13 @@ void main() {
         vec2 center = uShapeRect.xy + uShapeRect.zw * 0.5;
         float sd = sdRoundRect(p - center, uShapeRect.zw * 0.5, uRadius.x);
         float aa = max(fwidth(sd), 1e-4);
-        if (uMode == 1) {
+        if (uMode == 3) {
+            float circleSd = length(p - uA) - uRadius.y;
+            float combined = max(sd, circleSd);
+            float combinedAa = max(fwidth(combined), 1e-4);
+            alpha = 1.0 - smoothstep(-combinedAa * 0.5, combinedAa * 0.5, combined);
+        }
+        else if (uMode == 1) {
             alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, abs(sd) - uRadius.y);
         }
         else {
@@ -260,6 +266,32 @@ void main() {
             );
         }
 
+        void draw_circle_clipped_rounded_rect(
+            const NanPoint& center,
+            const float circle_radius,
+            const NanRect& clip_rect,
+            const float clip_radius,
+            const NanColor& color
+        ) override {
+            if (circle_radius <= 0.0F || clip_rect.get_width() <= 0.0F
+                || clip_rect.get_height() <= 0.0F) {
+                return;
+            }
+            const float corner = std::clamp(
+                clip_radius,
+                0.0F,
+                std::min(clip_rect.get_width(), clip_rect.get_height()) * 0.5F
+            );
+            draw_aa(
+                clip_rect,
+                corner,
+                circle_radius,
+                detail::SdfPrimitiveMode::clipped_circle,
+                to_rl(color),
+                center
+            );
+        }
+
         /// 懒加载 SDF 抗锯齿着色器与 1x1 白纹理。
         void ensure_aa() {
             if (aa_ready_) {
@@ -313,6 +345,13 @@ void main() {
             if (mode == detail::SdfPrimitiveMode::segment) {
                 DrawLineEx(to_rl(*line_a), to_rl(*line_b), half_width * 2.0F, color);
             }
+            else if (mode == detail::SdfPrimitiveMode::clipped_circle) {
+                // Do not alter raylib's scissor state here: DrawContext owns the active clip,
+                // and ending a temporary scissor would silently discard an ancestor clip.
+                // The native fallback cannot express a rounded intersection, so preserve
+                // traversal state and degrade to the unclipped impact circle instead.
+                DrawCircleV(to_rl(*line_a), half_width, color);
+            }
             else if (mode == detail::SdfPrimitiveMode::outline) {
                 DrawRectangleRoundedLinesEx(
                     to_rl(rect),
@@ -347,6 +386,7 @@ void main() {
             }
             const auto quad = mode == detail::SdfPrimitiveMode::segment
                 ? rect
+                : mode == detail::SdfPrimitiveMode::clipped_circle ? rect
                 : detail::sdf_quad_bounds(rect, mode, half_width);
             const ::Rectangle shape_rl = to_rl(rect);
             const ::Rectangle quad_rl = to_rl(quad);

@@ -5,7 +5,9 @@
 #include "button.hpp"
 #include "primitives/box_painter.hpp"
 #include "primitives/focus_ring_painter.hpp"
+#include "primitives/ripple_painter.hpp"
 #include "../render/draw_context.hpp"
+#include "../scene/input_event.hpp"
 #include "../theme/theme_manager.hpp"
 
 #include <algorithm>
@@ -92,6 +94,11 @@ namespace nandina::widget
 
     void Button::on_theme_changed(const theme::ThemeManager& manager) {
         appearance_ = manager.appearance();
+        reduced_motion_ = manager.reduced_motion();
+        if (reduced_motion_) {
+            ripple_origin_local_.reset();
+            ripple_progress_ = 1.0F;
+        }
         if (!system_explicit_) {
             system_ = manager.design_system_shared();
             theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
@@ -206,17 +213,58 @@ namespace nandina::widget
         return style;
     }
 
+    auto Button::ripple_active() const noexcept -> bool {
+        return ripple_origin_local_.has_value() && ripple_progress_ < 1.0F;
+    }
+
+    auto Button::ripple_progress() const noexcept -> float {
+        return ripple_progress_;
+    }
+
+    auto Button::on_input(scene::InputEvent& event) -> bool {
+        const bool handled = primitives::Pressable::on_input(event);
+        if (!handled || event.type() != scene::EventType::mouse_button || disabled()) {
+            return handled;
+        }
+        const auto& mouse = static_cast<const scene::MouseButtonEvent&>(event);
+        if (mouse.button() != scene::MouseButtonEvent::Button::left || !mouse.is_pressed()) {
+            return handled;
+        }
+
+        const auto style = resolved_style();
+        if (reduced_motion_ || style.ripple.duration <= foundation::nan_epsilon) {
+            ripple_origin_local_.reset();
+            ripple_progress_ = 1.0F;
+            return handled;
+        }
+        ripple_origin_local_ = to_local(mouse.screen_pos());
+        ripple_progress_ = 0.0F;
+        mark_dirty(scene::DirtyFlags::paint);
+        return handled;
+    }
+
     void Button::on_draw(render::DrawContext& ctx) {
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const float opacity = ctx.opacity();
 
-        // 基础容器与交互反馈保持为两个图层；border 覆盖在状态层之上，避免半透明
-        // overlay 改写描边颜色。ripple 后续可插入同一图层位置而不污染配方解析。
+        // 基础容器、状态层和 ripple 保持为独立图层；border 覆盖在其上，避免
+        // 半透明反馈改写描边颜色。
         primitives::BoxPainter::paint_fill(ctx, world, style.container, opacity);
         auto state_layer = style.container;
         state_layer.fill = theme::button_state_layer_color(style, visual_state());
         primitives::BoxPainter::paint_fill(ctx, world, state_layer, opacity);
+        if (ripple_active()) {
+            primitives::RipplePainter::paint(
+                ctx,
+                world,
+                ctx.world_transform().transform_point(*ripple_origin_local_),
+                style.container.radius,
+                style.ripple,
+                ripple_progress_,
+                opacity
+            );
+        }
         primitives::BoxPainter::paint_outline(ctx, world, style.container, opacity);
 
         apply_text_style(visual_state());
@@ -246,7 +294,33 @@ namespace nandina::widget
     }
 
     void Button::on_pressable_state_changed() {
+        if (disabled()) {
+            ripple_origin_local_.reset();
+            ripple_progress_ = 1.0F;
+        }
         mark_semantics_dirty();
+    }
+
+    void Button::on_process(const float dt) {
+        if (!ripple_active()) {
+            return;
+        }
+        const float duration = resolved_style().ripple.duration;
+        if (reduced_motion_ || duration <= foundation::nan_epsilon) {
+            ripple_origin_local_.reset();
+            ripple_progress_ = 1.0F;
+        }
+        else {
+            ripple_progress_ = std::clamp(
+                ripple_progress_ + std::max(dt, 0.0F) / duration,
+                0.0F,
+                1.0F
+            );
+            if (ripple_progress_ >= 1.0F) {
+                ripple_origin_local_.reset();
+            }
+        }
+        mark_dirty(scene::DirtyFlags::paint);
     }
 
     auto Button::semantics_properties() const -> semantics::Properties {

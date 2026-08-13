@@ -81,6 +81,12 @@ namespace nandina::theme
         ThemeColor pressed;
     };
 
+    /** Pointer impact feedback, clipped to the component container. */
+    using RippleStyle = struct RippleStyle {
+        ThemeColor color;
+        ThemeScalar duration;
+    };
+
     /**
      * 所有控件共享的尺寸 / 间距。组件只取用自己相关的槽位，其余忽略。
      */
@@ -157,6 +163,7 @@ namespace nandina::theme
         TypeStyle label;
         FocusRingStyle focus;
         StateLayerStyle state_layer;
+        RippleStyle ripple;
         ControlMetrics metrics;
     };
 
@@ -220,6 +227,8 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_padding_x;
         std::optional<ThemeColor> state_layer_hover;
         std::optional<ThemeColor> state_layer_pressed;
+        std::optional<ThemeColor> ripple_color;
+        std::optional<ThemeScalar> ripple_duration;
     };
 
     /** Checkbox 规则：支持 checked 布尔选择器（未勾选 outline / 勾选 filled）。 */
@@ -295,11 +304,17 @@ namespace nandina::theme
         NanColor pressed;
     };
 
+    using ResolvedRippleStyle = struct ResolvedRippleStyle {
+        NanColor color;
+        float duration = 0.0F;
+    };
+
     using ResolvedButtonStyle = struct ResolvedButtonStyle {
         ResolvedBoxStyle container;
         ResolvedTypeStyle label;
         ResolvedFocusRing focus;
         ResolvedStateLayer state_layer;
+        ResolvedRippleStyle ripple;
         ResolvedControlMetrics metrics;
     };
 

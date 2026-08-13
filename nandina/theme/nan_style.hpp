@@ -60,6 +60,9 @@ namespace nandina::theme
         typography_label_sm,
         typography_label_md,
         typography_label_lg,
+        motion_short_duration,
+        motion_medium_duration,
+        motion_long_duration,
     };
 
     template<typename T, typename Token>

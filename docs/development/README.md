@@ -898,13 +898,28 @@ as a separate review unit.
 owns a `system/full/reduced` application preference plus the current platform reduced-motion value,
 and exposes one effective `reduced_motion()` decision. Observers receive a revision only when that
 effective decision changes, so attached components can cancel or complete animation without a
-parallel settings channel. Button ripple remains the next widget-level unit and will consume this
-policy rather than adding a Button-specific accessibility flag.
+parallel settings channel. Button ripple now consumes this policy rather than adding a
+Button-specific accessibility flag.
+
+### A25. Button Ripple Feedback
+
+Status: complete.
+
+Button pointer presses start a recipe-driven ripple from the local press position. A shared
+`RipplePainter` expands to the farthest container corner with cubic ease-out and fades beneath the
+outline, label, and focus ring. Rounded clipping is an explicit render-device primitive; the raylib
+backend evaluates the circle/rounded-rectangle intersection in the existing SDF shader, while
+recording backends can inspect the semantic draw call without depending on GPU output.
+
+The animation duration comes from `NanMotionTokens`, and attached Buttons observe the effective
+application motion preference through `ThemeManager`. Reduced motion and disabled state cancel an
+active ripple and suppress later pointer ripples. The Settings example's motion checkbox controls
+that real policy rather than maintaining a visual-only preference.
 
 ### Deferred After Authoring Core
 
 - Router history, deep links, replace semantics, and page transitions.
-- Tween/animation primitives and reusable impact/ripple effects.
+- General tween/animation primitives and adoption of shared impact feedback by later controls.
 - Camera2D, offscreen/custom viewports, physics interpolation polish, broader Box2D joints, and advanced spatial queries.
 - Sprite/shape convenience nodes, particles, audio, navigation, scene serialization, and ECS remain optional future game-facing work rather than requirements for the application framework.
 - Virtualized lists, richer Anchor layout, and retained render caches.
