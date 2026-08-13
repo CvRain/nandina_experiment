@@ -178,6 +178,8 @@ module_widget = files(
     'widget/text_field.cpp',
     'widget/switch.hpp',
     'widget/switch.cpp',
+    'widget/badge.hpp',
+    'widget/badge.cpp',
 )
 
 module_app = files(

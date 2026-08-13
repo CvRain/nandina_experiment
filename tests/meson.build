@@ -149,6 +149,13 @@ switch_tests = executable(
 )
 test('switch', switch_tests)
 
+badge_tests = executable(
+    'badge_tests',
+    files('badge_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('badge', badge_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

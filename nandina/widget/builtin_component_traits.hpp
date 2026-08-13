@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP
 
 #include "build_context.hpp"
+#include "badge.hpp"
 #include "button.hpp"
 #include "checkbox.hpp"
 #include "label.hpp"
@@ -168,6 +169,14 @@ namespace nandina::widget
                 }
             });
             return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Badge> {
+        [[nodiscard]] static auto make(const BuildContext& ui, std::string text)
+            -> authoring::NodeBuilder<Badge> {
+            return authoring::make<Badge>(std::move(text), ui.theme());
         }
     };
 }
