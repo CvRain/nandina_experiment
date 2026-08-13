@@ -174,6 +174,19 @@ namespace nandina::theme
             scale_alpha(style.label.color, alpha);
         }
 
+        /** BadgeRecipe → 解析后的片段组合（纯展示，无状态变换）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const BadgeRecipe& recipe
+        ) -> ResolvedBadgeStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .label = resolve(system, appearance, recipe.label),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
         void apply_button_disabled(
             const DesignSystem& system,
@@ -345,6 +358,20 @@ namespace nandina::theme
         }
         if (state == SwitchVisualState::disabled) {
             apply_switch_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Badge 配方（纯展示：base → 规则列表，后匹配者胜，无状态变换）。
+     */
+    auto resolve_badge(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedBadgeStyle {
+        auto style = resolve_recipe(system, appearance, system.components.badge.base);
+        for (const auto& rule: system.components.badge.rules) {
+            apply_rule(system, appearance, style, rule);
         }
         return style;
     }
@@ -533,6 +560,32 @@ namespace nandina::theme
             style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedBadgeStyle& style,
+        const BadgeRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_padding_x)
+            style.metrics.padding_x = resolve_scalar(system, appearance, *rule.metrics_padding_x);
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -712,6 +765,30 @@ namespace nandina::theme
                 .thumb_size = ThemeScalar::literal(16.0F),
                 .gap = ThemeScalar::token(ScalarToken::spacing_sm),
                 .min_height = ThemeScalar::literal(32.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 Badge 配方（pill 展示标签，无交互）。 */
+    auto default_badge_recipe() -> BadgeRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface_variant),
+                .border = ThemeColor::transparent(ColorToken::surface_variant),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface_variant),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_sm),
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(22.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_sm),
+                .gap = ThemeScalar::literal(0.0F),
+                .min_height = ThemeScalar::literal(20.0F),
+                .box_size = ThemeScalar::literal(0.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
             },
         };
     }
@@ -962,6 +1039,10 @@ namespace nandina::theme
                                 ThemeScalar::token(ScalarToken::border_focus_ring),
                         },
                     },
+                },
+                .badge = BadgeRecipes {
+                    .base = default_badge_recipe(),
+                    .rules = {},
                 },
             },
         };

@@ -204,6 +204,13 @@ namespace nandina::theme
         SwitchMetrics metrics;
     };
 
+    /** Badge 配方：pill 容器 + 文本 + 度量（纯展示，无状态无交互）。 */
+    using BadgeRecipe = struct BadgeRecipe {
+        BoxStyle container;
+        TypeStyle label;
+        ControlMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -296,6 +303,18 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_gap;
     };
 
+    /** Badge 规则：无选择器（纯展示），覆盖容器 / 文本 / 度量字段。 */
+    using BadgeRecipeRule = struct BadgeRecipeRule {
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_padding_x;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -352,6 +371,12 @@ namespace nandina::theme
         ResolvedSwitchMetrics metrics;
     };
 
+    using ResolvedBadgeStyle = struct ResolvedBadgeStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle label;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -388,12 +413,18 @@ namespace nandina::theme
         std::vector<SwitchRecipeRule> rules;
     };
 
+    using BadgeRecipes = struct BadgeRecipes {
+        BadgeRecipe base;
+        std::vector<BadgeRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
         SliderRecipes slider;
         TextFieldRecipes text_field;
         SwitchRecipes switch_component;
+        BadgeRecipes badge;
     };
 
     /**
@@ -577,6 +608,11 @@ namespace nandina::theme
         SwitchVisualState state
     ) -> ResolvedSwitchStyle;
 
+    [[nodiscard]] auto resolve_badge(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedBadgeStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -622,6 +658,13 @@ namespace nandina::theme
         const SwitchRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedBadgeStyle& style,
+        const BadgeRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -629,6 +672,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_slider_recipe() -> SliderRecipe;
     [[nodiscard]] auto default_text_field_recipe() -> TextFieldRecipe;
     [[nodiscard]] auto default_switch_recipe() -> SwitchRecipe;
+    [[nodiscard]] auto default_badge_recipe() -> BadgeRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过
