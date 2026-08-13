@@ -151,7 +151,9 @@ introducing a dependency on parent component width.
 
 ### Step 0: SDF Coverage Repair
 
-Status: implemented; awaiting visual review in the Settings example.
+Status: complete. Verified with `[render][sdf]` unit tests covering quad bounds, outline inset and
+edge snapping, and zero-length segments, plus zoomed visual checks of corners, borders, checkboxes,
+switches, sliders, and focus rings in both Settings appearances.
 
 - Separate shape bounds from the expanded draw quad.
 - Preserve a one-pixel exterior AA band and an outline's exterior half-width.
@@ -177,10 +179,10 @@ the atlas with point filtering. This avoids applying GPU interpolation to an alr
 glyph without changing shaping, caret, wrapping, or layout widths. Fractional/high-DPI scaling
 remains a separate policy and must not silently stretch the 1x atlas.
 
-Status: implemented for the current 1x logical-pixel window path; awaiting visual review. The
-Settings example already covers 16px body/control text, 18px section labels, and a 28px heading in
-both appearances. A later DPI unit must introduce an explicit logical-to-physical scale and cache
-glyphs at the corresponding physical size before claiming 1.25x/1.5x/2x support.
+Status: complete for the current 1x logical-pixel window path. The Settings example covers 16px
+body/control text, 18px section labels, and a 28px heading in both appearances. The explicit
+logical-to-physical scale and physical-size glyph caching previously required before claiming
+1.25x/1.5x/2x support is delivered by Step 4C.
 
 Suggested commit: `fix(text): 统一字形像素对齐与缩放策略`
 
@@ -189,8 +191,9 @@ Suggested commit: `fix(text): 统一字形像素对齐与缩放策略`
 Land the eleven-stop reference data, variant policy, generator, consistency tests, and switch
 `default_design_system()` to the generated light/dark palettes in one theme-only unit.
 
-Status: implemented; awaiting code review. `default_reference_palette()` is now the single source
-for seven eleven-stop OKLCH scales, and `make_color_scheme()` derives both default appearances.
+Status: complete. Verified with `[theme][palette]` tests for reference scales, generator mapping,
+variant policy, and legacy construction compatibility. `default_reference_palette()` is now the
+single source for seven eleven-stop OKLCH scales, and `make_color_scheme()` derives both default appearances.
 The default policy keeps brand colors at 500 in both appearances to preserve Phase 7 visuals;
 `material_dark_tone()` is an opt-in policy that selects 400 for dark primary/secondary/tertiary.
 `NanColorScheme{}` remains equivalent to the generated light scheme for detached-widget and legacy
@@ -204,7 +207,9 @@ Suggested commit: `feat(theme): 从参考色阶生成默认语义调色板`
 Migrate Button from replacement fill semantics to an overlay and verify base/overlay/outline/focus
 draw order with a recording render device.
 
-Status: implemented; awaiting code review. Button resolution now preserves `container.fill` for
+Status: complete. Verified with `[widget][button][state-layer]` recording-device tests asserting
+base → overlay → outline/content → focus draw order, plus disabled and link no-overlay cases.
+Button resolution now preserves `container.fill` for
 every interactive state and exposes the active state-layer color separately. Filled buttons overlay
 `on_accent`; tonal, outlined, and ghost buttons overlay `accent`, using the shared hover/pressed
 opacity tokens. Drawing order is base fill, same-radius state overlay, outline, content, then focus
@@ -214,15 +219,17 @@ Suggested commit: `refactor(theme): 将按钮状态色改为独立叠加层`
 
 ### Step 4A: Define Fixed-Design Viewport Mapping
 
-Status: implemented; awaiting code review. `ViewportScalePolicy` defines a fixed logical design
+Status: complete. Verified with `[app][viewport]` unit tests for contain/cover anchoring, input
+round-tripping, and invalid-space rejection. `ViewportScalePolicy` defines a fixed logical design
 size, contain/cover behavior, and two-axis anchoring. The resulting `ViewportMapping` provides one
 uniform transform, content bounds, and inverse screen-to-logical conversion. It is pure geometry:
 no window backend, scene tree, or font cache behavior changes in this unit.
 
 ### Step 4B: Add Typed Component Sizing
 
-Status: implemented; awaiting code review. `NanControl` owns a typed size specification shared by
-imperative calls and `NodeBuilder`: logical fixed values, parent percentages, fill/content,
+Status: complete. Verified with headless geometry assertions at two window sizes plus the
+resizable-window Settings check (50% Save width). `NanControl` owns a typed size specification
+shared by imperative calls and `NodeBuilder`: logical fixed values, parent percentages, fill/content,
 min/max limits, and aspect ratio. Resolution occurs in the common measurement protocol, so existing
 widgets do not duplicate sizing code. Percent and fill require a finite parent axis and otherwise
 retain intrinsic measurement. Flex remains a separate remaining-space policy. The Settings Save
@@ -236,7 +243,7 @@ DrawContext, clipping, input, and semantics. Introduce explicit framebuffer/DPI 
 pipelines at the corresponding physical size before claiming non-1x text support. Default windows
 remain responsive and behavior-compatible.
 
-The first render foundation is implemented and awaiting review: `DrawContext` carries separate
+The render foundation is complete: `DrawContext` carries separate
 logical-to-screen and screen-to-physical factors, preserves an initial viewport transform through
 CanvasLayer traversal, and shared box/focus painters scale logical radii, borders, gaps, and ring
 widths. Glyph layout remains in logical units, while the atlas rasterizes at logical font size ×
@@ -275,6 +282,10 @@ the existing responsive-to-window path unchanged.
 Semantic snapshots now receive the same root transform, so accessibility bounds remain aligned with
 the painted controls under contain/cover scaling while the default identity transform preserves
 logical window behavior.
+
+Status: complete. Verified with `[app][viewport]` mapping tests, the TextField/EditableText 2x
+headless regression (selection geometry and caret stops), and the default responsive path, which
+remains behavior-compatible when `WindowConfig::viewport` is unset.
 
 ### Step 5: Ripple And Reduced Motion
 
