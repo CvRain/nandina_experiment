@@ -336,6 +336,13 @@ through `widget/controls.hpp`, while `widget/build_context.hpp` stays independen
 control catalog, keeping the component acceptance template strict without making the context header
 monolithic.
 
+Status: complete. The template is frozen in WORKFLOW.md §4 (recipe/rules, shared painters,
+light/dark and override tests, constrained layout, pointer/keyboard/focus, semantics, authoring
+via ComponentTraits, example-as-real-app). Badge is the first component completed against it:
+`BadgeRecipe`/`BadgeRecipeRule`/`resolve_badge` in the theme layer, a static pill widget reusing
+`BoxPainter` and `primitives::Text`, `ComponentTraits<Badge>` authoring without a BuildContext
+method, `static_text` semantics, six focused test cases, and a real "Beta" badge in Settings.
+
 ### Step 8: Close Page Root/Scope Lifetime
 
 Complete. The existing page-owned ReactiveScope now exposes a generation lifetime token;
@@ -377,6 +384,6 @@ downloads a WrapDB archive. A fresh checkout therefore requires `git submodule u
 - Common text sizes and supported scale factors follow a documented, tested clarity policy.
 - Default light/dark semantic palettes derive from one reference scale source.
 - Button state feedback no longer rewrites the base fill, and ripple can be disabled independently.
-- At least one new component completes the frozen acceptance template.
+- At least one new component completes the frozen acceptance template (Badge).
 - Retaining a page root cannot expose callbacks to destroyed page reactive state.
 - Every unit passes `meson compile -C buildDir` and `meson test -C buildDir` before review.

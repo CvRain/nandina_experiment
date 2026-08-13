@@ -66,7 +66,7 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 | `resource` | Stable UUID/key identities, immutable handles, bounded streams, resource URIs/platform locations, prioritized manager, builtin/memory/directory/SQLite backends. |
 | `text` | FreeType/HarfBuzz/FriBidi/utf8proc layout, fallback families, atlases, resource font loading, pipeline cache. |
 | `theme` | Immutable DesignSystem snapshots, light/dark semantic palettes, tokens, recipes, typed overrides. |
-| `widget` | Text/input controls, Button, Checkbox, Slider, Switch, ScrollView, and low-level layout controls. |
+| `widget` | Text/input controls, Button, Checkbox, Slider, Switch, ScrollView, Badge, and low-level layout controls. |
 | `app` | `NanApplication`, `NanWindow`, `NanRouter`, `NanPage`, `NanStore`, app theme propagation. |
 
 ### Logging Contract

@@ -104,12 +104,14 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
-- Phase 8 Step 6 implemented: `nan_relative_luminance` / `nan_contrast_ratio`
-  helpers (foundation) and the Settings brand theme (official Catppuccin
-  palette: Latte light / Mocha dark neutrals, Peach primary, Flamingo/Maroon
-  accent, 12/16/24 radii, 2–3px borders, AA contrast assertions).
-- Test suite 27/27 green; awaiting user visual review before committing.
-- Next: commit Step 6 (contrast tool and brand theme as separate commits), then
-  Step 7 (freeze the component template) and the first new component in the §4
-  order. Planned follow-ups: built-in ThemeManager theme families
+- Phase 8 Step 6 committed (`000ae6c` / `930fa44` / `371699f`): contrast helpers
+  and the Catppuccin Settings brand theme (Latte light / Mocha dark, Rosewater
+  light primary, Peach dark primary, 12/16/24 radii, 2–3px borders).
+- Phase 8 Step 7 complete: the component template is frozen here in §4 and Badge
+  is the first component completed against it (recipe/rule resolution, shared
+  painters, override survival, constrained layout, static_text semantics, real
+  "Beta" use in Settings).
+- Test suite 28/28 green.
+- Next: continue the D6 order with Card, then ProgressBar, then RadioButton.
+  Planned follow-ups: built-in ThemeManager theme families
   (fluent/material/creamy) and soft shadows for claymorphism elevation.
