@@ -206,7 +206,7 @@ namespace nandina::examples::settings
                     ui.make<widget::Label>("Profile").font_size(18.0F),
                     profile_field,
                     ui.make<widget::Label>("Preferences").font_size(18.0F),
-                    preferences,
+                    ui.make<widget::Card>().child(preferences),
                     ui.make<widget::Label>("Appearance").font_size(18.0F),
                     appearance_row,
                     ui.make<widget::Label>("Brand colors").font_size(18.0F),
