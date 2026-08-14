@@ -177,6 +177,13 @@ radio_button_tests = executable(
 )
 test('radio-button', radio_button_tests)
 
+theme_families_tests = executable(
+    'theme_families_tests',
+    files('theme_families_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('theme-families', theme_families_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),
