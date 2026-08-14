@@ -85,10 +85,11 @@ namespace nandina::scene
     struct ControlSizeSpec {
         LayoutLength width = content;
         LayoutLength height = content;
-        std::optional<float> min_width;
-        std::optional<float> max_width;
-        std::optional<float> min_height;
-        std::optional<float> max_height;
+        /// min/max 与 width/height 同属类型化长度：百分比相对父布局对应轴的有限上界解析。
+        std::optional<LayoutLength> min_width;
+        std::optional<LayoutLength> max_width;
+        std::optional<LayoutLength> min_height;
+        std::optional<LayoutLength> max_height;
         std::optional<float> aspect_ratio;
     };
 
@@ -115,9 +116,13 @@ namespace nandina::scene
         auto set_height(FillLength height) -> NanControl&;
         auto set_height(ContentLength height) -> NanControl&;
         auto set_min_width(float width) -> NanControl&;
+        auto set_min_width(PercentLength width) -> NanControl&;
         auto set_max_width(float width) -> NanControl&;
+        auto set_max_width(PercentLength width) -> NanControl&;
         auto set_min_height(float height) -> NanControl&;
+        auto set_min_height(PercentLength height) -> NanControl&;
         auto set_max_height(float height) -> NanControl&;
+        auto set_max_height(PercentLength height) -> NanControl&;
         auto set_aspect_ratio(float ratio) -> NanControl&;
         auto clear_aspect_ratio() -> NanControl&;
         [[nodiscard]] auto size_spec() const -> const ControlSizeSpec&;

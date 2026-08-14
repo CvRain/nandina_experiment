@@ -1775,6 +1775,32 @@ TEST_CASE("NanControl resolves typed component dimensions", "[widget][layout][si
     REQUIRE(fixed.get_height() == Catch::Approx(90.0F));
 }
 
+TEST_CASE("NanControl resolves percentage min and max limits", "[widget][layout][sizing]") {
+    auto capped = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    capped->set_width(scene::percent(50.0F)).set_max_width(scene::percent(25.0F));
+    const auto capped_size = capped->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 100.0F,
+    });
+    REQUIRE(capped_size.get_width() == Catch::Approx(100.0F));
+
+    auto floored = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    floored->set_width(scene::percent(10.0F)).set_min_width(scene::percent(30.0F));
+    const auto floored_size = floored->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 100.0F,
+    });
+    REQUIRE(floored_size.get_width() == Catch::Approx(120.0F));
+
+    auto shorted = std::make_shared<scene::NanControl>(foundation::NanSize(40.0F, 20.0F));
+    shorted->set_height(scene::percent(50.0F)).set_max_height(scene::percent(20.0F));
+    const auto shorted_size = shorted->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 100.0F,
+    });
+    REQUIRE(shorted_size.get_height() == Catch::Approx(20.0F));
+}
+
 TEST_CASE("scaled component paint keeps logical layout unchanged", "[widget][render][scale]") {
     constexpr float scale = 2.0F;
     const auto transform = foundation::NanTransform2D::from_scale(scale);

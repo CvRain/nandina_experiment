@@ -56,13 +56,25 @@ namespace nandina::scene
         [[nodiscard]] auto constrained_axis(
             float parent_min,
             float parent_max,
-            std::optional<float> own_min,
-            std::optional<float> own_max
+            const std::optional<LayoutLength>& own_min,
+            const std::optional<LayoutLength>& own_max
         ) -> std::pair<float, float> {
-            const float minimum = std::max(parent_min, own_min.value_or(0.0F));
+            const auto resolve = [parent_max](
+                                     const std::optional<LayoutLength>& length,
+                                     const float fallback
+                                 ) -> float {
+                if (!length.has_value()) {
+                    return fallback;
+                }
+                return resolved_length(*length, parent_max).value_or(fallback);
+            };
+            const float minimum = std::max(parent_min, resolve(own_min, 0.0F));
             const float maximum = std::max(
                 minimum,
-                std::min(parent_max, own_max.value_or(std::numeric_limits<float>::infinity()))
+                std::min(
+                    parent_max,
+                    resolve(own_max, std::numeric_limits<float>::infinity())
+                )
             );
             return {minimum, maximum};
         }
@@ -188,6 +200,13 @@ namespace nandina::scene
 
     auto NanControl::set_min_width(float width) -> NanControl& {
         require_non_negative_finite(width, "minimum width");
+        size_spec_.min_width = LogicalLength {width};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_min_width(PercentLength width) -> NanControl& {
+        require_non_negative_finite(width.value, "minimum width percentage");
         size_spec_.min_width = width;
         mark_layout_dirty();
         return *this;
@@ -195,6 +214,13 @@ namespace nandina::scene
 
     auto NanControl::set_max_width(float width) -> NanControl& {
         require_non_negative_finite(width, "maximum width");
+        size_spec_.max_width = LogicalLength {width};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_max_width(PercentLength width) -> NanControl& {
+        require_non_negative_finite(width.value, "maximum width percentage");
         size_spec_.max_width = width;
         mark_layout_dirty();
         return *this;
@@ -202,6 +228,13 @@ namespace nandina::scene
 
     auto NanControl::set_min_height(float height) -> NanControl& {
         require_non_negative_finite(height, "minimum height");
+        size_spec_.min_height = LogicalLength {height};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_min_height(PercentLength height) -> NanControl& {
+        require_non_negative_finite(height.value, "minimum height percentage");
         size_spec_.min_height = height;
         mark_layout_dirty();
         return *this;
@@ -209,6 +242,13 @@ namespace nandina::scene
 
     auto NanControl::set_max_height(float height) -> NanControl& {
         require_non_negative_finite(height, "maximum height");
+        size_spec_.max_height = LogicalLength {height};
+        mark_layout_dirty();
+        return *this;
+    }
+
+    auto NanControl::set_max_height(PercentLength height) -> NanControl& {
+        require_non_negative_finite(height.value, "maximum height percentage");
         size_spec_.max_height = height;
         mark_layout_dirty();
         return *this;
