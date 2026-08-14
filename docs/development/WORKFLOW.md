@@ -104,13 +104,12 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
-- Phase 8 Step 6 committed (`000ae6c` / `930fa44` / `371699f`): contrast helpers
-  and the Catppuccin Settings brand theme (Latte light / Mocha dark, Rosewater
-  light primary, Peach dark primary, 12/16/24 radii, 2–3px borders).
-- Phase 8 Step 7 complete: the component template is frozen here in §4. Badge
-  and Card are the first two components completed against it (recipe/rule
-  resolution, shared painters, override survival, constrained layout, static
-  semantics, real use in Settings).
+- Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). Badge and
+  Card are the first two components completed against the template frozen in §4.
+- Typed sizing was extended per D9: `set_min_*`/`set_max_*` accept percentage
+  lengths, and `Button::set_font_size(percent)` resolves as a fraction of the
+  control's own final height. Commits `6d6b74b`..`1514ded` cover scene, widget,
+  authoring, and example layers with imperative + authoring tests.
 - Test suite 29/29 green.
 - Next: continue the D6 order with ProgressBar, then RadioButton. Planned
   follow-ups: built-in ThemeManager theme families (fluent/material/creamy)

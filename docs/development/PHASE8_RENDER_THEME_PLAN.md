@@ -147,6 +147,25 @@ remeasurement instead of being stretched after layout. Direct `font_size(...)` r
 literal override; relative `em`-style units can be added later for inherited typography, without
 introducing a dependency on parent component width.
 
+### D9: Percentage Limits And Height-Relative Font Size Extend Typed Sizing
+
+Step 4B's typed sizing is extended in two directions, both exercised by the resizable-window
+Settings/base_window checks:
+
+- `set_min_*` / `set_max_*` accept the same typed lengths as `width`/`height`. A percentage limit
+  resolves against the parent's finite upper bound on that axis; on an unbounded axis it falls back
+  to the literal float default (0 for minimum, infinity for maximum), preserving the previous
+  float-only semantics. `fill`/`content` are deliberately not exposed as limit setters because they
+  are axis-consumption modes, not bounds.
+- `Button::set_font_size(percent)` is a fraction of the button's own final height, not of parent
+  width and not of the inherited font size. This is the "text scales with the control" game-UI
+  idiom. It remains distinct from the future `em`-style unit (fraction of the inherited font size)
+  mentioned in D8, and it does not reintroduce a dependency on parent width: the reference is the
+  control's own resolved height, derived from the effective layout constraints during measurement.
+
+Both extensions reuse `resolved_length` in the common measurement protocol and expose matching
+`NodeBuilder` modifiers, so the imperative and authoring APIs stay on one typed constraints model.
+
 ## Delivery Sequence
 
 ### Step 0: SDF Coverage Repair
@@ -235,6 +254,9 @@ widgets do not duplicate sizing code. Percent and fill require a finite parent a
 retain intrinsic measurement. Flex remains a separate remaining-space policy. The Settings Save
 action uses a constrained 50% width, pairing headless geometry assertions at two window sizes with
 a directly observable resizable-window check.
+
+Extended by D9: percentage min/max limits and height-relative percentage font size (`set_font_size`),
+with matching `NodeBuilder` modifiers and imperative + authoring tests.
 
 ### Step 4C: Integrate Window Scale And DPI
 
