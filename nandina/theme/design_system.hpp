@@ -224,6 +224,13 @@ namespace nandina::theme
         CardMetrics metrics;
     };
 
+    /** ProgressBar 配方：轨道 + 填充 + 度量（确定性进度条，无交互）。 */
+    using ProgressBarRecipe = struct ProgressBarRecipe {
+        BoxStyle track;
+        BoxStyle fill;
+        ControlMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -339,6 +346,21 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_min_height;
     };
 
+    /** ProgressBar 规则：支持 disabled 选择器，覆盖轨道 / 填充 / 度量字段。 */
+    using ProgressBarRecipeRule = struct ProgressBarRecipeRule {
+        std::optional<ProgressBarVisualState> state; // nullopt = 任意
+        std::optional<ThemeColor> track_fill;
+        std::optional<ThemeColor> track_border;
+        std::optional<ThemeScalar> track_border_width;
+        std::optional<ThemeScalar> track_radius;
+        std::optional<ThemeColor> fill_fill;
+        std::optional<ThemeColor> fill_border;
+        std::optional<ThemeScalar> fill_radius;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_min_height;
+        std::optional<ThemeScalar> metrics_preferred_width;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -412,6 +434,12 @@ namespace nandina::theme
         ResolvedCardMetrics metrics;
     };
 
+    using ResolvedProgressBarStyle = struct ResolvedProgressBarStyle {
+        ResolvedBoxStyle track;
+        ResolvedBoxStyle fill;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -458,6 +486,11 @@ namespace nandina::theme
         std::vector<CardRecipeRule> rules;
     };
 
+    using ProgressBarRecipes = struct ProgressBarRecipes {
+        ProgressBarRecipe base;
+        std::vector<ProgressBarRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -466,6 +499,7 @@ namespace nandina::theme
         SwitchRecipes switch_component;
         BadgeRecipes badge;
         CardRecipes card;
+        ProgressBarRecipes progress_bar;
     };
 
     /**
@@ -659,6 +693,12 @@ namespace nandina::theme
         ColorAppearance appearance
     ) -> ResolvedCardStyle;
 
+    [[nodiscard]] auto resolve_progress_bar(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ProgressBarVisualState state
+    ) -> ResolvedProgressBarStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -718,6 +758,13 @@ namespace nandina::theme
         const CardRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedProgressBarStyle& style,
+        const ProgressBarRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -727,6 +774,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_switch_recipe() -> SwitchRecipe;
     [[nodiscard]] auto default_badge_recipe() -> BadgeRecipe;
     [[nodiscard]] auto default_card_recipe() -> CardRecipe;
+    [[nodiscard]] auto default_progress_bar_recipe() -> ProgressBarRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

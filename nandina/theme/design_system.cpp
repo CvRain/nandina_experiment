@@ -203,6 +203,36 @@ namespace nandina::theme
             };
         }
 
+        /** ProgressBarRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const ProgressBarRecipe& recipe
+        ) -> ResolvedProgressBarStyle {
+            return {
+                .track = resolve(system, appearance, recipe.track),
+                .fill = resolve(system, appearance, recipe.fill),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
+        /** ProgressBar disabled 变换：轨道 / 填充颜色 ×opacity.disabled。 */
+        void apply_progress_bar_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedProgressBarStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.track.fill, alpha);
+            scale_alpha(style.track.border, alpha);
+            scale_alpha(style.fill.fill, alpha);
+            scale_alpha(style.fill.border, alpha);
+        }
+
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
         void apply_button_disabled(
             const DesignSystem& system,
@@ -402,6 +432,27 @@ namespace nandina::theme
         auto style = resolve_recipe(system, appearance, system.components.card.base);
         for (const auto& rule: system.components.card.rules) {
             apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 ProgressBar 配方（base → 规则列表，后匹配者胜 → disabled 变换）。
+     */
+    auto resolve_progress_bar(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const ProgressBarVisualState state
+    ) -> ResolvedProgressBarStyle {
+        auto style = resolve_recipe(system, appearance, system.components.progress_bar.base);
+        for (const auto& rule: system.components.progress_bar.rules) {
+            if (rule.state && *rule.state != state) {
+                continue;
+            }
+            apply_rule(system, appearance, style, rule);
+        }
+        if (state == ProgressBarVisualState::disabled) {
+            apply_progress_bar_disabled(system, appearance, style);
         }
         return style;
     }
@@ -646,6 +697,40 @@ namespace nandina::theme
         }
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedProgressBarStyle& style,
+        const ProgressBarRecipeRule& rule
+    ) {
+        if (rule.track_fill)
+            style.track.fill = resolve_color(system, appearance, *rule.track_fill);
+        if (rule.track_border)
+            style.track.border = resolve_color(system, appearance, *rule.track_border);
+        if (rule.track_border_width) {
+            style.track.border_width =
+                resolve_scalar(system, appearance, *rule.track_border_width);
+        }
+        if (rule.track_radius)
+            style.track.radius = resolve_scalar(system, appearance, *rule.track_radius);
+        if (rule.fill_fill)
+            style.fill.fill = resolve_color(system, appearance, *rule.fill_fill);
+        if (rule.fill_border)
+            style.fill.border = resolve_color(system, appearance, *rule.fill_border);
+        if (rule.fill_radius)
+            style.fill.radius = resolve_scalar(system, appearance, *rule.fill_radius);
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+        if (rule.metrics_preferred_width) {
+            style.metrics.preferred_width =
+                resolve_scalar(system, appearance, *rule.metrics_preferred_width);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -866,6 +951,32 @@ namespace nandina::theme
                 .padding_x = ThemeScalar::token(ScalarToken::spacing_md),
                 .padding_y = ThemeScalar::token(ScalarToken::spacing_md),
                 .min_height = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 ProgressBar 配方（outline_variant 轨道 + primary 填充）。 */
+    auto default_progress_bar_recipe() -> ProgressBarRecipe {
+        return {
+            .track = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::outline_variant),
+                .border = ThemeColor::transparent(ColorToken::outline_variant),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .fill = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::primary),
+                .border = ThemeColor::transparent(ColorToken::primary),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(8.0F),
+                .padding_x = ThemeScalar::literal(0.0F),
+                .gap = ThemeScalar::literal(0.0F),
+                .min_height = ThemeScalar::literal(8.0F),
+                .box_size = ThemeScalar::literal(0.0F),
+                .preferred_width = ThemeScalar::literal(240.0F),
             },
         };
     }
@@ -1123,6 +1234,10 @@ namespace nandina::theme
                 },
                 .card = CardRecipes {
                     .base = default_card_recipe(),
+                    .rules = {},
+                },
+                .progress_bar = ProgressBarRecipes {
+                    .base = default_progress_bar_recipe(),
                     .rules = {},
                 },
             },

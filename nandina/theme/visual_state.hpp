@@ -93,6 +93,12 @@ namespace nandina::theme
         disabled,
     };
 
+    /** ProgressBar 交互状态（确定性进度条：非交互，仅 normal / disabled）。 */
+    enum class ProgressBarVisualState {
+        normal,
+        disabled,
+    };
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP
