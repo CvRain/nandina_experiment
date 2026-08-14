@@ -20,7 +20,9 @@ namespace nandina::app
         }
         result.executable_path = std::string(path.data(), static_cast<std::size_t>(count));
 #else
-        // todo 需要解决windows上运行的情况
+        // todo 需适配windows使用（主要问题在nanres上，nanres还是作为扩展选项使用更好）
+	// std::format 在windows上可能出现报错情况，需要准备fmt库作为备用选项
+	// Clangd: In template: call to consteval function 'std::basic_format_arg<std::basic_format_context<std::__format::_Sink_iter<char>, char>>::_S_to_enum<const char *>' is not a constant expression
         throw std::runtime_error(
             "NanApplicationConfig: process discovery is unsupported on this platform"
         );

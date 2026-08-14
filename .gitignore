@@ -101,6 +101,8 @@ vcpkg_installed
 .wraplock
 .ai
 .kilo
+.github
+.agents
 
 dev-docs-*
 
