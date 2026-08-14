@@ -168,10 +168,19 @@ namespace nandina::theme
     }
 
     auto ThemeManager::contains_family(const std::string_view name) const -> bool {
-        return families_.contains(name);
+        return families_.contains(name) || system_families_.contains(name);
     }
 
     auto ThemeManager::activate_family(const std::string_view name) -> bool {
+        // 全快照族优先：整体 apply，外观翻转由 appearance() 在快照内完成。
+        if (const auto found = system_families_.find(name); found != system_families_.end()) {
+            if (active_family_ == name) {
+                return true;
+            }
+            active_family_ = found->first;
+            commit(found->second);
+            return true;
+        }
         const auto found = families_.find(name);
         if (found == families_.end()) {
             return false;
@@ -182,6 +191,18 @@ namespace nandina::theme
         active_family_ = found->first;
         sync_to_effective();
         return true;
+    }
+
+    void ThemeManager::register_theme_family(std::string name, DesignSystem system) {
+        if (name.empty()) {
+            throw std::invalid_argument("ThemeManager family name cannot be empty");
+        }
+        auto snapshot = std::make_shared<const DesignSystem>(std::move(system));
+        const bool replaces_active = active_family_ == name;
+        system_families_.insert_or_assign(std::move(name), std::move(snapshot));
+        if (replaces_active) {
+            sync_to_effective();
+        }
     }
 
     void ThemeManager::set_preference(const ThemePreference preference) {
@@ -285,6 +306,9 @@ namespace nandina::theme
         if (active_family_.empty()) {
             return active_name_;
         }
+        if (system_families_.contains(active_family_)) {
+            return active_family_; // 全快照族：不在 themes_ 中命中，外观翻转走 refresh_theme_view
+        }
         const auto& family = families_.at(active_family_);
         return appearance() == ColorAppearance::dark ? family.dark_theme : family.light_theme;
     }
@@ -298,6 +322,11 @@ namespace nandina::theme
     }
 
     void ThemeManager::sync_to_effective() {
+        // 全快照族：快照已内嵌两套 palette，外观变化只需刷新 theme() 视图。
+        if (!active_family_.empty() && system_families_.contains(active_family_)) {
+            refresh_theme_view();
+            return;
+        }
         const auto effective = effective_theme_name();
         const auto found = themes_.find(effective);
         if (found != themes_.end()) {

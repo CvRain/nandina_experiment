@@ -81,6 +81,13 @@ namespace nandina::theme
         register_family(std::string name, std::string light_theme, std::string dark_theme) -> bool;
         [[nodiscard]] auto contains_family(std::string_view name) const -> bool;
         [[nodiscard]] auto activate_family(std::string_view name) -> bool;
+
+        /**
+         * 注册「全快照主题族」：一个内嵌 light+dark 的 DesignSystem。
+         * activate_family 会原子 apply 整个快照；set_preference 只在其内翻转外观。
+         */
+        void register_theme_family(std::string name, DesignSystem system);
+
         void set_preference(ThemePreference preference);
         void set_system_appearance(ColorAppearance appearance);
 
@@ -111,6 +118,8 @@ namespace nandina::theme
 
         std::map<std::string, std::shared_ptr<const DesignSystem>, std::less<>> themes_;
         std::map<std::string, ThemeFamily, std::less<>> families_;
+        /// 全快照主题族（内嵌 light+dark），activate 时整体 apply。
+        std::map<std::string, std::shared_ptr<const DesignSystem>, std::less<>> system_families_;
         std::string active_name_ = "default";
         std::string active_family_;
         ThemePreference preference_ = ThemePreference::system;
