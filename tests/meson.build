@@ -184,6 +184,13 @@ theme_families_tests = executable(
 )
 test('theme-families', theme_families_tests)
 
+color_tests = executable(
+    'color_tests',
+    files('color_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('color', color_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

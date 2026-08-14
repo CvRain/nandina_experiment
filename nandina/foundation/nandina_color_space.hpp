@@ -33,11 +33,32 @@ namespace nandina::foundation
     };
 
     /// 8-bit sRGB color. Red, green, blue, and alpha are integers in [0, 255].
+    /// 名称沿用历史（“Hex”指 0xRRGGBBAA 打包值），内部为 4 个字节分量。
     struct NanHexRgb {
         std::uint8_t red {0};
         std::uint8_t green {0};
         std::uint8_t blue {0};
         std::uint8_t alpha {255};
+
+        /// 从 0xRRGGBBAA 打包值构造（red 在最高字节）。
+        [[nodiscard]] static constexpr auto from_uint32(const std::uint32_t rgba) -> NanHexRgb {
+            return {
+                .red = static_cast<std::uint8_t>(rgba >> 24),
+                .green = static_cast<std::uint8_t>(rgba >> 16),
+                .blue = static_cast<std::uint8_t>(rgba >> 8),
+                .alpha = static_cast<std::uint8_t>(rgba),
+            };
+        }
+
+        /// 打包为 0xRRGGBBAA。
+        [[nodiscard]] constexpr auto packed() const -> std::uint32_t {
+            return (static_cast<std::uint32_t>(red) << 24)
+                | (static_cast<std::uint32_t>(green) << 16)
+                | (static_cast<std::uint32_t>(blue) << 8)
+                | static_cast<std::uint32_t>(alpha);
+        }
+
+        auto operator==(const NanHexRgb&) const -> bool = default;
     };
 
     /// OKLab color. Light and alpha are normalized to [0, 1]; a and b are unbounded axes.
