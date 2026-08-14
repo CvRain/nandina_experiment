@@ -118,6 +118,10 @@ readable:
 - RadioButton closes the D6 order: a `RadioGroup` coordinating object enforces
   mutual exclusion and arrow-key roving focus, with a `radio` semantics role and
   the Settings appearance section (System/Light/Dark) as real use.
-- Test suite 31/31 green.
-- Next (planned follow-ups): built-in ThemeManager theme families
-  (fluent/material/creamy) and soft shadows for claymorphism elevation.
+- The `butter` built-in theme family (warm cream + Catppuccin) is landed via
+  `theme/builtin_themes.{hpp,cpp}` and `ThemeManager::register_theme_family`
+  (full-snapshot families). Settings now selects it with `activate_family("butter")`
+  instead of a hardcoded brand palette.
+- Test suite 32/32 green.
+- Next (planned follow-ups): fluent/material theme families (after more common
+  components land), and soft shadows for claymorphism elevation.
