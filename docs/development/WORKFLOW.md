@@ -104,9 +104,9 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
-- Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). Badge, Card,
-  and ProgressBar are the first three components completed against the template
-  frozen in §4.
+- Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). The full D6
+  component order — Badge, Card, ProgressBar, RadioButton — is now complete
+  against the template frozen in §4.
 - Typed sizing was extended per D9: `set_min_*`/`set_max_*` accept percentage
   lengths, and `Button::set_font_size(percent)` resolves as a fraction of the
   control's own final height. Commits `6d6b74b`..`1514ded` cover scene, widget,
@@ -115,7 +115,9 @@ readable:
   disabled alpha transform, `progress_bar` semantics role, one-way `Signal<float>`
   authoring, recording-device paint coverage, and a real click-to-advance use in
   base_window).
-- Test suite 30/30 green.
-- Next: continue the D6 order with RadioButton (mutual exclusion, keyboard
-  navigation, form semantics). Planned follow-ups: built-in ThemeManager theme
-  families (fluent/material/creamy) and soft shadows for claymorphism elevation.
+- RadioButton closes the D6 order: a `RadioGroup` coordinating object enforces
+  mutual exclusion and arrow-key roving focus, with a `radio` semantics role and
+  the Settings appearance section (System/Light/Dark) as real use.
+- Test suite 31/31 green.
+- Next (planned follow-ups): built-in ThemeManager theme families
+  (fluent/material/creamy) and soft shadows for claymorphism elevation.

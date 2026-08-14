@@ -375,6 +375,14 @@ percentage value, one-way `Signal<float>` authoring through `ComponentTraits<Pro
 real click-to-advance use in `base_window`. Nine focused test cases cover theme, light/dark,
 disabled, override survival, value clamping, constrained layout, semantics, paint, and authoring.
 
+RadioButton closes the D6 order with the highest interaction risk. A shared `RadioGroup`
+coordinating object (owned by its members) enforces mutual exclusion and arrow-key roving focus;
+`RadioButton` reuses `Pressable` and `BoxPainter` with a circular indicator and a checked dot,
+exposes a `radio` semantics role, and drives the Settings appearance section (System/Light/Dark)
+as real use. Nine focused test cases cover theme resolution, light/dark, disabled, override
+survival, mutual exclusion, arrow-key navigation, semantics, paint, and authoring, plus a Settings
+integration test for preference switching.
+
 ### Step 8: Close Page Root/Scope Lifetime
 
 Complete. The existing page-owned ReactiveScope now exposes a generation lifetime token;
