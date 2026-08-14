@@ -29,6 +29,7 @@ namespace nandina::semantics
         checkbox,
         slider,
         switch_control,
+        progress_bar,
     };
 
     enum class Composition : std::uint8_t {

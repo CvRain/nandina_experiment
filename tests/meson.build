@@ -163,6 +163,13 @@ card_tests = executable(
 )
 test('card', card_tests)
 
+progress_bar_tests = executable(
+    'progress_bar_tests',
+    files('progress_bar_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('progress-bar', progress_bar_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

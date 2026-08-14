@@ -182,6 +182,8 @@ module_widget = files(
     'widget/badge.cpp',
     'widget/card.hpp',
     'widget/card.cpp',
+    'widget/progress_bar.hpp',
+    'widget/progress_bar.cpp',
 )
 
 module_app = files(

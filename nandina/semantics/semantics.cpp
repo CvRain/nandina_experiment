@@ -54,6 +54,8 @@ namespace nandina::semantics
                 return "slider";
             case Role::switch_control:
                 return "switch";
+            case Role::progress_bar:
+                return "progress-bar";
         }
         return "none";
     }

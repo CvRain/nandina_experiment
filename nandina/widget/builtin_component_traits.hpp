@@ -11,6 +11,7 @@
 #include "card.hpp"
 #include "checkbox.hpp"
 #include "label.hpp"
+#include "progress_bar.hpp"
 #include "slider.hpp"
 #include "switch.hpp"
 #include "text_field.hpp"
@@ -185,6 +186,23 @@ namespace nandina::widget
     struct ComponentTraits<Card> {
         [[nodiscard]] static auto make(const BuildContext& ui) -> authoring::NodeBuilder<Card> {
             return authoring::make<Card>(ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<ProgressBar> {
+        [[nodiscard]] static auto make(const BuildContext& ui, const float value = 0.0F)
+            -> authoring::NodeBuilder<ProgressBar> {
+            return authoring::make<ProgressBar>(value, ui.theme());
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<float>& value
+        ) -> authoring::NodeBuilder<ProgressBar> {
+            auto result = make(ui, value.get());
+            ui.bind(result.build(), &ProgressBar::set_value, value);
+            return result;
         }
     };
 }
