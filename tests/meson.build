@@ -170,6 +170,13 @@ progress_bar_tests = executable(
 )
 test('progress-bar', progress_bar_tests)
 
+radio_button_tests = executable(
+    'radio_button_tests',
+    files('radio_button_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('radio-button', radio_button_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

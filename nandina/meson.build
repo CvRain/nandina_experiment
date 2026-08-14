@@ -184,6 +184,10 @@ module_widget = files(
     'widget/card.cpp',
     'widget/progress_bar.hpp',
     'widget/progress_bar.cpp',
+    'widget/radio_group.hpp',
+    'widget/radio_group.cpp',
+    'widget/radio_button.hpp',
+    'widget/radio_button.cpp',
 )
 
 module_app = files(

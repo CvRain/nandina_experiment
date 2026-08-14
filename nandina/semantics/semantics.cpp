@@ -56,6 +56,8 @@ namespace nandina::semantics
                 return "switch";
             case Role::progress_bar:
                 return "progress-bar";
+            case Role::radio:
+                return "radio";
         }
         return "none";
     }

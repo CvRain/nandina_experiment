@@ -30,6 +30,7 @@ namespace nandina::semantics
         slider,
         switch_control,
         progress_bar,
+        radio,
     };
 
     enum class Composition : std::uint8_t {

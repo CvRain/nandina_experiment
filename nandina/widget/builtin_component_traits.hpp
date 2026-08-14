@@ -12,6 +12,8 @@
 #include "checkbox.hpp"
 #include "label.hpp"
 #include "progress_bar.hpp"
+#include "radio_button.hpp"
+#include "radio_group.hpp"
 #include "slider.hpp"
 #include "switch.hpp"
 #include "text_field.hpp"
@@ -203,6 +205,22 @@ namespace nandina::widget
             auto result = make(ui, value.get());
             ui.bind(result.build(), &ProgressBar::set_value, value);
             return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<RadioButton> {
+        [[nodiscard]] static auto make(const BuildContext& ui, std::string label)
+            -> authoring::NodeBuilder<RadioButton> {
+            return authoring::make<RadioButton>(std::move(label), nullptr, ui.theme());
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string label,
+            std::shared_ptr<RadioGroup> group
+        ) -> authoring::NodeBuilder<RadioButton> {
+            return authoring::make<RadioButton>(std::move(label), std::move(group), ui.theme());
         }
     };
 }
