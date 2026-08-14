@@ -12,6 +12,7 @@
 #include "widget/button.hpp"
 #include "widget/checkbox.hpp"
 #include "widget/label.hpp"
+#include "widget/radio_button.hpp"
 #include "widget/slider.hpp"
 #include "widget/switch.hpp"
 #include "widget/text_field.hpp"
@@ -89,6 +90,13 @@ namespace
         -> widget::Button* {
         return find_node<widget::Button>(root, [text](const widget::Button& button) {
             return button.text() == text;
+        });
+    }
+
+    [[nodiscard]] auto radio_named(scene::NanNode& root, const std::string_view label)
+        -> widget::RadioButton* {
+        return find_node<widget::RadioButton>(root, [label](const widget::RadioButton& radio) {
+            return radio.label() == label;
         });
     }
 } // namespace
@@ -228,7 +236,7 @@ TEST_CASE("settings example visibly exercises percentage sizing", "[example][set
     REQUIRE(save->width() < wide_width);
 }
 
-TEST_CASE("settings appearance buttons switch the theme preference", "[example][settings]") {
+TEST_CASE("settings appearance radios switch the theme preference", "[example][settings]") {
     reactive::Graph graph;
     theme::ThemeManager themes;
     app::NanRouter router {graph, themes};
@@ -240,24 +248,31 @@ TEST_CASE("settings appearance buttons switch the theme preference", "[example][
     tree.set_root(router.host());
     REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
 
-    // 通过语义激活真实触发按钮回调（build() 返回后回调仍持有主题管理器引用）。
-    auto* dark = button_named(*router.host(), "Dark");
-    auto* light = button_named(*router.host(), "Light");
+    auto* system = radio_named(*router.host(), "System");
+    auto* dark = radio_named(*router.host(), "Dark");
+    auto* light = radio_named(*router.host(), "Light");
+    REQUIRE(system != nullptr);
     REQUIRE(dark != nullptr);
     REQUIRE(light != nullptr);
+    // 初始选中 System（build() 中 select 了首项）。
+    REQUIRE(system->checked());
+    REQUIRE_FALSE(dark->checked());
 
+    // 通过语义激活真实触发单选回调（build() 返回后回调仍持有主题管理器引用）。
     REQUIRE(tree.update_semantics());
     REQUIRE(tree.perform_semantics_action(
         dark->semantics_id(),
         {.action = semantics::Action::activate}
     ));
     REQUIRE(themes.preference() == theme::ThemePreference::dark);
+    REQUIRE_FALSE(system->checked());
 
     REQUIRE(tree.perform_semantics_action(
         light->semantics_id(),
         {.action = semantics::Action::activate}
     ));
     REQUIRE(themes.preference() == theme::ThemePreference::light);
+    REQUIRE_FALSE(dark->checked());
 }
 
 TEST_CASE("settings brand theme keeps paired contrast in both appearances", "[example][settings][contrast]") {

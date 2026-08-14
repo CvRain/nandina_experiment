@@ -162,23 +162,25 @@ namespace nandina::examples::settings
                              status.set("Preferences reset");
                          });
 
-        // Light/Dark 切换：捕获 ThemeManager 指针（由应用持有，跨整个 run）。
-        // 注意：不能捕获 ui 本身——BuildContext 是每次 build 的临时对象，
-        // build() 返回后即失效，回调里再解引用会悬垂。
+        // Appearance 单选组：互斥 + 键盘方向键漫游，选中直接驱动主题外观。
+        // 捕获 ThemeManager 指针（由应用持有）；不能捕获 ui（每次 build 的临时对象）。
+        auto appearance_group = widget::RadioGroup::create();
+        auto appearance_system = ui.make<widget::RadioButton>("System", appearance_group).build();
+        auto appearance_light = ui.make<widget::RadioButton>("Light", appearance_group).build();
+        auto appearance_dark = ui.make<widget::RadioButton>("Dark", appearance_group).build();
+        appearance_group->select(appearance_system.get());
+        ui.connect(appearance_group->selection_changed(), [themes](const int index) {
+            static constexpr theme::ThemePreference preferences[] = {
+                theme::ThemePreference::system,
+                theme::ThemePreference::light,
+                theme::ThemePreference::dark,
+            };
+            themes->set_preference(preferences[index]);
+        });
         auto appearance_row = ui.row()
-                                  .gap(8.0F)
-                                  .children(
-                                      ui.make<widget::Button>("Light")
-                                          .treatment(theme::ButtonTreatment::outlined)
-                                          .on_click([themes] {
-                                              themes->set_preference(theme::ThemePreference::light);
-                                          }),
-                                      ui.make<widget::Button>("Dark")
-                                          .treatment(theme::ButtonTreatment::outlined)
-                                          .on_click([themes] {
-                                              themes->set_preference(theme::ThemePreference::dark);
-                                          })
-                                  )
+                                  .gap(12.0F)
+                                  .cross_alignment(widget::LayoutAlignment::center)
+                                  .children(appearance_system, appearance_light, appearance_dark)
                                   .build();
 
         auto actions = ui.row()
