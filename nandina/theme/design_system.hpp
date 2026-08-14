@@ -231,6 +231,15 @@ namespace nandina::theme
         ControlMetrics metrics;
     };
 
+    /** RadioButton 配方：圆形指示器 + 选中点 + 文本 + 焦点环 + 度量。 */
+    using RadioButtonRecipe = struct RadioButtonRecipe {
+        BoxStyle indicator;
+        ThemeColor dot; // 选中内点颜色
+        TypeStyle label;
+        FocusRingStyle focus;
+        ControlMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -361,6 +370,23 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_preferred_width;
     };
 
+    /** RadioButton 规则：支持 checked 布尔选择器 + 状态选择器。 */
+    using RadioButtonRecipeRule = struct RadioButtonRecipeRule {
+        std::optional<bool> checked; // nullopt = 任意
+        std::optional<RadioButtonVisualState> state;
+        std::optional<ThemeColor> indicator_fill;
+        std::optional<ThemeColor> indicator_border;
+        std::optional<ThemeScalar> indicator_border_width;
+        std::optional<ThemeScalar> indicator_radius;
+        std::optional<ThemeColor> dot_color;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_box_size;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -440,6 +466,14 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedRadioButtonStyle = struct ResolvedRadioButtonStyle {
+        ResolvedBoxStyle indicator;
+        NanColor dot;
+        ResolvedTypeStyle label;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -491,6 +525,11 @@ namespace nandina::theme
         std::vector<ProgressBarRecipeRule> rules;
     };
 
+    using RadioButtonRecipes = struct RadioButtonRecipes {
+        RadioButtonRecipe base;
+        std::vector<RadioButtonRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -500,6 +539,7 @@ namespace nandina::theme
         BadgeRecipes badge;
         CardRecipes card;
         ProgressBarRecipes progress_bar;
+        RadioButtonRecipes radio_button;
     };
 
     /**
@@ -699,6 +739,13 @@ namespace nandina::theme
         ProgressBarVisualState state
     ) -> ResolvedProgressBarStyle;
 
+    [[nodiscard]] auto resolve_radio_button(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        bool checked,
+        RadioButtonVisualState state
+    ) -> ResolvedRadioButtonStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -765,6 +812,13 @@ namespace nandina::theme
         const ProgressBarRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedRadioButtonStyle& style,
+        const RadioButtonRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -775,6 +829,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_badge_recipe() -> BadgeRecipe;
     [[nodiscard]] auto default_card_recipe() -> CardRecipe;
     [[nodiscard]] auto default_progress_bar_recipe() -> ProgressBarRecipe;
+    [[nodiscard]] auto default_radio_button_recipe() -> RadioButtonRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

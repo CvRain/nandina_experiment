@@ -99,6 +99,15 @@ namespace nandina::theme
         disabled,
     };
 
+    /** RadioButton 交互状态。 */
+    enum class RadioButtonVisualState {
+        normal,
+        hovered,
+        pressed,
+        focused,
+        disabled,
+    };
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP

@@ -233,6 +233,38 @@ namespace nandina::theme
             scale_alpha(style.fill.border, alpha);
         }
 
+        /** RadioButtonRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const RadioButtonRecipe& recipe
+        ) -> ResolvedRadioButtonStyle {
+            return {
+                .indicator = resolve(system, appearance, recipe.indicator),
+                .dot = resolve_color(system, appearance, recipe.dot),
+                .label = resolve(system, appearance, recipe.label),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
+        /** RadioButton disabled 变换：指示器 / 内点 / 文本颜色 ×opacity.disabled。 */
+        void apply_radio_button_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedRadioButtonStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.indicator.fill, alpha);
+            scale_alpha(style.indicator.border, alpha);
+            scale_alpha(style.dot, alpha);
+            scale_alpha(style.label.color, alpha);
+        }
+
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
         void apply_button_disabled(
             const DesignSystem& system,
@@ -453,6 +485,29 @@ namespace nandina::theme
         }
         if (state == ProgressBarVisualState::disabled) {
             apply_progress_bar_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 RadioButton 配方（base → 规则列表，checked + state 选择器，后匹配者胜 →
+     * disabled 变换）。
+     */
+    auto resolve_radio_button(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const bool checked,
+        const RadioButtonVisualState state
+    ) -> ResolvedRadioButtonStyle {
+        auto style = resolve_recipe(system, appearance, system.components.radio_button.base);
+        for (const auto& rule: system.components.radio_button.rules) {
+            if ((rule.checked && *rule.checked != checked) || (rule.state && *rule.state != state)) {
+                continue;
+            }
+            apply_rule(system, appearance, style, rule);
+        }
+        if (state == RadioButtonVisualState::disabled) {
+            apply_radio_button_disabled(system, appearance, style);
         }
         return style;
     }
@@ -731,6 +786,38 @@ namespace nandina::theme
         }
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedRadioButtonStyle& style,
+        const RadioButtonRecipeRule& rule
+    ) {
+        if (rule.indicator_fill)
+            style.indicator.fill = resolve_color(system, appearance, *rule.indicator_fill);
+        if (rule.indicator_border)
+            style.indicator.border = resolve_color(system, appearance, *rule.indicator_border);
+        if (rule.indicator_border_width) {
+            style.indicator.border_width =
+                resolve_scalar(system, appearance, *rule.indicator_border_width);
+        }
+        if (rule.indicator_radius)
+            style.indicator.radius = resolve_scalar(system, appearance, *rule.indicator_radius);
+        if (rule.dot_color)
+            style.dot = resolve_color(system, appearance, *rule.dot_color);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_box_size)
+            style.metrics.box_size = resolve_scalar(system, appearance, *rule.metrics_box_size);
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -977,6 +1064,35 @@ namespace nandina::theme
                 .min_height = ThemeScalar::literal(8.0F),
                 .box_size = ThemeScalar::literal(0.0F),
                 .preferred_width = ThemeScalar::literal(240.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 RadioButton 配方（未选中：透明指示器 + outline 边框）。 */
+    auto default_radio_button_recipe() -> RadioButtonRecipe {
+        return {
+            .indicator = BoxStyle {
+                .fill = ThemeColor::transparent(ColorToken::surface),
+                .border = ThemeColor::token(ColorToken::outline),
+                .border_width = ThemeScalar::token(ScalarToken::border_thin),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .dot = ThemeColor::token(ColorToken::primary),
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .focus = FocusRingStyle {
+                .color = ThemeColor::token(ColorToken::focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(0.0F),
+                .padding_x = ThemeScalar::literal(0.0F),
+                .gap = ThemeScalar::token(ScalarToken::spacing_sm),
+                .min_height = ThemeScalar::literal(32.0F),
+                .box_size = ThemeScalar::literal(20.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
             },
         };
     }
@@ -1239,6 +1355,39 @@ namespace nandina::theme
                 .progress_bar = ProgressBarRecipes {
                     .base = default_progress_bar_recipe(),
                     .rules = {},
+                },
+                .radio_button = RadioButtonRecipes {
+                    .base = default_radio_button_recipe(),
+                    .rules = {
+                        // 选中：primary 指示器边框 + primary 内点。
+                        RadioButtonRecipeRule {
+                            .checked = true,
+                            .indicator_border = ThemeColor::token(ColorToken::primary),
+                        },
+                        // 未选中交互：指示器向 primary 轻微着色。
+                        RadioButtonRecipeRule {
+                            .checked = false,
+                            .state = RadioButtonVisualState::hovered,
+                            .indicator_fill = ThemeColor::with_alpha(
+                                ColorToken::primary,
+                                ThemeScalar::token(ScalarToken::opacity_hover_overlay)
+                            ),
+                        },
+                        RadioButtonRecipeRule {
+                            .checked = false,
+                            .state = RadioButtonVisualState::pressed,
+                            .indicator_fill = ThemeColor::with_alpha(
+                                ColorToken::primary,
+                                ThemeScalar::token(ScalarToken::opacity_pressed_overlay)
+                            ),
+                        },
+                        // 聚焦：焦点环开启（checked / unchecked 均适用）。
+                        RadioButtonRecipeRule {
+                            .state = RadioButtonVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                    },
                 },
             },
         };
