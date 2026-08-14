@@ -11,7 +11,7 @@
 
 namespace nandina::examples::settings
 {
-    [[nodiscard]] auto build(widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D>;
+    [[nodiscard]] auto build(const widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D>;
 } // namespace nandina::examples::settings
 
 #endif // NANDINA_EXPERIMENT_EXAMPLE_SETTINGS_EXAMPLE_HPP

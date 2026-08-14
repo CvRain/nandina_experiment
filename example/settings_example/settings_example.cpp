@@ -39,10 +39,10 @@ namespace nandina::examples::settings
         /// on_primary 遵循「On Accent = Base」取 Mocha Base，两套对比度均满足 AA。
         [[nodiscard]] auto hex_color(const std::uint32_t value) -> theme::NanColor {
             return theme::NanColor::from(theme::NanHexRgb {
-                static_cast<std::uint8_t>(value >> 16),
-                static_cast<std::uint8_t>(value >> 8),
-                static_cast<std::uint8_t>(value),
-                255,
+                .red = static_cast<std::uint8_t>(value >> 16),
+                .green = static_cast<std::uint8_t>(value >> 8),
+                .blue = static_cast<std::uint8_t>(value),
+                .alpha = 255,
             });
         }
 
@@ -66,7 +66,7 @@ namespace nandina::examples::settings
                 hex_color(0x7F849C), hex_color(0x5C5F77), hex_color(0x45475A),
                 hex_color(0x313244), hex_color(0x1E1E2E),
             };
-            const auto policy = theme::PaletteVariantPolicy {
+            constexpr  auto policy = theme::PaletteVariantPolicy {
                 .light_brand = theme::ColorShade::shade_500,
                 .dark_brand = theme::ColorShade::shade_300,
             };
@@ -87,7 +87,7 @@ namespace nandina::examples::settings
         }
     } // namespace
 
-    auto build(widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D> {
+    auto build(const widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D> {
         using widget::authoring::percent;
 
         // 品牌主题：亮/暗 primary / on_primary 配对由品牌色阶生成（暗色提升品牌档位），
