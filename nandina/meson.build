@@ -116,6 +116,8 @@ module_theme = files(
     'theme/nan_style.cpp',
     'theme/theme_manager.hpp',
     'theme/theme_manager.cpp',
+    'theme/builtin_themes.hpp',
+    'theme/builtin_themes.cpp',
     'theme/style_document.hpp',
     'theme/style_document.cpp',
 )
