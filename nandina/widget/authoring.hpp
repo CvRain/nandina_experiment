@@ -217,7 +217,21 @@ namespace nandina::widget::authoring
             return *this;
         }
 
+        auto min_width(scene::PercentLength width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_min_width(width);
+            return *this;
+        }
+
         auto max_width(float width) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_max_width(width);
+            return *this;
+        }
+
+        auto max_width(scene::PercentLength width) -> NodeBuilder&
             requires std::derived_from<Node, scene::NanControl>
         {
             node_->set_max_width(width);
@@ -231,7 +245,21 @@ namespace nandina::widget::authoring
             return *this;
         }
 
+        auto min_height(scene::PercentLength height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_min_height(height);
+            return *this;
+        }
+
         auto max_height(float height) -> NodeBuilder&
+            requires std::derived_from<Node, scene::NanControl>
+        {
+            node_->set_max_height(height);
+            return *this;
+        }
+
+        auto max_height(scene::PercentLength height) -> NodeBuilder&
             requires std::derived_from<Node, scene::NanControl>
         {
             node_->set_max_height(height);
@@ -253,6 +281,13 @@ namespace nandina::widget::authoring
         }
 
         auto font_size(float size) -> NodeBuilder&
+            requires requires(Node& node) { node.set_font_size(size); }
+        {
+            node_->set_font_size(size);
+            return *this;
+        }
+
+        auto font_size(scene::PercentLength size) -> NodeBuilder&
             requires requires(Node& node) { node.set_font_size(size); }
         {
             node_->set_font_size(size);
@@ -314,15 +349,12 @@ namespace nandina::widget::authoring
     private:
         template<typename Handler>
         [[nodiscard]] auto guarded(Handler&& handler) const {
-            return [lifetime = callback_lifetime_, handler = std::forward<Handler>(handler)](
-                       auto&&... args
-                   ) mutable {
+            return [lifetime = callback_lifetime_,
+                    handler = std::forward<Handler>(handler)](auto&&... args) mutable {
                 if (lifetime.has_value() && lifetime->expired()) {
                     return;
                 }
-                static_cast<void>(
-                    std::invoke(handler, std::forward<decltype(args)>(args)...)
-                );
+                static_cast<void>(std::invoke(handler, std::forward<decltype(args)>(args)...));
             };
         }
 
@@ -391,6 +423,6 @@ namespace nandina::widget
     /// Public root-view result. Builders remain the preferred composition type and
     /// materialize to this retained scene node at the page boundary.
     using View = std::shared_ptr<scene::NanNode2D>;
-}
+} // namespace nandina::widget
 
 #endif // NANDINA_EXPERIMENT_WIDGET_AUTHORING_HPP

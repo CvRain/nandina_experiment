@@ -409,6 +409,28 @@ TEST_CASE("authoring sizing uses the shared control constraints", "[authoring][l
     REQUIRE(measured.get_height() == Catch::Approx(90.0F));
 }
 
+TEST_CASE("authoring exposes percentage font size and limits", "[authoring][layout][sizing]") {
+    using namespace widget::authoring;
+
+    auto button = make<widget::Button>("DSL")
+                      .width(percent(50.0F))
+                      .height(percent(50.0F))
+                      .max_width(percent(40.0F))
+                      .font_size(percent(45.0F))
+                      .build();
+    const auto size = button->measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 200.0F,
+    });
+    REQUIRE(size.get_width() == Catch::Approx(160.0F));
+    REQUIRE(size.get_height() == Catch::Approx(100.0F));
+    REQUIRE(button->text_node().font_size() == Catch::Approx(45.0F));
+
+    auto fixed = make<widget::Button>("Fixed").font_size(22.0F).build();
+    (void)fixed->measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(fixed->text_node().font_size() == Catch::Approx(22.0F));
+}
+
 TEST_CASE("BuildContext carries page services into context factories", "[authoring][context]") {
     reactive::Graph graph;
     reactive::ReactiveScope page_scope {graph};
