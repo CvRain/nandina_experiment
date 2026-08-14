@@ -17,8 +17,8 @@ namespace nandina::widget
     public:
         explicit Card(theme::NanTheme theme = theme::default_theme());
 
-        [[nodiscard]] static auto
-        create(theme::NanTheme theme = theme::default_theme()) -> std::shared_ptr<Card>;
+        [[nodiscard]] static auto create(theme::NanTheme theme = theme::default_theme())
+            -> std::shared_ptr<Card>;
 
         /// 单子内容容器：替换既有子节点（空指针仅允许作为内部状态，公开接口拒绝）。
         auto set_child(std::shared_ptr<scene::NanControl> child) -> Card&;
