@@ -24,17 +24,10 @@ namespace nandina::widget
             return std::abs(lhs - rhs) <= foundation::nan_epsilon;
         }
 
-        [[nodiscard]] auto same_color(foundation::NanColor lhs, foundation::NanColor rhs) -> bool {
-            const auto a = lhs.oklch();
-            const auto b = rhs.oklch();
-            return near(a.light, b.light) && near(a.chroma, b.chroma) && near(a.hue, b.hue)
-                && near(a.alpha, b.alpha);
-        }
-
         [[nodiscard]] auto
         same_text_style(const primitives::TextStyle& lhs, const primitives::TextStyle& rhs)
             -> bool {
-            return same_color(lhs.color, rhs.color) && near(lhs.font_size, rhs.font_size)
+            return lhs.color.approx_equals(rhs.color) && near(lhs.font_size, rhs.font_size)
                 && lhs.overflow == rhs.overflow && lhs.max_lines == rhs.max_lines;
         }
     } // namespace
