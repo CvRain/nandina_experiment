@@ -6,49 +6,53 @@
 
 #include "theme_manager.hpp"
 
-#include <array>
-#include <cstdint>
 #include <utility>
 
 namespace nandina::theme
 {
-    namespace
-    {
-        [[nodiscard]] auto hex_color(const std::uint32_t value) -> NanColor {
-            return NanColor::from(NanHexRgb {
-                .red = static_cast<std::uint8_t>(value >> 16),
-                .green = static_cast<std::uint8_t>(value >> 8),
-                .blue = static_cast<std::uint8_t>(value),
-                .alpha = 255,
-            });
-        }
-
-        [[nodiscard]] auto scale(const std::array<std::uint32_t, 11>& values)
-            -> std::array<NanColor, 11> {
-            std::array<NanColor, 11> result {};
-            for (std::size_t i = 0; i < 11; ++i) {
-                result[i] = hex_color(values[i]);
-            }
-            return result;
-        }
-    } // namespace
-
     auto default_theme_families() -> std::vector<ThemeFamilyDefinition> {
         // ─── butter：黄油卡片 + Catppuccin（暖奶油中性 + 琥珀主色 + 暖粉辅色）───
-        // 中性 ramp 浅端取奶白/米黄，深端取暖棕（「On Accent = Base」取 950 档）。
-        // 主色/辅色以 Catppuccin Peach/Rosewater、Flamingo/Maroon 为参考，按暖调微调。
+        // 色阶按 50 → 950（浅 → 深）命名；950 档 = base，实现「On Accent = Base」。
+        // 主色/辅色以 Catppuccin Peach/Rosewater、Flamingo/Maroon 为参考做暖调微调。
         auto reference = default_reference_palette();
-        reference.neutral.stops = scale({
-            0xFAF6EC, 0xF2EAD9, 0xE8DCC4, 0xD9C8A8, 0xB3A184,
-            0x96856A, 0x7A6B54, 0x5A4F3E, 0x3F372B, 0x2A241B, 0x1C1811,
+        reference.neutral = nan_color_scale({
+            .shade_50 = 0xFAF6EC,  // 奶白（背景）
+            .shade_100 = 0xF2EAD9, // 米黄（表面）
+            .shade_200 = 0xE8DCC4, // 浅米（表面变体）
+            .shade_300 = 0xD9C8A8, // 米
+            .shade_400 = 0xB3A184, // 暖灰
+            .shade_500 = 0x96856A, // 暖灰（outline）
+            .shade_600 = 0x7A6B54, // 暖灰深
+            .shade_700 = 0x5A4F3E, // 暖深灰（次文本）
+            .shade_800 = 0x3F372B, // 深暖
+            .shade_900 = 0x2A241B, // 近黑暖（暗表面）
+            .shade_950 = 0x1C1811, // 最深暖（文字 / base）
         });
-        reference.primary.stops = scale({
-            0xFFF6E2, 0xFFEBC4, 0xFFD997, 0xFCC36C, 0xF5A845,
-            0xE78D28, 0xC97217, 0xA15710, 0x7A3E0A, 0x522804, 0x1C1811,
+        reference.primary = nan_color_scale({
+            .shade_50 = 0xFFF6E2,  // 奶油
+            .shade_100 = 0xFFEBC4, // 浅黄
+            .shade_200 = 0xFFD997,
+            .shade_300 = 0xFCC36C, // 暗色品牌（Peach 提亮）
+            .shade_400 = 0xF5A845,
+            .shade_500 = 0xE78D28, // 亮色品牌（琥珀）
+            .shade_600 = 0xC97217,
+            .shade_700 = 0xA15710,
+            .shade_800 = 0x7A3E0A,
+            .shade_900 = 0x522804,
+            .shade_950 = 0x1C1811, // on-primary（= base）
         });
-        reference.tertiary.stops = scale({
-            0xF9E4E0, 0xF4CCCC, 0xEBA5AE, 0xDD7F8A, 0xD45A68,
-            0xC23A4E, 0xA62A3C, 0x841F2F, 0x61151F, 0x3E0C12, 0x24060A,
+        reference.tertiary = nan_color_scale({
+            .shade_50 = 0xF9E4E0,
+            .shade_100 = 0xF4CCCC,
+            .shade_200 = 0xEBA5AE,
+            .shade_300 = 0xDD7F8A, // 暗色辅色（Flamingo 提亮）
+            .shade_400 = 0xD45A68,
+            .shade_500 = 0xC23A4E, // 亮色辅色（Maroon）
+            .shade_600 = 0xA62A3C,
+            .shade_700 = 0x841F2F,
+            .shade_800 = 0x61151F,
+            .shade_900 = 0x3E0C12,
+            .shade_950 = 0x24060A,
         });
 
         NanTokens butter_tokens {};
@@ -62,10 +66,11 @@ namespace nandina::theme
         families.push_back(ThemeFamilyDefinition {
             .name = "butter",
             .reference = std::move(reference),
-            .policy = {
-                .light_brand = ColorShade::shade_500,
-                .dark_brand = ColorShade::shade_300,
-            },
+            .policy =
+                {
+                    .light_brand = ColorShade::shade_500,
+                    .dark_brand = ColorShade::shade_300,
+                },
             .tokens = butter_tokens,
         });
         return families;

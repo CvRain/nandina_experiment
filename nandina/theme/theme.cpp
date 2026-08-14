@@ -25,6 +25,22 @@ namespace nandina::theme
         }
     } // namespace
 
+    auto nan_color_scale(const NanHexScale& spec) -> NanColorScale {
+        NanColorScale result;
+        result.stops[0] = NanColor::from_hex(spec.shade_50);
+        result.stops[1] = NanColor::from_hex(spec.shade_100);
+        result.stops[2] = NanColor::from_hex(spec.shade_200);
+        result.stops[3] = NanColor::from_hex(spec.shade_300);
+        result.stops[4] = NanColor::from_hex(spec.shade_400);
+        result.stops[5] = NanColor::from_hex(spec.shade_500);
+        result.stops[6] = NanColor::from_hex(spec.shade_600);
+        result.stops[7] = NanColor::from_hex(spec.shade_700);
+        result.stops[8] = NanColor::from_hex(spec.shade_800);
+        result.stops[9] = NanColor::from_hex(spec.shade_900);
+        result.stops[10] = NanColor::from_hex(spec.shade_950);
+        return result;
+    }
+
     auto default_reference_palette() -> NanReferencePalette {
         // Skeleton-compatible OKLCH scales. The warm primary keeps the Phase 7
         // built-in appearance; all semantic defaults below are selected from here.

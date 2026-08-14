@@ -11,6 +11,7 @@
 
 #include <array>
 #include <cstddef>
+#include <cstdint>
 
 namespace nandina::theme
 {
@@ -52,6 +53,28 @@ namespace nandina::theme
             return stops[static_cast<std::size_t>(shade)];
         }
     };
+
+    /**
+     * 16 进制色阶的命名结构（浅 → 深，50 → 950）。
+     * 供主题作者用命名字段表达色阶，避免 11 个位置化十六进制值难以阅读。
+     * 档位语义与 `ColorShade` 一致：50 最浅（背景/表面）、950 最深（文字/base）。
+     */
+    struct NanHexScale {
+        std::uint32_t shade_50;
+        std::uint32_t shade_100;
+        std::uint32_t shade_200;
+        std::uint32_t shade_300;
+        std::uint32_t shade_400;
+        std::uint32_t shade_500;
+        std::uint32_t shade_600;
+        std::uint32_t shade_700;
+        std::uint32_t shade_800;
+        std::uint32_t shade_900;
+        std::uint32_t shade_950;
+    };
+
+    /** 把命名的 16 进制色阶编译为 NanColorScale（内部转 OKLCH）。 */
+    [[nodiscard]] auto nan_color_scale(const NanHexScale& scale) -> NanColorScale;
 
     // Reference colors are authoring inputs. Components consume the resolved semantic scheme below.
     struct NanReferencePalette {
