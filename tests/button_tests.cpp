@@ -699,6 +699,50 @@ TEST_CASE("button forwards text state through its text primitive", "[widget][but
     REQUIRE(dev.texts[0].text.ends_with("..."));
 }
 
+TEST_CASE("button font size supports logical and percentage values", "[widget][button][text]") {
+    // 逻辑字号：显式值优先于主题与继承上下文。
+    widget::Button logical("Logical");
+    logical.set_font_size(20.0F);
+    (void)logical.measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 80.0F,
+    });
+    REQUIRE(logical.text_node().font_size() == Catch::Approx(20.0F));
+    REQUIRE(logical.font_size() == Catch::Approx(20.0F));
+
+    // 百分比字号：相对按钮自身最终高度解析，因此跟随窗口一起缩放。
+    widget::Button proportional("Proportional");
+    proportional.set_width(scene::percent(50.0F)).set_height(scene::percent(50.0F));
+    proportional.set_font_size(scene::percent(45.0F));
+    const auto size = proportional.measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 200.0F,
+    });
+    proportional.layout_to(
+        foundation::NanRect::from_origin_size(foundation::NanPoint::zero(), size)
+    );
+    REQUIRE(size.get_height() == Catch::Approx(100.0F));
+    REQUIRE(proportional.text_node().font_size() == Catch::Approx(45.0F));
+
+    // 显式值覆盖百分比；清除后回退主题配方。
+    proportional.set_font_size(30.0F);
+    (void)proportional.measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 200.0F,
+    });
+    REQUIRE(proportional.text_node().font_size() == Catch::Approx(30.0F));
+
+    proportional.clear_font_size();
+    (void)proportional.measure_layout(scene::LayoutConstraints {
+        .max_width = 400.0F,
+        .max_height = 200.0F,
+    });
+    REQUIRE(
+        proportional.text_node().font_size()
+        == Catch::Approx(proportional.resolved_style().label.font_size)
+    );
+}
+
 TEST_CASE("button text overflow controls its internal text primitive", "[widget][button][text]") {
     RecordingDevice dev;
     scene::NanSceneTree tree;

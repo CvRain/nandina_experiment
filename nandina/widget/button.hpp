@@ -41,6 +41,15 @@ namespace nandina::widget
         void set_font_weight(int weight);
         void set_font_slant(text::FontSlant slant);
 
+        /// 显式字号（逻辑单位），优先于百分比、继承上下文与主题配方。
+        void set_font_size(float size);
+        /// 百分比字号：相对按钮自身最终高度解析（如 percent(45) = 高度 × 45%）。
+        void set_font_size(scene::PercentLength size);
+        /// 清除显式/百分比字号，回退到继承上下文或主题配方。
+        void clear_font_size();
+        /// 当前生效的字号（最近一次样式应用后文本原语实际持有的值）。
+        [[nodiscard]] auto font_size() const -> float;
+
         void set_text_overflow(primitives::TextOverflow overflow);
         [[nodiscard]] auto text_overflow() const -> primitives::TextOverflow;
 
@@ -78,7 +87,9 @@ namespace nandina::widget
 
     private:
         void apply_metrics();
-        void apply_text_style(theme::ButtonVisualState state);
+        void apply_text_style(theme::ButtonVisualState state, float reference_height);
+        [[nodiscard]] auto resolved_font_size(float reference_height, float fallback) const
+            -> float;
 
         primitives::Text text_;
         /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。
@@ -91,6 +102,9 @@ namespace nandina::widget
         /// set_theme(NanTheme) 整份覆盖后不再跟随系统切换。
         bool system_explicit_ = false;
         bool font_explicit_ = false;
+        /// 显式字号与百分比字号互斥；均为空时回退继承上下文/主题。
+        std::optional<float> font_size_;
+        std::optional<scene::PercentLength> font_size_percent_;
         theme::ButtonTone tone_ = theme::ButtonTone::primary;
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;
         theme::ButtonSize size_ = theme::ButtonSize::medium;

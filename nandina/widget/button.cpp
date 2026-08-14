@@ -12,6 +12,7 @@
 
 #include <algorithm>
 #include <cmath>
+#include <stdexcept>
 #include <utility>
 
 namespace nandina::widget
@@ -89,7 +90,7 @@ namespace nandina::widget
 
     void Button::on_style_context_changed(const theme::ResolvedStyleContext& /*context*/) {
         mark_layout_dirty();
-        apply_text_style(visual_state());
+        apply_text_style(visual_state(), height());
     }
 
     void Button::on_theme_changed(const theme::ThemeManager& manager) {
@@ -129,6 +130,40 @@ namespace nandina::widget
         font_explicit_ = true;
         text_.set_font_slant(slant);
         mark_layout_dirty();
+    }
+
+    void Button::set_font_size(const float size) {
+        if (!std::isfinite(size) || size < 0.0F) {
+            throw std::invalid_argument("font size must be finite and non-negative");
+        }
+        font_size_ = size;
+        font_size_percent_.reset();
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    void Button::set_font_size(const scene::PercentLength size) {
+        if (!std::isfinite(size.value) || size.value < 0.0F) {
+            throw std::invalid_argument("font size percentage must be finite and non-negative");
+        }
+        font_size_percent_ = size;
+        font_size_.reset();
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    void Button::clear_font_size() {
+        if (!font_size_.has_value() && !font_size_percent_.has_value()) {
+            return;
+        }
+        font_size_.reset();
+        font_size_percent_.reset();
+        mark_layout_dirty();
+        apply_metrics();
+    }
+
+    auto Button::font_size() const -> float {
+        return text_.font_size();
     }
 
     void Button::set_text_overflow(primitives::TextOverflow overflow) {
@@ -267,7 +302,7 @@ namespace nandina::widget
         }
         primitives::BoxPainter::paint_outline(ctx, world, style.container, opacity);
 
-        apply_text_style(visual_state());
+        apply_text_style(visual_state(), height());
         // 文本布局始终使用逻辑尺寸；world 已包含视口变换，不能再作为 measure 输入，
         // 否则缩放后的文本宽度会污染下一次逻辑布局并造成组件尺寸振荡。
         const float content_width =
@@ -350,8 +385,12 @@ namespace nandina::widget
                                       : theme::ButtonVisualState::normal;
         const auto style =
             theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
+        // 百分比字号的基准 = 本次布局后按钮的最终高度（高度由 size_spec/配方决定）。
+        const float reference_height =
+            constraints.constrain(foundation::NanSize(0.0F, style.metrics.height)).get_height();
         apply_text_style(
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
+            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal,
+            reference_height
         );
         const float max_text_width = std::isfinite(constraints.max_width)
             ? std::max(0.0F, constraints.max_width - style.metrics.padding_x * 2.0F)
@@ -376,7 +415,8 @@ namespace nandina::widget
         const auto style =
             theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
         apply_text_style(
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal
+            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal,
+            height()
         );
         (void)text_.measure_layout(scene::LayoutConstraints::loose());
         set_size(foundation::NanSize(
@@ -385,14 +425,30 @@ namespace nandina::widget
         ));
     }
 
-    void Button::apply_text_style(theme::ButtonVisualState state) {
+    auto Button::resolved_font_size(const float reference_height, const float fallback) const
+        -> float {
+        if (font_size_.has_value()) {
+            return *font_size_;
+        }
+        if (font_size_percent_.has_value() && reference_height > 0.0F) {
+            return std::max(1.0F, reference_height * font_size_percent_->value * 0.01F);
+        }
+        return fallback;
+    }
+
+    void Button::apply_text_style(
+        const theme::ButtonVisualState state,
+        const float reference_height
+    ) {
         const auto style =
             theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
         const auto& context = resolved_style_context();
         const primitives::TextStyle text_style {
             .color = context.text_color_from_context ? context.text_color : style.label.color,
-            .font_size =
-                context.font_size_from_context ? context.font_size : style.label.font_size,
+            .font_size = resolved_font_size(
+                reference_height,
+                context.font_size_from_context ? context.font_size : style.label.font_size
+            ),
             .font = context.font_from_context && !font_explicit_ ? context.font : text_.font(),
             .overflow = text_overflow_,
             .max_lines = 1,
