@@ -368,6 +368,13 @@ Card follows as the surface-container component: `CardRecipe`/`CardRecipeRule`/`
 a single-child container reusing `BoxPainter` with recipe-driven padding, six focused test cases,
 and the Settings Preferences section wrapped in a Card.
 
+ProgressBar is the third component, validating track/value state: `ProgressBarRecipe`/`Rule`/
+`resolve_progress_bar` (outline-variant track + primary fill, disabled alpha transform), a
+non-interactive determinate widget reusing `BoxPainter`, a `progress_bar` semantics role with a
+percentage value, one-way `Signal<float>` authoring through `ComponentTraits<ProgressBar>`, and a
+real click-to-advance use in `base_window`. Nine focused test cases cover theme, light/dark,
+disabled, override survival, value clamping, constrained layout, semantics, paint, and authoring.
+
 ### Step 8: Close Page Root/Scope Lifetime
 
 Complete. The existing page-owned ReactiveScope now exposes a generation lifetime token;
