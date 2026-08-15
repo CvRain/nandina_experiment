@@ -83,7 +83,7 @@ uniform vec4 uShapeRect; // 图元矩形（raylib 屏幕坐标，y 向下）
 uniform vec4 uQuadRect;  // 覆盖 quad；包含图元外侧的抗锯齿过渡区
 uniform vec2 uRadius;  // x = 圆角半径；y = 线段 / 描边半宽
 uniform vec4 uColor;   // 实心颜色（RGBA 0..1）
-uniform int uMode;     // 0 = fill; 1 = outline; 2 = segment; 3 = circle clipped by round rect
+uniform int uMode;     // 0 = fill; 1 = outline; 2 = segment; 3 = circle clipped by round rect; 4 = shadow
 uniform vec2 uA;       // 线段端点 A（模式 2）
 uniform vec2 uB;       // 线段端点 B（模式 2）
 out vec4 finalColor;
@@ -120,6 +120,10 @@ void main() {
         }
         else if (uMode == 1) {
             alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, abs(sd) - uRadius.y);
+        }
+        else if (uMode == 4) {
+            // shadow：矩形内不透明，向外在 spread（uRadius.y）距离内渐隐。
+            alpha = 1.0 - smoothstep(0.0, max(uRadius.y, 1e-3), sd);
         }
         else {
             alpha = 1.0 - smoothstep(-aa * 0.5, aa * 0.5, sd);
@@ -290,6 +294,20 @@ void main() {
                 to_rl(color),
                 center
             );
+        }
+
+        void draw_rounded_rect_shadow(
+            const NanRect& r,
+            const float radius,
+            const float spread,
+            const NanColor& c
+        ) override {
+            if (r.get_width() <= 0.0F || r.get_height() <= 0.0F || spread <= 0.0F) {
+                return;
+            }
+            const float corner =
+                std::clamp(radius, 0.0F, std::min(r.get_width(), r.get_height()) * 0.5F);
+            draw_aa(r, corner, spread, detail::SdfPrimitiveMode::shadow, to_rl(c));
         }
 
         /// 懒加载 SDF 抗锯齿着色器与 1x1 白纹理。

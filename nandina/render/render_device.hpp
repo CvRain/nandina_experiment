@@ -89,6 +89,20 @@ namespace nandina::render
             draw_circle(center, circle_radius, color);
         }
 
+        /// 软阴影：圆角矩形 + 软边衰减。rect 为阴影的圆角矩形（已含偏移），
+        /// spread 为软边衰减宽度（屏幕空间）。默认 no-op，录制设备按需覆写计数。
+        virtual void draw_rounded_rect_shadow(
+            const NanRect& rect,
+            float radius,
+            float spread,
+            const NanColor& color
+        ) {
+            (void)rect;
+            (void)radius;
+            (void)spread;
+            (void)color;
+        }
+
         /// Text uses a minimal "top-left anchor + backend default font" interface;
         /// full text layout is abstracted later.
         virtual void draw_text(

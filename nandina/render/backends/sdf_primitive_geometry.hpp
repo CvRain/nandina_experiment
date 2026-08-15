@@ -18,6 +18,7 @@ namespace nandina::render::detail
         outline = 1,
         segment = 2,
         clipped_circle = 3,
+        shadow = 4,
     };
 
     inline constexpr float sdf_aa_padding = 1.0F;
@@ -85,9 +86,11 @@ namespace nandina::render::detail
         const SdfPrimitiveMode mode,
         const float half_width = 0.0F
     ) -> foundation::NanRect {
-        const float stroke_padding =
-            mode == SdfPrimitiveMode::outline ? std::max(0.0F, half_width) : 0.0F;
-        return shape_bounds.expanded(stroke_padding + sdf_aa_padding);
+        // outline 需容纳外侧半线宽；shadow 的软边衰减（spread）落在图元外侧。
+        const float soft_padding = mode == SdfPrimitiveMode::outline
+            ? std::max(0.0F, half_width)
+            : mode == SdfPrimitiveMode::shadow ? std::max(0.0F, half_width) : 0.0F;
+        return shape_bounds.expanded(soft_padding + sdf_aa_padding);
     }
 
     /** 包含线段圆头与抗锯齿过渡区的最小覆盖 quad。 */
