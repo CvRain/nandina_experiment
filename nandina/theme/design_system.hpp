@@ -275,6 +275,17 @@ namespace nandina::theme
         ControlMetrics metrics; // padding_x（气泡内边距）、gap（气泡与目标间距）、min_height
     };
 
+    /** Select 配方：触发字段 + 弹出列表 + 值/选项文本 + 焦点环 + 度量。 */
+    using SelectRecipe = struct SelectRecipe {
+        BoxStyle container;         // 触发字段（关闭态）
+        BoxStyle popup;             // 弹出列表容器
+        TypeStyle value;            // 当前选中值文本
+        TypeStyle option;           // 选项文本（未选中）
+        TypeStyle option_selected;  // 选中选项文本
+        FocusRingStyle focus;
+        ControlMetrics metrics;     // height（字段高）、padding_x、gap（字段与弹窗间距）、min_height（选项行高）
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -461,6 +472,30 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_min_height;
     };
 
+    /** Select 规则：支持状态选择器，覆盖字段 / 弹窗 / 文本 / 焦点环 / 度量字段。 */
+    using SelectRecipeRule = struct SelectRecipeRule {
+        std::optional<SelectVisualState> state; // nullopt = 任意
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> popup_fill;
+        std::optional<ThemeColor> popup_border;
+        std::optional<ThemeScalar> popup_border_width;
+        std::optional<ThemeScalar> popup_radius;
+        std::optional<ThemeColor> value_color;
+        std::optional<ThemeColor> option_color;
+        std::optional<ThemeColor> option_selected_color;
+        std::optional<ThemeScalar> option_font_size;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_min_height;
+        std::optional<ThemeScalar> metrics_preferred_width;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -566,6 +601,16 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedSelectStyle = struct ResolvedSelectStyle {
+        ResolvedBoxStyle container;
+        ResolvedBoxStyle popup;
+        ResolvedTypeStyle value;
+        ResolvedTypeStyle option;
+        ResolvedTypeStyle option_selected;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -632,6 +677,11 @@ namespace nandina::theme
         std::vector<TooltipRecipeRule> rules;
     };
 
+    using SelectRecipes = struct SelectRecipes {
+        SelectRecipe base;
+        std::vector<SelectRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -644,6 +694,7 @@ namespace nandina::theme
         RadioButtonRecipes radio_button;
         TabsRecipes tabs;
         TooltipRecipes tooltip;
+        SelectRecipes select;
     };
 
     /**
@@ -875,6 +926,12 @@ namespace nandina::theme
         ColorAppearance appearance
     ) -> ResolvedTooltipStyle;
 
+    [[nodiscard]] auto resolve_select(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        SelectVisualState state
+    ) -> ResolvedSelectStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -962,6 +1019,13 @@ namespace nandina::theme
         const TooltipRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedSelectStyle& style,
+        const SelectRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -975,6 +1039,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_radio_button_recipe() -> RadioButtonRecipe;
     [[nodiscard]] auto default_tabs_recipe() -> TabsRecipe;
     [[nodiscard]] auto default_tooltip_recipe() -> TooltipRecipe;
+    [[nodiscard]] auto default_select_recipe() -> SelectRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

@@ -115,6 +115,13 @@ namespace nandina::theme
         disabled,
     };
 
+    /** Select 交互状态。 */
+    enum class SelectVisualState {
+        normal,
+        focused,
+        disabled,
+    };
+
 } // namespace nandina::theme
 
 #endif // NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP

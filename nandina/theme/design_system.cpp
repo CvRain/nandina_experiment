@@ -298,6 +298,39 @@ namespace nandina::theme
             };
         }
 
+        /** SelectRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const SelectRecipe& recipe
+        ) -> ResolvedSelectStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .popup = resolve(system, appearance, recipe.popup),
+                .value = resolve(system, appearance, recipe.value),
+                .option = resolve(system, appearance, recipe.option),
+                .option_selected = resolve(system, appearance, recipe.option_selected),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
+        /** Select disabled 变换：字段 / 值文本颜色 ×opacity.disabled。 */
+        void apply_select_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedSelectStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.container.fill, alpha);
+            scale_alpha(style.container.border, alpha);
+            scale_alpha(style.value.color, alpha);
+        }
+
         /** Tabs disabled 变换：标签 / 指示条颜色 ×opacity.disabled。 */
         void apply_tabs_disabled(
             const DesignSystem& system,
@@ -592,6 +625,27 @@ namespace nandina::theme
         auto style = resolve_recipe(system, appearance, system.components.tooltip.base);
         for (const auto& rule: system.components.tooltip.rules) {
             apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Select 配方（base → 规则列表，state 选择器，后匹配者胜 → disabled 变换）。
+     */
+    auto resolve_select(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const SelectVisualState state
+    ) -> ResolvedSelectStyle {
+        auto style = resolve_recipe(system, appearance, system.components.select.base);
+        for (const auto& rule: system.components.select.rules) {
+            if (rule.state && *rule.state != state) {
+                continue;
+            }
+            apply_rule(system, appearance, style, rule);
+        }
+        if (state == SelectVisualState::disabled) {
+            apply_select_disabled(system, appearance, style);
         }
         return style;
     }
@@ -1004,6 +1058,67 @@ namespace nandina::theme
         }
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedSelectStyle& style,
+        const SelectRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.popup_fill)
+            style.popup.fill = resolve_color(system, appearance, *rule.popup_fill);
+        if (rule.popup_border)
+            style.popup.border = resolve_color(system, appearance, *rule.popup_border);
+        if (rule.popup_border_width) {
+            style.popup.border_width =
+                resolve_scalar(system, appearance, *rule.popup_border_width);
+        }
+        if (rule.popup_radius)
+            style.popup.radius = resolve_scalar(system, appearance, *rule.popup_radius);
+        if (rule.value_color)
+            style.value.color = resolve_color(system, appearance, *rule.value_color);
+        if (rule.option_color)
+            style.option.color = resolve_color(system, appearance, *rule.option_color);
+        if (rule.option_selected_color) {
+            style.option_selected.color =
+                resolve_color(system, appearance, *rule.option_selected_color);
+        }
+        if (rule.option_font_size) {
+            style.option.font_size = resolve_scalar(system, appearance, *rule.option_font_size);
+            style.option_selected.font_size =
+                resolve_scalar(system, appearance, *rule.option_font_size);
+        }
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+        if (rule.metrics_preferred_width) {
+            style.metrics.preferred_width =
+                resolve_scalar(system, appearance, *rule.metrics_preferred_width);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -1353,6 +1468,48 @@ namespace nandina::theme
         };
     }
 
+    /** @return 框架默认 Select 配方（surface_variant 字段 + surface 弹窗 + primary 选中）。 */
+    auto default_select_recipe() -> SelectRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface_variant),
+                .border = ThemeColor::token(ColorToken::outline_variant),
+                .border_width = ThemeScalar::token(ScalarToken::border_thin),
+                .radius = ThemeScalar::token(ScalarToken::radius_sm),
+            },
+            .popup = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface),
+                .border = ThemeColor::token(ColorToken::outline_variant),
+                .border_width = ThemeScalar::token(ScalarToken::border_thin),
+                .radius = ThemeScalar::token(ScalarToken::radius_sm),
+            },
+            .value = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .option = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .option_selected = TypeStyle {
+                .color = ThemeColor::token(ColorToken::primary),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .focus = FocusRingStyle {
+                .color = ThemeColor::token(ColorToken::focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(40.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_md),
+                .gap = ThemeScalar::literal(4.0F),
+                .min_height = ThemeScalar::literal(32.0F),
+                .box_size = ThemeScalar::literal(0.0F),
+                .preferred_width = ThemeScalar::literal(160.0F),
+            },
+        };
+    }
+
     /**
      * 框架默认设计系统。
      *
@@ -1658,6 +1815,16 @@ namespace nandina::theme
                 .tooltip = TooltipRecipes {
                     .base = default_tooltip_recipe(),
                     .rules = {},
+                },
+                .select = SelectRecipes {
+                    .base = default_select_recipe(),
+                    .rules = {
+                        SelectRecipeRule {
+                            .state = SelectVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                    },
                 },
             },
         };
