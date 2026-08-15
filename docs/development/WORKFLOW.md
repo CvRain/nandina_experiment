@@ -128,6 +128,9 @@ readable:
 - Tabs landed: a horizontal tab bar with single selection, arrow-key roving focus,
   underline indicator, `tab` semantics role, and `Signal<int>` two-way authoring;
   Settings shows a General/Appearance/About tabs section.
-- Test suite 34/34 green.
+- Tooltip landed: a hover-triggered floating bubble (primary fill + on-primary text)
+  wrapping a trigger control, with delay/placement/override and a `tooltip`
+  semantics role; Settings wraps the Reset button.
+- Test suite 35/35 green.
 - Next (planned follow-ups): fluent/material theme families (after more common
   components land).
