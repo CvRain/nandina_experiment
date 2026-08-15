@@ -125,6 +125,9 @@ readable:
 - Soft shadows landed: `IRenderDevice::draw_rounded_rect_shadow` (SDF mode 4 soft
   falloff), `ShadowPainter`, `ShadowStyle` on `CardRecipe`, and a butter card
   shadow rule. Default Card stays flat; butter gets warm-clay elevation.
-- Test suite 33/33 green.
+- Tabs landed: a horizontal tab bar with single selection, arrow-key roving focus,
+  underline indicator, `tab` semantics role, and `Signal<int>` two-way authoring;
+  Settings shows a General/Appearance/About tabs section.
+- Test suite 34/34 green.
 - Next (planned follow-ups): fluent/material theme families (after more common
   components land).
