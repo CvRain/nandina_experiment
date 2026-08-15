@@ -266,6 +266,41 @@ namespace nandina::theme
             scale_alpha(style.label.color, alpha);
         }
 
+        /** TabsRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const TabsRecipe& recipe
+        ) -> ResolvedTabsStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .selected_background = resolve(system, appearance, recipe.selected_background),
+                .label = resolve(system, appearance, recipe.label),
+                .label_selected = resolve(system, appearance, recipe.label_selected),
+                .indicator = resolve_color(system, appearance, recipe.indicator),
+                .indicator_thickness =
+                    resolve_scalar(system, appearance, recipe.indicator_thickness),
+                .focus = resolve(system, appearance, recipe.focus),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
+        /** Tabs disabled 变换：标签 / 指示条颜色 ×opacity.disabled。 */
+        void apply_tabs_disabled(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            ResolvedTabsStyle& style
+        ) {
+            const float alpha = resolve_scalar(
+                system,
+                appearance,
+                ThemeScalar::token(ScalarToken::opacity_disabled)
+            );
+            scale_alpha(style.label.color, alpha);
+            scale_alpha(style.label_selected.color, alpha);
+            scale_alpha(style.indicator, alpha);
+        }
+
         /** Button disabled 变换：全部颜色 ×opacity.disabled，焦点环隐去。 */
         void apply_button_disabled(
             const DesignSystem& system,
@@ -509,6 +544,27 @@ namespace nandina::theme
         }
         if (state == RadioButtonVisualState::disabled) {
             apply_radio_button_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Tabs 配方（base → 规则列表，state 选择器，后匹配者胜 → disabled 变换）。
+     */
+    auto resolve_tabs(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const TabsVisualState state
+    ) -> ResolvedTabsStyle {
+        auto style = resolve_recipe(system, appearance, system.components.tabs.base);
+        for (const auto& rule: system.components.tabs.rules) {
+            if (rule.state && *rule.state != state) {
+                continue;
+            }
+            apply_rule(system, appearance, style, rule);
+        }
+        if (state == TabsVisualState::disabled) {
+            apply_tabs_disabled(system, appearance, style);
         }
         return style;
     }
@@ -831,6 +887,64 @@ namespace nandina::theme
             style.metrics.box_size = resolve_scalar(system, appearance, *rule.metrics_box_size);
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedTabsStyle& style,
+        const TabsRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.selected_background_fill) {
+            style.selected_background.fill =
+                resolve_color(system, appearance, *rule.selected_background_fill);
+        }
+        if (rule.selected_background_radius) {
+            style.selected_background.radius =
+                resolve_scalar(system, appearance, *rule.selected_background_radius);
+        }
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.label_selected_color) {
+            style.label_selected.color =
+                resolve_color(system, appearance, *rule.label_selected_color);
+        }
+        if (rule.label_selected_font_size) {
+            style.label_selected.font_size =
+                resolve_scalar(system, appearance, *rule.label_selected_font_size);
+        }
+        if (rule.indicator_color)
+            style.indicator = resolve_color(system, appearance, *rule.indicator_color);
+        if (rule.indicator_thickness) {
+            style.indicator_thickness =
+                resolve_scalar(system, appearance, *rule.indicator_thickness);
+        }
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -1111,6 +1225,46 @@ namespace nandina::theme
                 .gap = ThemeScalar::token(ScalarToken::spacing_sm),
                 .min_height = ThemeScalar::literal(32.0F),
                 .box_size = ThemeScalar::literal(20.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 Tabs 配方（下划线风格：无容器背景/pill，选中 primary + 下划线）。 */
+    auto default_tabs_recipe() -> TabsRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::transparent(ColorToken::surface),
+                .border = ThemeColor::transparent(ColorToken::surface),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::literal(0.0F),
+            },
+            .selected_background = BoxStyle {
+                .fill = ThemeColor::transparent(ColorToken::surface),
+                .border = ThemeColor::transparent(ColorToken::surface),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::literal(0.0F),
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface_variant),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .label_selected = TypeStyle {
+                .color = ThemeColor::token(ColorToken::primary),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .indicator = ThemeColor::token(ColorToken::primary),
+            .indicator_thickness = ThemeScalar::literal(2.0F),
+            .focus = FocusRingStyle {
+                .color = ThemeColor::token(ColorToken::focus_ring),
+                .width = ThemeScalar::literal(0.0F), // focused 规则按需开启
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(0.0F),
+                .padding_x = ThemeScalar::literal(0.0F),
+                .gap = ThemeScalar::token(ScalarToken::spacing_lg),
+                .min_height = ThemeScalar::literal(40.0F),
+                .box_size = ThemeScalar::literal(0.0F),
                 .preferred_width = ThemeScalar::literal(0.0F),
             },
         };
@@ -1403,6 +1557,16 @@ namespace nandina::theme
                         // 聚焦：焦点环开启（checked / unchecked 均适用）。
                         RadioButtonRecipeRule {
                             .state = RadioButtonVisualState::focused,
+                            .focus_ring_width =
+                                ThemeScalar::token(ScalarToken::border_focus_ring),
+                        },
+                    },
+                },
+                .tabs = TabsRecipes {
+                    .base = default_tabs_recipe(),
+                    .rules = {
+                        TabsRecipeRule {
+                            .state = TabsVisualState::focused,
                             .focus_ring_width =
                                 ThemeScalar::token(ScalarToken::border_focus_ring),
                         },

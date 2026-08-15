@@ -256,6 +256,18 @@ namespace nandina::theme
         ControlMetrics metrics;
     };
 
+    /** Tabs 配方：容器（背景/边框）+ 选中 pill + 下划线 + 标签 + 焦点环 + 度量。 */
+    using TabsRecipe = struct TabsRecipe {
+        BoxStyle container;           // 列表容器背景/边框/圆角（透明默认 = 无背景边框）
+        BoxStyle selected_background; // 选中标签 pill 背景（透明默认 = 无 pill）
+        TypeStyle label;              // 未选中标签
+        TypeStyle label_selected;     // 选中标签
+        ThemeColor indicator;         // 下划线颜色（透明默认 = 无下划线）
+        ThemeScalar indicator_thickness;
+        FocusRingStyle focus;
+        ControlMetrics metrics;       // gap（标签间距）、padding_x（容器内边距）、min_height
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -407,6 +419,28 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_box_size;
     };
 
+    /** Tabs 规则：支持状态选择器，覆盖容器/选中 pill/标签/指示条/焦点环/度量字段。 */
+    using TabsRecipeRule = struct TabsRecipeRule {
+        std::optional<TabsVisualState> state; // nullopt = 任意
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> selected_background_fill;
+        std::optional<ThemeScalar> selected_background_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> label_selected_color;
+        std::optional<ThemeScalar> label_selected_font_size;
+        std::optional<ThemeColor> indicator_color;
+        std::optional<ThemeScalar> indicator_thickness;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_min_height;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -495,6 +529,17 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedTabsStyle = struct ResolvedTabsStyle {
+        ResolvedBoxStyle container;
+        ResolvedBoxStyle selected_background;
+        ResolvedTypeStyle label;
+        ResolvedTypeStyle label_selected;
+        NanColor indicator;
+        float indicator_thickness = 0.0F;
+        ResolvedFocusRing focus;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -551,6 +596,11 @@ namespace nandina::theme
         std::vector<RadioButtonRecipeRule> rules;
     };
 
+    using TabsRecipes = struct TabsRecipes {
+        TabsRecipe base;
+        std::vector<TabsRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -561,6 +611,7 @@ namespace nandina::theme
         CardRecipes card;
         ProgressBarRecipes progress_bar;
         RadioButtonRecipes radio_button;
+        TabsRecipes tabs;
     };
 
     /**
@@ -781,6 +832,12 @@ namespace nandina::theme
         RadioButtonVisualState state
     ) -> ResolvedRadioButtonStyle;
 
+    [[nodiscard]] auto resolve_tabs(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        TabsVisualState state
+    ) -> ResolvedTabsStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -854,6 +911,13 @@ namespace nandina::theme
         const RadioButtonRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedTabsStyle& style,
+        const TabsRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -865,6 +929,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_card_recipe() -> CardRecipe;
     [[nodiscard]] auto default_progress_bar_recipe() -> ProgressBarRecipe;
     [[nodiscard]] auto default_radio_button_recipe() -> RadioButtonRecipe;
+    [[nodiscard]] auto default_tabs_recipe() -> TabsRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过
