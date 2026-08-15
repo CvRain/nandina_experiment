@@ -65,6 +65,7 @@ namespace nandina::examples::settings
             const std::string names[] = {"General", "Appearance", "About"};
             return std::string("Active tab: ") + names[active_tab.get()];
         });
+        auto& language = ui.signal<int>(0);
 
         // 该设置直接驱动框架统一动效策略；页面销毁时 effect 随 ReactiveScope 回收。
         auto* themes = &ui.theme_manager();
@@ -94,7 +95,11 @@ namespace nandina::examples::settings
                     ui.make<widget::Checkbox>(reduced_motion, "Reduce interface motion"),
                     ui.make<widget::Label>(scale_label)
                         .color_token(theme::ColorToken::on_surface_variant),
-                    ui.make<widget::Slider>(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F)
+                    ui.make<widget::Slider>(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F),
+                    ui.make<widget::Select>(
+                        language,
+                        std::vector<std::string> {"English", "中文", "日本語", "Test str"}
+                    )
                 )
                 .build();
 
@@ -180,46 +185,53 @@ namespace nandina::examples::settings
                                 ui.make<widget::Label>("Segmented")
                                     .color_token(theme::ColorToken::on_surface_variant),
                                 ui.make<widget::Tabs>(
-                                    std::vector<std::string> {"General", "Appearance"}
+                                      std::vector<std::string> {"General", "Appearance"}
                                 )
                                     .configure([](widget::Tabs& tabs) {
-                                        tabs.set_override(theme::TabsRecipeRule {
-                                            .container_fill = theme::ThemeColor::token(
-                                                theme::ColorToken::surface_variant
-                                            ),
-                                            .container_radius = theme::ThemeScalar::literal(8.0F),
-                                            .selected_background_fill = theme::ThemeColor::token(
-                                                theme::ColorToken::surface
-                                            ),
-                                            .selected_background_radius =
-                                                theme::ThemeScalar::literal(6.0F),
-                                            .indicator_color = theme::ThemeColor::transparent(
-                                                theme::ColorToken::primary
-                                            ),
-                                            .metrics_padding_x =
-                                                theme::ThemeScalar::literal(6.0F),
-                                            .metrics_gap = theme::ThemeScalar::literal(8.0F),
-                                        });
+                                        tabs.set_override(
+                                            theme::TabsRecipeRule {
+                                                .container_fill = theme::ThemeColor::token(
+                                                    theme::ColorToken::surface_variant
+                                                ),
+                                                .container_radius =
+                                                    theme::ThemeScalar::literal(8.0F),
+                                                .selected_background_fill =
+                                                    theme::ThemeColor::token(
+                                                        theme::ColorToken::surface
+                                                    ),
+                                                .selected_background_radius =
+                                                    theme::ThemeScalar::literal(6.0F),
+                                                .indicator_color = theme::ThemeColor::transparent(
+                                                    theme::ColorToken::primary
+                                                ),
+                                                .metrics_gap = theme::ThemeScalar::literal(8.0F),
+                                                .metrics_padding_x =
+                                                    theme::ThemeScalar::literal(6.0F),
+                                            }
+                                        );
                                     })
                             )
                             .build()
                     ),
-                    ui.make<widget::Label>(active_tab_label).color_token(
-                        theme::ColorToken::on_surface_variant
-                    ),
+                    ui.make<widget::Label>(active_tab_label)
+                        .color_token(theme::ColorToken::on_surface_variant),
                     ui.make<widget::Label>("Brand colors").font_size(18.0F),
                     ui.row()
                         .gap(10.0F)
                         .children(
                             // on_primary 配对由下方 Save 主按钮（primary 底 + on_primary 字）演示。
-                            ui.make<widget::Label>("Primary")
-                                .color_token(theme::ColorToken::primary),
-                            ui.make<widget::Label>("Coral")
-                                .color_token(theme::ColorToken::tertiary),
-                            ui.make<widget::Label>("Variant")
-                                .color_token(theme::ColorToken::on_surface_variant),
-                            ui.make<widget::Label>("Outline")
-                                .color_token(theme::ColorToken::outline)
+                            ui.make<widget::Label>("Primary").color_token(
+                                theme::ColorToken::primary
+                            ),
+                            ui.make<widget::Label>("Coral").color_token(
+                                theme::ColorToken::tertiary
+                            ),
+                            ui.make<widget::Label>("Variant").color_token(
+                                theme::ColorToken::on_surface_variant
+                            ),
+                            ui.make<widget::Label>("Outline").color_token(
+                                theme::ColorToken::outline
+                            )
                         )
                         .build(),
                     ui.make<widget::Label>(summary).color_token(
