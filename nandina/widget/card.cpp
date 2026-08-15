@@ -7,6 +7,7 @@
 #include "../render/draw_context.hpp"
 #include "../theme/theme_manager.hpp"
 #include "primitives/box_painter.hpp"
+#include "primitives/shadow_painter.hpp"
 
 #include <algorithm>
 #include <stdexcept>
@@ -80,6 +81,13 @@ namespace nandina::widget
     void Card::on_draw(render::DrawContext& context) {
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
+        primitives::ShadowPainter::paint(
+            context,
+            world,
+            style.container.radius,
+            style.shadow,
+            context.opacity()
+        );
         primitives::BoxPainter::paint(context, world, style.container, context.opacity());
     }
 

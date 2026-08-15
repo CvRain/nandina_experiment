@@ -21,6 +21,8 @@ namespace
     public:
         int rounded_fills = 0;
         int rounded_outlines = 0;
+        int shadows = 0;
+        int shadow_before_fill = 0;
 
         void begin_frame() override {}
         void end_frame() override {}
@@ -38,6 +40,17 @@ namespace
             const foundation::NanColor&
         ) override {
             ++rounded_fills;
+        }
+        void draw_rounded_rect_shadow(
+            const foundation::NanRect&,
+            float,
+            float,
+            const foundation::NanColor&
+        ) override {
+            ++shadows;
+            if (rounded_fills == 0 && rounded_outlines == 0) {
+                ++shadow_before_fill;
+            }
         }
         void draw_rounded_rect_outline(
             const foundation::NanRect&,
@@ -164,6 +177,27 @@ TEST_CASE("card paints a rounded surface with outline", "[card][paint]") {
     tree.draw(dev);
     REQUIRE(dev.rounded_fills == 1);
     REQUIRE(dev.rounded_outlines == 1);
+    REQUIRE(dev.shadows == 0); // 默认无阴影
+}
+
+TEST_CASE("card draws soft shadow before container when configured", "[card][shadow]") {
+    auto card = widget::Card::create();
+    card->set_override(theme::CardRecipeRule {
+        .shadow_color = theme::ThemeColor::literal(
+            foundation::NanColor::from_hex(0x000000, 0.5F)
+        ),
+        .shadow_offset_y = theme::ThemeScalar::literal(4.0F),
+        .shadow_spread = theme::ThemeScalar::literal(8.0F),
+    });
+    scene::NanSceneTree tree;
+    tree.set_root(card);
+    REQUIRE(tree.layout_root(foundation::NanSize(280.0F, 120.0F)) >= 1);
+
+    RecordingDevice dev;
+    tree.draw(dev);
+    REQUIRE(dev.shadows == 1);
+    REQUIRE(dev.shadow_before_fill == 1);
+    REQUIRE(dev.rounded_fills == 1);
 }
 
 TEST_CASE("card keeps child semantics reachable", "[card][semantics]") {
