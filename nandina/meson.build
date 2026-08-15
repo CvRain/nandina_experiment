@@ -195,6 +195,8 @@ module_widget = files(
     'widget/tabs.cpp',
     'widget/tooltip.hpp',
     'widget/tooltip.cpp',
+    'widget/select.hpp',
+    'widget/select.cpp',
 )
 
 module_app = files(

@@ -205,6 +205,13 @@ tooltip_tests = executable(
 )
 test('tooltip', tooltip_tests)
 
+select_tests = executable(
+    'select_tests',
+    files('select_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('select', select_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

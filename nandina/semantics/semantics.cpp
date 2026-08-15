@@ -62,6 +62,8 @@ namespace nandina::semantics
                 return "tab";
             case Role::tooltip:
                 return "tooltip";
+            case Role::combobox:
+                return "combobox";
         }
         return "none";
     }

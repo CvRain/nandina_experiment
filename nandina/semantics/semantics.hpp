@@ -33,6 +33,7 @@ namespace nandina::semantics
         radio,
         tab,
         tooltip,
+        combobox,
     };
 
     enum class Composition : std::uint8_t {

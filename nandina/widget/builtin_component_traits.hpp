@@ -14,6 +14,7 @@
 #include "progress_bar.hpp"
 #include "radio_button.hpp"
 #include "radio_group.hpp"
+#include "select.hpp"
 #include "slider.hpp"
 #include "switch.hpp"
 #include "tabs.hpp"
@@ -264,6 +265,34 @@ namespace nandina::widget
             std::shared_ptr<Control> trigger
         ) -> authoring::NodeBuilder<Tooltip> {
             return authoring::make<Tooltip>(std::move(text), std::move(trigger), ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Select> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::vector<std::string> options,
+            const int selected = 0
+        ) -> authoring::NodeBuilder<Select> {
+            return authoring::make<Select>(std::move(options), ui.theme())
+                .configure([selected](Select& select) { select.set_selected_index(selected); });
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<int>& selected,
+            std::vector<std::string> options
+        ) -> authoring::NodeBuilder<Select> {
+            auto result = make(ui, std::move(options), selected.get());
+            const auto control = result.build();
+            ui.bind(control, &Select::set_selected_index, selected);
+            ui.connect(control->selection_changed(), [&selected](const int index) {
+                if (selected.peek() != index) {
+                    selected.set(index);
+                }
+            });
+            return result;
         }
     };
 }
