@@ -113,6 +113,8 @@ namespace nandina::examples::settings
                              interface_scale.set(1.0F);
                              status.set("Preferences reset");
                          });
+        auto reset_tooltip =
+            ui.make<widget::Tooltip>("Restore default preferences", reset.build()).build();
 
         // Appearance 单选组：互斥 + 键盘方向键漫游，选中直接驱动主题外观。
         // 捕获 ThemeManager 指针（由应用持有）；不能捕获 ui（每次 build 的临时对象）。
@@ -138,7 +140,7 @@ namespace nandina::examples::settings
         auto actions = ui.row()
                            .gap(8.0F)
                            .cross_alignment(widget::LayoutAlignment::center)
-                           .children(save, reset)
+                           .children(save, reset_tooltip)
                            .build();
         auto content =
             ui.column()
