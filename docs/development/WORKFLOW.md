@@ -131,6 +131,11 @@ readable:
 - Tooltip landed: a hover-triggered floating bubble (primary fill + on-primary text)
   wrapping a trigger control, with delay/placement/override and a `tooltip`
   semantics role; Settings wraps the Reset button.
-- Test suite 35/35 green.
+- Select landed: a single-choice dropdown with a popup option list drawn on a
+  raised z-order, keyboard open/navigate/select/escape, `combobox` semantics, and
+  `Signal<int>` two-way authoring; Settings adds a language select.
+- Test suite 36/36 green.
 - Next (planned follow-ups): fluent/material theme families (after more common
-  components land).
+  components land); text vertical alignment (baseline/descent) fix; general
+  tween/animation system then component switch animations; system font discovery
+  and CJK fallback ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
