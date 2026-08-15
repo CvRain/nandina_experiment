@@ -268,6 +268,13 @@ namespace nandina::theme
         ControlMetrics metrics;       // gap（标签间距）、padding_x（容器内边距）、min_height
     };
 
+    /** Tooltip 配方：气泡容器 + 文本 + 度量（纯展示浮层，无交互状态）。 */
+    using TooltipRecipe = struct TooltipRecipe {
+        BoxStyle container;
+        TypeStyle label;
+        ControlMetrics metrics; // padding_x（气泡内边距）、gap（气泡与目标间距）、min_height
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -441,6 +448,19 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_min_height;
     };
 
+    /** Tooltip 规则：无选择器（纯展示），覆盖气泡 / 文本 / 度量字段。 */
+    using TooltipRecipeRule = struct TooltipRecipeRule {
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_min_height;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -540,6 +560,12 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedTooltipStyle = struct ResolvedTooltipStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle label;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -601,6 +627,11 @@ namespace nandina::theme
         std::vector<TabsRecipeRule> rules;
     };
 
+    using TooltipRecipes = struct TooltipRecipes {
+        TooltipRecipe base;
+        std::vector<TooltipRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -612,6 +643,7 @@ namespace nandina::theme
         ProgressBarRecipes progress_bar;
         RadioButtonRecipes radio_button;
         TabsRecipes tabs;
+        TooltipRecipes tooltip;
     };
 
     /**
@@ -838,6 +870,11 @@ namespace nandina::theme
         TabsVisualState state
     ) -> ResolvedTabsStyle;
 
+    [[nodiscard]] auto resolve_tooltip(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedTooltipStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -918,6 +955,13 @@ namespace nandina::theme
         const TabsRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedTooltipStyle& style,
+        const TooltipRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -930,6 +974,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_progress_bar_recipe() -> ProgressBarRecipe;
     [[nodiscard]] auto default_radio_button_recipe() -> RadioButtonRecipe;
     [[nodiscard]] auto default_tabs_recipe() -> TabsRecipe;
+    [[nodiscard]] auto default_tooltip_recipe() -> TooltipRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

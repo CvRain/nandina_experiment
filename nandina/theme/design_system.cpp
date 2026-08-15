@@ -285,6 +285,19 @@ namespace nandina::theme
             };
         }
 
+        /** TooltipRecipe → 解析后的片段组合（配方即事实来源）。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const TooltipRecipe& recipe
+        ) -> ResolvedTooltipStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .label = resolve(system, appearance, recipe.label),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
         /** Tabs disabled 变换：标签 / 指示条颜色 ×opacity.disabled。 */
         void apply_tabs_disabled(
             const DesignSystem& system,
@@ -565,6 +578,20 @@ namespace nandina::theme
         }
         if (state == TabsVisualState::disabled) {
             apply_tabs_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Tooltip 配方（纯展示：base → 规则列表，后匹配者胜）。
+     */
+    auto resolve_tooltip(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedTooltipStyle {
+        auto style = resolve_recipe(system, appearance, system.components.tooltip.base);
+        for (const auto& rule: system.components.tooltip.rules) {
+            apply_rule(system, appearance, style, rule);
         }
         return style;
     }
@@ -945,6 +972,38 @@ namespace nandina::theme
         }
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedTooltipStyle& style,
+        const TooltipRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -1270,6 +1329,30 @@ namespace nandina::theme
         };
     }
 
+    /** @return 框架默认 Tooltip 配方（primary 气泡 + on_primary 文本）。 */
+    auto default_tooltip_recipe() -> TooltipRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::primary),
+                .border = ThemeColor::transparent(ColorToken::primary),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_sm),
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_primary),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_sm),
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(0.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_sm),
+                .gap = ThemeScalar::token(ScalarToken::spacing_sm),
+                .min_height = ThemeScalar::literal(24.0F),
+                .box_size = ThemeScalar::literal(0.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
     /**
      * 框架默认设计系统。
      *
@@ -1571,6 +1654,10 @@ namespace nandina::theme
                                 ThemeScalar::token(ScalarToken::border_focus_ring),
                         },
                     },
+                },
+                .tooltip = TooltipRecipes {
+                    .base = default_tooltip_recipe(),
+                    .rules = {},
                 },
             },
         };
