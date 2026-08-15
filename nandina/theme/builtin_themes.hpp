@@ -20,12 +20,14 @@ namespace nandina::theme
 {
     class ThemeManager;
 
-    /** 内置主题族定义：一组参考色阶 + 变体策略 + tokens。 */
+    /** 内置主题族定义：一组参考色阶 + 变体策略 + tokens + 配方规则定制。 */
     struct ThemeFamilyDefinition {
         std::string name;
         NanReferencePalette reference;
         PaletteVariantPolicy policy;
         NanTokens tokens;
+        /// 追加到 Card 配方的规则（如 butter 的软阴影）；后续可扩展其它组件。
+        std::vector<CardRecipeRule> card_rules;
     };
 
     /** @return 框架内置主题族目录（当前仅 butter；fluent/material 后续补齐）。 */

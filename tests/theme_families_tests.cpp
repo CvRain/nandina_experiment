@@ -73,6 +73,22 @@ TEST_CASE("register_theme_family activates a full snapshot and flips appearance"
     REQUIRE(themes.design_system().dark.primary.oklch().light > light_primary);
 }
 
+TEST_CASE("butter family gives cards a soft shadow while default stays flat", "[theme][families][card]") {
+    const auto families = theme::default_theme_families();
+    const auto butter = theme::build_family_design_system(families[0]);
+    const auto default_system = theme::default_design_system();
+
+    const auto butter_card = theme::resolve_card(butter, theme::ColorAppearance::light);
+    const auto flat_card = theme::resolve_card(default_system, theme::ColorAppearance::light);
+
+    REQUIRE(butter_card.shadow.spread > 0.0F);
+    REQUIRE(butter_card.shadow.offset_y == Catch::Approx(4.0F));
+    REQUIRE(butter_card.shadow.color.alpha() > 0.0F);
+
+    REQUIRE(flat_card.shadow.spread == Catch::Approx(0.0F));
+    REQUIRE(flat_card.shadow.color.alpha() == Catch::Approx(0.0F));
+}
+
 TEST_CASE("legacy named families coexist with full-snapshot families", "[theme][families]") {
     theme::ThemeManager themes;
     auto light_theme = theme::default_theme();

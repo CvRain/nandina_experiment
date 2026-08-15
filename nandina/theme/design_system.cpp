@@ -195,6 +195,7 @@ namespace nandina::theme
         ) -> ResolvedCardStyle {
             return {
                 .container = resolve(system, appearance, recipe.container),
+                .shadow = resolve(system, appearance, recipe.shadow),
                 .metrics = {
                     .padding_x = resolve_scalar(system, appearance, recipe.metrics.padding_x),
                     .padding_y = resolve_scalar(system, appearance, recipe.metrics.padding_y),
@@ -738,6 +739,18 @@ namespace nandina::theme
         }
         if (rule.container_radius)
             style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.shadow_color)
+            style.shadow.color = resolve_color(system, appearance, *rule.shadow_color);
+        if (rule.shadow_offset_x) {
+            style.shadow.offset_x =
+                resolve_scalar(system, appearance, *rule.shadow_offset_x);
+        }
+        if (rule.shadow_offset_y) {
+            style.shadow.offset_y =
+                resolve_scalar(system, appearance, *rule.shadow_offset_y);
+        }
+        if (rule.shadow_spread)
+            style.shadow.spread = resolve_scalar(system, appearance, *rule.shadow_spread);
         if (rule.metrics_padding_x) {
             style.metrics.padding_x =
                 resolve_scalar(system, appearance, *rule.metrics_padding_x);
@@ -1025,7 +1038,7 @@ namespace nandina::theme
         };
     }
 
-    /** @return 框架默认 Card 配方（surface 卡片容器，单子内容）。 */
+    /** @return 框架默认 Card 配方（surface 卡片容器，单子内容；默认无阴影）。 */
     auto default_card_recipe() -> CardRecipe {
         return {
             .container = BoxStyle {
@@ -1033,6 +1046,12 @@ namespace nandina::theme
                 .border = ThemeColor::token(ColorToken::outline_variant),
                 .border_width = ThemeScalar::token(ScalarToken::border_thin),
                 .radius = ThemeScalar::token(ScalarToken::radius_md),
+            },
+            .shadow = ShadowStyle {
+                .color = ThemeColor::literal(NanColor::from_hex(0x000000, 0.0F)),
+                .offset_x = ThemeScalar::literal(0.0F),
+                .offset_y = ThemeScalar::literal(0.0F),
+                .spread = ThemeScalar::literal(0.0F),
             },
             .metrics = CardMetrics {
                 .padding_x = ThemeScalar::token(ScalarToken::spacing_md),

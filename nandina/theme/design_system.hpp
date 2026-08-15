@@ -87,6 +87,14 @@ namespace nandina::theme
         ThemeScalar duration;
     };
 
+    /** 软阴影（elevation）：颜色 + 偏移 + 软边衰减宽度，供 Card 等容器叠加。 */
+    using ShadowStyle = struct ShadowStyle {
+        ThemeColor color;   // 阴影颜色（带 alpha 控强度）
+        ThemeScalar offset_x;
+        ThemeScalar offset_y;
+        ThemeScalar spread; // 软边衰减宽度（>0）
+    };
+
     /**
      * 所有控件共享的尺寸 / 间距。组件只取用自己相关的槽位，其余忽略。
      */
@@ -144,6 +152,13 @@ namespace nandina::theme
         float min_height = 0.0F;
         float box_size = 0.0F;
         float preferred_width = 0.0F;
+    };
+
+    using ResolvedShadowStyle = struct ResolvedShadowStyle {
+        NanColor color;
+        float offset_x = 0.0F;
+        float offset_y = 0.0F;
+        float spread = 0.0F;
     };
 
     /** 解析后的 Switch 度量。 */
@@ -218,9 +233,10 @@ namespace nandina::theme
         ThemeScalar min_height;
     };
 
-    /** Card 配方：surface 容器 + 度量（单子内容容器，无状态）。 */
+    /** Card 配方：surface 容器 + 软阴影 + 度量（单子内容容器，无状态）。 */
     using CardRecipe = struct CardRecipe {
         BoxStyle container;
+        ShadowStyle shadow;
         CardMetrics metrics;
     };
 
@@ -344,12 +360,16 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_padding_x;
     };
 
-    /** Card 规则：无选择器（纯容器），覆盖容器 / 度量字段。 */
+    /** Card 规则：无选择器（纯容器），覆盖容器 / 阴影 / 度量字段。 */
     using CardRecipeRule = struct CardRecipeRule {
         std::optional<ThemeColor> container_fill;
         std::optional<ThemeColor> container_border;
         std::optional<ThemeScalar> container_border_width;
         std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> shadow_color;
+        std::optional<ThemeScalar> shadow_offset_x;
+        std::optional<ThemeScalar> shadow_offset_y;
+        std::optional<ThemeScalar> shadow_spread;
         std::optional<ThemeScalar> metrics_padding_x;
         std::optional<ThemeScalar> metrics_padding_y;
         std::optional<ThemeScalar> metrics_min_height;
@@ -457,6 +477,7 @@ namespace nandina::theme
 
     using ResolvedCardStyle = struct ResolvedCardStyle {
         ResolvedBoxStyle container;
+        ResolvedShadowStyle shadow;
         ResolvedCardMetrics metrics;
     };
 
@@ -666,6 +687,20 @@ namespace nandina::theme
             .min_height = resolve_scalar(system, appearance, metrics.min_height),
             .box_size = resolve_scalar(system, appearance, metrics.box_size),
             .preferred_width = resolve_scalar(system, appearance, metrics.preferred_width),
+        };
+    }
+
+    /** 解析软阴影片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const ShadowStyle& shadow
+    ) -> ResolvedShadowStyle {
+        return {
+            .color = resolve_color(system, appearance, shadow.color),
+            .offset_x = resolve_scalar(system, appearance, shadow.offset_x),
+            .offset_y = resolve_scalar(system, appearance, shadow.offset_y),
+            .spread = resolve_scalar(system, appearance, shadow.spread),
         };
     }
 

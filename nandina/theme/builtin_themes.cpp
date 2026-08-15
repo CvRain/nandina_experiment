@@ -72,6 +72,15 @@ namespace nandina::theme
                     .dark_brand = ColorShade::shade_300,
                 },
             .tokens = butter_tokens,
+            .card_rules =
+                {
+                    // 卡片软阴影：暖棕、向下偏移、柔和衰减（claymorphism elevation）。
+                    CardRecipeRule {
+                        .shadow_color = ThemeColor::literal(NanColor::from_hex(0x1C1811, 0.16F)),
+                        .shadow_offset_y = ThemeScalar::literal(4.0F),
+                        .shadow_spread = ThemeScalar::literal(10.0F),
+                    },
+                },
         });
         return families;
     }
@@ -81,6 +90,9 @@ namespace nandina::theme
         system.tokens = family.tokens;
         system.light = make_color_scheme(family.reference, ColorAppearance::light, family.policy);
         system.dark = make_color_scheme(family.reference, ColorAppearance::dark, family.policy);
+        for (const auto& rule: family.card_rules) {
+            system.components.card.rules.push_back(rule);
+        }
         return system;
     }
 
