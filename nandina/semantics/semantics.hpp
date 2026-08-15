@@ -31,6 +31,7 @@ namespace nandina::semantics
         switch_control,
         progress_bar,
         radio,
+        tab,
     };
 
     enum class Composition : std::uint8_t {

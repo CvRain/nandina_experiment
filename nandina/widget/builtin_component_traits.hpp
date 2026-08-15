@@ -16,6 +16,7 @@
 #include "radio_group.hpp"
 #include "slider.hpp"
 #include "switch.hpp"
+#include "tabs.hpp"
 #include "text_field.hpp"
 
 namespace nandina::widget
@@ -221,6 +222,34 @@ namespace nandina::widget
             std::shared_ptr<RadioGroup> group
         ) -> authoring::NodeBuilder<RadioButton> {
             return authoring::make<RadioButton>(std::move(label), std::move(group), ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Tabs> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::vector<std::string> labels,
+            const int selected = 0
+        ) -> authoring::NodeBuilder<Tabs> {
+            return authoring::make<Tabs>(std::move(labels), ui.theme())
+                .configure([selected](Tabs& tabs) { tabs.set_selected_index(selected); });
+        }
+
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            reactive::Signal<int>& selected,
+            std::vector<std::string> labels
+        ) -> authoring::NodeBuilder<Tabs> {
+            auto result = make(ui, std::move(labels), selected.get());
+            const auto control = result.build();
+            ui.bind(control, &Tabs::set_selected_index, selected);
+            ui.connect(control->selection_changed(), [&selected](const int index) {
+                if (selected.peek() != index) {
+                    selected.set(index);
+                }
+            });
+            return result;
         }
     };
 }

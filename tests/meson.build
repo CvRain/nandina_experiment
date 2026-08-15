@@ -191,6 +191,13 @@ color_tests = executable(
 )
 test('color', color_tests)
 
+tabs_tests = executable(
+    'tabs_tests',
+    files('tabs_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('tabs', tabs_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

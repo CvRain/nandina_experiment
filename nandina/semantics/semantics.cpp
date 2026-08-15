@@ -58,6 +58,8 @@ namespace nandina::semantics
                 return "progress-bar";
             case Role::radio:
                 return "radio";
+            case Role::tab:
+                return "tab";
         }
         return "none";
     }
