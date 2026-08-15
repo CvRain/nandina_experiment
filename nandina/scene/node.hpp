@@ -194,6 +194,10 @@ namespace nandina::scene
         /// Override in subclasses that have a z-ordering concept.
         [[nodiscard]] virtual auto z_index_hint() const -> int;
 
+        /// 子树内最大 z_index_hint（含自身）。用于把「打开的浮层」提升到祖先链的
+        /// 兄弟排序之上，使弹出内容（dropdown/dialog）能盖住后续兄弟。
+        [[nodiscard]] auto subtree_z_index_hint() const -> int;
+
         /// True if this node can become the focus target.
         [[nodiscard]] virtual auto is_focusable() const -> bool;
 

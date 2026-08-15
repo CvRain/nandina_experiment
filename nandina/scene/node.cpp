@@ -316,6 +316,14 @@
         return 0;
     }
 
+    auto NanNode::subtree_z_index_hint() const -> int {
+        int max_z = z_index_hint();
+        for (const auto& child: children_) {
+            max_z = std::max(max_z, child->subtree_z_index_hint());
+        }
+        return max_z;
+    }
+
     auto NanNode::is_focusable() const -> bool {
         return false;
     }
@@ -478,7 +486,7 @@
                 indices[i] = i;
             }
             std::stable_sort(indices.begin(), indices.end(), [this](size_t a, size_t b) {
-                return children_[a]->z_index_hint() < children_[b]->z_index_hint();
+                return children_[a]->subtree_z_index_hint() < children_[b]->subtree_z_index_hint();
             });
 
             for (size_t idx: indices) {

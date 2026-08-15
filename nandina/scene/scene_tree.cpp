@@ -664,8 +664,8 @@ namespace nandina::scene
                     std::ranges::stable_sort(indices, [layer](const std::size_t a, const std::size_t b) {
                         const auto* lhs = layer->get_child(a);
                         const auto* rhs = layer->get_child(b);
-                        return (lhs != nullptr ? lhs->z_index_hint() : 0)
-                            > (rhs != nullptr ? rhs->z_index_hint() : 0);
+                        return (lhs != nullptr ? lhs->subtree_z_index_hint() : 0)
+                            > (rhs != nullptr ? rhs->subtree_z_index_hint() : 0);
                     });
                     for (const auto index: indices) {
                         auto* child = layer->get_child(index);
@@ -709,8 +709,8 @@ namespace nandina::scene
                 const auto* raw_b = node->get_child(b);
                 const auto* child_a = raw_a ? raw_a->as_node2d() : nullptr;
                 const auto* child_b = raw_b ? raw_b->as_node2d() : nullptr;
-                const int za = child_a ? child_a->z_index() : 0;
-                const int zb = child_b ? child_b->z_index() : 0;
+                const int za = child_a ? child_a->subtree_z_index_hint() : 0;
+                const int zb = child_b ? child_b->subtree_z_index_hint() : 0;
                 if (za != zb) {
                     return za > zb;
                 }
