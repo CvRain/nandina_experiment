@@ -122,6 +122,9 @@ readable:
   `theme/builtin_themes.{hpp,cpp}` and `ThemeManager::register_theme_family`
   (full-snapshot families). Settings now selects it with `activate_family("butter")`
   instead of a hardcoded brand palette.
-- Test suite 32/32 green.
+- Soft shadows landed: `IRenderDevice::draw_rounded_rect_shadow` (SDF mode 4 soft
+  falloff), `ShadowPainter`, `ShadowStyle` on `CardRecipe`, and a butter card
+  shadow rule. Default Card stays flat; butter gets warm-clay elevation.
+- Test suite 33/33 green.
 - Next (planned follow-ups): fluent/material theme families (after more common
-  components land), and soft shadows for claymorphism elevation.
+  components land).
