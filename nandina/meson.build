@@ -193,6 +193,8 @@ module_widget = files(
     'widget/radio_button.cpp',
     'widget/tabs.hpp',
     'widget/tabs.cpp',
+    'widget/tooltip.hpp',
+    'widget/tooltip.cpp',
 )
 
 module_app = files(

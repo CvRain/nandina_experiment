@@ -198,6 +198,13 @@ tabs_tests = executable(
 )
 test('tabs', tabs_tests)
 
+tooltip_tests = executable(
+    'tooltip_tests',
+    files('tooltip_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('tooltip', tooltip_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

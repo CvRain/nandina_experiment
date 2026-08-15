@@ -18,6 +18,7 @@
 #include "switch.hpp"
 #include "tabs.hpp"
 #include "text_field.hpp"
+#include "tooltip.hpp"
 
 namespace nandina::widget
 {
@@ -250,6 +251,19 @@ namespace nandina::widget
                 }
             });
             return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Tooltip> {
+        template<typename Control>
+            requires std::derived_from<Control, scene::NanControl>
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string text,
+            std::shared_ptr<Control> trigger
+        ) -> authoring::NodeBuilder<Tooltip> {
+            return authoring::make<Tooltip>(std::move(text), std::move(trigger), ui.theme());
         }
     };
 }

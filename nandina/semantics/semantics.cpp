@@ -60,6 +60,8 @@ namespace nandina::semantics
                 return "radio";
             case Role::tab:
                 return "tab";
+            case Role::tooltip:
+                return "tooltip";
         }
         return "none";
     }

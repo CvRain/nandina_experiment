@@ -32,6 +32,7 @@ namespace nandina::semantics
         progress_bar,
         radio,
         tab,
+        tooltip,
     };
 
     enum class Composition : std::uint8_t {
