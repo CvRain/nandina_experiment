@@ -64,6 +64,8 @@ namespace nandina::semantics
                 return "tooltip";
             case Role::combobox:
                 return "combobox";
+            case Role::separator:
+                return "separator";
         }
         return "none";
     }

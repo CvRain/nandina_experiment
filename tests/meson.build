@@ -212,6 +212,13 @@ select_tests = executable(
 )
 test('select', select_tests)
 
+basic_widgets_tests = executable(
+    'basic_widgets_tests',
+    files('basic_widgets_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('basic-widgets', basic_widgets_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

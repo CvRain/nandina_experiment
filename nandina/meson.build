@@ -197,6 +197,12 @@ module_widget = files(
     'widget/tooltip.cpp',
     'widget/select.hpp',
     'widget/select.cpp',
+    'widget/divider.hpp',
+    'widget/divider.cpp',
+    'widget/avatar.hpp',
+    'widget/avatar.cpp',
+    'widget/chip.hpp',
+    'widget/chip.cpp',
 )
 
 module_app = files(

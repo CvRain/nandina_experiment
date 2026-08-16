@@ -6,10 +6,13 @@
 #define NANDINA_EXPERIMENT_WIDGET_BUILTIN_COMPONENT_TRAITS_HPP
 
 #include "build_context.hpp"
+#include "avatar.hpp"
 #include "badge.hpp"
 #include "button.hpp"
 #include "card.hpp"
 #include "checkbox.hpp"
+#include "chip.hpp"
+#include "divider.hpp"
 #include "label.hpp"
 #include "progress_bar.hpp"
 #include "radio_button.hpp"
@@ -293,6 +296,33 @@ namespace nandina::widget
                 }
             });
             return result;
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Divider> {
+        [[nodiscard]] static auto make(const BuildContext& ui)
+            -> authoring::NodeBuilder<Divider> {
+            return authoring::make<Divider>(ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Avatar> {
+        [[nodiscard]] static auto make(const BuildContext& ui, std::string name)
+            -> authoring::NodeBuilder<Avatar> {
+            return authoring::make<Avatar>(std::move(name), ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Chip> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string text,
+            const bool removable = false
+        ) -> authoring::NodeBuilder<Chip> {
+            return authoring::make<Chip>(std::move(text), removable, ui.theme());
         }
     };
 }

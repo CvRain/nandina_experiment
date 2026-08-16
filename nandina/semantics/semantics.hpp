@@ -34,6 +34,7 @@ namespace nandina::semantics
         tab,
         tooltip,
         combobox,
+        separator,
     };
 
     enum class Composition : std::uint8_t {
