@@ -22,10 +22,10 @@ application_lines = sum(nonblank_lines(path) for path in application)
 if bootstrap_lines > 30:
     raise SystemExit(f"example bootstrap exceeds budget: {bootstrap_lines} > 30")
 # Budget raised from 220 to 260 in Step 6 (brand theme reference scales, data),
-# then to 280 for component visual-variant showcases, and to 300 for the scrollable
-# full Settings showcase (Tabs/Select/Tooltip/Basics) the user requested to verify.
-if application_lines > 300:
-    raise SystemExit(f"settings example exceeds budget: {application_lines} > 300")
+# then to 280 for component visual-variant showcases, to 300 for the scrollable
+# Settings showcase, and to 320 for the interactive style-variant switcher.
+if application_lines > 320:
+    raise SystemExit(f"settings example exceeds budget: {application_lines} > 320")
 
 source = "\n".join(path.read_text(encoding="utf-8") for path in application)
 for forbidden in (

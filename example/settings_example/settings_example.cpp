@@ -67,6 +67,28 @@ namespace nandina::examples::settings
         });
         auto& language = ui.signal<int>(0);
 
+        // Divider 样式变体：按钮循环切换 solid/dashed/double/double_dashed。
+        auto& divider_style = ui.signal<int>(0);
+        auto divider = ui.make<widget::Divider>().build();
+        (void)ui.effect([divider, &divider_style] {
+            constexpr widget::Divider::Pattern patterns[] = {
+                widget::Divider::Pattern::solid,
+                widget::Divider::Pattern::dashed,
+                widget::Divider::Pattern::double_line,
+                widget::Divider::Pattern::double_dashed,
+            };
+            divider->set_pattern(patterns[divider_style.get()]);
+        });
+        auto& divider_label = ui.computed([&] {
+            const std::string names[] = {"Solid", "Dashed", "Double", "Double dashed"};
+            return std::string("Divider · ") + names[divider_style.get()];
+        });
+        auto cycle_divider = ui.make<widget::Button>("Cycle divider style")
+                                 .on_click([&divider_style] {
+                                     divider_style.set((divider_style.peek() + 1) % 4);
+                                 })
+                                 .build();
+
         // 该设置直接驱动框架统一动效策略；页面销毁时 effect 随 ReactiveScope 回收。
         auto* themes = &ui.theme_manager();
         (void)ui.effect([themes, &reduced_motion] {
@@ -230,9 +252,16 @@ namespace nandina::examples::settings
                                 })
                         )
                         .build(),
-                    ui.make<widget::Divider>().configure([](widget::Divider& divider) {
-                        divider.set_pattern(widget::Divider::Pattern::dashed);
-                    }),
+                    ui.row()
+                        .gap(10.0F)
+                        .cross_alignment(widget::LayoutAlignment::center)
+                        .children(
+                            divider,
+                            ui.make<widget::Label>(divider_label)
+                                .color_token(theme::ColorToken::on_surface_variant)
+                        )
+                        .build(),
+                    cycle_divider,
                     ui.make<widget::Label>("Brand colors").font_size(18.0F),
                     ui.row()
                         .gap(10.0F)
