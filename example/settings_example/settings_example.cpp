@@ -89,6 +89,29 @@ namespace nandina::examples::settings
                                  })
                                  .build();
 
+        // Button treatment 变体：循环 filled/tonal/outlined/ghost/link。
+        auto& treatment_style = ui.signal<int>(0);
+        auto demo_button = ui.make<widget::Button>("Stylized button").build();
+        (void)ui.effect([demo_button, &treatment_style] {
+            constexpr theme::ButtonTreatment treatments[] = {
+                theme::ButtonTreatment::filled,
+                theme::ButtonTreatment::tonal,
+                theme::ButtonTreatment::outlined,
+                theme::ButtonTreatment::ghost,
+                theme::ButtonTreatment::link,
+            };
+            demo_button->set_treatment(treatments[treatment_style.get()]);
+        });
+        auto& treatment_label = ui.computed([&] {
+            const std::string names[] = {"Filled", "Tonal", "Outlined", "Ghost", "Link"};
+            return std::string("Button · ") + names[treatment_style.get()];
+        });
+        auto cycle_treatment = ui.make<widget::Button>("Cycle button style")
+                                   .on_click([&treatment_style] {
+                                       treatment_style.set((treatment_style.peek() + 1) % 5);
+                                   })
+                                   .build();
+
         // 该设置直接驱动框架统一动效策略；页面销毁时 effect 随 ReactiveScope 回收。
         auto* themes = &ui.theme_manager();
         (void)ui.effect([themes, &reduced_motion] {
@@ -262,6 +285,16 @@ namespace nandina::examples::settings
                         )
                         .build(),
                     cycle_divider,
+                    ui.row()
+                        .gap(10.0F)
+                        .cross_alignment(widget::LayoutAlignment::center)
+                        .children(
+                            demo_button,
+                            ui.make<widget::Label>(treatment_label)
+                                .color_token(theme::ColorToken::on_surface_variant)
+                        )
+                        .build(),
+                    cycle_treatment,
                     ui.make<widget::Label>("Brand colors").font_size(18.0F),
                     ui.row()
                         .gap(10.0F)
