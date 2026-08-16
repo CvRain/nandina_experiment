@@ -134,8 +134,13 @@ readable:
 - Select landed: a single-choice dropdown with a popup option list drawn on a
   raised z-order, keyboard open/navigate/select/escape, `combobox` semantics, and
   `Signal<int>` two-way authoring; Settings adds a language select.
-- Test suite 36/36 green.
+- Basic widgets landed: Divider (solid/dashed/double patterns, `separator`),
+  Avatar (UTF-8-safe initials), and Chip (removable pill with `removed` event);
+  Settings shows them in a Basics row inside a scrollable viewport.
+- Test suite 37/37 green.
 - Next (planned follow-ups): fluent/material theme families (after more common
-  components land); text vertical alignment (baseline/descent) fix; general
-  tween/animation system then component switch animations; system font discovery
+  components land); Dialog/Modal (overlay/scrim + focus trap); a sidebar + router
+  "stack view" composite (QML StackView-like) once components mature; component
+  keyboard/focus pass (Chip/Select/etc.); text vertical alignment
+  (baseline/descent) fix; general tween/animation system; system font discovery
   and CJK fallback ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
