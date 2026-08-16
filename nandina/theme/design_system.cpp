@@ -331,6 +331,46 @@ namespace nandina::theme
             scale_alpha(style.value.color, alpha);
         }
 
+        /** DividerRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const DividerRecipe& recipe
+        ) -> ResolvedDividerStyle {
+            return {
+                .color = resolve_color(system, appearance, recipe.color),
+                .thickness = resolve_scalar(system, appearance, recipe.thickness),
+                .preferred_length = resolve_scalar(system, appearance, recipe.preferred_length),
+            };
+        }
+
+        /** AvatarRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const AvatarRecipe& recipe
+        ) -> ResolvedAvatarStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .label = resolve(system, appearance, recipe.label),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
+        /** ChipRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const ChipRecipe& recipe
+        ) -> ResolvedChipStyle {
+            return {
+                .container = resolve(system, appearance, recipe.container),
+                .label = resolve(system, appearance, recipe.label),
+                .remove_color = resolve_color(system, appearance, recipe.remove_color),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
         /** Tabs disabled 变换：标签 / 指示条颜色 ×opacity.disabled。 */
         void apply_tabs_disabled(
             const DesignSystem& system,
@@ -646,6 +686,48 @@ namespace nandina::theme
         }
         if (state == SelectVisualState::disabled) {
             apply_select_disabled(system, appearance, style);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Divider 配方（纯展示：base → 规则列表，后匹配者胜）。
+     */
+    auto resolve_divider(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedDividerStyle {
+        auto style = resolve_recipe(system, appearance, system.components.divider.base);
+        for (const auto& rule: system.components.divider.rules) {
+            apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Avatar 配方（纯展示：base → 规则列表，后匹配者胜）。
+     */
+    auto resolve_avatar(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedAvatarStyle {
+        auto style = resolve_recipe(system, appearance, system.components.avatar.base);
+        for (const auto& rule: system.components.avatar.rules) {
+            apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Chip 配方（纯展示：base → 规则列表，后匹配者胜）。
+     */
+    auto resolve_chip(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedChipStyle {
+        auto style = resolve_recipe(system, appearance, system.components.chip.base);
+        for (const auto& rule: system.components.chip.rules) {
+            apply_rule(system, appearance, style, rule);
         }
         return style;
     }
@@ -1119,6 +1201,78 @@ namespace nandina::theme
         }
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedDividerStyle& style,
+        const DividerRecipeRule& rule
+    ) {
+        if (rule.color)
+            style.color = resolve_color(system, appearance, *rule.color);
+        if (rule.thickness)
+            style.thickness = resolve_scalar(system, appearance, *rule.thickness);
+        if (rule.preferred_length) {
+            style.preferred_length =
+                resolve_scalar(system, appearance, *rule.preferred_length);
+        }
+    }
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedAvatarStyle& style,
+        const AvatarRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.metrics_box_size)
+            style.metrics.box_size = resolve_scalar(system, appearance, *rule.metrics_box_size);
+    }
+
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedChipStyle& style,
+        const ChipRecipeRule& rule
+    ) {
+        if (rule.container_fill)
+            style.container.fill = resolve_color(system, appearance, *rule.container_fill);
+        if (rule.container_border)
+            style.container.border = resolve_color(system, appearance, *rule.container_border);
+        if (rule.container_border_width) {
+            style.container.border_width =
+                resolve_scalar(system, appearance, *rule.container_border_width);
+        }
+        if (rule.container_radius)
+            style.container.radius = resolve_scalar(system, appearance, *rule.container_radius);
+        if (rule.label_color)
+            style.label.color = resolve_color(system, appearance, *rule.label_color);
+        if (rule.label_font_size)
+            style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
+        if (rule.remove_color)
+            style.remove_color = resolve_color(system, appearance, *rule.remove_color);
+        if (rule.metrics_height)
+            style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -1510,6 +1664,64 @@ namespace nandina::theme
         };
     }
 
+    /** @return 框架默认 Divider 配方（outline_variant 1px 线）。 */
+    auto default_divider_recipe() -> DividerRecipe {
+        return {
+            .color = ThemeColor::token(ColorToken::outline_variant),
+            .thickness = ThemeScalar::token(ScalarToken::border_thin),
+            .preferred_length = ThemeScalar::literal(0.0F),
+        };
+    }
+
+    /** @return 框架默认 Avatar 配方（surface_variant 圆形 + on_surface_variant 首字母）。 */
+    auto default_avatar_recipe() -> AvatarRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface_variant),
+                .border = ThemeColor::transparent(ColorToken::surface_variant),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface_variant),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_md),
+            },
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(0.0F),
+                .padding_x = ThemeScalar::literal(0.0F),
+                .gap = ThemeScalar::literal(0.0F),
+                .min_height = ThemeScalar::literal(0.0F),
+                .box_size = ThemeScalar::literal(40.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
+    /** @return 框架默认 Chip 配方（surface_variant pill + on_surface_variant 文本 + on_surface_variant 移除）。 */
+    auto default_chip_recipe() -> ChipRecipe {
+        return {
+            .container = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface_variant),
+                .border = ThemeColor::transparent(ColorToken::surface_variant),
+                .border_width = ThemeScalar::literal(0.0F),
+                .radius = ThemeScalar::token(ScalarToken::radius_full),
+            },
+            .label = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface_variant),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_sm),
+            },
+            .remove_color = ThemeColor::token(ColorToken::on_surface_variant),
+            .metrics = ControlMetrics {
+                .height = ThemeScalar::literal(28.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_sm),
+                .gap = ThemeScalar::literal(6.0F),
+                .min_height = ThemeScalar::literal(24.0F),
+                .box_size = ThemeScalar::literal(0.0F),
+                .preferred_width = ThemeScalar::literal(0.0F),
+            },
+        };
+    }
+
     /**
      * 框架默认设计系统。
      *
@@ -1825,6 +2037,18 @@ namespace nandina::theme
                                 ThemeScalar::token(ScalarToken::border_focus_ring),
                         },
                     },
+                },
+                .divider = DividerRecipes {
+                    .base = default_divider_recipe(),
+                    .rules = {},
+                },
+                .avatar = AvatarRecipes {
+                    .base = default_avatar_recipe(),
+                    .rules = {},
+                },
+                .chip = ChipRecipes {
+                    .base = default_chip_recipe(),
+                    .rules = {},
                 },
             },
         };

@@ -286,6 +286,28 @@ namespace nandina::theme
         ControlMetrics metrics;     // height（字段高）、padding_x、gap（字段与弹窗间距）、min_height（选项行高）
     };
 
+    /** Divider 配方：分隔线颜色/厚度/首选长度（纯展示）。 */
+    using DividerRecipe = struct DividerRecipe {
+        ThemeColor color;
+        ThemeScalar thickness;
+        ThemeScalar preferred_length;
+    };
+
+    /** Avatar 配方：圆形容器 + 首字母文本 + 度量（纯展示）。 */
+    using AvatarRecipe = struct AvatarRecipe {
+        BoxStyle container;
+        TypeStyle label;
+        ControlMetrics metrics; // box_size = 直径
+    };
+
+    /** Chip 配方：pill 容器 + 文本 + 移除标记 + 度量。 */
+    using ChipRecipe = struct ChipRecipe {
+        BoxStyle container;
+        TypeStyle label;
+        ThemeColor remove_color;
+        ControlMetrics metrics; // height、padding_x、gap（文本与移除标记间距）
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -496,6 +518,38 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_preferred_width;
     };
 
+    /** Divider 规则：无选择器，覆盖颜色/厚度/首选长度。 */
+    using DividerRecipeRule = struct DividerRecipeRule {
+        std::optional<ThemeColor> color;
+        std::optional<ThemeScalar> thickness;
+        std::optional<ThemeScalar> preferred_length;
+    };
+
+    /** Avatar 规则：无选择器，覆盖容器/文本/度量字段。 */
+    using AvatarRecipeRule = struct AvatarRecipeRule {
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeScalar> metrics_box_size;
+    };
+
+    /** Chip 规则：无选择器，覆盖容器/文本/移除标记/度量字段。 */
+    using ChipRecipeRule = struct ChipRecipeRule {
+        std::optional<ThemeColor> container_fill;
+        std::optional<ThemeColor> container_border;
+        std::optional<ThemeScalar> container_border_width;
+        std::optional<ThemeScalar> container_radius;
+        std::optional<ThemeColor> label_color;
+        std::optional<ThemeScalar> label_font_size;
+        std::optional<ThemeColor> remove_color;
+        std::optional<ThemeScalar> metrics_height;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_gap;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -611,6 +665,25 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedDividerStyle = struct ResolvedDividerStyle {
+        NanColor color;
+        float thickness = 0.0F;
+        float preferred_length = 0.0F;
+    };
+
+    using ResolvedAvatarStyle = struct ResolvedAvatarStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle label;
+        ResolvedControlMetrics metrics;
+    };
+
+    using ResolvedChipStyle = struct ResolvedChipStyle {
+        ResolvedBoxStyle container;
+        ResolvedTypeStyle label;
+        NanColor remove_color;
+        ResolvedControlMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -682,6 +755,21 @@ namespace nandina::theme
         std::vector<SelectRecipeRule> rules;
     };
 
+    using DividerRecipes = struct DividerRecipes {
+        DividerRecipe base;
+        std::vector<DividerRecipeRule> rules;
+    };
+
+    using AvatarRecipes = struct AvatarRecipes {
+        AvatarRecipe base;
+        std::vector<AvatarRecipeRule> rules;
+    };
+
+    using ChipRecipes = struct ChipRecipes {
+        ChipRecipe base;
+        std::vector<ChipRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -695,6 +783,9 @@ namespace nandina::theme
         TabsRecipes tabs;
         TooltipRecipes tooltip;
         SelectRecipes select;
+        DividerRecipes divider;
+        AvatarRecipes avatar;
+        ChipRecipes chip;
     };
 
     /**
@@ -932,6 +1023,21 @@ namespace nandina::theme
         SelectVisualState state
     ) -> ResolvedSelectStyle;
 
+    [[nodiscard]] auto resolve_divider(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedDividerStyle;
+
+    [[nodiscard]] auto resolve_avatar(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedAvatarStyle;
+
+    [[nodiscard]] auto resolve_chip(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedChipStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -1026,6 +1132,27 @@ namespace nandina::theme
         const SelectRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedDividerStyle& style,
+        const DividerRecipeRule& rule
+    );
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedAvatarStyle& style,
+        const AvatarRecipeRule& rule
+    );
+
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedChipStyle& style,
+        const ChipRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -1040,6 +1167,9 @@ namespace nandina::theme
     [[nodiscard]] auto default_tabs_recipe() -> TabsRecipe;
     [[nodiscard]] auto default_tooltip_recipe() -> TooltipRecipe;
     [[nodiscard]] auto default_select_recipe() -> SelectRecipe;
+    [[nodiscard]] auto default_divider_recipe() -> DividerRecipe;
+    [[nodiscard]] auto default_avatar_recipe() -> AvatarRecipe;
+    [[nodiscard]] auto default_chip_recipe() -> ChipRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过
