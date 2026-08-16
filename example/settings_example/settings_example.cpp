@@ -215,6 +215,24 @@ namespace nandina::examples::settings
                     ),
                     ui.make<widget::Label>(active_tab_label)
                         .color_token(theme::ColorToken::on_surface_variant),
+                    ui.make<widget::Label>("Basics").font_size(18.0F),
+                    ui.row()
+                        .gap(10.0F)
+                        .cross_alignment(widget::LayoutAlignment::center)
+                        .children(
+                            ui.make<widget::Avatar>("Nandina"),
+                            ui.make<widget::Chip>("Design"),
+                            ui.make<widget::Chip>("Removable", true)
+                                .configure([&status](widget::Chip& chip) {
+                                    chip.set_on_remove(
+                                        [&status] { status.set("Removed the chip"); }
+                                    );
+                                })
+                        )
+                        .build(),
+                    ui.make<widget::Divider>().configure([](widget::Divider& divider) {
+                        divider.set_pattern(widget::Divider::Pattern::dashed);
+                    }),
                     ui.make<widget::Label>("Brand colors").font_size(18.0F),
                     ui.row()
                         .gap(10.0F)
@@ -242,6 +260,8 @@ namespace nandina::examples::settings
                         theme::ColorToken::on_surface_variant
                     )
                 );
-        return ui.padding(foundation::NanInsets::all(20.0F)).child(content).build();
+        return ui.padding(foundation::NanInsets::all(20.0F))
+            .child(ui.scroll_view().child(content))
+            .build();
     }
 } // namespace nandina::examples::settings
