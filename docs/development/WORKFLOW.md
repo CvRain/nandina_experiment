@@ -122,6 +122,11 @@ readable:
   `theme/builtin_themes.{hpp,cpp}` and `ThemeManager::register_theme_family`
   (full-snapshot families). Settings now selects it with `activate_family("butter")`
   instead of a hardcoded brand palette.
+- `fluent` (Fluent 2 / Windows: cool grays + blue accent, sharp 4/8/12 radii) and
+  `material` (Material 3: tonal neutrals + purple/pink, rounded 8/12/16 radii)
+  families landed. `PaletteVariantPolicy` gained `light_on_brand`/`dark_on_brand`
+  so `on_primary` flips with appearance for mid/dark accents; Settings adds a
+  Theme-family Select (butter/fluent/material) driving `activate_family`.
 - Soft shadows landed: `IRenderDevice::draw_rounded_rect_shadow` (SDF mode 4 soft
   falloff), `ShadowPainter`, `ShadowStyle` on `CardRecipe`, and a butter card
   shadow rule. Default Card stays flat; butter gets warm-clay elevation.
@@ -137,10 +142,14 @@ readable:
 - Basic widgets landed: Divider (solid/dashed/double patterns, `separator`),
   Avatar (UTF-8-safe initials), and Chip (removable pill with `removed` event);
   Settings shows them in a Basics row inside a scrollable viewport.
+- The router is now exercised by the example: `ShellPage` hosts a persistent
+  sidebar and a **nested `NanRouter`** (real QML-StackView-style content stack),
+  with section pages (General/Appearance/Components/About) backed by a shared
+  `SettingsStore`, plus a parameterized `DetailPage` demonstrating push/pop.
+  The bootstrap migrated to `use_store` + `run_page<ShellPage>`; the example
+  budget test now permits `NanPageT`/`route_key` (raised to 700 lines).
 - Test suite 37/37 green.
-- Next (planned follow-ups): fluent/material theme families (after more common
-  components land); Dialog/Modal (overlay/scrim + focus trap); a sidebar + router
-  "stack view" composite (QML StackView-like) once components mature; component
+- Next (planned follow-ups): Dialog/Modal (overlay/scrim + focus trap); component
   keyboard/focus pass (Chip/Select/etc.); text vertical alignment
   (baseline/descent) fix; general tween/animation system; system font discovery
   and CJK fallback ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
