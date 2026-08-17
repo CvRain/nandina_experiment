@@ -11,10 +11,12 @@
 
 using namespace nandina;
 
-TEST_CASE("default theme families include butter", "[theme][families]") {
+TEST_CASE("default theme families include butter fluent and material", "[theme][families]") {
     const auto families = theme::default_theme_families();
-    REQUIRE(families.size() == 1);
+    REQUIRE(families.size() == 3);
     REQUIRE(families[0].name == "butter");
+    REQUIRE(families[1].name == "fluent");
+    REQUIRE(families[2].name == "material");
 }
 
 TEST_CASE("butter family compiles to a warm cream design system", "[theme][families]") {
@@ -35,29 +37,97 @@ TEST_CASE("butter family compiles to a warm cream design system", "[theme][famil
     REQUIRE(design.dark.primary.oklch().light > design.light.primary.oklch().light);
 }
 
-TEST_CASE("butter family keeps AA text contrast in both appearances", "[theme][families][contrast]") {
-    const auto families = theme::default_theme_families();
-    const auto design = theme::build_family_design_system(families[0]);
+TEST_CASE(
+    "every built-in family keeps AA text contrast in both appearances",
+    "[theme][families][contrast]"
+) {
+    for (const auto& family: theme::default_theme_families()) {
+        CAPTURE(family.name);
+        const auto design = theme::build_family_design_system(family);
 
-    const auto require_aa = [](const theme::NanColorScheme& scheme) {
-        REQUIRE(
-            foundation::nan_contrast_ratio(scheme.primary, scheme.on_primary)
-            >= foundation::nan_contrast_aa_text
-        );
-        REQUIRE(
-            foundation::nan_contrast_ratio(scheme.surface, scheme.on_surface)
-            >= foundation::nan_contrast_aa_text
-        );
-        REQUIRE(
-            foundation::nan_contrast_ratio(scheme.background, scheme.on_background)
-            >= foundation::nan_contrast_aa_text
-        );
-    };
-    require_aa(design.light);
-    require_aa(design.dark);
+        const auto require_aa = [](const theme::NanColorScheme& scheme) {
+            REQUIRE(
+                foundation::nan_contrast_ratio(scheme.primary, scheme.on_primary)
+                >= foundation::nan_contrast_aa_text
+            );
+            REQUIRE(
+                foundation::nan_contrast_ratio(scheme.surface, scheme.on_surface)
+                >= foundation::nan_contrast_aa_text
+            );
+            REQUIRE(
+                foundation::nan_contrast_ratio(scheme.background, scheme.on_background)
+                >= foundation::nan_contrast_aa_text
+            );
+        };
+        require_aa(design.light);
+        require_aa(design.dark);
+    }
 }
 
-TEST_CASE("register_theme_family activates a full snapshot and flips appearance", "[theme][families]") {
+TEST_CASE(
+    "fluent family compiles to a flat blue design system with flipped on-brand",
+    "[theme][families]"
+) {
+    const auto families = theme::default_theme_families();
+    const auto design = theme::build_family_design_system(families[1]);
+
+    // Fluent 锐角：圆角 4/8/12。
+    REQUIRE(design.tokens.radius.sm == Catch::Approx(4.0F));
+    REQUIRE(design.tokens.radius.md == Catch::Approx(8.0F));
+    REQUIRE(design.tokens.radius.lg == Catch::Approx(12.0F));
+
+    // 蓝色 accent 亮暗翻转：暗色品牌更亮。
+    REQUIRE(design.dark.primary.oklch().light > design.light.primary.oklch().light);
+    // on-primary 随外观翻转：亮色 accent 配浅字，暗色 accent 配深字。
+    REQUIRE(design.light.on_primary.oklch().light > design.light.primary.oklch().light);
+    REQUIRE(design.dark.on_primary.oklch().light < design.dark.primary.oklch().light);
+}
+
+TEST_CASE("material family compiles to a rounded purple design system", "[theme][families]") {
+    const auto families = theme::default_theme_families();
+    const auto design = theme::build_family_design_system(families[2]);
+
+    // Material 圆角：圆角 8/12/16。
+    REQUIRE(design.tokens.radius.sm == Catch::Approx(8.0F));
+    REQUIRE(design.tokens.radius.md == Catch::Approx(12.0F));
+    REQUIRE(design.tokens.radius.lg == Catch::Approx(16.0F));
+
+    REQUIRE(design.dark.primary.oklch().light > design.light.primary.oklch().light);
+    REQUIRE(design.light.on_primary.oklch().light > design.light.primary.oklch().light);
+    REQUIRE(design.dark.on_primary.oklch().light < design.dark.primary.oklch().light);
+
+    // 精确对齐 M3 baseline 语义色（skill 文档 color-system.md）。
+    REQUIRE(design.light.primary == foundation::NanColor::from_hex(0x6750A4));
+    REQUIRE(design.dark.primary == foundation::NanColor::from_hex(0xD0BCFF));
+    REQUIRE(design.dark.on_primary == foundation::NanColor::from_hex(0x381E72));
+    REQUIRE(design.light.outline == foundation::NanColor::from_hex(0x79747E));
+    REQUIRE(design.dark.outline == foundation::NanColor::from_hex(0x938F99));
+    REQUIRE(design.light.on_surface_variant == foundation::NanColor::from_hex(0x49454F));
+    REQUIRE(design.light.outline_variant == foundation::NanColor::from_hex(0xCAC4D0));
+}
+
+TEST_CASE(
+    "fluent and material stay flat while butter keeps its soft card shadow",
+    "[theme][families][card]"
+) {
+    const auto families = theme::default_theme_families();
+    const auto fluent = theme::build_family_design_system(families[1]);
+    const auto material = theme::build_family_design_system(families[2]);
+
+    REQUIRE(
+        theme::resolve_card(fluent, theme::ColorAppearance::light).shadow.spread
+        == Catch::Approx(0.0F)
+    );
+    REQUIRE(
+        theme::resolve_card(material, theme::ColorAppearance::light).shadow.spread
+        == Catch::Approx(0.0F)
+    );
+}
+
+TEST_CASE(
+    "register_theme_family activates a full snapshot and flips appearance",
+    "[theme][families]"
+) {
     theme::ThemeManager themes;
     theme::register_default_theme_families(themes);
     REQUIRE(themes.contains_family("butter"));
@@ -73,7 +143,10 @@ TEST_CASE("register_theme_family activates a full snapshot and flips appearance"
     REQUIRE(themes.design_system().dark.primary.oklch().light > light_primary);
 }
 
-TEST_CASE("butter family gives cards a soft shadow while default stays flat", "[theme][families][card]") {
+TEST_CASE(
+    "butter family gives cards a soft shadow while default stays flat",
+    "[theme][families][card]"
+) {
     const auto families = theme::default_theme_families();
     const auto butter = theme::build_family_design_system(families[0]);
     const auto default_system = theme::default_design_system();

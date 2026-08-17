@@ -30,7 +30,7 @@ namespace nandina::theme
         std::vector<CardRecipeRule> card_rules;
     };
 
-    /** @return 框架内置主题族目录（当前仅 butter；fluent/material 后续补齐）。 */
+    /** @return 框架内置主题族目录（butter / fluent / material）。 */
     [[nodiscard]] auto default_theme_families() -> std::vector<ThemeFamilyDefinition>;
 
     /** 从主题族定义编译 DesignSystem（复用默认 typography 与 recipe，替换 tokens + light/dark）。 */

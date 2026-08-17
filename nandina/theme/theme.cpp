@@ -139,7 +139,7 @@ namespace nandina::theme
         outline_variant = reference.neutral.at(dark ? ColorShade::shade_800 : ColorShade::shade_300);
 
         primary = reference.primary.at(brand);
-        on_primary = reference.primary.at(ColorShade::shade_950);
+        on_primary = reference.primary.at(dark ? policy.dark_on_brand : policy.light_on_brand);
         secondary = reference.secondary.at(brand);
         on_secondary = reference.secondary.at(ColorShade::shade_50);
         tertiary = reference.tertiary.at(brand);

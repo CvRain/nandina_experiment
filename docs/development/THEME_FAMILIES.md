@@ -1,6 +1,6 @@
 # 内置主题族（Theme Families）
 
-> 状态：✅ butter 已落地（基础设施 + 示例抽离完成）；fluent/material 待常用组件补齐后再做
+> 状态：✅ butter / fluent / material 三族已落地（含 on_brand 前景字翻转支持 + example 切换 UI）
 > 关联：Phase 8 Deferred Work「built-in theme families」
 > 参考：[Fluent 2](https://fluent2.microsoft.design/design-tokens)、
 > [Material 3 色彩系统](https://m3.material.io/styles/color/roles)、
@@ -32,6 +32,9 @@ ThemeFamilyDefinition { name, reference, policy, tokens }
 - 参考色阶的**单条 11 档 ramp 覆盖亮↔暗**：`make_color_scheme` 对 light 取浅端、
   对 dark 取深端（这正是当前 example 的做法）。品牌色 950 档放 flavor base，实现
   Catppuccin「On Accent = Base」规则。
+- `on_primary` 前景字由策略新增的 `light_on_brand / dark_on_brand` 档位决定（默认 950 档）。
+  butter 用深字（On Accent = Base）；中/深色强调的 fluent/material 亮色用浅档、暗色用深档，
+  随外观翻转保证对比度。
 - 框架默认 `default_design_system()`（Skeleton）保持不变，作为 detached widget / 测试的
   中性回退；应用通过 `activate_family()` 显式选择主题族，`butter` 为 example 的默认选择。
 
@@ -51,25 +54,31 @@ ThemeFamilyDefinition { name, reference, policy, tokens }
 - policy：`{ light_brand = shade_500, dark_brand = shade_300 }`。
 - tokens：`radius sm/md/lg = 12/16/24`，`border thin/medium = 2/3`（软阴影待 shadow 图元）。
 
-### 3.2 `fluent` —— Fluent 2 / Windows
+### 3.2 `fluent` —— Fluent 2 / Windows ✅
 
 - 设计语言：冷灰中性、直角偏小圆角（4/8px）、8px 间距网格、Segoe UI 质感。
-- 中性：亮底 `#f3f3f3`、surface `#ffffff`、文字 `#242424`；暗底 `#202020`、surface `#2b2b2b`、
-  文字 `#ffffff`（生成 11 档 ramp）。
-- 强调色（accent）：light `#0067c0`（Fluent Blue）、dark `#4cc2ff`（亮青蓝）。
-- 状态色：success `#107c10`、warning `#9d5d00`、error `#c42b1c`（暗色变体更亮）。
-- policy：`{ light_brand = shade_500, dark_brand = shade_400 }`。
-- tokens：`radius sm/md/lg = 4/8/12`，`border thin/medium = 1/1`。
+- 中性：亮底 `#f3f3f3`、surface `#ffffff`、文字 `#202020`；暗底 `#202020`、surface `#2b2b2b`、
+  文字 `#f3f3f3`（生成 11 档 ramp）。
+- 强调色（accent）：light `#0067c0`（Fluent Blue）、dark `#4cc2ff`（亮青蓝）；
+  on-primary 亮色用白（shade 50）、暗色用深蓝黑（shade 950）。
+- secondary / tertiary / 状态色沿用 `default_reference_palette()`（Skeleton）。
+- policy：`{ light_brand = shade_500, dark_brand = shade_300, light_on_brand = shade_50, dark_on_brand = shade_950 }`。
+- tokens：`radius sm/md/lg = 4/8/12`，`border thin/medium = 1/2`（默认）。
 
-### 3.3 `material` —— Material 3 / Android
+### 3.3 `material` —— Material 3 / Android ✅
 
 - 设计语言：Material 3 色调、surface/on-surface 分层、4px 密度、全圆角。
-- 中性：亮底 `#fef7ff`、surface `#fffbfe`、文字 `#1c1b1f`；暗底 `#1c1b1f`、文字 `#e6e1e5`。
-- primary：light `#6750a4`（紫）、dark `#d0bcff`；secondary `#625b71 / #ccc2dc`；
-  tertiary `#7d5260 / #efb8c8`。
-- 状态色：success `#2e7d32`、warning `#b26a00`、error `#c62828`（暗色更亮）。
-- policy：`{ light_brand = shade_500, dark_brand = shade_400 }`（Material 式暗色提亮品牌档）。
-- tokens：`radius sm/md/lg = 8/12/16`，`border thin/medium = 1/2`。
+- 精确对齐 M3 **baseline**（参考 [material-3-skill](https://github.com/hamen/material-3-skill) 的
+  `color-system.md`，非动态取色）。
+- 中性：亮底 `#fef7ff`（surface）、亮 surface `#ffffff`（surface-container-lowest）、
+  文字 `#141218`；暗底 `#141218`、暗 surface `#211f26`（surface-container）、文字 `#fef7ff`。
+  surface-variant `#e7e0ec`、on-surface-variant `#49454f`、outline `#79747e`（亮）`#938f99`（暗）、
+  outline-variant `#cac4d0`。
+- primary（M3 tonal palette）：light `#6750a4`（tone 40）、dark `#d0bcff`（tone 80）；
+  on-primary 亮色白（tone 100）、暗色 `#381e72`（tone 20）；primary-container `#eaddff`。
+- tertiary `#7d5260 / #efb8c8`；secondary / 状态色沿用 `default_reference_palette()`（Skeleton）。
+- policy：`{ light_brand = shade_500, dark_brand = shade_300, light_on_brand = shade_50, dark_on_brand = shade_950 }`。
+- tokens：`radius sm/md/lg = 8/12/16`，`border thin/medium = 1/2`（默认）。
 
 ## 4. ThemeManager 集成
 
@@ -88,7 +97,8 @@ void ThemeManager::register_theme_family(std::string name, DesignSystem system);
 1. 删除 example 内的 `brand_design_system()`（约 40 行），改用
    `themes.register_theme_families(default_theme_families()); themes.activate_family("butter")`。
 2. Appearance 单选组继续驱动 `set_preference`（System/Light/Dark）。
-3. 新增「主题族」单选组（Butter/Fluent/Material）驱动 `activate_family`，作为真实切换验证。
+3. 新增「主题族」Select（Butter/Fluent/Material）驱动 `activate_family`（位于 Appearance 页），
+   作为真实切换验证。
 
 ## 6. 测试
 

@@ -91,10 +91,19 @@ namespace nandina::theme
     struct PaletteVariantPolicy {
         ColorShade light_brand = ColorShade::shade_500;
         ColorShade dark_brand = ColorShade::shade_500;
+        // on_primary（前景字）档位。默认为最深档（butter 的「On Accent = Base」：
+        // 浅色强调色配深字）。中/深色强调色的族（fluent/material）翻转用浅档。
+        ColorShade light_on_brand = ColorShade::shade_950;
+        ColorShade dark_on_brand = ColorShade::shade_950;
 
-        /** Material 风格可选项：暗色外观使用更亮的 400 档品牌色。 */
+        /** Material 风格可选项：暗色外观使用更亮的 400 档品牌色，前景字随外观翻转。 */
         [[nodiscard]] static constexpr auto material_dark_tone() -> PaletteVariantPolicy {
-            return {.light_brand = ColorShade::shade_500, .dark_brand = ColorShade::shade_400};
+            return {
+                .light_brand = ColorShade::shade_500,
+                .dark_brand = ColorShade::shade_400,
+                .light_on_brand = ColorShade::shade_50,
+                .dark_on_brand = ColorShade::shade_950,
+            };
         }
     };
 
