@@ -1,5 +1,5 @@
 //
-// Minimal Nandina application bootstrap.
+// Nandina application bootstrap - router-driven settings dashboard.
 //
 
 #include "settings_example.hpp"
@@ -9,19 +9,14 @@
 using namespace nandina;
 
 auto main() -> int {
-    return app::run(
-        {
-            .id = "org.nandina.example",
-            .window =
-                {
-                    .title = "Nandina Settings",
-                    .width = 720,
-                    .height = 520,
-                    .target_fps = 120,
-                    .resizable = true,
-                    .vsync = true,
-                },
-        },
-        examples::settings::build
-    );
+    app::NanApplication application(app::NanApplicationConfig::for_process("org.nandina.example"));
+    application.use_store<examples::settings::SettingsStore>();
+    return application.run_page<examples::settings::ShellPage>({
+        .title = "Nandina Settings",
+        .width = 960,
+        .height = 640,
+        .target_fps = 120,
+        .resizable = true,
+        .vsync = true,
+    });
 }

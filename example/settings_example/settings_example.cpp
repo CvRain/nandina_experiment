@@ -1,5 +1,5 @@
 //
-// Settings example - UI composition and component logic only.
+// Settings example - router-driven dashboard implementation.
 //
 
 #include "settings_example.hpp"
@@ -10,13 +10,16 @@
 #include "widget/layout.hpp"
 
 #include <format>
-#include <memory>
 #include <string>
+#include <utility>
+#include <vector>
 
 namespace nandina::examples::settings
 {
     namespace
     {
+        using widget::authoring::percent;
+
         [[nodiscard]] auto preference_summary(
             const std::string& profile,
             const bool notifications,
@@ -32,98 +35,117 @@ namespace nandina::examples::settings
             return result;
         }
 
+        [[nodiscard]] auto section_heading(const widget::BuildContext& ui, const std::string& text)
+            -> std::shared_ptr<widget::Label> {
+            return ui.make<widget::Label>(text).font_size(20.0F).build();
+        }
     } // namespace
 
-    auto build(const widget::BuildContext& ui) -> std::shared_ptr<scene::NanNode2D> {
-        using widget::authoring::percent;
+    SettingsStore::SettingsStore(reactive::Graph& graph):
+        profile(graph, "Nandina developer"),
+        notifications(graph, true),
+        diagnostics(graph, false),
+        reduced_motion(graph, false),
+        interface_scale(graph, 1.0F),
+        language(graph, 0),
+        family(graph, 0),
+        status(graph, "Changes are applied locally") {}
 
-        // 内置主题族：注册框架自带主题，选择 butter（黄油卡片 + Catppuccin 暖调）。
-        // 开发者可在此拷贝族快照覆盖色板后原子 apply，或注册自定义族。
+    ShellPage::~ShellPage() = default;
+
+    auto ShellPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto& store = context.store<SettingsStore>();
+        auto ui = context.ui();
+
+        // 内置主题族：注册 butter / fluent / material，默认 butter；Appearance 页可切换。
         theme::register_default_theme_families(ui.theme_manager());
         (void)ui.theme_manager().activate_family("butter");
 
-        auto& profile = ui.signal<std::string>("Nandina developer");
-        auto& notifications = ui.signal<bool>(true);
-        auto& diagnostics = ui.signal<bool>(false);
-        auto& reduced_motion = ui.signal<bool>(false);
-        auto& interface_scale = ui.signal<float>(1.0F);
-        auto& status = ui.signal<std::string>("Changes are applied locally");
-        auto& summary = ui.computed([&] {
+        // 主题族切换挂在常驻 shell（Appearance 页的 Select 驱动它），跨页保持生效。
+        auto* themes = &ui.theme_manager();
+        (void)ui.effect([themes, &store] {
+            static constexpr const char* names[] = {"butter", "fluent", "material"};
+            (void)themes->activate_family(names[store.family.get()]);
+        });
+
+        // 嵌套内容 router（真实 StackView）：侧边栏切换 section 页，About 推 detail 页。
+        content_ = std::make_unique<app::NanRouter>(
+            context.graph(),
+            context.theme_manager(),
+            &store,
+            app::nan_type_key<SettingsStore>(),
+            nullptr,
+            nullptr,
+            nullptr,
+            &context.dispatcher(),
+            nullptr
+        );
+        content_->push<GeneralPage>();
+
+        auto nav_button = [&ui](const std::string& text, auto&& action) {
+            return ui.make<widget::Button>(text)
+                .on_click(std::forward<decltype(action)>(action))
+                .build();
+        };
+        auto sidebar =
+            ui.column()
+                .gap(8.0F)
+                .children(
+                    ui.make<widget::Label>("Nandina").font_size(22.0F),
+                    ui.make<widget::Badge>("Beta"),
+                    nav_button(
+                        "General",
+                        [this] { (void)content_->request_replace<GeneralPage>(); }
+                    ),
+                    nav_button(
+                        "Appearance",
+                        [this] { (void)content_->request_replace<AppearancePage>(); }
+                    ),
+                    nav_button(
+                        "Components",
+                        [this] { (void)content_->request_replace<ComponentsPage>(); }
+                    ),
+                    nav_button("About", [this] { (void)content_->request_replace<AboutPage>(); })
+                )
+                .build();
+
+        return ui.padding(foundation::NanInsets::all(16.0F))
+            .child(ui.row()
+                       .gap(16.0F)
+                       .cross_alignment(widget::LayoutAlignment::stretch)
+                       .children(sidebar, ui.expanded().child(content_->host())))
+            .build();
+    }
+
+    auto GeneralPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto& store = context.store<SettingsStore>();
+        auto ui = context.ui();
+
+        auto& summary = ui.computed([&store] {
             return preference_summary(
-                profile.get(),
-                notifications.get(),
-                diagnostics.get(),
-                reduced_motion.get(),
-                interface_scale.get()
+                store.profile.get(),
+                store.notifications.get(),
+                store.diagnostics.get(),
+                store.reduced_motion.get(),
+                store.interface_scale.get()
             );
         });
-        auto& scale_label = ui.computed([&] {
-            return std::format("Interface scale · {:.0f}%", interface_scale.get() * 100.0F);
+        auto& scale_label = ui.computed([&store] {
+            return std::format("Interface scale · {:.0f}%", store.interface_scale.get() * 100.0F);
         });
-        auto& active_tab = ui.signal<int>(0);
-        auto& active_tab_label = ui.computed([&] {
-            const std::string names[] = {"General", "Appearance", "About"};
-            return std::string("Active tab: ") + names[active_tab.get()];
-        });
-        auto& language = ui.signal<int>(0);
 
-        // Divider 样式变体：按钮循环切换 solid/dashed/double/double_dashed。
-        auto& divider_style = ui.signal<int>(0);
-        auto divider = ui.make<widget::Divider>().build();
-        (void)ui.effect([divider, &divider_style] {
-            constexpr widget::Divider::Pattern patterns[] = {
-                widget::Divider::Pattern::solid,
-                widget::Divider::Pattern::dashed,
-                widget::Divider::Pattern::double_line,
-                widget::Divider::Pattern::double_dashed,
-            };
-            divider->set_pattern(patterns[divider_style.get()]);
-        });
-        auto& divider_label = ui.computed([&] {
-            const std::string names[] = {"Solid", "Dashed", "Double", "Double dashed"};
-            return std::string("Divider · ") + names[divider_style.get()];
-        });
-        auto cycle_divider = ui.make<widget::Button>("Cycle divider style")
-                                 .on_click([&divider_style] {
-                                     divider_style.set((divider_style.peek() + 1) % 4);
-                                 })
-                                 .build();
-
-        // Button treatment 变体：循环 filled/tonal/outlined/ghost/link。
-        auto& treatment_style = ui.signal<int>(0);
-        auto demo_button = ui.make<widget::Button>("Stylized button").build();
-        (void)ui.effect([demo_button, &treatment_style] {
-            constexpr theme::ButtonTreatment treatments[] = {
-                theme::ButtonTreatment::filled,
-                theme::ButtonTreatment::tonal,
-                theme::ButtonTreatment::outlined,
-                theme::ButtonTreatment::ghost,
-                theme::ButtonTreatment::link,
-            };
-            demo_button->set_treatment(treatments[treatment_style.get()]);
-        });
-        auto& treatment_label = ui.computed([&] {
-            const std::string names[] = {"Filled", "Tonal", "Outlined", "Ghost", "Link"};
-            return std::string("Button · ") + names[treatment_style.get()];
-        });
-        auto cycle_treatment = ui.make<widget::Button>("Cycle button style")
-                                   .on_click([&treatment_style] {
-                                       treatment_style.set((treatment_style.peek() + 1) % 5);
-                                   })
-                                   .build();
-
-        // 该设置直接驱动框架统一动效策略；页面销毁时 effect 随 ReactiveScope 回收。
+        // 该设置直接驱动框架统一动效策略。
         auto* themes = &ui.theme_manager();
-        (void)ui.effect([themes, &reduced_motion] {
+        (void)ui.effect([themes, &store] {
             themes->set_motion_preference(
-                reduced_motion.get() ? theme::MotionPreference::reduced
-                                     : theme::MotionPreference::system
+                store.reduced_motion.get() ? theme::MotionPreference::reduced
+                                           : theme::MotionPreference::system
             );
         });
 
         auto profile_field =
-            ui.make<widget::TextField>(profile, "Profile name").autofocus().build();
-        auto diagnostics_note = ui.when(diagnostics, [](widget::BuildContext branch) {
+            ui.make<widget::TextField>(store.profile, "Profile name").autofocus().build();
+        auto diagnostics_note = ui.when(store.diagnostics, [](widget::BuildContext branch) {
             return branch
                 .make<widget::Label>("Anonymous diagnostics help improve rendering stability")
                 .color_token(theme::ColorToken::on_surface_variant);
@@ -134,15 +156,21 @@ namespace nandina::examples::settings
                 .gap(6.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
-                    ui.make<widget::Switch>(notifications, "Desktop notifications"),
-                    ui.make<widget::Checkbox>(diagnostics, "Send anonymous diagnostics"),
+                    ui.make<widget::Switch>(store.notifications, "Desktop notifications"),
+                    ui.make<widget::Checkbox>(store.diagnostics, "Send anonymous diagnostics"),
                     diagnostics_note,
-                    ui.make<widget::Checkbox>(reduced_motion, "Reduce interface motion"),
+                    ui.make<widget::Checkbox>(store.reduced_motion, "Reduce interface motion"),
                     ui.make<widget::Label>(scale_label)
                         .color_token(theme::ColorToken::on_surface_variant),
-                    ui.make<widget::Slider>(interface_scale, "Interface scale", 0.75F, 1.5F, 0.05F),
+                    ui.make<widget::Slider>(
+                        store.interface_scale,
+                        "Interface scale",
+                        0.75F,
+                        1.5F,
+                        0.05F
+                    ),
                     ui.make<widget::Select>(
-                        language,
+                        store.language,
                         std::vector<std::string> {"English", "中文", "日本語", "Test str"}
                     )
                 )
@@ -152,22 +180,53 @@ namespace nandina::examples::settings
                         .tone(theme::ButtonTone::primary)
                         .width(percent(50.0F))
                         .min_width(180.0F)
-                        .on_click([&] { status.set("Preferences saved for " + profile.peek()); });
+                        .on_click([&store] {
+                            store.status.set("Preferences saved for " + store.profile.peek());
+                        });
         auto reset = ui.make<widget::Button>("Reset")
                          .treatment(theme::ButtonTreatment::outlined)
-                         .on_click([&] {
-                             profile.set("Nandina developer");
-                             notifications.set(true);
-                             diagnostics.set(false);
-                             reduced_motion.set(false);
-                             interface_scale.set(1.0F);
-                             status.set("Preferences reset");
+                         .on_click([&store] {
+                             store.profile.set("Nandina developer");
+                             store.notifications.set(true);
+                             store.diagnostics.set(false);
+                             store.reduced_motion.set(false);
+                             store.interface_scale.set(1.0F);
+                             store.status.set("Preferences reset");
                          });
         auto reset_tooltip =
             ui.make<widget::Tooltip>("Restore default preferences", reset.build()).build();
+        auto actions = ui.row()
+                           .gap(8.0F)
+                           .cross_alignment(widget::LayoutAlignment::center)
+                           .children(save, reset_tooltip)
+                           .build();
 
-        // Appearance 单选组：互斥 + 键盘方向键漫游，选中直接驱动主题外观。
-        // 捕获 ThemeManager 指针（由应用持有）；不能捕获 ui（每次 build 的临时对象）。
+        auto content = ui.column()
+                           .gap(12.0F)
+                           .cross_alignment(widget::LayoutAlignment::stretch)
+                           .children(
+                               section_heading(ui, "General"),
+                               ui.make<widget::Label>("Profile").font_size(18.0F),
+                               profile_field,
+                               ui.make<widget::Label>("Preferences").font_size(18.0F),
+                               ui.make<widget::Card>().child(preferences),
+                               ui.make<widget::Label>(summary).color_token(
+                                   theme::ColorToken::on_surface_variant
+                               ),
+                               actions,
+                               ui.make<widget::Label>(store.status)
+                                   .color_token(theme::ColorToken::on_surface_variant)
+                           );
+        return ui.padding(foundation::NanInsets::all(20.0F))
+            .child(ui.scroll_view().child(content))
+            .build();
+    }
+
+    auto AppearancePage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto& store = context.store<SettingsStore>();
+        auto ui = context.ui();
+
+        auto* themes = &ui.theme_manager();
         auto appearance_group = widget::RadioGroup::create();
         auto appearance_system = ui.make<widget::RadioButton>("System", appearance_group).build();
         auto appearance_light = ui.make<widget::RadioButton>("Light", appearance_group).build();
@@ -186,35 +245,104 @@ namespace nandina::examples::settings
                                   .cross_alignment(widget::LayoutAlignment::center)
                                   .children(appearance_system, appearance_light, appearance_dark)
                                   .build();
+        auto family_select = ui.make<widget::Select>(
+                                   store.family,
+                                   std::vector<std::string> {"butter", "fluent", "material"}
+        )
+                                 .build();
 
-        auto actions = ui.row()
-                           .gap(8.0F)
-                           .cross_alignment(widget::LayoutAlignment::center)
-                           .children(save, reset_tooltip)
-                           .build();
+        auto content = ui.column()
+                           .gap(12.0F)
+                           .cross_alignment(widget::LayoutAlignment::stretch)
+                           .children(
+                               section_heading(ui, "Appearance"),
+                               appearance_row,
+                               ui.make<widget::Label>("Theme family").font_size(18.0F),
+                               family_select,
+                               ui.make<widget::Label>("Brand colors").font_size(18.0F),
+                               ui.row()
+                                   .gap(10.0F)
+                                   .children(
+                                       ui.make<widget::Label>("Primary").color_token(
+                                           theme::ColorToken::primary
+                                       ),
+                                       ui.make<widget::Label>("Coral").color_token(
+                                           theme::ColorToken::tertiary
+                                       ),
+                                       ui.make<widget::Label>("Variant").color_token(
+                                           theme::ColorToken::on_surface_variant
+                                       ),
+                                       ui.make<widget::Label>("Outline").color_token(
+                                           theme::ColorToken::outline
+                                       )
+                                   )
+                                   .build()
+                           );
+        return ui.padding(foundation::NanInsets::all(20.0F))
+            .child(ui.scroll_view().child(content))
+            .build();
+    }
+
+    auto ComponentsPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto& store = context.store<SettingsStore>();
+        auto ui = context.ui();
+
+        auto& active_tab = ui.signal<int>(0);
+        auto& active_tab_label = ui.computed([&active_tab] {
+            const std::string names[] = {"General", "Appearance", "About"};
+            return std::string("Active tab: ") + names[active_tab.get()];
+        });
+
+        // Divider 样式变体：按钮循环切换 solid/dashed/double/double_dashed。
+        auto& divider_style = ui.signal<int>(0);
+        auto divider = ui.make<widget::Divider>().build();
+        (void)ui.effect([divider, &divider_style] {
+            constexpr widget::Divider::Pattern patterns[] = {
+                widget::Divider::Pattern::solid,
+                widget::Divider::Pattern::dashed,
+                widget::Divider::Pattern::double_line,
+                widget::Divider::Pattern::double_dashed,
+            };
+            divider->set_pattern(patterns[divider_style.get()]);
+        });
+        auto& divider_label = ui.computed([&divider_style] {
+            const std::string names[] = {"Solid", "Dashed", "Double", "Double dashed"};
+            return std::string("Divider · ") + names[divider_style.get()];
+        });
+        auto cycle_divider =
+            ui.make<widget::Button>("Cycle divider style")
+                .on_click([&divider_style] { divider_style.set((divider_style.peek() + 1) % 4); })
+                .build();
+
+        // Button treatment 变体：循环 filled/tonal/outlined/ghost/link。
+        auto& treatment_style = ui.signal<int>(0);
+        auto demo_button = ui.make<widget::Button>("Stylized button").build();
+        (void)ui.effect([demo_button, &treatment_style] {
+            constexpr theme::ButtonTreatment treatments[] = {
+                theme::ButtonTreatment::filled,
+                theme::ButtonTreatment::tonal,
+                theme::ButtonTreatment::outlined,
+                theme::ButtonTreatment::ghost,
+                theme::ButtonTreatment::link,
+            };
+            demo_button->set_treatment(treatments[treatment_style.get()]);
+        });
+        auto& treatment_label = ui.computed([&treatment_style] {
+            const std::string names[] = {"Filled", "Tonal", "Outlined", "Ghost", "Link"};
+            return std::string("Button · ") + names[treatment_style.get()];
+        });
+        auto cycle_treatment = ui.make<widget::Button>("Cycle button style")
+                                   .on_click([&treatment_style] {
+                                       treatment_style.set((treatment_style.peek() + 1) % 5);
+                                   })
+                                   .build();
+
         auto content =
             ui.column()
                 .gap(12.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
-                    ui.row()
-                        .gap(10.0F)
-                        .cross_alignment(widget::LayoutAlignment::center)
-                        .children(
-                            ui.make<widget::Label>("Nandina Settings").font_size(28.0F),
-                            ui.make<widget::Badge>("Beta")
-                        )
-                        .build(),
-                    ui.make<widget::Label>(
-                          "A compact application authored from components and state"
-                    )
-                        .color_token(theme::ColorToken::on_surface_variant),
-                    ui.make<widget::Label>("Profile").font_size(18.0F),
-                    profile_field,
-                    ui.make<widget::Label>("Preferences").font_size(18.0F),
-                    ui.make<widget::Card>().child(preferences),
-                    ui.make<widget::Label>("Appearance").font_size(18.0F),
-                    appearance_row,
+                    section_heading(ui, "Components"),
                     ui.make<widget::Label>("Tabs").font_size(18.0F),
                     ui.make<widget::Card>().child(
                         ui.column()
@@ -268,10 +396,10 @@ namespace nandina::examples::settings
                             ui.make<widget::Avatar>("Nandina"),
                             ui.make<widget::Chip>("Design"),
                             ui.make<widget::Chip>("Removable", true)
-                                .configure([&status](widget::Chip& chip) {
-                                    chip.set_on_remove(
-                                        [&status] { status.set("Removed the chip"); }
-                                    );
+                                .configure([&store](widget::Chip& chip) {
+                                    chip.set_on_remove([&store] {
+                                        store.status.set("Removed the chip");
+                                    });
                                 })
                         )
                         .build(),
@@ -294,36 +422,58 @@ namespace nandina::examples::settings
                                 .color_token(theme::ColorToken::on_surface_variant)
                         )
                         .build(),
-                    cycle_treatment,
-                    ui.make<widget::Label>("Brand colors").font_size(18.0F),
-                    ui.row()
-                        .gap(10.0F)
-                        .children(
-                            // on_primary 配对由下方 Save 主按钮（primary 底 + on_primary 字）演示。
-                            ui.make<widget::Label>("Primary").color_token(
-                                theme::ColorToken::primary
-                            ),
-                            ui.make<widget::Label>("Coral").color_token(
-                                theme::ColorToken::tertiary
-                            ),
-                            ui.make<widget::Label>("Variant").color_token(
-                                theme::ColorToken::on_surface_variant
-                            ),
-                            ui.make<widget::Label>("Outline").color_token(
-                                theme::ColorToken::outline
-                            )
-                        )
-                        .build(),
-                    ui.make<widget::Label>(summary).color_token(
-                        theme::ColorToken::on_surface_variant
-                    ),
-                    actions,
-                    ui.make<widget::Label>(status).color_token(
-                        theme::ColorToken::on_surface_variant
-                    )
+                    cycle_treatment
                 );
         return ui.padding(foundation::NanInsets::all(20.0F))
             .child(ui.scroll_view().child(content))
             .build();
     }
+
+    auto AboutPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto ui = context.ui();
+        auto& router = context.router();
+
+        auto content =
+            ui.column()
+                .gap(12.0F)
+                .cross_alignment(widget::LayoutAlignment::stretch)
+                .children(
+                    section_heading(ui, "About"),
+                    ui.make<widget::Label>("Nandina is a C++ + raylib game-engine-as-UI framework")
+                        .color_token(theme::ColorToken::on_surface_variant),
+                    ui.make<widget::Button>("Open component detail")
+                        .on_click([&router] {
+                            (void)router.request_push<DetailPage>(DetailParams {
+                                .title = "Select",
+                                .body = "Pushed with route params; press Back to pop.",
+                            });
+                        })
+                        .build()
+                );
+        return ui.padding(foundation::NanInsets::all(20.0F))
+            .child(ui.scroll_view().child(content))
+            .build();
+    }
+
+    auto DetailPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
+        auto ui = context.ui();
+        auto& router = context.router();
+
+        auto content = ui.column()
+                           .gap(12.0F)
+                           .cross_alignment(widget::LayoutAlignment::stretch)
+                           .children(
+                               section_heading(ui, "Detail"),
+                               ui.make<widget::Label>(params().title).font_size(22.0F),
+                               ui.make<widget::Label>(params().body)
+                                   .color_token(theme::ColorToken::on_surface_variant),
+                               ui.make<widget::Button>("Back")
+                                   .on_click([&router] { (void)router.request_pop(); })
+                                   .build()
+                           );
+        return ui.padding(foundation::NanInsets::all(20.0F))
+            .child(ui.scroll_view().child(content))
+            .build();
+    }
+
 } // namespace nandina::examples::settings
