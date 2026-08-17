@@ -1,7 +1,7 @@
 #include "settings_example.hpp"
 
 #include "app/nan_router.hpp"
-#include "app/root_view.hpp"
+#include "app/ui_dispatcher.hpp"
 #include "foundation/contrast.hpp"
 #include "foundation/geometry.hpp"
 #include "render/render_device.hpp"
@@ -23,6 +23,7 @@
 #include <string_view>
 
 using namespace nandina;
+namespace settings = nandina::examples::settings;
 
 namespace
 {
@@ -33,23 +34,20 @@ namespace
         void set_clip(const foundation::NanRect&) override {}
         void clear_clip() override {}
         void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
-        void draw_rect_outline(
-            const foundation::NanRect&,
-            float,
-            const foundation::NanColor&
-        ) override {}
-        void draw_rounded_rect(
-            const foundation::NanRect&,
-            float,
-            const foundation::NanColor&
-        ) override {}
+        void
+        draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        }
+        void
+        draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        }
         void draw_line(
             const foundation::NanPoint&,
             const foundation::NanPoint&,
             float,
             const foundation::NanColor&
         ) override {}
-        void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {}
+        void draw_circle(const foundation::NanPoint&, float, const foundation::NanColor&) override {
+        }
         void draw_text(
             std::string_view,
             const foundation::NanPoint&,
@@ -101,17 +99,29 @@ namespace
     }
 } // namespace
 
-TEST_CASE("settings example exercises stateful controls through semantics", "[example][settings]") {
+TEST_CASE(
+    "settings dashboard exercises stateful controls through semantics",
+    "[example][settings]"
+) {
     reactive::Graph graph;
     theme::ThemeManager themes;
-    app::NanRouter router {graph, themes};
-    (void)router.push<app::detail::RootViewPage>(
-        app::detail::make_root_view_params(examples::settings::build)
-    );
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        nullptr,
+        nullptr,
+        nullptr,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
-    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
 
     auto* diagnostics = checkbox_named(*router.host(), "Send anonymous diagnostics");
     auto* reduced_motion = checkbox_named(*router.host(), "Reduce interface motion");
@@ -190,35 +200,46 @@ TEST_CASE("settings example exercises stateful controls through semantics", "[ex
     REQUIRE(scale->value() == 1.0F);
 }
 
-TEST_CASE("settings example survives appearance switching and redraw", "[example][settings]") {
+TEST_CASE("settings dashboard survives appearance switching and redraw", "[example][settings]") {
     reactive::Graph graph;
     theme::ThemeManager themes;
-    app::NanRouter router {graph, themes};
-    (void)router.push<app::detail::RootViewPage>(
-        app::detail::make_root_view_params(examples::settings::build)
-    );
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        nullptr,
+        nullptr,
+        nullptr,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
-    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
 
     RecordingDevice dev;
     themes.set_preference(theme::ThemePreference::dark);
-    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
     tree.draw(dev);
 
     themes.set_preference(theme::ThemePreference::light);
-    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
     tree.draw(dev);
 }
 
-TEST_CASE("settings example visibly exercises percentage sizing", "[example][settings][layout]") {
+TEST_CASE(
+    "settings General page visibly exercises percentage sizing",
+    "[example][settings][layout]"
+) {
     reactive::Graph graph;
     theme::ThemeManager themes;
-    app::NanRouter router {graph, themes};
-    (void)router.push<app::detail::RootViewPage>(
-        app::detail::make_root_view_params(examples::settings::build)
-    );
+    settings::SettingsStore store {graph};
+    app::NanRouter router {graph, themes, &store, app::nan_type_key<settings::SettingsStore>()};
+    (void)router.push<settings::GeneralPage>();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
@@ -239,10 +260,9 @@ TEST_CASE("settings example visibly exercises percentage sizing", "[example][set
 TEST_CASE("settings appearance radios switch the theme preference", "[example][settings]") {
     reactive::Graph graph;
     theme::ThemeManager themes;
-    app::NanRouter router {graph, themes};
-    (void)router.push<app::detail::RootViewPage>(
-        app::detail::make_root_view_params(examples::settings::build)
-    );
+    settings::SettingsStore store {graph};
+    app::NanRouter router {graph, themes, &store, app::nan_type_key<settings::SettingsStore>()};
+    (void)router.push<settings::AppearancePage>();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
@@ -260,10 +280,9 @@ TEST_CASE("settings appearance radios switch the theme preference", "[example][s
 
     // 通过语义激活真实触发单选回调（build() 返回后回调仍持有主题管理器引用）。
     REQUIRE(tree.update_semantics());
-    REQUIRE(tree.perform_semantics_action(
-        dark->semantics_id(),
-        {.action = semantics::Action::activate}
-    ));
+    REQUIRE(
+        tree.perform_semantics_action(dark->semantics_id(), {.action = semantics::Action::activate})
+    );
     REQUIRE(themes.preference() == theme::ThemePreference::dark);
     REQUIRE_FALSE(system->checked());
 
@@ -275,17 +294,29 @@ TEST_CASE("settings appearance radios switch the theme preference", "[example][s
     REQUIRE_FALSE(dark->checked());
 }
 
-TEST_CASE("settings brand theme keeps paired contrast in both appearances", "[example][settings][contrast]") {
+TEST_CASE(
+    "settings brand theme keeps paired contrast in both appearances",
+    "[example][settings][contrast]"
+) {
     reactive::Graph graph;
     theme::ThemeManager themes;
-    app::NanRouter router {graph, themes};
-    (void)router.push<app::detail::RootViewPage>(
-        app::detail::make_root_view_params(examples::settings::build)
-    );
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        nullptr,
+        nullptr,
+        nullptr,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
     scene::NanSceneTree tree;
     tree.set_theme_manager(themes);
     tree.set_root(router.host());
-    REQUIRE(tree.layout_root(foundation::NanSize(720.0F, 520.0F)) >= 1);
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
 
     const auto& design = themes.design_system();
     const auto require_aa_text = [](const theme::NanColorScheme& scheme) {
@@ -305,6 +336,90 @@ TEST_CASE("settings brand theme keeps paired contrast in both appearances", "[ex
     require_aa_text(design.light);
     require_aa_text(design.dark);
 
-    // 暗色外观走 material_dark_tone：品牌色提升到 400 档，亮暗 primary 明度不同。
+    // 默认族 butter 暗色品牌提升到更亮档位（dark_brand = shade_300）。
     REQUIRE(design.dark.primary.oklch().light > design.light.primary.oklch().light);
+}
+
+TEST_CASE(
+    "settings sidebar navigates sections and pushes a parameterized detail page",
+    "[example][settings][router]"
+) {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        nullptr,
+        nullptr,
+        nullptr,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
+
+    // 初始内容为 General 页。
+    REQUIRE(button_named(*router.host(), "Save preferences") != nullptr);
+
+    // 侧边栏切到 Appearance：General 被替换，出现 Appearance 单选组。
+    auto* appearance_nav = button_named(*router.host(), "Appearance");
+    REQUIRE(appearance_nav != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        appearance_nav->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(radio_named(*router.host(), "Dark") != nullptr);
+    REQUIRE(button_named(*router.host(), "Save preferences") == nullptr);
+
+    // 侧边栏切到 About：出现 detail 入口按钮。
+    auto* about_nav = button_named(*router.host(), "About");
+    REQUIRE(about_nav != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        about_nav->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(dispatcher.drain() == 1);
+    auto* detail_button = button_named(*router.host(), "Open component detail");
+    REQUIRE(detail_button != nullptr);
+
+    // push 带参数的 DetailPage：内容区显示参数化标题。
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        detail_button->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(dispatcher.drain() == 1);
+    auto* back = button_named(*router.host(), "Back");
+    REQUIRE(back != nullptr);
+    REQUIRE(
+        find_node<widget::Label>(
+            *router.host(),
+            [](const widget::Label& label) { return label.text() == "Select"; }
+        )
+        != nullptr
+    );
+
+    // Back 弹出 DetailPage，回到 About。
+    REQUIRE(tree.update_semantics());
+    REQUIRE(
+        tree.perform_semantics_action(back->semantics_id(), {.action = semantics::Action::activate})
+    );
+    REQUIRE(dispatcher.drain() == 1);
+    REQUIRE(button_named(*router.host(), "Open component detail") != nullptr);
+    REQUIRE(
+        find_node<widget::Label>(
+            *router.host(),
+            [](const widget::Label& label) { return label.text() == "Select"; }
+        )
+        == nullptr
+    );
 }
