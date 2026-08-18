@@ -159,6 +159,12 @@ readable:
   resource, and registers it as the default fallback so CJK glyphs (中文/日本語)
   no longer render as tofu. NanApplication wires it up automatically and degrades
   silently when absent.
+- Keyboard/focus pass complete: Chip (the last interactive control lacking it)
+  is now focusable when removable, activates on Enter/Space and removes on
+  Delete/Backspace, draws a focus ring via a new `focus` field in its recipe,
+  and reports focused semantics. All interactive widgets now have keyboard
+  access (Button/Checkbox/Switch/Radio via `Pressable`; Slider/Select/Tabs
+  native; Dialog traps Tab).
 - Test suite 39/39 green.
-- Next (planned follow-ups): component keyboard/focus pass (Chip/Select/etc.);
-  text vertical alignment (baseline/descent) fix; general tween/animation system.
+- Next (planned follow-ups): text vertical alignment (baseline/descent) fix;
+  general tween/animation system.
