@@ -139,6 +139,58 @@ TEST_CASE("chip remove button emits removed event", "[chip][interaction]") {
     REQUIRE(removed == 1);
 }
 
+TEST_CASE("chip is focusable when removable and activates via keyboard", "[chip][focus][keyboard]") {
+    auto chip = widget::Chip::create("Tag", true);
+    auto plain = widget::Chip::create("Plain", false);
+    REQUIRE(chip->is_focusable());
+    REQUIRE_FALSE(plain->is_focusable());
+
+    int removed = 0;
+    auto subscription = chip->removed().subscribe([&] { ++removed; });
+
+    // Enter / Space 激活移除；Backspace / Delete 删除移除。
+    scene::KeyEvent enter(257, scene::KeyEvent::Action::press);
+    REQUIRE(chip->on_input(enter));
+    REQUIRE(removed == 1);
+
+    scene::KeyEvent space(32, scene::KeyEvent::Action::press);
+    REQUIRE(chip->on_input(space));
+    REQUIRE(removed == 2);
+
+    scene::KeyEvent backspace(259, scene::KeyEvent::Action::press);
+    REQUIRE(chip->on_input(backspace));
+    REQUIRE(removed == 3);
+
+    scene::KeyEvent del(261, scene::KeyEvent::Action::press);
+    REQUIRE(chip->on_input(del));
+    REQUIRE(removed == 4);
+
+    // 不可移除 chip 忽略键盘。
+    scene::KeyEvent press(257, scene::KeyEvent::Action::press);
+    REQUIRE_FALSE(plain->on_input(press));
+}
+
+TEST_CASE("chip reports focused semantics for the focus ring", "[chip][focus][semantics]") {
+    auto chip = widget::Chip::create("Tag", true);
+    scene::NanSceneTree tree;
+    tree.set_root(chip);
+    REQUIRE(tree.layout_root(foundation::NanSize(160.0F, 48.0F)) >= 1);
+    REQUIRE(tree.update_semantics());
+
+    tree.set_focus(chip.get());
+    REQUIRE(tree.update_semantics());
+    const auto* node = tree.semantics_tree().find(chip->semantics_id());
+    REQUIRE(node != nullptr);
+    REQUIRE(node->properties.state.focusable);
+    REQUIRE(node->properties.state.focused);
+
+    tree.set_focus(nullptr);
+    REQUIRE(tree.update_semantics());
+    node = tree.semantics_tree().find(chip->semantics_id());
+    REQUIRE(node != nullptr);
+    REQUIRE_FALSE(node->properties.state.focused);
+}
+
 TEST_CASE("avatar handles CJK initials without corrupting bytes", "[avatar]") {
     auto avatar = widget::Avatar::create("南天竹");
     REQUIRE(avatar->initials() == "南");
