@@ -371,6 +371,20 @@ namespace nandina::theme
             };
         }
 
+        /** DialogRecipe → 解析后的片段组合。 */
+        [[nodiscard]] auto resolve_recipe(
+            const DesignSystem& system,
+            const ColorAppearance appearance,
+            const DialogRecipe& recipe
+        ) -> ResolvedDialogStyle {
+            return {
+                .scrim = resolve_color(system, appearance, recipe.scrim),
+                .panel = resolve(system, appearance, recipe.panel),
+                .title = resolve(system, appearance, recipe.title),
+                .metrics = resolve(system, appearance, recipe.metrics),
+            };
+        }
+
         /** Tabs disabled 变换：标签 / 指示条颜色 ×opacity.disabled。 */
         void apply_tabs_disabled(
             const DesignSystem& system,
@@ -727,6 +741,20 @@ namespace nandina::theme
     ) -> ResolvedChipStyle {
         auto style = resolve_recipe(system, appearance, system.components.chip.base);
         for (const auto& rule: system.components.chip.rules) {
+            apply_rule(system, appearance, style, rule);
+        }
+        return style;
+    }
+
+    /**
+     * 解析 Dialog 配方（纯展示：base → 规则列表，后匹配者胜）。
+     */
+    auto resolve_dialog(
+        const DesignSystem& system,
+        const ColorAppearance appearance
+    ) -> ResolvedDialogStyle {
+        auto style = resolve_recipe(system, appearance, system.components.dialog.base);
+        for (const auto& rule: system.components.dialog.rules) {
             apply_rule(system, appearance, style, rule);
         }
         return style;
@@ -1273,6 +1301,48 @@ namespace nandina::theme
             style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
     }
 
+    void apply_rule(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        ResolvedDialogStyle& style,
+        const DialogRecipeRule& rule
+    ) {
+        if (rule.scrim)
+            style.scrim = resolve_color(system, appearance, *rule.scrim);
+        if (rule.panel_fill)
+            style.panel.fill = resolve_color(system, appearance, *rule.panel_fill);
+        if (rule.panel_border)
+            style.panel.border = resolve_color(system, appearance, *rule.panel_border);
+        if (rule.panel_border_width) {
+            style.panel.border_width =
+                resolve_scalar(system, appearance, *rule.panel_border_width);
+        }
+        if (rule.panel_radius)
+            style.panel.radius = resolve_scalar(system, appearance, *rule.panel_radius);
+        if (rule.title_color)
+            style.title.color = resolve_color(system, appearance, *rule.title_color);
+        if (rule.title_font_size)
+            style.title.font_size = resolve_scalar(system, appearance, *rule.title_font_size);
+        if (rule.metrics_panel_width) {
+            style.metrics.panel_width =
+                resolve_scalar(system, appearance, *rule.metrics_panel_width);
+        }
+        if (rule.metrics_padding_x) {
+            style.metrics.padding_x =
+                resolve_scalar(system, appearance, *rule.metrics_padding_x);
+        }
+        if (rule.metrics_padding_y) {
+            style.metrics.padding_y =
+                resolve_scalar(system, appearance, *rule.metrics_padding_y);
+        }
+        if (rule.metrics_gap)
+            style.metrics.gap = resolve_scalar(system, appearance, *rule.metrics_gap);
+        if (rule.metrics_min_height) {
+            style.metrics.min_height =
+                resolve_scalar(system, appearance, *rule.metrics_min_height);
+        }
+    }
+
     /** @return 框架默认 Button 配方（normal 态通用语义；treatment/size 由规则覆盖）。 */
     auto default_button_recipe() -> ButtonRecipe {
         return {
@@ -1722,6 +1792,33 @@ namespace nandina::theme
         };
     }
 
+    /** @return 框架默认 Dialog 配方（半透明 scrim + surface 面板 + on_surface 标题）。 */
+    auto default_dialog_recipe() -> DialogRecipe {
+        return {
+            .scrim = ThemeColor::with_alpha(
+                ColorOperand {ColorToken::on_surface},
+                ThemeScalar::literal(0.40F)
+            ),
+            .panel = BoxStyle {
+                .fill = ThemeColor::token(ColorToken::surface),
+                .border = ThemeColor::token(ColorToken::outline_variant),
+                .border_width = ThemeScalar::token(ScalarToken::border_thin),
+                .radius = ThemeScalar::token(ScalarToken::radius_md),
+            },
+            .title = TypeStyle {
+                .color = ThemeColor::token(ColorToken::on_surface),
+                .font_size = ThemeScalar::token(ScalarToken::typography_label_lg),
+            },
+            .metrics = DialogMetrics {
+                .panel_width = ThemeScalar::literal(360.0F),
+                .padding_x = ThemeScalar::token(ScalarToken::spacing_lg),
+                .padding_y = ThemeScalar::token(ScalarToken::spacing_md),
+                .gap = ThemeScalar::token(ScalarToken::spacing_md),
+                .min_height = ThemeScalar::literal(120.0F),
+            },
+        };
+    }
+
     /**
      * 框架默认设计系统。
      *
@@ -2048,6 +2145,10 @@ namespace nandina::theme
                 },
                 .chip = ChipRecipes {
                     .base = default_chip_recipe(),
+                    .rules = {},
+                },
+                .dialog = DialogRecipes {
+                    .base = default_dialog_recipe(),
                     .rules = {},
                 },
             },

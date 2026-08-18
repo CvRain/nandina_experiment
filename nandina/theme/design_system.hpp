@@ -308,6 +308,23 @@ namespace nandina::theme
         ControlMetrics metrics; // height、padding_x、gap（文本与移除标记间距）
     };
 
+    /** Dialog 度量：面板尺寸 / 内边距 / 标题与内容间距 / 最小高度。 */
+    using DialogMetrics = struct DialogMetrics {
+        ThemeScalar panel_width;
+        ThemeScalar padding_x;
+        ThemeScalar padding_y;
+        ThemeScalar gap;
+        ThemeScalar min_height;
+    };
+
+    /** Dialog 配方：半透明遮罩 + 居中面板 + 标题文本 + 度量。 */
+    using DialogRecipe = struct DialogRecipe {
+        ThemeColor scrim;    // 遮罩（半透明，覆盖全屏）
+        BoxStyle panel;      // 居中面板容器
+        TypeStyle title;     // 标题文本
+        DialogMetrics metrics;
+    };
+
     // ─── 配方规则覆盖（selector 增量） ────────────────────────────────────────
     //
     // 配方书 = `base`（完全指定）+ 有序规则列表。
@@ -550,6 +567,22 @@ namespace nandina::theme
         std::optional<ThemeScalar> metrics_gap;
     };
 
+    /** Dialog 规则：无选择器，覆盖遮罩/面板/标题/度量字段。 */
+    using DialogRecipeRule = struct DialogRecipeRule {
+        std::optional<ThemeColor> scrim;
+        std::optional<ThemeColor> panel_fill;
+        std::optional<ThemeColor> panel_border;
+        std::optional<ThemeScalar> panel_border_width;
+        std::optional<ThemeScalar> panel_radius;
+        std::optional<ThemeColor> title_color;
+        std::optional<ThemeScalar> title_font_size;
+        std::optional<ThemeScalar> metrics_panel_width;
+        std::optional<ThemeScalar> metrics_padding_x;
+        std::optional<ThemeScalar> metrics_padding_y;
+        std::optional<ThemeScalar> metrics_gap;
+        std::optional<ThemeScalar> metrics_min_height;
+    };
+
     // ─── 解析后的配方（控件绘制时消费） ──────────────────────────────────────
 
     /** 解析后的状态层（具体叠加色；hover/focused 用 hover，pressed 用 pressed）。 */
@@ -684,6 +717,21 @@ namespace nandina::theme
         ResolvedControlMetrics metrics;
     };
 
+    using ResolvedDialogMetrics = struct ResolvedDialogMetrics {
+        float panel_width = 0.0F;
+        float padding_x = 0.0F;
+        float padding_y = 0.0F;
+        float gap = 0.0F;
+        float min_height = 0.0F;
+    };
+
+    using ResolvedDialogStyle = struct ResolvedDialogStyle {
+        NanColor scrim;
+        ResolvedBoxStyle panel;
+        ResolvedTypeStyle title;
+        ResolvedDialogMetrics metrics;
+    };
+
     // ─── Typography 角色 ──────────────────────────────────────────────────────
 
     /** 命名排版角色；配方内的文本片段可引用这些角色或直接覆盖。 */
@@ -770,6 +818,11 @@ namespace nandina::theme
         std::vector<ChipRecipeRule> rules;
     };
 
+    using DialogRecipes = struct DialogRecipes {
+        DialogRecipe base;
+        std::vector<DialogRecipeRule> rules;
+    };
+
     using ComponentRecipes = struct ComponentRecipes {
         ButtonRecipes button;
         CheckboxRecipes checkbox;
@@ -786,6 +839,7 @@ namespace nandina::theme
         DividerRecipes divider;
         AvatarRecipes avatar;
         ChipRecipes chip;
+        DialogRecipes dialog;
     };
 
     /**
@@ -915,6 +969,21 @@ namespace nandina::theme
         };
     }
 
+    /** 解析 Dialog 度量片段为具体值。 */
+    [[nodiscard]] inline auto resolve(
+        const DesignSystem& system,
+        const ColorAppearance appearance,
+        const DialogMetrics& metrics
+    ) -> ResolvedDialogMetrics {
+        return {
+            .panel_width = resolve_scalar(system, appearance, metrics.panel_width),
+            .padding_x = resolve_scalar(system, appearance, metrics.padding_x),
+            .padding_y = resolve_scalar(system, appearance, metrics.padding_y),
+            .gap = resolve_scalar(system, appearance, metrics.gap),
+            .min_height = resolve_scalar(system, appearance, metrics.min_height),
+        };
+    }
+
     /** 解析软阴影片段为具体值。 */
     [[nodiscard]] inline auto resolve(
         const DesignSystem& system,
@@ -1038,6 +1107,11 @@ namespace nandina::theme
         ColorAppearance appearance
     ) -> ResolvedChipStyle;
 
+    [[nodiscard]] auto resolve_dialog(
+        const DesignSystem& system,
+        ColorAppearance appearance
+    ) -> ResolvedDialogStyle;
+
     // 规则覆盖：把配方规则应用到已解析的配方。解析器与 widget 的 set_override 共用同一路径。
 
     /** @param tone 当前 Button tone（accent / on_accent 引用依赖它）。 */
@@ -1153,6 +1227,13 @@ namespace nandina::theme
         const ChipRecipeRule& rule
     );
 
+    void apply_rule(
+        const DesignSystem& system,
+        ColorAppearance appearance,
+        ResolvedDialogStyle& style,
+        const DialogRecipeRule& rule
+    );
+
     // ─── 框架默认值（定义见 design_system.cpp） ──────────────────────────────
 
     [[nodiscard]] auto default_button_recipe() -> ButtonRecipe;
@@ -1170,6 +1251,7 @@ namespace nandina::theme
     [[nodiscard]] auto default_divider_recipe() -> DividerRecipe;
     [[nodiscard]] auto default_avatar_recipe() -> AvatarRecipe;
     [[nodiscard]] auto default_chip_recipe() -> ChipRecipe;
+    [[nodiscard]] auto default_dialog_recipe() -> DialogRecipe;
 
     /**
      * 框架默认设计系统。品牌主题从本函数的拷贝开始修改字段，再通过

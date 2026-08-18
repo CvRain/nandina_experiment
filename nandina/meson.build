@@ -203,6 +203,8 @@ module_widget = files(
     'widget/avatar.cpp',
     'widget/chip.hpp',
     'widget/chip.cpp',
+    'widget/dialog.hpp',
+    'widget/dialog.cpp',
 )
 
 module_app = files(

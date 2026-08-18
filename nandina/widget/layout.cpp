@@ -831,6 +831,56 @@ namespace nandina::widget
         relayout();
     }
 
+    auto Stack::create() -> std::shared_ptr<Stack> {
+        return std::make_shared<Stack>();
+    }
+
+    auto Stack::add(std::shared_ptr<scene::NanControl> child) -> Stack& {
+        if (!child) {
+            throw std::runtime_error("Stack::add: child is null");
+        }
+        add_child(std::move(child));
+        mark_layout_dirty();
+        relayout();
+        return *this;
+    }
+
+    void Stack::relayout() {
+        (void)measure_layout(scene::LayoutConstraints::loose());
+        layout_to(foundation::NanRect::from_origin_size(position(), measured_size()));
+    }
+
+    auto Stack::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
+        float max_width = 0.0F;
+        float max_height = 0.0F;
+        for (std::size_t i = 0; i < child_count(); ++i) {
+            auto* child = get_child(i) != nullptr ? get_child(i)->as_control() : nullptr;
+            if (!child || !child->visible()) {
+                continue;
+            }
+            const auto measured = child->measure_layout(scene::LayoutConstraints::loose());
+            max_width = std::max(max_width, measured.get_width());
+            max_height = std::max(max_height, measured.get_height());
+        }
+        return constraints.constrain(foundation::NanSize(max_width, max_height));
+    }
+
+    auto Stack::on_layout() -> void {
+        for (std::size_t i = 0; i < child_count(); ++i) {
+            auto* child = get_child(i) != nullptr ? get_child(i)->as_control() : nullptr;
+            if (!child || !child->visible()) {
+                continue;
+            }
+            (void)child->measure_layout(scene::LayoutConstraints::tight(size()));
+            child->layout_to(local_rect());
+        }
+    }
+
+    void Stack::on_ready() {
+        scene::NanControl::on_ready();
+        relayout();
+    }
+
     Padding::Padding(foundation::NanInsets insets): insets_(insets) {}
 
     auto Padding::create(foundation::NanInsets insets) -> std::shared_ptr<Padding> {

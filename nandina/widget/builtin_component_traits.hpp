@@ -12,6 +12,7 @@
 #include "card.hpp"
 #include "checkbox.hpp"
 #include "chip.hpp"
+#include "dialog.hpp"
 #include "divider.hpp"
 #include "label.hpp"
 #include "progress_bar.hpp"
@@ -323,6 +324,27 @@ namespace nandina::widget
             const bool removable = false
         ) -> authoring::NodeBuilder<Chip> {
             return authoring::make<Chip>(std::move(text), removable, ui.theme());
+        }
+    };
+
+    template<>
+    struct ComponentTraits<Dialog> {
+        [[nodiscard]] static auto make(
+            const BuildContext& ui,
+            std::string title,
+            std::shared_ptr<scene::NanControl> content = nullptr
+        ) -> authoring::NodeBuilder<Dialog> {
+            return authoring::make<Dialog>(ui.theme())
+                .configure(
+                    [title = std::move(title), content = std::move(content)](
+                        Dialog& dialog
+                    ) mutable {
+                        dialog.set_title(std::move(title));
+                        if (content) {
+                            (void)dialog.set_content(std::move(content));
+                        }
+                    }
+                );
         }
     };
 }

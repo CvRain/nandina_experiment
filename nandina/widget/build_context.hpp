@@ -208,6 +208,10 @@ namespace nandina::widget
             return authoring::grid(columns);
         }
 
+        [[nodiscard]] auto stack() const -> authoring::NodeBuilder<Stack> {
+            return authoring::stack();
+        }
+
         template<typename Source, typename TrueFactory>
             requires requires(Source& source) {
                 { source.get() } -> std::convertible_to<bool>;

@@ -416,6 +416,10 @@ namespace nandina::widget::authoring
         return make<Grid>(columns);
     }
 
+    [[nodiscard]] inline auto stack() -> NodeBuilder<Stack> {
+        return make<Stack>();
+    }
+
 } // namespace nandina::widget::authoring
 
 namespace nandina::widget

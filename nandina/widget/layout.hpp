@@ -162,6 +162,21 @@ namespace nandina::widget
         LayoutAlignment cross_alignment_ = LayoutAlignment::start;
     };
 
+    class Stack: public scene::NanControl {
+    public:
+        [[nodiscard]] static auto create() -> std::shared_ptr<Stack>;
+
+        auto add(std::shared_ptr<scene::NanControl> child) -> Stack&;
+
+        void relayout();
+
+    protected:
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override;
+        auto on_layout() -> void override;
+        void on_ready() override;
+    };
+
     class Padding: public scene::NanControl {
     public:
         explicit Padding(foundation::NanInsets insets = foundation::NanInsets::all(0.0F));

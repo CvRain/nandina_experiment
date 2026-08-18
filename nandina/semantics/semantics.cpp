@@ -66,6 +66,8 @@ namespace nandina::semantics
                 return "combobox";
             case Role::separator:
                 return "separator";
+            case Role::dialog:
+                return "dialog";
         }
         return "none";
     }
