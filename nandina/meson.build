@@ -129,6 +129,8 @@ module_text = files(
     'text/font_loader.cpp',
     'text/font_family.hpp',
     'text/font_family.cpp',
+    'text/system_fonts.hpp',
+    'text/system_fonts.cpp',
     'text/font_pipeline.hpp',
     'text/font_pipeline.cpp',
     'text/glyph_atlas.hpp',

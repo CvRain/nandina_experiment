@@ -9,6 +9,7 @@
 #include "../resource/backends/builtin_backend.hpp"
 #include "../resource/backends/sqlite_backend.hpp"
 #include "../resource/platform_resource_locator.hpp"
+#include "../text/system_fonts.hpp"
 
 namespace nandina::app
 {
@@ -49,6 +50,8 @@ namespace nandina::app
                     "NanApplication: cannot register built-in default font family"
                 );
             }
+            // 系统字体回退：发现并挂载系统 CJK 字体作为默认回退；找不到时静默降级。
+            (void)text::register_system_cjk_fallback(resources, families);
         }
     } // namespace
 
