@@ -53,6 +53,7 @@ namespace nandina::widget
 
         auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& context) -> void override;
+        [[nodiscard]] auto is_focusable() const -> bool override;
 
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
@@ -61,10 +62,12 @@ namespace nandina::widget
 
     private:
         void apply_text_style();
+        void remove();
         [[nodiscard]] auto remove_rect() const -> foundation::NanRect;
 
         std::string text_string_;
         bool removable_ = false;
+        bool focused_ = false;
         primitives::Text text_;
         std::function<void()> on_remove_;
         reactive::Event<> removed_;

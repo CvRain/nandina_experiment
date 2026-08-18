@@ -367,6 +367,7 @@ namespace nandina::theme
                 .container = resolve(system, appearance, recipe.container),
                 .label = resolve(system, appearance, recipe.label),
                 .remove_color = resolve_color(system, appearance, recipe.remove_color),
+                .focus = resolve(system, appearance, recipe.focus),
                 .metrics = resolve(system, appearance, recipe.metrics),
             };
         }
@@ -1291,6 +1292,10 @@ namespace nandina::theme
             style.label.font_size = resolve_scalar(system, appearance, *rule.label_font_size);
         if (rule.remove_color)
             style.remove_color = resolve_color(system, appearance, *rule.remove_color);
+        if (rule.focus_ring_color)
+            style.focus.color = resolve_color(system, appearance, *rule.focus_ring_color);
+        if (rule.focus_ring_width)
+            style.focus.width = resolve_scalar(system, appearance, *rule.focus_ring_width);
         if (rule.metrics_height)
             style.metrics.height = resolve_scalar(system, appearance, *rule.metrics_height);
         if (rule.metrics_padding_x) {
@@ -1781,6 +1786,10 @@ namespace nandina::theme
                 .font_size = ThemeScalar::token(ScalarToken::typography_label_sm),
             },
             .remove_color = ThemeColor::token(ColorToken::on_surface_variant),
+            .focus = FocusRingStyle {
+                .color = ThemeColor::token(ColorToken::focus_ring),
+                .width = ThemeScalar::token(ScalarToken::border_focus_ring),
+            },
             .metrics = ControlMetrics {
                 .height = ThemeScalar::literal(28.0F),
                 .padding_x = ThemeScalar::token(ScalarToken::spacing_sm),

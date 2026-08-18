@@ -5,6 +5,7 @@
 #include "chip.hpp"
 
 #include "primitives/box_painter.hpp"
+#include "primitives/focus_ring_painter.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
 #include "../theme/theme_manager.hpp"
@@ -130,7 +131,38 @@ namespace nandina::widget
     }
 
     auto Chip::on_input(scene::InputEvent& event) -> bool {
-        if (!removable_ || event.type() != scene::EventType::mouse_button) {
+        if (event.type() == scene::EventType::focus_enter) {
+            focused_ = removable_;
+            mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::semantics);
+            return false;
+        }
+        if (event.type() == scene::EventType::focus_leave) {
+            focused_ = false;
+            mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::semantics);
+            return false;
+        }
+        if (event.type() == scene::EventType::key) {
+            auto& key = static_cast<scene::KeyEvent&>(event);
+            if (!key.is_pressed() || !removable_) {
+                return false;
+            }
+            constexpr int key_enter = 257;
+            constexpr int key_space = 32;
+            constexpr int key_backspace = 259;
+            constexpr int key_delete = 261;
+            if (key.keycode() == key_enter || key.keycode() == key_space
+                || key.keycode() == key_backspace || key.keycode() == key_delete)
+            {
+                remove();
+                event.accept();
+                return true;
+            }
+            return false;
+        }
+        if (event.type() != scene::EventType::mouse_button) {
+            return false;
+        }
+        if (!removable_) {
             return false;
         }
         auto& mouse = static_cast<scene::MouseButtonEvent&>(event);
@@ -139,20 +171,24 @@ namespace nandina::widget
         }
         const auto local = to_local(mouse.screen_pos());
         if (remove_rect().contains_point(local)) {
-            if (on_remove_) {
-                on_remove_();
-            }
-            removed_.emit();
+            remove();
             event.accept();
             return true;
         }
         return false;
     }
 
+    auto Chip::is_focusable() const -> bool {
+        return removable_;
+    }
+
     void Chip::on_draw(render::DrawContext& context) {
         const auto style = resolved_style();
         const auto world = render::world_bounds_from_local(context.world_transform(), local_rect());
         primitives::BoxPainter::paint(context, world, style.container, context.opacity());
+        if (focused_ && style.focus.width > 0.0F) {
+            primitives::FocusRingPainter::paint(context, world, style.focus, context.opacity());
+        }
 
         apply_text_style();
         (void)text_.measure_layout(scene::LayoutConstraints::loose());
@@ -203,7 +239,7 @@ namespace nandina::widget
         return {
             .role = removable_ ? semantics::Role::button : semantics::Role::generic,
             .label = text_string_,
-            .state = {.focusable = removable_},
+            .state = {.focusable = removable_, .focused = focused_},
             .actions = removable_ ? semantics::Action::activate : semantics::Action::none,
         };
     }
@@ -222,6 +258,13 @@ namespace nandina::widget
         if (!same_text_style(text_.style(), text_style)) {
             text_.set_style(text_style);
         }
+    }
+
+    void Chip::remove() {
+        if (on_remove_) {
+            on_remove_();
+        }
+        removed_.emit();
     }
 
     auto Chip::remove_rect() const -> foundation::NanRect {

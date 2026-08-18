@@ -305,6 +305,7 @@ namespace nandina::theme
         BoxStyle container;
         TypeStyle label;
         ThemeColor remove_color;
+        FocusRingStyle focus;
         ControlMetrics metrics; // height、padding_x、gap（文本与移除标记间距）
     };
 
@@ -562,6 +563,8 @@ namespace nandina::theme
         std::optional<ThemeColor> label_color;
         std::optional<ThemeScalar> label_font_size;
         std::optional<ThemeColor> remove_color;
+        std::optional<ThemeColor> focus_ring_color;
+        std::optional<ThemeScalar> focus_ring_width;
         std::optional<ThemeScalar> metrics_height;
         std::optional<ThemeScalar> metrics_padding_x;
         std::optional<ThemeScalar> metrics_gap;
@@ -714,6 +717,7 @@ namespace nandina::theme
         ResolvedBoxStyle container;
         ResolvedTypeStyle label;
         NanColor remove_color;
+        ResolvedFocusRing focus;
         ResolvedControlMetrics metrics;
     };
 
