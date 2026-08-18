@@ -148,8 +148,13 @@ readable:
   `SettingsStore`, plus a parameterized `DetailPage` demonstrating push/pop.
   The bootstrap migrated to `use_store` + `run_page<ShellPage>`; the example
   budget test now permits `NanPageT`/`route_key` (raised to 700 lines).
-- Test suite 37/37 green.
-- Next (planned follow-ups): Dialog/Modal (overlay/scrim + focus trap); component
-  keyboard/focus pass (Chip/Select/etc.); text vertical alignment
-  (baseline/descent) fix; general tween/animation system; system font discovery
-  and CJK fallback ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
+- Dialog/Modal landed: a modal overlay (`scrim` + centered panel + title +
+  content) with `dialog` semantics, Escape/scrim-click dismissal (configurable),
+  a within-panel Tab focus trap, and full-screen positioning via a new `Stack`
+  overlay layout. The example wires a "Reset → confirm dialog" flow; Settings
+  Reset now pops the dialog before committing.
+- Test suite 38/38 green.
+- Next (planned follow-ups): component keyboard/focus pass (Chip/Select/etc.);
+  text vertical alignment (baseline/descent) fix; general tween/animation system;
+  system font discovery and CJK fallback
+  ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
