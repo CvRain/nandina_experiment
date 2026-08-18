@@ -33,6 +33,7 @@ namespace nandina::examples::settings
         reactive::Signal<int> language;
         reactive::Signal<int> family;
         reactive::Signal<std::string> status;
+        reactive::Signal<bool> confirm_reset;
     };
 
     /// Persistent sidebar + nested router content area (the app's first page).

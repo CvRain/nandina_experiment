@@ -49,7 +49,8 @@ namespace nandina::examples::settings
         interface_scale(graph, 1.0F),
         language(graph, 0),
         family(graph, 0),
-        status(graph, "Changes are applied locally") {}
+        status(graph, "Changes are applied locally"),
+        confirm_reset(graph, false) {}
 
     ShellPage::~ShellPage() = default;
 
@@ -109,12 +110,42 @@ namespace nandina::examples::settings
                 )
                 .build();
 
-        return ui.padding(foundation::NanInsets::all(16.0F))
-            .child(ui.row()
-                       .gap(16.0F)
-                       .cross_alignment(widget::LayoutAlignment::stretch)
-                       .children(sidebar, ui.expanded().child(content_->host())))
-            .build();
+        // 重置确认对话框：General 页 Reset 按钮置位 confirm_reset，effect 打开对话框。
+        auto reset_dialog = ui.make<widget::Dialog>("Reset preferences?").build();
+        auto cancel =
+            ui.make<widget::Button>("Cancel").on_click(
+                                                 [reset_dialog] { reset_dialog->close(); }
+            ).build();
+        auto confirm_reset_button = ui.make<widget::Button>("Confirm reset")
+                                        .tone(theme::ButtonTone::primary)
+                                        .on_click([reset_dialog, &store] {
+                                            store.profile.set("Nandina developer");
+                                            store.notifications.set(true);
+                                            store.diagnostics.set(false);
+                                            store.reduced_motion.set(false);
+                                            store.interface_scale.set(1.0F);
+                                            store.status.set("Preferences reset");
+                                            store.confirm_reset.set(false);
+                                            reset_dialog->close();
+                                        })
+                                        .build();
+        (void)reset_dialog->set_content(
+            ui.row().gap(8.0F).children(cancel, confirm_reset_button).build()
+        );
+        reset_dialog->set_on_close([&store] { store.confirm_reset.set(false); });
+        (void)ui.effect([reset_dialog, &store] {
+            if (store.confirm_reset.get()) {
+                reset_dialog->open();
+            }
+        });
+
+        auto content = ui.padding(foundation::NanInsets::all(16.0F))
+                           .child(ui.row()
+                                      .gap(16.0F)
+                                      .cross_alignment(widget::LayoutAlignment::stretch)
+                                      .children(sidebar, ui.expanded().child(content_->host())))
+                           .build();
+        return ui.stack().children(content, reset_dialog).build();
     }
 
     auto GeneralPage::build(app::PageContext& context) -> std::shared_ptr<scene::NanNode2D> {
@@ -185,14 +216,7 @@ namespace nandina::examples::settings
                         });
         auto reset = ui.make<widget::Button>("Reset")
                          .treatment(theme::ButtonTreatment::outlined)
-                         .on_click([&store] {
-                             store.profile.set("Nandina developer");
-                             store.notifications.set(true);
-                             store.diagnostics.set(false);
-                             store.reduced_motion.set(false);
-                             store.interface_scale.set(1.0F);
-                             store.status.set("Preferences reset");
-                         });
+                         .on_click([&store] { store.confirm_reset.set(true); });
         auto reset_tooltip =
             ui.make<widget::Tooltip>("Restore default preferences", reset.build()).build();
         auto actions = ui.row()
