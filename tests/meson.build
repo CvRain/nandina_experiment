@@ -219,6 +219,13 @@ basic_widgets_tests = executable(
 )
 test('basic-widgets', basic_widgets_tests)
 
+dialog_tests = executable(
+    'dialog_tests',
+    files('dialog_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('dialog', dialog_tests)
+
 resource_tests = executable(
     'resource_tests',
     files('resource_tests.cpp'),

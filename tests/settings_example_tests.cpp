@@ -186,9 +186,17 @@ TEST_CASE(
         != nullptr
     );
 
+    // Reset 现在先弹出确认对话框，再点 Confirm reset 真正重置。
     REQUIRE(tree.update_semantics());
     REQUIRE(tree.perform_semantics_action(
         reset->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    auto* confirm = button_named(*router.host(), "Confirm reset");
+    REQUIRE(confirm != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        confirm->semantics_id(),
         {.action = semantics::Action::activate}
     ));
     REQUIRE(input->value() == "Nandina developer");
