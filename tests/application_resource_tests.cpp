@@ -94,7 +94,9 @@ TEST_CASE("NanApplication always installs builtin resource and font services", "
     REQUIRE((*font)->storage() == resource::ResourceStorage::embedded_blob);
     auto family = application.font_families().resolve({}, application.font_loader());
     REQUIRE(family.has_value());
-    REQUIRE(family->faces.size() == 1);
+    // 默认族首位必须是内置拉丁字体；系统 CJK 回退（若存在）追加在后。
+    REQUIRE_FALSE(family->faces.empty());
+    REQUIRE(family->specs.front().resource == resource::ResourceKey("fonts/default"));
 }
 
 TEST_CASE("functional root views use existing page context and concrete nodes", "[app][view]") {
