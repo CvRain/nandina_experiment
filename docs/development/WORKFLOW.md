@@ -153,8 +153,12 @@ readable:
   a within-panel Tab focus trap, and full-screen positioning via a new `Stack`
   overlay layout. The example wires a "Reset → confirm dialog" flow; Settings
   Reset now pops the dialog before committing.
-- Test suite 38/38 green.
+- System font discovery + CJK fallback landed: `text/system_fonts` scans
+  cross-platform font directories for a known CJK face (Noto Sans CJK / Source
+  Han Sans / Sarasa / PingFang / Microsoft YaHei / WenQuanYi …), mounts it as a
+  resource, and registers it as the default fallback so CJK glyphs (中文/日本語)
+  no longer render as tofu. NanApplication wires it up automatically and degrades
+  silently when absent.
+- Test suite 39/39 green.
 - Next (planned follow-ups): component keyboard/focus pass (Chip/Select/etc.);
-  text vertical alignment (baseline/descent) fix; general tween/animation system;
-  system font discovery and CJK fallback
-  ([Sarasa Gothic](https://github.com/be5invis/Sarasa-Gothic.git)).
+  text vertical alignment (baseline/descent) fix; general tween/animation system.
