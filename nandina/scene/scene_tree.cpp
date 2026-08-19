@@ -3,6 +3,7 @@
 //
 
 #include "scene_tree.hpp"
+#include "../animation/animation_host.hpp"
 #include "../render/draw_context.hpp"
 #include "control.hpp"
 #include "canvas_layer.hpp"
@@ -137,7 +138,7 @@ namespace nandina::scene
 
     } // namespace
 
-    NanSceneTree::NanSceneTree() = default;
+    NanSceneTree::NanSceneTree(): animation_host_(std::make_unique<animation::AnimationHost>(*this)) {}
 
     NanSceneTree::PhaseScope::PhaseScope(NanSceneTree& tree, const FramePhase phase):
         tree_(&tree), previous_(tree.phase_) {
@@ -180,7 +181,8 @@ namespace nandina::scene
     }
 
     auto NanSceneTree::defers_tree_mutation() const -> bool {
-        return phase_ == FramePhase::process || phase_ == FramePhase::layout
+        return phase_ == FramePhase::process || phase_ == FramePhase::animation
+            || phase_ == FramePhase::layout
             || phase_ == FramePhase::post_layout || phase_ == FramePhase::paint;
     }
 
@@ -288,6 +290,14 @@ namespace nandina::scene
         return theme_manager_;
     }
 
+    auto NanSceneTree::animation_host() noexcept -> animation::AnimationHost& {
+        return *animation_host_;
+    }
+
+    auto NanSceneTree::animation_host() const noexcept -> const animation::AnimationHost& {
+        return *animation_host_;
+    }
+
     void NanSceneTree::mark_semantics_dirty() noexcept {
         semantics_dirty_ = true;
     }
@@ -377,6 +387,10 @@ namespace nandina::scene
         if (root_) {
             root_->_propagate_physics(dt);
         }
+    }
+
+    auto NanSceneTree::advance_animations(const float dt) -> void {
+        animation_host_->advance(dt);
     }
 
     auto NanSceneTree::_layout_root_once(const foundation::NanSize viewport_size) -> bool {

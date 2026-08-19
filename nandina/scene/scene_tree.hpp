@@ -22,6 +22,11 @@ namespace nandina::render
     class IRenderDevice;
 } // namespace nandina::render
 
+namespace nandina::animation
+{
+    class AnimationHost;
+}
+
 namespace nandina::text
 {
     class FontPipelineCache;
@@ -89,6 +94,8 @@ namespace nandina::scene
         void set_theme_manager(theme::ThemeManager& manager);
         void clear_theme_manager() noexcept;
         [[nodiscard]] auto theme_manager() const noexcept -> theme::ThemeManager*;
+        [[nodiscard]] auto animation_host() noexcept -> animation::AnimationHost&;
+        [[nodiscard]] auto animation_host() const noexcept -> const animation::AnimationHost&;
 
         // ---- accessibility semantics ----
 
@@ -108,6 +115,7 @@ namespace nandina::scene
         /// Flushes any pending queue_delete() requests before processing.
         auto process(float dt) -> void;
         auto physics_step(float dt) -> void;
+        auto advance_animations(float dt) -> void;
 
         /// Layout the root control to the supplied viewport. Post-layout callbacks
         /// may request one additional pass; further invalidation remains for next frame.
@@ -221,6 +229,7 @@ namespace nandina::scene
         foundation::NanTransform2D semantics_transform_;
         bool semantics_dirty_ = true;
         FramePhase phase_ = FramePhase::idle;
+        std::unique_ptr<animation::AnimationHost> animation_host_;
     };
 
 } // namespace nandina::scene

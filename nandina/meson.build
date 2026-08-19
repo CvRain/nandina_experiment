@@ -213,6 +213,8 @@ module_widget = files(
 )
 
 module_animation = files(
+    'animation/animation_host.hpp',
+    'animation/animation_host.cpp',
     'animation/animated_property.hpp',
     'animation/behavior.hpp',
     'animation/easing.hpp',

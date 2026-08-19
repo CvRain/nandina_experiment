@@ -3,6 +3,7 @@
 //
 
 #include "node.hpp"
+#include "../animation/animation_host.hpp"
 #include "../render/draw_context.hpp"
 #include "../theme/theme_manager.hpp"
 #include "node2d.hpp"
@@ -405,6 +406,9 @@
     }
 
     void NanNode::_propagate_exit_tree() {
+        if (tree_ != nullptr) {
+            tree_->animation_host().cancel_owner(*this);
+        }
         on_exit_tree();
         on_theme_context_removed();
         for (auto& child: children_) {

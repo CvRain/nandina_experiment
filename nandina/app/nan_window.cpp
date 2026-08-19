@@ -278,6 +278,11 @@ namespace nandina::app
             deferred_effects.commit();
         }
 
+        {
+            auto phase = tree_.enter_phase(scene::FramePhase::animation);
+            tree_.advance_animations(dt);
+        }
+
         const auto window_size = foundation::NanSize(
             static_cast<float>(GetScreenWidth()),
             static_cast<float>(GetScreenHeight())
