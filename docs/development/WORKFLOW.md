@@ -169,5 +169,27 @@ readable:
   height (`Text::measured_text_height()`, ascent+descent) instead of the em
   size (`laid_out_font_size()`), removing the "slightly low" offset across
   Button/Chip/Tabs/Select/Tooltip/etc. TextField already used line height.
-- Test suite 39/39 green.
-- Next (planned follow-ups): general tween/animation system.
+- Tween/animation system landed (minimal 1.0 seed): `animation/easing.hpp` +
+  `animation/tween.hpp` (generic `Tween<T>`, reduced-motion aware). Tabs
+  underline slides between tabs and Dialog scrim/panel fade in on open. The
+  declarative, per-property QML-style system (`AnimatedProperty<T>` + `Behavior`)
+  is specced in `docs/development/ANIMATION.md` and deferred to 1.1 (needs
+  per-node opacity + behavior config).
+- Declarative animation 1.1 started with its first review unit: shared typed visual
+  property paths use `part + field` identities (`visual::label.color`,
+  `visual::container.radius`) instead of per-component property catalogs. Text and
+  Box primitives own field behavior, components expose only their standard parts,
+  unsupported combinations fail concepts at compile time, and BuildContext can bind
+  tracked sources through the same path protocol.
+- Declarative animation unit 2 adds typed `Behavior<T>` and `AnimatedProperty<T>` as
+  host-independent value objects. Logical targets now differ from presentation values;
+  disabled/zero-duration policies jump, active transitions continuously retarget from
+  their current value, and `NanColor` interpolates in OKLCH over the shortest hue arc.
+  Button was audited alongside this step: fixed font-size writes now share the label
+  presentation entry, instance visual values outrank inherited StyleContext, font-only
+  context changes are detected, recipe overrides refresh detached metrics, and interaction
+  state invalidates layout/paint/semantics. `AnimationHost` is the next unit.
+- Test suite 40/40 green.
+- Next (planned follow-ups, 1.1): declarative animation (`ANIMATION.md`) incl.
+  per-node opacity, Dialog fade-out/content fade, behavior composition; slider
+  label rendering; multi-font import / custom font loading / i18n language packs.
