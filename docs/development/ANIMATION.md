@@ -1,8 +1,9 @@
 # 动画 / 过渡系统（Animation & Transitions）
 
 > 状态：1.0 已落地「最小 Tween + easing 曲线 + Tabs/Dialog 两点示范」；
-> 1.1 前两个交付单元已完成：公共 typed visual property path，以及
-> `AnimatedProperty<T> + Behavior<T>` 值语义。下一单元是 `AnimationHost`。
+> 1.1 前三个交付单元已完成：公共 typed visual property path、
+> `AnimatedProperty<T> + Behavior<T>` 值语义，以及场景树 `AnimationHost`。
+> 下一单元是 Builder `.behavior(path, spec)` 与属性 endpoint 接线。
 > 关联：Phase 8 Deferred Work「general tween/animation system」。
 
 ## 1. 目标
@@ -25,8 +26,7 @@
   - `Dialog` 打开时 scrim + 面板淡入（`long_duration` + `ease_out`）。
 
 **仍待后续单元解决**：
-- `AnimatedProperty` 目前是独立值对象，尚未接入场景树 `AnimationHost`；现有 Tabs/Dialog
-  仍手写 `on_process()`。
+- 属性 endpoint 尚未接入 `AnimationHost`；现有 Tabs/Dialog 仍手写 `on_process()`。
 - `Dialog` 内容子节点不淡入（无 per-node opacity，见 §5）。
 - `Dialog` 淡出未做（需把 close 延迟到淡出完成，涉及模态状态机）。
 
@@ -118,6 +118,18 @@ builder.behavior(visual::label.color, tween);      // 变化行为
 `AnimatedProperty` 不自行要求组件覆写 `on_process()`。活跃属性注册到场景树拥有的
 `AnimationHost`，完成、取消或 owner 退出树时自动注销。Host 只遍历活跃动画，不扫描所有节点。
 
+第三单元采用以下运行时契约：
+
+- 每个 `NanSceneTree` 独占一个 Host；不同窗口/场景树的时钟和轨道不共享。
+- `set_target(owner, property, target, dirty_flags)` 是 Host 接入点；以 property 地址作为
+  轨道 identity，连续 retarget 更新原轨道而不是重复注册。
+- Host 仅持有弱 owner；节点 `_propagate_exit_tree()` 时同步完成并取消其全部轨道，保证属性
+  不残留 `is_animating()` 状态，keep-alive 但已卸载的页面不会继续推进或重挂载后续跑。
+- `advance(dt)` 使用调用方提供的帧增量，测试可直接注入确定性 fake/manual clock；不读取全局时间。
+- 每次 presentation value 确实变化后才传播该属性声明的 `DirtyFlags`；完成轨道当帧移除。
+- 当前模板 API 要求 `AnimatedProperty` 与 owner 生命周期一致（通常是组件/presentation 成员）；
+  后续 Builder 只组合该协议，不再建立第二套轨道所有权。
+
 动画阶段位于 reactive 之后、layout 之前：
 
 ```text
@@ -182,7 +194,7 @@ parallel(a, b) / sequential(a, b) / stagger(items, interval)
 |---|---|---|
 | 1（完成） | 公共 visual property path + primitive part 暴露 | 支持/不支持的属性组合由 concept 编译期判定；第三方组件无需中心注册 |
 | 2（完成） | `AnimatedProperty<T>` + `Behavior<T>` | target/value 分离、直跳、retarget、负 dt/越界输入测试 |
-| 3 | `AnimationHost` + animation frame phase | 活跃注册、owner 卸载取消、fake clock、正确 DirtyFlags |
+| 3（完成） | `AnimationHost` + animation frame phase | 活跃注册、owner 卸载取消、fake clock、正确 DirtyFlags |
 | 4 | Builder `.bind(path, source)` / `.behavior(path, spec)` | 命令式与 DSL 写入同一 target；错误节点/属性组合无法编译 |
 | 5 | `NanNode2D::local_opacity` | 子树只乘一次节点 alpha；不产生随深度指数衰减 |
 | 6 | Label 颜色 + Button container radius 纵向示范 | OKLCH 颜色插值、圆角过渡、reduced motion、绘制结果测试 |

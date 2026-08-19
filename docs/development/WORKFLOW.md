@@ -188,7 +188,14 @@ readable:
   Button was audited alongside this step: fixed font-size writes now share the label
   presentation entry, instance visual values outrank inherited StyleContext, font-only
   context changes are detected, recipe overrides refresh detached metrics, and interaction
-  state invalidates layout/paint/semantics. `AnimationHost` is the next unit.
+  state invalidates layout/paint/semantics.
+- Declarative animation unit 3 adds one `AnimationHost` per `NanSceneTree` and an explicit
+  `animation` frame phase between reactive commit and layout. The Host stores only active,
+  property-identity-deduplicated tracks, advances from caller-provided `dt`, propagates exact
+  paint/layout/semantics dirty flags only when presentation values change, and completes plus
+  cancels tracks synchronously when owners exit the tree. Manual-clock, retarget, cross-tree,
+  clear, parent layout propagation, and keep-alive detach regressions are covered headlessly.
+  Builder `.behavior(path, spec)` and endpoint-to-Host wiring are the next review unit.
 - Test suite 40/40 green.
 - Next (planned follow-ups, 1.1): declarative animation (`ANIMATION.md`) incl.
   per-node opacity, Dialog fade-out/content fade, behavior composition; slider
