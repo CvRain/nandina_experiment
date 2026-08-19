@@ -794,6 +794,16 @@ TEST_CASE("Text setter and property share mutation and dirty behavior", "[widget
     REQUIRE(changes == 2);
 }
 
+TEST_CASE("Text measured height includes descent beyond the em size", "[widget][text][metrics]") {
+    auto text = std::make_shared<widget::primitives::Text>("hello");
+    text->set_font_size(16.0F);
+
+    // 垂直居中应使用行高（含 ascent/descent），而非 em 尺寸。
+    REQUIRE(text->laid_out_font_size() == Catch::Approx(16.0F));
+    REQUIRE(text->measured_text_height() > text->laid_out_font_size());
+    REQUIRE(text->measured_text_height() == Catch::Approx(16.0F * 1.2F));
+}
+
 TEST_CASE("Label binding follows tree lifetime and may be replaced", "[widget][label][property]") {
     reactive::Graph graph;
     reactive::Signal<std::string> first {graph, "first"};
