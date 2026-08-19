@@ -13,6 +13,7 @@
 #include "layout.hpp"
 #include "list_view.hpp"
 #include "scroll_view.hpp"
+#include "visual_property.hpp"
 
 #include <concepts>
 #include <functional>
@@ -312,6 +313,13 @@ namespace nandina::widget::authoring
             requires requires(Node& node) { node.request_focus(); }
         {
             node_->request_focus();
+            return *this;
+        }
+
+        template<visual::Path Path, typename Value>
+            requires property::WritableValue<Node, Path, Value>
+        auto set(Path path, Value&& value) -> NodeBuilder& {
+            property::write(*node_, path, std::forward<Value>(value));
             return *this;
         }
 

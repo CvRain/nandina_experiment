@@ -142,6 +142,7 @@ module_text = files(
 )
 
 module_widget = files(
+    'widget/visual_property.hpp',
     'widget/authoring.hpp',
     'widget/build_context.hpp',
     'widget/reactive_control.hpp',
@@ -149,6 +150,7 @@ module_widget = files(
     'widget/declarative.hpp',
     'widget/list_view.hpp',
     'widget/primitives/box_painter.hpp',
+    'widget/primitives/box_presentation.hpp',
     'widget/primitives/shadow_painter.hpp',
     'widget/primitives/focus_ring_painter.hpp',
     'widget/primitives/ripple_painter.hpp',
@@ -160,6 +162,7 @@ module_widget = files(
     'widget/primitives/text_layout_backend.cpp',
     'widget/primitives/text.hpp',
     'widget/primitives/text.cpp',
+    'widget/primitives/text_presentation.hpp',
     'widget/primitives/editable_text.hpp',
     'widget/primitives/editable_text.cpp',
     'widget/component_traits.hpp',
@@ -209,6 +212,13 @@ module_widget = files(
     'widget/dialog.cpp',
 )
 
+module_animation = files(
+    'animation/animated_property.hpp',
+    'animation/behavior.hpp',
+    'animation/easing.hpp',
+    'animation/tween.hpp',
+)
+
 module_app = files(
     'app/viewport_scaling.hpp',
     'app/viewport_scaling.cpp',
@@ -251,7 +261,7 @@ endif
 
 nandina_lib = static_library(
     'nandina',
-    [module_fundation, module_reactive, module_resource, module_scene, module_semantics, module_render, module_theme, module_text, module_widget, module_app, module_physics2d, builtin_font_data, builtin_font_license_data],
+    [module_fundation, module_reactive, module_resource, module_scene, module_semantics, module_render, module_theme, module_text, module_widget, module_app, module_animation, module_physics2d, builtin_font_data, builtin_font_license_data],
     cpp_args : nandina_cpp_args,
     dependencies : nandina_dependencies,
     install : true,

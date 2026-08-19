@@ -6,8 +6,10 @@
 #define NANDINA_EXPERIMENT_WIDGET_BUTTON_HPP
 
 #include "../theme/design_system.hpp"
+#include "primitives/box_presentation.hpp"
 #include "primitives/pressable.hpp"
 #include "primitives/text.hpp"
+#include "primitives/text_presentation.hpp"
 
 #include <memory>
 #include <optional>
@@ -29,6 +31,10 @@ namespace nandina::widget
         [[nodiscard]] auto text() const -> std::string_view;
         [[nodiscard]] auto text_node() -> primitives::Text&;
         [[nodiscard]] auto text_node() const -> const primitives::Text&;
+        [[nodiscard]] auto visual_part(visual::label_t) noexcept
+            -> primitives::TextPresentation&;
+        [[nodiscard]] auto visual_part(visual::container_t) noexcept
+            -> primitives::BoxPresentation&;
 
         void set_text_pipeline(primitives::TextPipeline pipeline);
         [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
@@ -41,7 +47,7 @@ namespace nandina::widget
         void set_font_weight(int weight);
         void set_font_slant(text::FontSlant slant);
 
-        /// 显式字号（逻辑单位），优先于百分比、继承上下文与主题配方。
+        /// 显式字号（逻辑单位），写入共享 label.font_size 实例属性。
         void set_font_size(float size);
         /// 百分比字号：相对按钮自身最终高度解析（如 percent(45) = 高度 × 45%）。
         void set_font_size(scene::PercentLength size);
@@ -88,10 +94,14 @@ namespace nandina::widget
     private:
         void apply_metrics();
         void apply_text_style(theme::ButtonVisualState state, float reference_height);
+        [[nodiscard]] auto resolved_recipe_style(theme::ButtonVisualState state) const
+            -> theme::ResolvedButtonStyle;
         [[nodiscard]] auto resolved_font_size(float reference_height, float fallback) const
             -> float;
 
         primitives::Text text_;
+        primitives::TextPresentation label_presentation_;
+        primitives::BoxPresentation container_presentation_;
         /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。
         std::shared_ptr<const theme::DesignSystem> system_;
         theme::ColorAppearance appearance_ = theme::ColorAppearance::light;
@@ -102,8 +112,7 @@ namespace nandina::widget
         /// set_theme(NanTheme) 整份覆盖后不再跟随系统切换。
         bool system_explicit_ = false;
         bool font_explicit_ = false;
-        /// 显式字号与百分比字号互斥；均为空时回退继承上下文/主题。
-        std::optional<float> font_size_;
+        /// 百分比字号与 label presentation 的固定字号互斥。
         std::optional<scene::PercentLength> font_size_percent_;
         theme::ButtonTone tone_ = theme::ButtonTone::primary;
         theme::ButtonTreatment treatment_ = theme::ButtonTreatment::filled;

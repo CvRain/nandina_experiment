@@ -50,6 +50,7 @@ namespace nandina::widget
         system_ =
             std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
         theme_view_ = theme;
+        fade_.reset(1.0F);
         set_visible(false); // 初始关闭：隐藏面板与内容子节点。
     }
 
@@ -85,6 +86,18 @@ namespace nandina::widget
         }
         open_ = true;
         set_visible(true);
+        if (reduced_motion_) {
+            fade_.reset(1.0F);
+        }
+        else {
+            // 用 long_duration + ease_out，让面板「浮现」而非「闪现」。
+            fade_.start(
+                0.0F,
+                1.0F,
+                system_->tokens.motion.long_duration,
+                animation::Easing::ease_out
+            );
+        }
         request_focus();
         mark_dirty(
             scene::DirtyFlags::paint | scene::DirtyFlags::layout | scene::DirtyFlags::semantics
@@ -96,6 +109,7 @@ namespace nandina::widget
             return;
         }
         open_ = false;
+        fade_.reset(1.0F);
         set_visible(false);
         if (on_close_) {
             on_close_();
@@ -170,6 +184,7 @@ namespace nandina::widget
 
     void Dialog::on_theme_changed(const theme::ThemeManager& manager) {
         appearance_ = manager.appearance();
+        reduced_motion_ = manager.reduced_motion();
         if (!system_explicit_) {
             system_ = manager.design_system_shared();
             theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
@@ -229,33 +244,46 @@ namespace nandina::widget
             return;
         }
         const auto style = resolved_style();
+        const float fade = fade_.value();
         apply_text_style();
         (void)title_text_.measure_layout(scene::LayoutConstraints::loose());
 
-        // 遮罩覆盖整个父容器。
+        // 遮罩覆盖整个父容器（淡入）。
         const auto full = render::world_bounds_from_local(context.world_transform(), local_rect());
+        const auto scrim = style.scrim.with_alpha(style.scrim.alpha() * fade);
         primitives::BoxPainter::paint(
             context,
             full,
             theme::ResolvedBoxStyle {
-                .fill = style.scrim,
-                .border = style.scrim,
+                .fill = scrim,
+                .border = scrim,
                 .border_width = 0.0F,
                 .radius = 0.0F,
             },
             context.opacity()
         );
 
-        // 居中面板。
+        // 居中面板（淡入）。
         const auto panel_world =
             render::world_bounds_from_local(context.world_transform(), panel_rect());
-        primitives::BoxPainter::paint(context, panel_world, style.panel, context.opacity());
+        auto panel = style.panel;
+        panel.fill = panel.fill.with_alpha(panel.fill.alpha() * fade);
+        panel.border = panel.border.with_alpha(panel.border.alpha() * fade);
+        primitives::BoxPainter::paint(context, panel_world, panel, context.opacity());
 
         const auto title_position = foundation::NanPoint(
             panel_world.get_left() + context.logical_to_screen(style.metrics.padding_x),
             panel_world.get_top() + context.logical_to_screen(style.metrics.padding_y)
         );
         title_text_.draw_at(context, title_position);
+    }
+
+    void Dialog::on_process(const float dt) {
+        if (fade_.is_finished()) {
+            return;
+        }
+        (void)fade_.tick(dt);
+        mark_dirty(scene::DirtyFlags::paint);
     }
 
     auto Dialog::on_measure(const scene::LayoutConstraints constraints) -> foundation::NanSize {

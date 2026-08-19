@@ -7,6 +7,7 @@
 
 #include "text_layout_backend.hpp"
 #include "../../reactive/property.hpp"
+#include "../visual_property.hpp"
 
 #include <memory>
 #include <string>
@@ -20,6 +21,26 @@ namespace nandina::text
 
 namespace nandina::widget::primitives
 {
+
+    class Text;
+
+    class TextColorProperty {
+    public:
+        explicit TextColorProperty(Text& text) noexcept: text_(&text) {}
+        void set(foundation::NanColor color);
+
+    private:
+        Text* text_;
+    };
+
+    class TextFontSizeProperty {
+    public:
+        explicit TextFontSizeProperty(Text& text) noexcept: text_(&text) {}
+        void set(float size);
+
+    private:
+        Text* text_;
+    };
 
     class Text: public scene::NanControl {
     public:
@@ -41,6 +62,9 @@ namespace nandina::widget::primitives
 
         void set_font_size(float size);
         [[nodiscard]] auto font_size() const -> float;
+        [[nodiscard]] auto visual_part(visual::label_t) noexcept -> Text&;
+        [[nodiscard]] auto property(visual::color_t) noexcept -> TextColorProperty;
+        [[nodiscard]] auto property(visual::font_size_t) noexcept -> TextFontSizeProperty;
         void set_font(text::FontRequest request);
         void set_font_family(resource::ResourceKey family);
         void clear_font_family();

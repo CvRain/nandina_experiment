@@ -101,6 +101,7 @@ namespace nandina::widget
         if (before == selected_index_) {
             return;
         }
+        sync_indicator(true);
         if (on_change_) {
             on_change_(selected_index_);
         }
@@ -198,6 +199,11 @@ namespace nandina::widget
 
     void Tabs::on_theme_changed(const theme::ThemeManager& manager) {
         appearance_ = manager.appearance();
+        reduced_motion_ = manager.reduced_motion();
+        if (reduced_motion_) {
+            indicator_x_.finish();
+            indicator_width_.finish();
+        }
         if (!system_explicit_) {
             system_ = manager.design_system_shared();
             theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
@@ -308,13 +314,11 @@ namespace nandina::widget
             label_texts_[i]->draw_at(context, position);
         }
 
-        // 4. 下划线指示条（透明则跳过）。
+        // 4. 下划线指示条（透明则跳过；x/宽由 tween 驱动，切换时平滑过渡）。
         if (has_selected && style.indicator.alpha() > 0.0F && style.indicator_thickness > 0.0F) {
-            const std::size_t selected = static_cast<std::size_t>(selected_index_);
             const float thickness = context.logical_to_screen(style.indicator_thickness);
-            const float selected_x = context.logical_to_screen(tab_offsets_[selected]);
-            const float selected_width =
-                context.logical_to_screen(label_texts_[selected]->measured_text_width());
+            const float selected_x = context.logical_to_screen(indicator_x_.value());
+            const float selected_width = context.logical_to_screen(indicator_width_.value());
             const auto indicator = foundation::NanRect::from_xywh(
                 world.get_left() + selected_x,
                 world.get_bottom() - thickness,
@@ -331,6 +335,16 @@ namespace nandina::widget
         if (focused_ && !disabled_ && style.focus.width > 0.0F) {
             primitives::FocusRingPainter::paint(context, world, style.focus, opacity);
         }
+    }
+
+    void Tabs::on_process(const float dt) {
+        const bool animating = !indicator_x_.is_finished() || !indicator_width_.is_finished();
+        if (!animating) {
+            return;
+        }
+        (void)indicator_x_.tick(dt);
+        (void)indicator_width_.tick(dt);
+        mark_dirty(scene::DirtyFlags::paint);
     }
 
     auto Tabs::on_measure(const scene::LayoutConstraints constraints) -> foundation::NanSize {
@@ -405,6 +419,38 @@ namespace nandina::widget
             (void)label_texts_[i]->measure_layout(scene::LayoutConstraints::loose());
             tab_offsets_[i] = x;
             x += label_texts_[i]->measured_text_width() + gap;
+        }
+        // 空闲时吸附指示条到当前选中项（首次绘制 / 程序化选中 / 主题变化）。
+        const bool has = selected_index_ >= 0
+            && static_cast<std::size_t>(selected_index_) < label_texts_.size();
+        if (has && indicator_x_.is_finished() && indicator_width_.is_finished()) {
+            const auto selected = static_cast<std::size_t>(selected_index_);
+            indicator_x_.reset(tab_offsets_[selected]);
+            indicator_width_.reset(label_texts_[selected]->measured_text_width());
+        }
+    }
+
+    void Tabs::sync_indicator(const bool animate) {
+        // 注意：不能在选中后立即 measure_labels()——那会把指示条吸附到新目标，
+        // 导致动画变成 new→new 的空操作。这里直接用上一次 measure 的偏移，
+        // 从「当前（旧）值」动画到新目标。
+        const bool has = selected_index_ >= 0
+            && static_cast<std::size_t>(selected_index_) < label_texts_.size();
+        if (!has) {
+            return;
+        }
+        const auto selected = static_cast<std::size_t>(selected_index_);
+        const float target_x = tab_offsets_[selected];
+        const float target_width = label_texts_[selected]->measured_text_width();
+        if (animate && !reduced_motion_ && labels_.size() > 1) {
+            const float duration = system_->tokens.motion.medium_duration;
+            indicator_x_.start(indicator_x_.value(), target_x, duration);
+            indicator_width_.start(indicator_width_.value(), target_width, duration);
+            mark_dirty(scene::DirtyFlags::paint);
+        }
+        else {
+            indicator_x_.reset(target_x);
+            indicator_width_.reset(target_width);
         }
     }
 

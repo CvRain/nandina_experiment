@@ -28,11 +28,15 @@ namespace nandina::widget
         same_text_style(const primitives::TextStyle& lhs, const primitives::TextStyle& rhs)
             -> bool {
             return lhs.color.approx_equals(rhs.color) && near(lhs.font_size, rhs.font_size)
-                && lhs.overflow == rhs.overflow && lhs.max_lines == rhs.max_lines;
+                && lhs.font == rhs.font && lhs.overflow == rhs.overflow
+                && lhs.max_lines == rhs.max_lines;
         }
     } // namespace
 
-    Button::Button(std::string text, theme::NanTheme theme): text_(std::move(text)) {
+    Button::Button(std::string text, theme::NanTheme theme):
+        text_(std::move(text)),
+        label_presentation_(*this),
+        container_presentation_(*this) {
         system_ = std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
         theme_view_ = theme;
         apply_metrics();
@@ -59,6 +63,14 @@ namespace nandina::widget
 
     auto Button::text_node() const -> const primitives::Text& {
         return text_;
+    }
+
+    auto Button::visual_part(visual::label_t) noexcept -> primitives::TextPresentation& {
+        return label_presentation_;
+    }
+
+    auto Button::visual_part(visual::container_t) noexcept -> primitives::BoxPresentation& {
+        return container_presentation_;
     }
 
     void Button::set_text_pipeline(primitives::TextPipeline pipeline) {
@@ -126,12 +138,11 @@ namespace nandina::widget
     }
 
     void Button::set_font_size(const float size) {
-        if (!std::isfinite(size) || size < 0.0F) {
-            throw std::invalid_argument("font size must be finite and non-negative");
+        if (!std::isfinite(size) || size <= 0.0F) {
+            throw std::invalid_argument("font size must be finite and positive");
         }
-        font_size_ = size;
+        property::write(*this, visual::label.font_size, size);
         font_size_percent_.reset();
-        mark_layout_dirty();
         apply_metrics();
     }
 
@@ -140,17 +151,19 @@ namespace nandina::widget
             throw std::invalid_argument("font size percentage must be finite and non-negative");
         }
         font_size_percent_ = size;
-        font_size_.reset();
+        label_presentation_.clear_font_size();
         mark_layout_dirty();
         apply_metrics();
     }
 
     void Button::clear_font_size() {
-        if (!font_size_.has_value() && !font_size_percent_.has_value()) {
+        if (!font_size_percent_.has_value()) {
+            label_presentation_.clear_font_size();
+            apply_metrics();
             return;
         }
-        font_size_.reset();
         font_size_percent_.reset();
+        label_presentation_.clear_font_size();
         mark_layout_dirty();
         apply_metrics();
     }
@@ -183,6 +196,7 @@ namespace nandina::widget
 
     void Button::set_override(theme::ButtonRecipeRule rule) {
         override_ = std::move(rule);
+        apply_metrics();
         mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::layout);
     }
 
@@ -208,6 +222,7 @@ namespace nandina::widget
 
     void Button::set_button_size(theme::ButtonSize size) {
         size_ = size;
+        mark_layout_dirty();
         apply_metrics();
     }
 
@@ -232,12 +247,9 @@ namespace nandina::widget
     }
 
     auto Button::resolved_style() const -> theme::ResolvedButtonStyle {
-        auto style = theme::resolve_button(
-            *system_, appearance_, tone_, treatment_, size_, visual_state()
-        );
-        if (override_) {
-            theme::apply_rule(*system_, appearance_, style, *override_, tone_);
-        }
+        auto style = resolved_recipe_style(visual_state());
+        label_presentation_.apply(style.label);
+        container_presentation_.apply(style.container);
         return style;
     }
 
@@ -326,7 +338,10 @@ namespace nandina::widget
             ripple_origin_local_.reset();
             ripple_progress_ = 1.0F;
         }
-        mark_semantics_dirty();
+        mark_dirty(
+            scene::DirtyFlags::paint | scene::DirtyFlags::layout
+            | scene::DirtyFlags::semantics
+        );
     }
 
     void Button::on_process(const float dt) {
@@ -374,17 +389,12 @@ namespace nandina::widget
     }
 
     auto Button::on_measure(scene::LayoutConstraints constraints) -> foundation::NanSize {
-        const auto state = disabled() ? theme::ButtonVisualState::disabled
-                                      : theme::ButtonVisualState::normal;
-        const auto style =
-            theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
+        const auto state = visual_state();
+        const auto style = resolved_style();
         // 百分比字号的基准 = 本次布局后按钮的最终高度（高度由 size_spec/配方决定）。
         const float reference_height =
             constraints.constrain(foundation::NanSize(0.0F, style.metrics.height)).get_height();
-        apply_text_style(
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal,
-            reference_height
-        );
+        apply_text_style(state, reference_height);
         const float max_text_width = std::isfinite(constraints.max_width)
             ? std::max(0.0F, constraints.max_width - style.metrics.padding_x * 2.0F)
             : constraints.max_width;
@@ -403,14 +413,11 @@ namespace nandina::widget
     }
 
     void Button::apply_metrics() {
-        const auto state = disabled() ? theme::ButtonVisualState::disabled
-                                      : theme::ButtonVisualState::normal;
-        const auto style =
-            theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
-        apply_text_style(
-            disabled() ? theme::ButtonVisualState::disabled : theme::ButtonVisualState::normal,
-            height()
-        );
+        const auto state = visual_state();
+        auto style = resolved_recipe_style(state);
+        label_presentation_.apply(style.label);
+        container_presentation_.apply(style.container);
+        apply_text_style(state, height());
         (void)text_.measure_layout(scene::LayoutConstraints::loose());
         set_size(foundation::NanSize(
             text_.width() + style.metrics.padding_x * 2.0F,
@@ -418,11 +425,18 @@ namespace nandina::widget
         ));
     }
 
+    auto Button::resolved_recipe_style(const theme::ButtonVisualState state) const
+        -> theme::ResolvedButtonStyle {
+        auto style =
+            theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
+        if (override_) {
+            theme::apply_rule(*system_, appearance_, style, *override_, tone_);
+        }
+        return style;
+    }
+
     auto Button::resolved_font_size(const float reference_height, const float fallback) const
         -> float {
-        if (font_size_.has_value()) {
-            return *font_size_;
-        }
         if (font_size_percent_.has_value() && reference_height > 0.0F) {
             return std::max(1.0F, reference_height * font_size_percent_->value * 0.01F);
         }
@@ -433,10 +447,9 @@ namespace nandina::widget
         const theme::ButtonVisualState state,
         const float reference_height
     ) {
-        const auto style =
-            theme::resolve_button(*system_, appearance_, tone_, treatment_, size_, state);
+        const auto style = resolved_recipe_style(state);
         const auto& context = resolved_style_context();
-        const primitives::TextStyle text_style {
+        primitives::TextStyle text_style {
             .color = context.text_color_from_context ? context.text_color : style.label.color,
             .font_size = resolved_font_size(
                 reference_height,
@@ -446,6 +459,7 @@ namespace nandina::widget
             .overflow = text_overflow_,
             .max_lines = 1,
         };
+        label_presentation_.apply(text_style);
         if (same_text_style(text_.style(), text_style)) {
             return;
         }

@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_DIALOG_HPP
 #define NANDINA_EXPERIMENT_WIDGET_DIALOG_HPP
 
+#include "../animation/tween.hpp"
 #include "../scene/control.hpp"
 #include "../theme/design_system.hpp"
 #include "primitives/text.hpp"
@@ -59,6 +60,7 @@ namespace nandina::widget
         [[nodiscard]] auto is_focusable() const -> bool override;
         auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& context) -> void override;
+        void on_process(float dt) override;
 
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
@@ -73,8 +75,10 @@ namespace nandina::widget
 
         primitives::Text title_text_;
         std::weak_ptr<scene::NanControl> content_;
+        animation::Tween<float> fade_;
         bool open_ = false;
         bool dismissible_ = true;
+        bool reduced_motion_ = false;
         std::function<void()> on_close_;
         std::shared_ptr<const theme::DesignSystem> system_;
         theme::ColorAppearance appearance_ = theme::ColorAppearance::light;

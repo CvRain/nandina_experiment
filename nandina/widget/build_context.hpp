@@ -106,6 +106,21 @@ namespace nandina::widget
             );
         }
 
+        /// Bind a tracked source to a shared typed visual property path. Unsupported
+        /// node/part/field combinations are rejected by the Writable concept.
+        template<typename Node, visual::Path Path, typename Source>
+            requires property::Writable<Node, Path>
+                && requires(Source& source) {
+                       { source.get() } -> std::convertible_to<property::value_t<Path>>;
+                   }
+        void bind(const std::shared_ptr<Node>& target, Path path, Source& source) const {
+            scope_->effect([weak = std::weak_ptr<Node>(target), path, &source] {
+                if (const auto current = weak.lock()) {
+                    property::write(*current, path, source.get());
+                }
+            });
+        }
+
         /// Construct a custom component with its own reactive lifetime. The component
         /// receives the derived context and releases its subscriptions/effects before
         /// the concrete node is destroyed.

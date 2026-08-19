@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_TABS_HPP
 #define NANDINA_EXPERIMENT_WIDGET_TABS_HPP
 
+#include "../animation/tween.hpp"
 #include "../reactive/event.hpp"
 #include "../scene/control.hpp"
 #include "../theme/design_system.hpp"
@@ -64,6 +65,7 @@ namespace nandina::widget
         [[nodiscard]] auto is_focusable() const -> bool override;
         auto on_input(scene::InputEvent& event) -> bool override;
         auto on_draw(render::DrawContext& context) -> void override;
+        void on_process(float dt) override;
 
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
@@ -74,15 +76,19 @@ namespace nandina::widget
         void rebuild_texts();
         void apply_text_styles();
         void measure_labels();
+        void sync_indicator(bool animate);
         [[nodiscard]] auto hit_index(float local_x) const -> int;
 
         std::vector<std::string> labels_;
         std::vector<std::shared_ptr<primitives::Text>> label_texts_;
         std::vector<float> tab_offsets_;
+        animation::Tween<float> indicator_x_;
+        animation::Tween<float> indicator_width_;
         int selected_index_ = 0;
         bool disabled_ = false;
         bool focused_ = false;
         bool hovered_ = false;
+        bool reduced_motion_ = false;
         std::function<void(int)> on_change_;
         reactive::Event<int> selection_changed_;
         /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。

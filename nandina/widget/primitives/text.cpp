@@ -7,11 +7,20 @@
 #include "../../text/font_pipeline.hpp"
 
 #include <algorithm>
+#include <cmath>
 #include <stdexcept>
 #include <utility>
 
 namespace nandina::widget::primitives
 {
+
+    void TextColorProperty::set(foundation::NanColor color) {
+        text_->set_color(std::move(color));
+    }
+
+    void TextFontSizeProperty::set(const float size) {
+        text_->set_font_size(size);
+    }
 
     Text::Text(std::string text, const ITextLayoutBackend& backend):
         text_(std::move(text), [this](const std::string& value) { apply_text(value); }),
@@ -43,6 +52,9 @@ namespace nandina::widget::primitives
 
     void Text::set_style(TextStyle style) {
         style.max_lines = std::max(1, style.max_lines);
+        if (!std::isfinite(style.font_size) || style.font_size <= 0.0F) {
+            throw std::invalid_argument("Text font size must be finite and positive");
+        }
         if (style.font.weight < 1 || style.font.weight > 1000) {
             throw std::invalid_argument("Text font weight must be between 1 and 1000");
         }
@@ -65,6 +77,7 @@ namespace nandina::widget::primitives
     void Text::set_color(foundation::NanColor color) {
         style_.color = color;
         color_explicit_ = true;
+        mark_dirty(scene::DirtyFlags::paint);
     }
 
     auto Text::color() const -> foundation::NanColor {
@@ -72,6 +85,9 @@ namespace nandina::widget::primitives
     }
 
     void Text::set_font_size(float size) {
+        if (!std::isfinite(size) || size <= 0.0F) {
+            throw std::invalid_argument("Text font size must be finite and positive");
+        }
         style_.font_size = size;
         font_size_explicit_ = true;
         mark_layout_dirty();
@@ -80,6 +96,18 @@ namespace nandina::widget::primitives
 
     auto Text::font_size() const -> float {
         return style_.font_size;
+    }
+
+    auto Text::visual_part(visual::label_t) noexcept -> Text& {
+        return *this;
+    }
+
+    auto Text::property(visual::color_t) noexcept -> TextColorProperty {
+        return TextColorProperty {*this};
+    }
+
+    auto Text::property(visual::font_size_t) noexcept -> TextFontSizeProperty {
+        return TextFontSizeProperty {*this};
     }
 
     void Text::set_font(text::FontRequest request) {
