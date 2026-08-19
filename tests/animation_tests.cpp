@@ -3,10 +3,13 @@
 //
 
 #include "animation/animated_property.hpp"
+#include "animation/animation_host.hpp"
 #include "animation/behavior.hpp"
 #include "animation/easing.hpp"
 #include "animation/tween.hpp"
 #include "foundation/nandina_color.hpp"
+#include "scene/control.hpp"
+#include "scene/scene_tree.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -15,6 +18,30 @@
 #include <stdexcept>
 
 using namespace nandina;
+
+namespace
+{
+    class AnimatedProbe final: public scene::NanControl {
+    public:
+        animation::AnimatedProperty<float> paint_value {0.0F};
+        animation::AnimatedProperty<float> layout_value {0.0F};
+    };
+
+    void advance(scene::NanSceneTree& tree, const float dt) {
+        auto phase = tree.enter_phase(scene::FramePhase::animation);
+        tree.advance_animations(dt);
+    }
+
+    constexpr auto all_dirty_flags = scene::DirtyFlags::measure | scene::DirtyFlags::layout
+        | scene::DirtyFlags::paint | scene::DirtyFlags::semantics;
+} // namespace
+
+static_assert(
+    static_cast<int>(scene::FramePhase::reactive) < static_cast<int>(scene::FramePhase::animation)
+);
+static_assert(
+    static_cast<int>(scene::FramePhase::animation) < static_cast<int>(scene::FramePhase::layout)
+);
 
 TEST_CASE("easing curves map 0->0 and 1->1", "[animation][easing]") {
     for (const auto easing:
@@ -197,4 +224,154 @@ TEST_CASE("behavior rejects invalid durations", "[animation][behavior]") {
         animation::Behavior<float>(std::numeric_limits<float>::quiet_NaN()),
         std::invalid_argument
     );
+}
+
+TEST_CASE("animation host advances only active properties with manual dt", "[animation][host]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    probe->clear_dirty(all_dirty_flags);
+
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    REQUIRE(tree.animation_host().active_count() == 1);
+    REQUIRE(probe->paint_value.target() == Catch::Approx(10.0F));
+    REQUIRE(probe->paint_value.value() == Catch::Approx(0.0F));
+    REQUIRE_FALSE(probe->is_dirty(scene::DirtyFlags::paint));
+
+    advance(tree, 0.25F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(2.5F));
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
+    REQUIRE_FALSE(probe->is_dirty(scene::layout_dirty_flags));
+    REQUIRE_FALSE(probe->is_dirty(scene::DirtyFlags::semantics));
+
+    probe->clear_dirty(all_dirty_flags);
+    advance(tree, 5.0F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
+
+    probe->clear_dirty(all_dirty_flags);
+    advance(tree, 0.5F);
+    REQUIRE_FALSE(probe->is_dirty(scene::DirtyFlags::paint));
+}
+
+TEST_CASE("animation host retargets one property without duplicate tracks", "[animation][host]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    advance(tree, 0.5F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(5.0F));
+
+    tree.animation_host().set_target(*probe, probe->paint_value, 20.0F, scene::DirtyFlags::paint);
+    REQUIRE(tree.animation_host().active_count() == 1);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(5.0F));
+    advance(tree, 0.5F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(12.5F));
+}
+
+TEST_CASE("animation host applies immediate targets and exact dirty flags", "[animation][host]") {
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>();
+    auto probe = std::make_shared<AnimatedProbe>();
+    root->add_child(probe);
+    tree.set_root(root);
+    (void)tree.update_semantics();
+    REQUIRE_FALSE(tree.semantics_dirty());
+    root->clear_dirty(all_dirty_flags);
+    probe->clear_dirty(all_dirty_flags);
+
+    tree.animation_host().set_target(
+        *probe,
+        probe->paint_value,
+        4.0F,
+        scene::DirtyFlags::paint | scene::DirtyFlags::semantics
+    );
+    REQUIRE(probe->paint_value.value() == Catch::Approx(4.0F));
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::semantics));
+    REQUIRE_FALSE(probe->is_dirty(scene::layout_dirty_flags));
+    REQUIRE_FALSE(root->is_dirty(scene::layout_dirty_flags));
+    REQUIRE(tree.semantics_dirty());
+
+    probe->layout_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    root->clear_dirty(all_dirty_flags);
+    probe->clear_dirty(all_dirty_flags);
+    tree.animation_host().set_target(
+        *probe,
+        probe->layout_value,
+        8.0F,
+        scene::layout_dirty_flags | scene::DirtyFlags::paint
+    );
+    advance(tree, 0.25F);
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::measure));
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::layout));
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
+    REQUIRE_FALSE(probe->is_dirty(scene::DirtyFlags::semantics));
+    REQUIRE(root->is_dirty(scene::DirtyFlags::measure));
+    REQUIRE(root->is_dirty(scene::DirtyFlags::layout));
+}
+
+TEST_CASE("animation host cancels tracks when an owner exits the tree", "[animation][host]") {
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>();
+    auto probe = std::make_shared<AnimatedProbe>();
+    root->add_child(probe);
+    tree.set_root(root);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    advance(tree, 0.25F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(2.5F));
+    REQUIRE(tree.animation_host().active_count() == 1);
+
+    auto detached = root->remove_child(*probe);
+    REQUIRE(detached == probe);
+    REQUIRE_FALSE(probe->is_inside_tree());
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE_FALSE(probe->paint_value.is_animating());
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+
+    advance(tree, 1.0F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+}
+
+TEST_CASE("animation host rejects owners from another scene tree", "[animation][host]") {
+    scene::NanSceneTree first;
+    scene::NanSceneTree second;
+    auto probe = std::make_shared<AnimatedProbe>();
+    first.set_root(probe);
+
+    REQUIRE_THROWS_AS(
+        second.animation_host()
+            .set_target(*probe, probe->paint_value, 1.0F, scene::DirtyFlags::paint),
+        std::invalid_argument
+    );
+}
+
+TEST_CASE(
+    "animation phase defers tree mutation and host clear finishes tracks",
+    "[animation][host]"
+) {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    advance(tree, 0.25F);
+    probe->clear_dirty(all_dirty_flags);
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::animation);
+        REQUIRE(tree.defers_tree_mutation());
+        tree.animation_host().clear();
+    }
+
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE_FALSE(probe->paint_value.is_animating());
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+    REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
 }
