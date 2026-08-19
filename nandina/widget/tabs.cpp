@@ -300,10 +300,10 @@ namespace nandina::widget
 
         // 3. 标签。
         for (std::size_t i = 0; i < label_texts_.size(); ++i) {
-            const float font_size = context.logical_to_screen(label_texts_[i]->laid_out_font_size());
+            const float text_height = context.logical_to_screen(label_texts_[i]->measured_text_height());
             const auto position = foundation::NanPoint(
                 world.get_left() + context.logical_to_screen(tab_offsets_[i]),
-                world.get_top() + (world.get_height() - font_size) * 0.5F
+                world.get_top() + (world.get_height() - text_height) * 0.5F
             );
             label_texts_[i]->draw_at(context, position);
         }

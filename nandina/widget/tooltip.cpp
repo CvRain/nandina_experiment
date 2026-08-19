@@ -225,11 +225,11 @@ namespace nandina::widget
             render::world_bounds_from_local(context.world_transform(), local_bubble);
         primitives::BoxPainter::paint(context, world, style.container, context.opacity());
 
-        const float font_size = context.logical_to_screen(text_.laid_out_font_size());
+        const float text_height = context.logical_to_screen(text_.measured_text_height());
         const float text_width = context.logical_to_screen(text_.measured_text_width());
         const auto text_position = foundation::NanPoint(
             world.get_left() + (world.get_width() - text_width) * 0.5F,
-            world.get_top() + (world.get_height() - font_size) * 0.5F
+            world.get_top() + (world.get_height() - text_height) * 0.5F
         );
         text_.draw_at(context, text_position);
     }

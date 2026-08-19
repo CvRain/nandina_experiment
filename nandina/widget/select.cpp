@@ -363,10 +363,11 @@ namespace nandina::widget
         primitives::BoxPainter::paint(context, field, style.container, opacity);
 
         (void)value_text_.measure_layout(scene::LayoutConstraints::loose());
-        const float value_font = context.logical_to_screen(value_text_.laid_out_font_size());
+        const float value_height =
+            context.logical_to_screen(value_text_.measured_text_height());
         const auto value_pos = foundation::NanPoint(
             field.get_left() + context.logical_to_screen(style.metrics.padding_x),
-            field.get_top() + (field.get_height() - value_font) * 0.5F
+            field.get_top() + (field.get_height() - value_height) * 0.5F
         );
         value_text_.draw_at(context, value_pos);
 
@@ -404,11 +405,12 @@ namespace nandina::widget
 
             for (std::size_t i = 0; i < option_texts_.size(); ++i) {
                 (void)option_texts_[i]->measure_layout(scene::LayoutConstraints::loose());
-                const float font = context.logical_to_screen(option_texts_[i]->laid_out_font_size());
+                const float option_height =
+                    context.logical_to_screen(option_texts_[i]->measured_text_height());
                 const auto pos = foundation::NanPoint(
                     popup.get_left() + context.logical_to_screen(style.metrics.padding_x),
                     popup.get_top() + row_h * static_cast<float>(i)
-                        + (row_h - font) * 0.5F
+                        + (row_h - option_height) * 0.5F
                 );
                 option_texts_[i]->draw_at(context, pos);
             }

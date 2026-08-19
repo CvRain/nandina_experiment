@@ -150,6 +150,14 @@ namespace nandina::widget::primitives
         return width;
     }
 
+    auto Text::measured_text_height() const -> float {
+        float height = 0.0F;
+        for (const auto& line: layout_.lines) {
+            height += line.size.get_height();
+        }
+        return height;
+    }
+
     auto Text::laid_out_font_size() const -> float {
         return layout_.font_size;
     }

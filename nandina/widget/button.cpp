@@ -309,10 +309,10 @@ namespace nandina::widget
             }
         );
         const float text_width = ctx.logical_to_screen(text_.measured_text_width());
-        const float font_size = ctx.logical_to_screen(text_.laid_out_font_size());
+        const float text_height = ctx.logical_to_screen(text_.measured_text_height());
         const auto text_pos = foundation::NanPoint(
             world.get_left() + (world.get_width() - text_width) * 0.5F,
-            world.get_top() + (world.get_height() - font_size) * 0.5F
+            world.get_top() + (world.get_height() - text_height) * 0.5F
         );
         text_.draw_at(ctx, text_pos);
 

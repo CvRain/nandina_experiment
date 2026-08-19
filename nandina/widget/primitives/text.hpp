@@ -55,6 +55,7 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto max_lines() const -> int;
 
         [[nodiscard]] auto measured_text_width() const -> float;
+        [[nodiscard]] auto measured_text_height() const -> float;
         [[nodiscard]] auto laid_out_font_size() const -> float;
         [[nodiscard]] auto layout_result() const -> const TextLayoutResult&;
 
