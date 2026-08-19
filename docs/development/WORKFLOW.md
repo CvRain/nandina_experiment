@@ -165,6 +165,9 @@ readable:
   and reports focused semantics. All interactive widgets now have keyboard
   access (Button/Checkbox/Switch/Radio via `Pressable`; Slider/Select/Tabs
   native; Dialog traps Tab).
+- Text vertical alignment fixed: widgets now center text by its measured line
+  height (`Text::measured_text_height()`, ascent+descent) instead of the em
+  size (`laid_out_font_size()`), removing the "slightly low" offset across
+  Button/Chip/Tabs/Select/Tooltip/etc. TextField already used line height.
 - Test suite 39/39 green.
-- Next (planned follow-ups): text vertical alignment (baseline/descent) fix;
-  general tween/animation system.
+- Next (planned follow-ups): general tween/animation system.
