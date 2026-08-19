@@ -113,6 +113,15 @@ TEST_CASE("dialog open toggles z-order, focusability and semantics", "[dialog]")
     REQUIRE_FALSE(harness.dialog->is_open());
 }
 
+TEST_CASE("dialog fade-in advances without error", "[dialog][animation]") {
+    DialogHarness harness;
+    harness.dialog->open();
+    harness.layout();
+    harness.dialog->on_process(0.5F); // 越过 medium_duration，淡入结束
+    harness.dialog->on_process(0.5F); // 空闲，无操作
+    REQUIRE(harness.dialog->is_open());
+}
+
 TEST_CASE("dialog hides its content when closed", "[dialog][visibility]") {
     DialogHarness harness;
     auto button = widget::Button::create("OK");

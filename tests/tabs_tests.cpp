@@ -145,6 +145,19 @@ TEST_CASE("tabs selects by index and clamps out-of-range", "[tabs][value]") {
     REQUIRE(tabs->selected_index() == 0);
 }
 
+TEST_CASE("tabs indicator animation advances without error", "[tabs][animation]") {
+    auto tabs = widget::Tabs::create({"A", "B", "C"});
+    scene::NanSceneTree tree;
+    tree.set_root(tabs);
+    REQUIRE(tree.layout_root(foundation::NanSize(280.0F, 48.0F)) >= 1);
+
+    tabs->select(1); // 触发下划线切换动画
+    REQUIRE(tabs->selected_index() == 1);
+    tabs->on_process(0.5F); // 越过 medium_duration，动画结束
+    tabs->on_process(0.5F); // 空闲，无操作
+    REQUIRE(tabs->selected_index() == 1);
+}
+
 TEST_CASE("tabs arrow keys navigate with wrap-around", "[tabs][keyboard]") {
     auto tabs = widget::Tabs::create({"A", "B", "C"});
     scene::NanSceneTree tree;

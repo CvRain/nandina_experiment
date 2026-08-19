@@ -16,6 +16,7 @@
 
 #include <cmath>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <string_view>
 #include <vector>
@@ -740,6 +741,87 @@ TEST_CASE("button font size supports logical and percentage values", "[widget][b
     REQUIRE(
         proportional.text_node().font_size()
         == Catch::Approx(proportional.resolved_style().label.font_size)
+    );
+}
+
+TEST_CASE("button visual instances outrank inherited text context", "[widget][button][style]") {
+    widget::Button button("Instance");
+    theme::StyleContext context;
+    context.font_size = theme::StyleValue<float>::explicit_value(31.0F);
+    context.text_color = theme::StyleValue<foundation::NanColor>::explicit_value(
+        foundation::NanColor::from_oklch(0.35F, 0.08F, 240.0F)
+    );
+    button.set_style_context(context);
+
+    const auto instance_color = foundation::NanColor::from_oklch(0.78F, 0.12F, 30.0F);
+    widget::property::write(button, widget::visual::label.color, instance_color);
+    widget::property::write(button, widget::visual::label.font_size, 19.0F);
+    (void)button.measure_layout(scene::LayoutConstraints::loose());
+
+    REQUIRE(button.text_node().color().approx_equals(instance_color));
+    REQUIRE(button.text_node().font_size() == Catch::Approx(19.0F));
+
+    button.clear_font_size();
+    (void)button.measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(button.text_node().font_size() == Catch::Approx(31.0F));
+
+    button.set_font_size(18.0F);
+    (void)button.measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(button.text_node().font_size() == Catch::Approx(18.0F));
+}
+
+TEST_CASE("button applies font-only StyleContext changes", "[widget][button][style]") {
+    widget::Button button("Font");
+    auto context = theme::StyleContext {};
+    auto first = text::FontRequest {};
+    first.family = resource::ResourceKey::parse("families/first");
+    context.font = theme::StyleValue<text::FontRequest>::explicit_value(first);
+    button.set_style_context(context);
+    REQUIRE(button.text_node().font() == first);
+
+    auto second = first;
+    second.family = resource::ResourceKey::parse("families/second");
+    context.font = theme::StyleValue<text::FontRequest>::explicit_value(second);
+    button.set_style_context(context);
+    REQUIRE(button.text_node().font() == second);
+}
+
+TEST_CASE("button overrides refresh detached metrics immediately", "[widget][button][style]") {
+    widget::Button button("Metrics");
+    const float before = button.width();
+    theme::ButtonRecipeRule rule;
+    rule.metrics_padding_x = theme::ThemeScalar::literal(48.0F);
+    button.set_override(std::move(rule));
+
+    REQUIRE(button.resolved_style().metrics.padding_x == Catch::Approx(48.0F));
+    REQUIRE(button.width() > before);
+}
+
+TEST_CASE("button interaction state invalidates layout paint and semantics", "[widget][button]") {
+    scene::NanSceneTree tree;
+    auto button = std::make_shared<widget::Button>("State");
+    tree.set_root(button);
+    (void)tree.layout_root(foundation::NanSize(240.0F, 80.0F));
+    button->clear_dirty(
+        scene::DirtyFlags::paint | scene::DirtyFlags::layout
+        | scene::DirtyFlags::semantics
+    );
+
+    tree.dispatch_mouse_move(scene::MouseMoveEvent {
+        foundation::NanPoint(4.0F, 4.0F), foundation::NanPoint::zero()
+    });
+
+    REQUIRE(button->is_dirty(scene::DirtyFlags::paint));
+    REQUIRE(button->is_dirty(scene::DirtyFlags::layout));
+    REQUIRE(button->is_dirty(scene::DirtyFlags::semantics));
+}
+
+TEST_CASE("text rejects invalid font sizes through both public paths", "[widget][text]") {
+    widget::primitives::Text text("Invalid");
+    REQUIRE_THROWS_AS(text.set_font_size(0.0F), std::invalid_argument);
+    REQUIRE_THROWS_AS(
+        widget::property::write(text, widget::visual::label.font_size, -1.0F),
+        std::invalid_argument
     );
 }
 

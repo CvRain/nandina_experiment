@@ -561,6 +561,51 @@ TEST_CASE(
 }
 
 TEST_CASE(
+    "typed visual properties compose shared parts with component capabilities",
+    "[authoring][binding][visual-property]"
+) {
+    using LabelColor = decltype(widget::visual::label.color);
+    using LabelFontSize = decltype(widget::visual::label.font_size);
+    using ContainerRadius = decltype(widget::visual::container.radius);
+
+    static_assert(widget::property::Writable<widget::Label, LabelColor>);
+    static_assert(widget::property::Writable<widget::Label, LabelFontSize>);
+    static_assert(widget::property::Writable<widget::Button, LabelColor>);
+    static_assert(widget::property::Writable<widget::Button, ContainerRadius>);
+    static_assert(!widget::property::Writable<widget::Label, ContainerRadius>);
+
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+
+    const auto initial = foundation::NanColor::from_oklch(0.62F, 0.12F, 255.0F);
+    const auto changed = foundation::NanColor::from_oklch(0.72F, 0.18F, 35.0F);
+    reactive::Signal<foundation::NanColor> color {graph, initial};
+    reactive::Signal<float> radius {graph, 6.0F};
+
+    auto label = ui.make<widget::Label>("Motion label")
+                     .set(widget::visual::label.font_size, 22.0F)
+                     .build();
+    auto button = ui.make<widget::Button>("Motion button").build();
+    ui.bind(label, widget::visual::label.color, color);
+    ui.bind(button, widget::visual::label.color, color);
+    ui.bind(button, widget::visual::container.radius, radius);
+
+    REQUIRE(label->font_size() == Catch::Approx(22.0F));
+    REQUIRE(label->color().approx_equals(initial));
+    REQUIRE(button->resolved_style().label.color.approx_equals(initial));
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(6.0F));
+
+    color.set(changed);
+    radius.set(24.0F);
+
+    REQUIRE(label->color().approx_equals(changed));
+    REQUIRE(button->resolved_style().label.color.approx_equals(changed));
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(24.0F));
+}
+
+TEST_CASE(
     "BuildContext text fields synchronize writable string signals",
     "[authoring][binding]"
 ) {

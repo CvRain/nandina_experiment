@@ -226,6 +226,13 @@ dialog_tests = executable(
 )
 test('dialog', dialog_tests)
 
+animation_tests = executable(
+    'animation_tests',
+    files('animation_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('animation', animation_tests)
+
 system_fonts_tests = executable(
     'system_fonts_tests',
     files('system_fonts_tests.cpp'),
