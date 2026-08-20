@@ -4,6 +4,7 @@
 
 #include "settings_example.hpp"
 
+#include "animation/behavior.hpp"
 #include "foundation/geometry.hpp"
 #include "theme/builtin_themes.hpp"
 #include "widget/controls.hpp"
@@ -70,6 +71,8 @@ namespace nandina::examples::settings
         });
 
         // 嵌套内容 router（真实 StackView）：侧边栏切换 section 页，About 推 detail 页。
+        // 开启页面转场：replace/push/pop 淡入淡出，且被替换页面的生命周期在淡出期间保留；
+        // 全局 reduced-motion 打开时由 AnimationHost 统一直跳。
         content_ = std::make_unique<app::NanRouter>(
             context.graph(),
             context.theme_manager(),
@@ -81,6 +84,8 @@ namespace nandina::examples::settings
             &context.dispatcher(),
             nullptr
         );
+        content_->set_transition_enabled(true);
+        content_->set_transition_duration(0.22F);
         content_->push<GeneralPage>();
 
         auto nav_button = [&ui](const std::string& text, auto&& action) {
@@ -361,6 +366,22 @@ namespace nandina::examples::settings
                                    })
                                    .build();
 
+        // 声明式动画示范：点击让圆角在 4 ↔ 24 之间平滑过渡（reduced-motion 下由 Host 直跳）。
+        auto& motion_radius = ui.signal<float>(4.0F);
+        auto motion_button = ui.make<widget::Button>("Animate corner radius")
+                                 .behavior(
+                                     widget::visual::container.radius,
+                                     animation::Behavior<float>(0.3F, animation::Easing::ease_in_out)
+                                 )
+                                 .bind(widget::visual::container.radius, motion_radius)
+                                 .on_click([&motion_radius] {
+                                     motion_radius.set(motion_radius.peek() > 12.0F ? 4.0F : 24.0F);
+                                 })
+                                 .build();
+        auto& motion_label = ui.computed([&motion_radius] {
+            return std::format("Corner radius · {:.0f}px", motion_radius.get());
+        });
+
         auto content =
             ui.column()
                 .gap(12.0F)
@@ -446,7 +467,11 @@ namespace nandina::examples::settings
                                 .color_token(theme::ColorToken::on_surface_variant)
                         )
                         .build(),
-                    cycle_treatment
+                    cycle_treatment,
+                    ui.make<widget::Label>("Motion").font_size(18.0F),
+                    motion_button,
+                    ui.make<widget::Label>(motion_label)
+                        .color_token(theme::ColorToken::on_surface_variant)
                 );
         return ui.padding(foundation::NanInsets::all(20.0F))
             .child(ui.scroll_view().child(content))

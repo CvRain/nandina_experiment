@@ -97,6 +97,18 @@ namespace
             return radio.label() == label;
         });
     }
+
+    /// 推进页面转场直至完成（淡入淡出 + 延迟 drop 的 detach）。
+    void settle_transition(scene::NanSceneTree& tree) {
+        for (int i = 0; i < 30; ++i) {
+            tree.process(1.0F / 60.0F);
+            tree.flush_tree_mutations();
+            {
+                auto phase = tree.enter_phase(scene::FramePhase::animation);
+                tree.advance_animations(1.0F / 60.0F);
+            }
+        }
+    }
 } // namespace
 
 TEST_CASE(
@@ -384,6 +396,7 @@ TEST_CASE(
         {.action = semantics::Action::activate}
     ));
     REQUIRE(dispatcher.drain() == 1);
+    settle_transition(tree);
     REQUIRE(radio_named(*router.host(), "Dark") != nullptr);
     REQUIRE(button_named(*router.host(), "Save preferences") == nullptr);
 
@@ -396,6 +409,7 @@ TEST_CASE(
         {.action = semantics::Action::activate}
     ));
     REQUIRE(dispatcher.drain() == 1);
+    settle_transition(tree);
     auto* detail_button = button_named(*router.host(), "Open component detail");
     REQUIRE(detail_button != nullptr);
 
@@ -406,6 +420,7 @@ TEST_CASE(
         {.action = semantics::Action::activate}
     ));
     REQUIRE(dispatcher.drain() == 1);
+    settle_transition(tree);
     auto* back = button_named(*router.host(), "Back");
     REQUIRE(back != nullptr);
     REQUIRE(
@@ -422,6 +437,7 @@ TEST_CASE(
         tree.perform_semantics_action(back->semantics_id(), {.action = semantics::Action::activate})
     );
     REQUIRE(dispatcher.drain() == 1);
+    settle_transition(tree);
     REQUIRE(button_named(*router.host(), "Open component detail") != nullptr);
     REQUIRE(
         find_node<widget::Label>(
