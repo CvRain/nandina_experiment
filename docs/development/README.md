@@ -46,7 +46,7 @@ Core principles:
 - Prefer one source of truth. `resources.toml` is the only human resource inventory; generated lock/package data and Meson wiring derive from it.
 - Separate delivery from semantics: the resource layer knows font bytes, the font registry knows logical families/faces/fallbacks, and the style layer decides which family a component requests.
 - Use tokens for theme-dependent values and literals for deliberate fixed overrides. Never write resolved theme values back into local component style.
-- Inherit only properties whose semantics are naturally inherited, primarily typography, text color, direction, locale, and opacity. Background, border, padding, layout, shadow, and component variants remain local unless explicitly forced to inherit.
+- Inherit only properties whose semantics are naturally inherited, primarily typography, text color, direction, and locale. Background, border, padding, layout, shadow, and component variants remain local unless explicitly forced to inherit. Opacity is not a style property: it is the node-local `NanNode2D::local_opacity`.
 - Theme changes recompute token-backed values; literal instance overrides remain unchanged. Child widgets with no local typography override follow the nearest inherited style, while non-inherited properties continue to use their own component defaults.
 - Application code should describe state, UI projection, and user intent. Tree mutation, subscription lifetime, keyed reuse, dirty propagation, and post-layout work belong to the framework.
 - Only the UI thread mutates widgets. Background work returns through a UI dispatcher and is cancelled with the owning scope.
@@ -528,9 +528,9 @@ Status: complete.
 
 Replace the scene-wide fixed default `TextPipeline` assumption with a window font-resolution context backed by `FontFamilyRegistry` and `FontPipelineCache`. Extend text style/request with logical family, weight, and slant. Add imperative controls such as `set_font_family()`, `set_font_weight()`, and `set_font()`; explicit low-level pipelines remain a supported override.
 
-Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, locale/direction, and opacity inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not.
+Introduce four-state style values: unset, inherit, initial, and explicit value. Typography, text color, and locale/direction inherit by default. Background, border, radius, padding, layout, shadow, and component variants do not. Opacity is not a style property: it is the node-local `NanNode2D::local_opacity`.
 
-`StyleContext` is stored on every scene node and resolves against the nearest parent into a `ResolvedStyleContext`. Changes propagate immediately through attached or detached subtrees; detaching a node clears inherited results, while `initial` cuts a single property back to its framework default. Text primitives consume inherited font requests, font size, and color unless an instance setter or complete `TextStyle` has supplied an explicit override. Resolved opacity multiplies through `DrawContext`, so nested styled subtrees preserve the existing renderer-independent opacity contract.
+`StyleContext` is stored on every scene node and resolves against the nearest parent into a `ResolvedStyleContext`. Changes propagate immediately through attached or detached subtrees; detaching a node clears inherited results, while `initial` cuts a single property back to its framework default. Text primitives consume inherited font requests, font size, and color unless an instance setter or complete `TextStyle` has supplied an explicit override. Opacity threads through `DrawContext` as `effective = parent effective × node local_opacity` (each node multiplies once), keeping the renderer-independent subtree-fade contract without style-level double-counting.
 
 ### A7. NanStyle And ThemeManager
 

@@ -1,9 +1,12 @@
 # 动画 / 过渡系统（Animation & Transitions）
 
 > 状态：1.0 已落地「最小 Tween + easing 曲线 + Tabs/Dialog 两点示范」；
-> 1.1 前四个交付单元已完成：公共 typed visual property path、
-> `AnimatedProperty<T> + Behavior<T>` 值语义、场景树 `AnimationHost`，以及
-> Builder `.bind/.behavior` 与 typed property endpoint。下一单元是 per-node opacity。
+> 1.1 九个交付单元全部完成：公共 typed visual property path、
+> `AnimatedProperty<T> + Behavior<T>` 值语义、场景树 `AnimationHost`，
+> Builder `.bind/.behavior` 与 typed property endpoint、`NanNode2D::local_opacity`
+> （含移除 `StyleContext.opacity` 双重相乘瑕疵）、全局 reduced-motion 下沉、
+> Label/Button 纵向示范、Tabs/Dialog 迁移 + Dialog 状态机、parallel/sequential/stagger
+> 组合器、spring + keyframes，以及 router transition（页面退出保留生命周期）。
 > 关联：Phase 8 Deferred Work「general tween/animation system」。
 
 ## 1. 目标
@@ -28,10 +31,10 @@
   - `Dialog` 打开时 scrim + 面板淡入（`long_duration` + `ease_out`）。
 
 **仍待后续单元解决**：
-- 全局 reduced-motion policy 尚未下沉到 typed endpoint；现有 Tabs/Dialog 仍手写
-  `on_process()`。
-- `Dialog` 内容子节点不淡入（无 per-node opacity，见 §5）。
-- `Dialog` 淡出未做（需把 close 延迟到淡出完成，涉及模态状态机）。
+- 组件语义转场的 motion slot 定制 DSL（`builder.motion(...)`）尚未暴露；Tabs/Dialog 内部已用
+  `AnimatedProperty` + Host，但开发者定制「指示器移动」「Dialog 出入场」的入口待后续单元。
+- 组合器与 router transition（单元 8）：parallel/sequential/stagger 与页面退出保留生命周期。
+- spring / keyframes（单元 9）。
 
 ## 3. 目标架构（QML 式，1.1）
 
@@ -138,6 +141,9 @@ primitive 的字段代理只做校验与转发。`BuildContext::make<T>()` 返�
 - 每次 presentation value 确实变化后才传播该属性声明的 `DirtyFlags`；完成轨道当帧移除。
 - 当前模板 API 要求 `AnimatedProperty` 与 owner 生命周期一致（通常是组件/presentation 成员）；
   后续 Builder 只组合该协议，不再建立第二套轨道所有权。
+- 全局 reduced-motion（单元 6）：Host 通过 `tree_->theme_manager()->reduced_motion()` 读取策略。
+  `set_target` 归约时 `property.finish()` 直跳不注册轨道；`advance()` 归约时 `clear()` 完成全部
+  在途轨道。无 ThemeManager 时视为未归约。策略切换无需 revision 通知，下一帧 `advance` 自会收敛。
 
 动画阶段位于 reactive 之后、layout 之前：
 
@@ -173,6 +179,18 @@ ui.make<widget::Button>("切换状态")
 Behavior 覆盖优先级固定为：实例覆盖 → 组件 recipe motion → theme motion token → 立即更新；
 全局 reduced-motion policy 在最外层强制直跳。resolved theme 值只作为目标来源，不回写 recipe。
 
+单元 9 已落地 spring：`SpringSpec`（stiffness/damping/mass，拒绝非法参数）与 `Spring<T>`
+（半隐式 Euler 积分、settle 判定、retarget 保留速度、`finish` 直跳）。`AnimatedProperty<T>`
+新增 `set_spring/clear_spring`，与 `Behavior` 互斥，浮点类型才启用（`NanColor` 等非浮点用
+`SpringMemberSelector` 惰性选择占位类型，避免约束不满足）。spring 复用同一 Host/时钟/取消/
+retarget，不引入第二套调度器。
+
+单元 9 同时落地 keyframes：`Keyframe<T>`（time + value，时间严格递增且首帧为 0）与
+`Keyframes<T>`（按时间线性插值，复用 `lerp` 故算术类型与 `NanColor` 都可用；插值结果缓存
+使 `value()` 返回稳定引用）。`AnimatedProperty<T>` 新增 `set_keyframes/clear_keyframes`，与
+`Behavior`/`Spring` 互斥，`set_target` 会清除 keyframes 回落 tween/spring。builder
+`.behavior(motion::spring(...))` / `.keyframes(...)` DSL 入口仍留待后续。
+
 ### 3.5 组件内部转场
 
 并非所有动效都应拆成公开数值属性。Tabs 指示器、Dialog 出入场属于组件语义转场，公开
@@ -186,6 +204,12 @@ builder.motion(Dialog::visibility_motion, motion::tween(...));
 组件内部可用一个 `AnimatedProperty<NanRect>` 或 parallel group 实现 slot，但开发者定制的是
 “指示器移动”“Dialog 出入场”，而不是私有几何字段。
 
+单元 7 已落地内部迁移：Tabs 的 `indicator_x_/indicator_width_` 与 Dialog 的 `fade_` 均改为
+`AnimatedProperty<float>` 并由场景树 Host 推进，删除手写 `on_process` tick；Dialog 增加
+`opening/opened/closing/closed` 状态机，`close()` 延迟到淡出完成才隐藏并触发 `on_close_`，
+内容子节点通过覆写 `Dialog::local_opacity()`（`NanNode2D::local_opacity() × fade_.value()`）
+随面板整体淡入淡出。公开的 `builder.motion(...)` slot 定制仍留待后续单元。
+
 ### 3.6 组合（1.1 后段）
 
 ```cpp
@@ -193,6 +217,19 @@ parallel(a, b) / sequential(a, b) / stagger(items, interval)
 ```
 
 用于「面板淡入 + 上移」等复合转场；router 页面切换复用同一 Host、时钟和取消语义。
+
+单元 8 已落地组合器 `animation::Group`：一个 Group 聚合多个类型擦除的 clip（每个 clip 包装
+一个 `AnimatedProperty<T>` 的目标 + `Behavior<T>`），`Group::parallel/sequential/stagger` 只决定
+每个 clip 的触发谓词（全立即 / 前一个完成 / 固定间隔）。`AnimationHost::run(owner, group)`
+把 Group 作为一条轨道推进，复用同一时钟、归约动效与 owner 取消语义；Group 按值移交、由
+Host 持有，规避了「局部 Group 先于场景树析构」的悬垂。Group 只可移动（`sequential` 的
+ready 谓词用指针引用相邻 clip，move 保留缓冲地址、copy 会悬垂）。
+
+单元 8 同时落地 router transition（`NanRouter::set_transition_enabled`，默认关闭=即时切换）：
+开启后每页根包一层 `PageFrame`（`AnimatedProperty<float> opacity` + 覆写 `local_opacity()`），
+push 淡入、pop/replace 淡出；被替换页面移入 `exiting_` 列表，其 scope/async 在淡出期间保留，
+`PageHost::on_process` 轮询淡出完成后才清生命周期并把 detach 延迟到 tree_commit（`remove_child`
+不能出现在 process 阶段）。关闭转场时行为与原先完全一致（host 直接持有页面根）。
 
 ## 4. 开发流程与交付顺序
 
@@ -205,25 +242,43 @@ parallel(a, b) / sequential(a, b) / stagger(items, interval)
 | 2（完成） | `AnimatedProperty<T>` + `Behavior<T>` | target/value 分离、直跳、retarget、负 dt/越界输入测试 |
 | 3（完成） | `AnimationHost` + animation frame phase | 活跃注册、owner 卸载取消、fake clock、正确 DirtyFlags |
 | 4（完成） | Builder `.bind(path, source)` / `.behavior(path, spec)` | 命令式与 DSL 写入同一 target；错误节点/属性组合无法编译 |
-| 5 | `NanNode2D::local_opacity` | 子树只乘一次节点 alpha；不产生随深度指数衰减 |
-| 6 | Label 颜色 + Button container radius 纵向示范 | OKLCH 颜色插值、圆角过渡、reduced motion、绘制结果测试 |
-| 7 | Tabs/Dialog 迁移 | 删除组件手写 tick；Dialog opening/opened/closing/closed 状态机 |
-| 8 | 组合器与 router transition | parallel/sequential/stagger 与页面退出保留生命周期 |
-| 9 | spring / keyframes | 统一时钟、取消、retarget，不引入第二套调度器 |
+| 5（完成） | `NanNode2D::local_opacity` | 子树只乘一次节点 alpha；不产生随深度指数衰减 |
+| 6（完成） | Label 颜色 + Button container radius 纵向示范 | OKLCH 颜色插值、圆角过渡、reduced motion、绘制结果测试 |
+| 7（完成） | Tabs/Dialog 迁移 | 删除组件手写 tick；Dialog opening/opened/closing/closed 状态机 |
+| 8（完成） | 组合器与 router transition | parallel/sequential/stagger 落地；页面退出保留生命周期的 router transition 落地 |
+| 9（完成） | spring / keyframes | spring + keyframes 落地（统一时钟/取消/retarget，不引入第二套调度器） |
 
 每个单元执行：文档状态同步 → 最小实现 → focused tests → 全量测试 → 示例视觉复核 → 提交。
 
 ## 5. Per-node opacity
 
-现有 `DrawContext` 已有 inherited opacity 通道，但 `StyleContext.opacity` 会按继承层级重复解析并
-相乘，不等同于节点局部 alpha。1.1 增加独立 `NanNode2D::local_opacity`：
+现有 `DrawContext` 已有 inherited opacity 通道，但旧实现把 `StyleContext.opacity` 作为
+「默认继承」属性解析（`resolve_style_value(..., inherits_by_default=true)`），再在绘制遍历里
+乘一次，导致深层树中 opacity 随继承层级重复指数衰减（父 0.5、子无覆盖 → 子实际 0.25）。
+1.1 修复并增加独立的 `NanNode2D::local_opacity`：
 
 ```text
 effective opacity = parent effective opacity × node local opacity
 ```
 
-它只在当前节点乘一次，影响整个子树绘制；可见性、输入和 semantics 仍由显式转场状态决定。
-这是 Dialog 内容淡入、页面转场和任意子树动画的基础。
+修复决策（单元 5）：
+
+- 删除 `StyleContext.opacity` / `ResolvedStyleContext.opacity` / `opacity_from_context`
+  这套与节点 alpha 重复的继承属性（其运行时唯一消费者就是绘制乘法），不留冗余旧接口。
+- `NanNode` 新增虚钩子 `local_opacity()`（基类恒 `1.0`），`NanNode2D` 覆写返回局部 alpha，
+  使绘制遍历对任意节点都能「只乘一次局部值」而不依赖 RTTI。
+- `NanNode2D::local_opacity_` 默认 `1.0`；`set_local_opacity()` 拒绝非有限值、clamp 到
+  `[0,1]`，值未变时 no-op。
+- 修改只产生 paint invalidation：`NanNode::mark_paint_dirty()` 沿祖先链找到最近的
+  `NanControl`（或自身）置 `DirtyFlags::paint`，不触碰 layout/semantics。
+- 不影响可见性、输入、semantics：这些仍由显式转场状态决定。
+
+每个节点只乘一次，影响整个子树绘制；这是 Dialog 内容淡入、页面转场和任意子树动画的基础。
+
+验证（headless）：`render_tests` 覆盖父子透明度（父 0.5、子无覆盖 → 0.5 而非 0.25）、
+三层 0.5 嵌套 → 0.125、兄弟隔离与上下文恢复、绘制 alpha 结果；`scene_tests` 覆盖默认值
+1.0、clamp 到 [0,1]、非有限值抛错、透明度不改 visibility，以及 `set_local_opacity` 仅置
+paint dirty（不触 layout/semantics）。全量 `meson test` 40/40 通过。
 
 ## 6. 与 reactive 的关系
 

@@ -203,7 +203,59 @@ readable:
   failures, detached initialization does not spuriously animate, and behavior replacement or
   override clearing synchronously reconciles Host tracks. Per-node opacity is the next review unit;
   endpoint-wide reduced-motion enforcement remains with the later Label/Button visual fixture.
+- Declarative animation unit 5 adds `NanNode2D::local_opacity` and removes the redundant
+  `StyleContext.opacity` inherited property that double-multiplied alpha down the tree. Effective
+  opacity is now `parent effective × node local opacity`, each node multiplying exactly once via a
+  `NanNode::local_opacity()` virtual hook (base opaque, Node2D overrides); `set_local_opacity`
+  validates and clamps to [0,1] then marks only paint dirty through `NanNode::mark_paint_dirty()`
+  (nearest Control ancestor). Opacity no longer affects visibility, input, or semantics. The old
+  "0.5 → 0.25" inheritance test was replaced with parent-child / deep-nesting / sibling-isolation /
+  context-restore draw assertions; 40/40 green.
+- Declarative animation unit 6 wires global reduced-motion into `AnimationHost`: it reads
+  `tree_->theme_manager()->reduced_motion()`, jumps new targets without registering a track, and
+  clears in-flight tracks when the policy toggles on; toggling off resumes normal animation. No
+  per-widget reduced-motion wiring is needed. The Label color / Button container radius vertical
+  slice (OKLCH interpolation + radius transition through `.bind/.behavior`) was already exercised
+  and now additionally proves the reduced-motion path; 40/40 green.
+- Declarative animation unit 7 migrates Tabs and Dialog off hand-written `Tween` ticks. Tabs
+  `indicator_x_/indicator_width_` and Dialog `fade_` are now `AnimatedProperty<float>` driven by the
+  scene `AnimationHost`; Tabs drops `on_process` entirely. Dialog gains an
+  `opening/opened/closing/closed` state machine: `close()` fades out and only hides + fires
+  `on_close_` after the fade completes, and content children fade with the panel by overriding
+  `Dialog::local_opacity()` (`NanNode2D::local_opacity() × fade_.value()`), so title/scrim/panel no
+  longer hand-multiply alpha. A minimal Dialog `on_process` only transitions the state machine (no
+  tween ticking). Reduced-motion stays centralized in the Host. Tests now advance via
+  `AnimationHost` and assert the deferred-close contract; 40/40 green.
+- Declarative animation unit 8 (combinators) adds `animation::Group` with `parallel` /
+  `sequential` / `stagger`: each clip type-erases one `AnimatedProperty<T>` target + `Behavior<T>`
+  and a `ready(elapsed)` trigger predicate (all-immediate / previous-finished / fixed-interval).
+  `AnimationHost::run(owner, group)` hosts the Group as a single track on the same clock, reduced
+  motion, and owner-cancel semantics; the Group is passed by value and owned via shared_ptr so a
+  local Group can never outlive its track, and it is move-only (sequential's ready predicate points
+  at its neighbour clip, which survives move but not copy). Router transition (page-exit lifecycle
+  preservation) builds on this next. Tests cover parallel firing, sequential ordering, stagger
+  intervals, jump-on-finish, and cancel-on-owner-exit; 40/40 green.
+- Declarative animation unit 9 (spring) adds `SpringSpec` (stiffness/damping/mass, rejecting
+  invalid parameters) and `Spring<T>` (semi-implicit Euler integration, settle detection,
+  velocity-preserving retarget, `finish` jump). `AnimatedProperty<T>` gains `set_spring` /
+  `clear_spring`, mutually exclusive with `Behavior`, enabled only for floating-point types via a
+  lazy `SpringMemberSelector` so `NanColor` never instantiates the constrained `Spring`. Spring
+  reuses the same Host/clock/cancel/retarget (no second scheduler). Tests cover overshoot + settle,
+  retarget continuity, finish, invalid specs, and behavior/spring exclusivity; 40/40 green.
+- Declarative animation unit 9 (keyframes) adds `Keyframe<T>` + `Keyframes<T>` (time-value pairs,
+  strictly increasing, first at 0; interpolated via the shared `lerp` so arithmetic and `NanColor`
+  both work, with the interpolated result cached so `value()` returns a stable reference).
+  `AnimatedProperty<T>` gains `set_keyframes` / `clear_keyframes`, mutually exclusive with
+  `Behavior`/`Spring`, and `set_target` clears keyframes back to tween/spring. Tests cover
+  interpolation, finish-at-last-frame, invalid inputs, and exclusivity; 40/40 green.
+- Declarative animation unit 8 (router transition) adds opt-in page transitions
+  (`NanRouter::set_transition_enabled`, default off = instant). When enabled, each page root is
+  wrapped in a `PageFrame` (`AnimatedProperty<float> opacity` + `local_opacity()` override); push
+  fades in and pop/replace fades out. The replaced page moves to an `exiting_` list so its
+  scope/async stay alive during the fade-out, and `PageHost::on_process` polls for completion before
+  clearing the lifecycle, deferring the tree detach to `tree_commit` (since `remove_child` cannot run
+  in the process phase). With transitions off the router behaves exactly as before. Tests cover
+  fade-in, deferred teardown on pop, and immediate teardown when disabled; 40/40 green.
 - Test suite 40/40 green.
-- Next (planned follow-ups, 1.1): declarative animation (`ANIMATION.md`) incl.
-  per-node opacity, Dialog fade-out/content fade, behavior composition; slider
-  label rendering; multi-font import / custom font loading / i18n language packs.
+- Next (planned follow-ups, 1.1): slider label rendering; multi-font import / custom font loading /
+  i18n language packs.
