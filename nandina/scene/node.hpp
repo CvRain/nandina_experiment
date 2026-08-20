@@ -162,6 +162,11 @@ namespace nandina::scene
         [[nodiscard]] auto resolved_semantics_properties() const -> semantics::Properties;
         void mark_semantics_dirty();
 
+        /// Paint-only invalidation: marks the nearest `NanControl` ancestor (or this
+        /// node itself when it is a Control) paint-dirty. Node-local visual changes
+        /// such as opacity use this instead of touching layout/semantics.
+        void mark_paint_dirty();
+
         // ---- lifecycle (override in subclasses) ----
 
         /// Called when the node enters the tree (top-down: parent before children).
@@ -204,6 +209,11 @@ namespace nandina::scene
         /// True if this node should be drawn / hit-tested in the active tree.
         /// A false return means this node AND all descendants are skipped.
         [[nodiscard]] virtual auto is_visible_in_tree() const -> bool;
+
+        /// Local alpha in [0,1] applied once to this node during draw traversal.
+        /// Base nodes are opaque (1.0); NanNode2D overrides to expose a mutable value.
+        /// The DrawContext effective opacity is `parent effective × local_opacity()`.
+        [[nodiscard]] virtual auto local_opacity() const -> float;
 
         /// Safe down-cast to NanNode2D without RTTI.
         /// Base returns nullptr; NanNode2D overrides to return itself.

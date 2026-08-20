@@ -7,6 +7,10 @@
 #include "canvas_layer.hpp"
 #include "scene_tree.hpp"
 
+#include <algorithm>
+#include <cmath>
+#include <stdexcept>
+
 namespace nandina::scene
 {
 
@@ -150,6 +154,24 @@ namespace nandina::scene
     void NanNode2D::set_visible(const bool v) {
         visible_ = v;
         mark_semantics_dirty();
+    }
+
+    // ---- opacity ----
+
+    auto NanNode2D::local_opacity() const -> float {
+        return local_opacity_;
+    }
+
+    void NanNode2D::set_local_opacity(const float opacity) {
+        if (!std::isfinite(opacity)) {
+            throw std::invalid_argument("NanNode2D::set_local_opacity: opacity must be finite");
+        }
+        const float clamped = std::clamp(opacity, 0.0F, 1.0F);
+        if (local_opacity_ == clamped) {
+            return;
+        }
+        local_opacity_ = clamped;
+        mark_paint_dirty();
     }
 
     // ---- draw order ----

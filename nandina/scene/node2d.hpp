@@ -86,6 +86,14 @@ namespace nandina::scene
         [[nodiscard]] auto visible() const -> bool;
         void set_visible(bool v);
 
+        // ---- opacity ----
+
+        /// Local alpha in [0,1]; default 1.0 (opaque). Multiplied once with the
+        /// parent effective opacity during draw traversal. Affects the whole
+        /// subtree's paint, but not visibility, input, or semantics.
+        [[nodiscard]] auto local_opacity() const -> float override;
+        void set_local_opacity(float opacity);
+
         // ---- draw order ----
 
         /// z_index controls sibling draw order. Higher values draw on top.
@@ -146,6 +154,7 @@ namespace nandina::scene
         foundation::NanTransform2D transform_;
         bool visible_ = true;
         int z_index_ = 0;
+        float local_opacity_ = 1.0F;
 
         mutable foundation::NanTransform2D cached_global_;
         mutable bool global_invalid_ = true;

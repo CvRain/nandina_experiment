@@ -59,7 +59,6 @@ namespace nandina::theme
         StyleValue<text::FontRequest> font;
         StyleValue<float> font_size;
         StyleValue<foundation::NanColor> text_color;
-        StyleValue<float> opacity;
         StyleValue<std::string> locale;
         StyleValue<TextDirection> direction;
     };
@@ -70,13 +69,11 @@ namespace nandina::theme
         foundation::NanColor text_color = foundation::NanColor::from(
             foundation::NanHexRgb {.red = 255, .green = 255, .blue = 255, .alpha = 255}
         );
-        float opacity = 1.0F;
         std::string locale = "und";
         TextDirection direction = TextDirection::automatic;
         bool font_from_context = false;
         bool font_size_from_context = false;
         bool text_color_from_context = false;
-        bool opacity_from_context = false;
         bool locale_from_context = false;
         bool direction_from_context = false;
     };
@@ -132,12 +129,6 @@ namespace nandina::theme
                 inherited != nullptr ? &inherited->text_color : nullptr,
                 true
             ),
-            .opacity = resolve_style_value(
-                local.opacity,
-                initial.opacity,
-                inherited != nullptr ? &inherited->opacity : nullptr,
-                true
-            ),
             .locale = resolve_style_value(
                 local.locale,
                 initial.locale,
@@ -160,9 +151,6 @@ namespace nandina::theme
             .text_color_from_context = resolves_from_context(
                 local.text_color.state(),
                 inherited != nullptr && inherited->text_color_from_context
-            ),
-            .opacity_from_context = resolves_from_context(
-                local.opacity.state(), inherited != nullptr && inherited->opacity_from_context
             ),
             .locale_from_context = resolves_from_context(
                 local.locale.state(), inherited != nullptr && inherited->locale_from_context

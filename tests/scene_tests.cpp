@@ -13,7 +13,9 @@
 #include "scene/scene_tree.hpp"
 
 #include <functional>
+#include <limits>
 #include <memory>
+#include <stdexcept>
 #include <string>
 #include <vector>
 
@@ -622,14 +624,12 @@ TEST_CASE("modifiers propagate through button and key events", "[scene][modifier
 TEST_CASE("StyleContext resolves four-state inherited values", "[scene][style]") {
     const auto inherited = theme::ResolvedStyleContext {
         .font_size = 24.0F,
-        .opacity = 0.6F,
         .locale = "zh-CN",
         .direction = theme::TextDirection::left_to_right,
     };
 
     theme::StyleContext local;
     local.font_size = theme::StyleValue<float>::initial();
-    local.opacity = theme::StyleValue<float>::explicit_value(0.8F);
     local.locale = theme::StyleValue<std::string>::inherit();
     local.direction = theme::StyleValue<theme::TextDirection>::explicit_value(
         theme::TextDirection::right_to_left
@@ -637,7 +637,6 @@ TEST_CASE("StyleContext resolves four-state inherited values", "[scene][style]")
 
     const auto resolved = theme::resolve_style_context(local, &inherited);
     REQUIRE(resolved.font_size == Catch::Approx(16.0F));
-    REQUIRE(resolved.opacity == Catch::Approx(0.8F));
     REQUIRE(resolved.locale == "zh-CN");
     REQUIRE(resolved.direction == theme::TextDirection::right_to_left);
     REQUIRE(theme::resolve_style_value(local.font_size, 12.0F, &inherited.font_size, false)
@@ -652,6 +651,45 @@ TEST_CASE("StyleContext resolves four-state inherited values", "[scene][style]")
         == 3
     );
     REQUIRE_THROWS_AS(local.font_size.value(), std::logic_error);
+}
+
+TEST_CASE("local opacity defaults to opaque, clamps, and rejects non-finite", "[scene][opacity]") {
+    auto node = std::make_shared<scene::NanNode2D>();
+    REQUIRE(node->local_opacity() == Catch::Approx(1.0F));
+
+    node->set_local_opacity(0.25F);
+    REQUIRE(node->local_opacity() == Catch::Approx(0.25F));
+
+    node->set_local_opacity(2.0F);
+    REQUIRE(node->local_opacity() == Catch::Approx(1.0F));
+
+    node->set_local_opacity(-0.5F);
+    REQUIRE(node->local_opacity() == Catch::Approx(0.0F));
+
+    // Opacity does not flip visibility: a fully transparent node stays visible.
+    REQUIRE(node->visible());
+
+    REQUIRE_THROWS_AS(
+        node->set_local_opacity(std::numeric_limits<float>::quiet_NaN()),
+        std::invalid_argument
+    );
+    REQUIRE_THROWS_AS(
+        node->set_local_opacity(std::numeric_limits<float>::infinity()),
+        std::invalid_argument
+    );
+}
+
+TEST_CASE("local opacity change marks only paint dirty", "[scene][opacity]") {
+    auto control = std::make_shared<scene::NanControl>(foundation::NanSize(10.0F, 10.0F));
+    control->clear_dirty(
+        scene::DirtyFlags::paint | scene::DirtyFlags::layout | scene::DirtyFlags::semantics
+    );
+
+    control->set_local_opacity(0.5F);
+
+    REQUIRE(control->is_dirty(scene::DirtyFlags::paint));
+    REQUIRE_FALSE(control->is_dirty(scene::DirtyFlags::layout));
+    REQUIRE_FALSE(control->is_dirty(scene::DirtyFlags::semantics));
 }
 
 TEST_CASE("StyleContext changes propagate through the scene hierarchy", "[scene][style]") {

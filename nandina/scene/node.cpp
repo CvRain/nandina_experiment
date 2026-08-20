@@ -6,6 +6,7 @@
 #include "../animation/animation_host.hpp"
 #include "../render/draw_context.hpp"
 #include "../theme/theme_manager.hpp"
+#include "control.hpp"
 #include "node2d.hpp"
 #include "scene_tree.hpp"
 
@@ -301,6 +302,19 @@
         }
     }
 
+    auto NanNode::local_opacity() const -> float {
+        return 1.0F;
+    }
+
+    void NanNode::mark_paint_dirty() {
+        for (auto* node = this; node != nullptr; node = node->parent()) {
+            if (auto* control = node->as_control(); control != nullptr) {
+                control->mark_dirty(DirtyFlags::paint);
+                return;
+            }
+        }
+    }
+
     void NanNode::on_enter_tree() {}
     void NanNode::on_ready() {}
     void NanNode::on_exit_tree() {}
@@ -477,7 +491,7 @@
         // Update world transform for this node (virtual: no RTTI in traversal).
         const auto saved_world = _push_draw_transform(ctx);
         const float saved_opacity = ctx.opacity_;
-        ctx.opacity_ *= std::clamp(resolved_style_context_.opacity, 0.0F, 1.0F);
+        ctx.opacity_ *= local_opacity();
 
         on_draw(ctx);
 

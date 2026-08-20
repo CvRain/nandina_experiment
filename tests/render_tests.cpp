@@ -433,30 +433,63 @@ TEST_CASE("nested control overflow clips are intersected", "[render][clip][contr
     REQUIRE(dev.clips[3].cleared);
 }
 
-TEST_CASE("inherited opacity multiplies down the tree", "[render][opacity]") {
+TEST_CASE("node local opacity multiplies once per node (no exponential decay)", "[render][opacity]") {
     RecordingDevice dev;
     scene::NanSceneTree tree;
     auto root = std::make_shared<RectNode>(1.0F);
-    auto inherited_child = std::make_shared<RectNode>(1.0F);
-    auto initial_child = std::make_shared<RectNode>(1.0F);
+    auto child = std::make_shared<RectNode>(1.0F);
 
-    theme::StyleContext root_style;
-    root_style.opacity = theme::StyleValue<float>::explicit_value(0.5F);
-    root->set_style_context(root_style);
-
-    theme::StyleContext initial_style;
-    initial_style.opacity = theme::StyleValue<float>::initial();
-    initial_child->set_style_context(initial_style);
-    root->add_child(inherited_child);
-    root->add_child(initial_child);
+    root->set_local_opacity(0.5F);
+    root->add_child(child);
     tree.set_root(root);
+    tree.draw(dev);
 
+    REQUIRE(dev.rects.size() == 2);
+    REQUIRE(dev.rects[0].alpha == Catch::Approx(0.5F)); // root: 0.5
+    REQUIRE(dev.rects[1].alpha == Catch::Approx(0.5F)); // child: 0.5 × 1.0 (not 0.25)
+}
+
+TEST_CASE("deep nesting multiplies each local opacity exactly once", "[render][opacity]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto a = std::make_shared<RectNode>(1.0F);
+    auto b = std::make_shared<RectNode>(1.0F);
+    auto c = std::make_shared<RectNode>(1.0F);
+
+    a->set_local_opacity(0.5F);
+    b->set_local_opacity(0.5F);
+    c->set_local_opacity(0.5F);
+    b->add_child(c);
+    a->add_child(b);
+    tree.set_root(a);
     tree.draw(dev);
 
     REQUIRE(dev.rects.size() == 3);
     REQUIRE(dev.rects[0].alpha == Catch::Approx(0.5F));
     REQUIRE(dev.rects[1].alpha == Catch::Approx(0.25F));
-    REQUIRE(dev.rects[2].alpha == Catch::Approx(0.5F));
+    REQUIRE(dev.rects[2].alpha == Catch::Approx(0.125F));
+}
+
+TEST_CASE("sibling opacity is isolated and the context restores after a subtree", "[render][opacity]") {
+    RecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<RectNode>(1.0F);
+    auto faded = std::make_shared<RectNode>(1.0F);
+    auto faded_child = std::make_shared<RectNode>(1.0F);
+    auto sibling = std::make_shared<RectNode>(1.0F);
+
+    faded->set_local_opacity(0.5F);
+    faded->add_child(faded_child);
+    root->add_child(faded);
+    root->add_child(sibling);
+    tree.set_root(root);
+    tree.draw(dev);
+
+    REQUIRE(dev.rects.size() == 4);
+    REQUIRE(dev.rects[0].alpha == Catch::Approx(1.0F)); // root
+    REQUIRE(dev.rects[1].alpha == Catch::Approx(0.5F)); // faded subtree root
+    REQUIRE(dev.rects[2].alpha == Catch::Approx(0.5F)); // faded child (0.5 × 1.0)
+    REQUIRE(dev.rects[3].alpha == Catch::Approx(1.0F)); // sibling restored to opaque
 }
 
 TEST_CASE("canvas layers draw by layer order and reset their transform", "[render][canvas-layer]") {
