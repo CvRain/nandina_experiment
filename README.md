@@ -42,7 +42,7 @@ Layout, input, text, render device, platform window
 | `widget/` | 语义组件 + primitive（box/shadow/focus/ripple/text/pressable）+ 布局 |
 | `semantics/` | 可访问性树（Role/State/Action） |
 | `app/` | NanApplication/NanWindow/NanRouter（keep-alive 页栈）/Page/Store |
-| `animation/` | easing、`Tween<T>`、`Behavior<T>`、`AnimatedProperty<T>`、场景树 `AnimationHost` |
+| `animation/` | easing、`Tween<T>`、`Behavior<T>`、`AnimatedProperty<T>`、typed endpoint、场景树 `AnimationHost` |
 
 ## 已实现能力
 
@@ -59,7 +59,8 @@ Layout, input, text, render device, platform window
 - **路由**：`NanRouter`（keep-alive 页栈 + push/pop/replace + 参数页 + 生命周期）；
   示例用「侧边栏 + 嵌套 router」的 settings dashboard 承载。
 - **动画**：easing + `Tween<T>`；`Behavior<T>` 与 `AnimatedProperty<T>` 完成 target/value
-  值语义；场景树 `AnimationHost` 在 reactive 与 layout 之间只推进活跃轨道。
+  值语义；typed property endpoint 将 Builder `.bind/.behavior`、命令式 setter 与场景树
+  `AnimationHost` 汇入同一 target，并在 reactive 与 layout 之间只推进活跃轨道。
   Tabs 下划线与 Dialog 淡入仍待迁移到 Host。
 - **字体**：系统字体发现 + CJK 回退（Noto Sans CJK / 思源黑体 / Sarasa / 苹方 / 微软雅黑 /
   文泉驿…），内置拉丁字体缺字自动落系统字体。
@@ -89,8 +90,8 @@ sqlite3、tomlplusplus、box2d（可选）、Catch2。C++26（clang/gcc）。
 
 - **1.0（收尾中）**：上述能力全部落地；`tests/` 40/40 绿。
 - **1.1（进行中）**：声明式可定制动画系统（typed visual property、
-  `AnimatedProperty<T>` + `Behavior`、AnimationHost 已完成；后续为 Builder behavior、
-  per-node opacity、Dialog 淡出/内容淡入、组合器）；
+  `AnimatedProperty<T>` + `Behavior`、AnimationHost、Builder bind/behavior endpoint 已完成；
+  后续为 per-node opacity、Dialog 淡出/内容淡入、组合器）；
   slider label 渲染；多字体导入 / 自定义字体加载 / i18n 语言包。
 - **1.2（规划）**：spring 物理、keyframes、路由转场；Vulkan/SDL 后端评估。
 

@@ -195,7 +195,14 @@ readable:
   paint/layout/semantics dirty flags only when presentation values change, and completes plus
   cancels tracks synchronously when owners exit the tree. Manual-clock, retarget, cross-tree,
   clear, parent layout propagation, and keep-alive detach regressions are covered headlessly.
-  Builder `.behavior(path, spec)` and endpoint-to-Host wiring are the next review unit.
+  Builder `.behavior(path, spec)` and endpoint-to-Host wiring are layered on this contract.
+- Declarative animation unit 4 adds reusable owner-aware property endpoints and makes
+  BuildContext-authored builders carry their current reactive scope. `.bind(path, source)` and
+  `.behavior(path, spec)` now converge with ordinary setters on one logical target; Text and Box
+  primitives expose the same protocol, invalid part/field combinations remain compile-time
+  failures, detached initialization does not spuriously animate, and behavior replacement or
+  override clearing synchronously reconciles Host tracks. Per-node opacity is the next review unit;
+  endpoint-wide reduced-motion enforcement remains with the later Label/Button visual fixture.
 - Test suite 40/40 green.
 - Next (planned follow-ups, 1.1): declarative animation (`ANIMATION.md`) incl.
   per-node opacity, Dialog fade-out/content fade, behavior composition; slider

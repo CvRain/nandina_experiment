@@ -1,9 +1,9 @@
 # 动画 / 过渡系统（Animation & Transitions）
 
 > 状态：1.0 已落地「最小 Tween + easing 曲线 + Tabs/Dialog 两点示范」；
-> 1.1 前三个交付单元已完成：公共 typed visual property path、
-> `AnimatedProperty<T> + Behavior<T>` 值语义，以及场景树 `AnimationHost`。
-> 下一单元是 Builder `.behavior(path, spec)` 与属性 endpoint 接线。
+> 1.1 前四个交付单元已完成：公共 typed visual property path、
+> `AnimatedProperty<T> + Behavior<T>` 值语义、场景树 `AnimationHost`，以及
+> Builder `.bind/.behavior` 与 typed property endpoint。下一单元是 per-node opacity。
 > 关联：Phase 8 Deferred Work「general tween/animation system」。
 
 ## 1. 目标
@@ -21,12 +21,15 @@
 - `animation/behavior.hpp`：类型化属性的时长、缓动与启用策略；拒绝负数及非有限时长。
 - `animation/animated_property.hpp`：逻辑 `target` 与呈现 `value` 分离；无 Behavior、禁用、
   零时长时直跳，中途换目标从当前 `value` 连续 retarget。
+- `animation/property_endpoint.hpp`：primitive 可复用的 owner-aware endpoint；未挂载时初始化
+  直跳，挂载后把 target 交给所属场景树 Host，并负责行为变更和 override 清除时注销轨道。
 - 两个示范：
   - `Tabs` 下划线指示条 `indicator_x_/indicator_width_` 切换时滑动（`medium_duration`）。
   - `Dialog` 打开时 scrim + 面板淡入（`long_duration` + `ease_out`）。
 
 **仍待后续单元解决**：
-- 属性 endpoint 尚未接入 `AnimationHost`；现有 Tabs/Dialog 仍手写 `on_process()`。
+- 全局 reduced-motion policy 尚未下沉到 typed endpoint；现有 Tabs/Dialog 仍手写
+  `on_process()`。
 - `Dialog` 内容子节点不淡入（无 per-node opacity，见 §5）。
 - `Dialog` 淡出未做（需把 close 延迟到淡出完成，涉及模态状态机）。
 
@@ -108,6 +111,12 @@ label->set_color(color);                            // 命令式
 ui.bind(label, visual::label.color, color_signal); // 响应式目标
 builder.behavior(visual::label.color, tween);      // 变化行为
 ```
+
+第四单元已实现该入口：`PropertyEndpoint<T>` 持有稳定 `AnimatedProperty<T>`，Box/Text
+primitive 的字段代理只做校验与转发。`BuildContext::make<T>()` 返回的 Builder 携带当前
+`ReactiveScope`，因此 `.bind(path, source)` 的 effect 仍由页面/组件/region scope 管理；
+低层 `authoring::make<T>()` 没有隐式 scope，不能单独建立 binding。`.behavior()` 不拥有
+订阅或时钟，只向同一 endpoint 安装类型匹配的 `Behavior<T>`。
 
 视觉实例属性属于本地显式值，级联优先级高于继承 `StyleContext`、组件 recipe 与 theme token；
 例如 `Button::set_font_size(float)` 与 `visual::label.font_size` 写入同一 presentation 存储，
@@ -195,7 +204,7 @@ parallel(a, b) / sequential(a, b) / stagger(items, interval)
 | 1（完成） | 公共 visual property path + primitive part 暴露 | 支持/不支持的属性组合由 concept 编译期判定；第三方组件无需中心注册 |
 | 2（完成） | `AnimatedProperty<T>` + `Behavior<T>` | target/value 分离、直跳、retarget、负 dt/越界输入测试 |
 | 3（完成） | `AnimationHost` + animation frame phase | 活跃注册、owner 卸载取消、fake clock、正确 DirtyFlags |
-| 4 | Builder `.bind(path, source)` / `.behavior(path, spec)` | 命令式与 DSL 写入同一 target；错误节点/属性组合无法编译 |
+| 4（完成） | Builder `.bind(path, source)` / `.behavior(path, spec)` | 命令式与 DSL 写入同一 target；错误节点/属性组合无法编译 |
 | 5 | `NanNode2D::local_opacity` | 子树只乘一次节点 alpha；不产生随深度指数衰减 |
 | 6 | Label 颜色 + Button container radius 纵向示范 | OKLCH 颜色插值、圆角过渡、reduced motion、绘制结果测试 |
 | 7 | Tabs/Dialog 迁移 | 删除组件手写 tick；Dialog opening/opened/closing/closed 状态机 |
