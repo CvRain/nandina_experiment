@@ -220,6 +220,35 @@ namespace
             return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
         }
     };
+
+    struct TeardownParams {
+        bool* destroyed = nullptr;
+    };
+
+    class TeardownPage final: public app::NanPageT<TeardownParams> {
+    public:
+        explicit TeardownPage(TeardownParams params): NanPageT(params) {}
+
+        ~TeardownPage() override {
+            *params().destroyed = true;
+        }
+
+        [[nodiscard]] auto route_key() const -> std::string_view override {
+            return "teardown";
+        }
+
+        [[nodiscard]] auto build(app::PageContext&) -> std::shared_ptr<scene::NanNode2D> override {
+            return std::make_shared<scene::NanControl>(foundation::NanSize(80, 40));
+        }
+    };
+
+    void tick_router(scene::NanSceneTree& tree, const float dt) {
+        tree.process(dt);
+        {
+            auto phase = tree.enter_phase(scene::FramePhase::animation);
+            tree.advance_animations(dt);
+        }
+    }
 } // namespace
 
 TEST_CASE("router pushes keep-alive pages and toggles top visibility", "[app][router]") {
@@ -651,4 +680,63 @@ TEST_CASE("router clear deactivates active page", "[app][router][lifecycle]") {
 
     router.clear();
     REQUIRE(log.deactivations == 1);
+}
+
+TEST_CASE("router transition fades pages in and preserves lifecycle on exit", "[app][router][transition]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    router.set_transition_enabled(true);
+    router.set_transition_duration(0.2F);
+
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+
+    router.push<PlainPage>();
+    bool destroyed = false;
+    router.push<TeardownPage>(TeardownParams {.destroyed = &destroyed});
+    REQUIRE(router.depth() == 2);
+    REQUIRE_FALSE(destroyed);
+
+    // 开启转场后，host 的直接子节点是包装帧；顶层页淡入（opacity 从 0 开始）。
+    auto* top_frame = router.host()->get_child(1)->as_control();
+    REQUIRE(top_frame != nullptr);
+    REQUIRE(top_frame->local_opacity() < 1.0F);
+
+    // 推进到淡入完成，进入稳定打开状态。
+    for (int i = 0; i < 30; ++i) {
+        tick_router(tree, 1.0F / 60.0F);
+    }
+    REQUIRE(top_frame->local_opacity() == Catch::Approx(1.0F));
+
+    // pop：栈深度立即减少，但被替换页面的生命周期在淡出期间仍保留。
+    REQUIRE(router.pop());
+    REQUIRE(router.depth() == 1);
+    REQUIRE_FALSE(destroyed);
+
+    // 淡出完成后，drop 轮询销毁页面。
+    for (int i = 0; i < 30; ++i) {
+        tick_router(tree, 1.0F / 60.0F);
+    }
+    REQUIRE(destroyed);
+}
+
+TEST_CASE("router with transition disabled drops pages immediately", "[app][router][transition]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    app::NanRouter router {graph, themes};
+    REQUIRE_FALSE(router.transition_enabled());
+
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+
+    router.push<PlainPage>();
+    bool destroyed = false;
+    router.push<TeardownPage>(TeardownParams {.destroyed = &destroyed});
+
+    // 关闭转场：host 直接持有页面根（无包装），pop 即时销毁。
+    REQUIRE(router.pop());
+    REQUIRE(destroyed);
 }

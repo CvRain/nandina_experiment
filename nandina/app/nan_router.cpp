@@ -4,11 +4,55 @@
 
 #include "nan_router.hpp"
 
+#include "../animation/animated_property.hpp"
+#include "../animation/animation_host.hpp"
+#include "../animation/behavior.hpp"
+#include "../scene/scene_tree.hpp"
+
+#include <cmath>
+
 namespace nandina::app
 {
+    /// 每页的转场包装：承载淡入淡出 opacity 并透传布局。
+    class PageFrame final: public scene::NanControl {
+    public:
+        animation::AnimatedProperty<float> opacity {0.0F};
+
+        [[nodiscard]] auto local_opacity() const -> float override {
+            return NanControl::local_opacity() * opacity.value();
+        }
+
+    protected:
+        [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
+            -> foundation::NanSize override {
+            return constraints.constrain(size());
+        }
+
+        auto on_layout() -> void override {
+            for (std::size_t i = 0; i < child_count(); ++i) {
+                auto* child = get_child(i) != nullptr ? get_child(i)->as_control() : nullptr;
+                if (!child) {
+                    continue;
+                }
+                (void)child->measure_layout(scene::LayoutConstraints::tight(size()));
+                child->layout_to(local_rect());
+            }
+        }
+    };
+
     namespace
     {
         class PageHost final: public scene::NanControl {
+        public:
+            std::function<void()> on_tick;
+
+            void on_process(const float dt) override {
+                (void)dt;
+                if (on_tick) {
+                    on_tick();
+                }
+            }
+
         protected:
             [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
                 -> foundation::NanSize override {
@@ -48,7 +92,9 @@ namespace nandina::app
         font_families_(font_families),
         dispatcher_(dispatcher),
         background_executor_(background_executor),
-        host_(std::make_shared<PageHost>()) {}
+        host_(std::make_shared<PageHost>()) {
+        static_cast<PageHost*>(host_.get())->on_tick = [this] { drop_completed_exits(); };
+    }
 
     NanRouter::NanRouter(
         reactive::Graph& graph,
@@ -117,8 +163,7 @@ namespace nandina::app
             return false;
         }
 
-        drop_frame(frames_.back());
-        frames_.pop_back();
+        remove_top();
         sync_visibility();
         return true;
     }
@@ -152,6 +197,10 @@ namespace nandina::app
             drop_frame(frames_.back());
             frames_.pop_back();
         }
+        for (auto& frame: exiting_) {
+            drop_frame(frame);
+        }
+        exiting_.clear();
     }
 
     auto NanRouter::request_pop() -> bool {
@@ -194,12 +243,23 @@ namespace nandina::app
             throw std::runtime_error("NanRouter::push_page: page build returned null root");
         }
 
-        root->set_visible(false);
-        attach_root(root);
+        std::shared_ptr<PageFrame> frame;
+        if (transition_enabled_) {
+            // 转场时由包装帧控制可见性；页面根保持可见，避免根被标记不可见而失去焦点/命中。
+            frame = std::make_shared<PageFrame>();
+            frame->add_child(root);
+            frame->set_visible(false);
+            attach_root(frame);
+        }
+        else {
+            root->set_visible(false);
+            attach_root(root);
+        }
         frames_.push_back(
             Frame {
                 .page = std::move(page),
                 .root = std::move(root),
+                .frame = std::move(frame),
                 .scope = std::move(scope),
                 .async_scope = std::move(async_scope),
                 .key = {},
@@ -208,6 +268,9 @@ namespace nandina::app
         );
         frames_.back().key = std::string(frames_.back().page->route_key());
         sync_visibility();
+        if (transition_enabled_ && frames_.back().frame) {
+            fade_frame(frames_.back(), 1.0F);
+        }
     }
 
     void NanRouter::sync_visibility() {
@@ -224,7 +287,7 @@ namespace nandina::app
 
         // Set all frames invisible, mark top as visible.
         for (std::size_t i = 0; i < frames_.size(); ++i) {
-            frames_[i].root->set_visible(i + 1 == frames_.size());
+            frame_node(frames_[i])->set_visible(i + 1 == frames_.size());
         }
 
         if (!frames_.empty()) {
@@ -263,7 +326,7 @@ namespace nandina::app
             auto ctx = make_context_for(frame);
             frame.page->on_deactivate(ctx);
         }
-        detach_root(frame.root);
+        detach_root(frame_node(frame));
         if (frame.async_scope != nullptr) {
             frame.async_scope->clear();
         }
@@ -300,6 +363,93 @@ namespace nandina::app
             theme_manager_,
             dispatcher_
         };
+    }
+
+    void NanRouter::set_transition_enabled(const bool enabled) {
+        transition_enabled_ = enabled;
+    }
+
+    auto NanRouter::transition_enabled() const -> bool {
+        return transition_enabled_;
+    }
+
+    void NanRouter::set_transition_duration(const float seconds) {
+        if (!std::isfinite(seconds) || seconds < 0.0F) {
+            throw std::invalid_argument("transition duration must be finite and non-negative");
+        }
+        transition_duration_ = seconds;
+    }
+
+    auto NanRouter::frame_node(const Frame& frame) const -> std::shared_ptr<scene::NanNode2D> {
+        if (frame.frame) {
+            return frame.frame;
+        }
+        return frame.root;
+    }
+
+    void NanRouter::fade_frame(Frame& frame, const float target) {
+        if (!frame.frame) {
+            return;
+        }
+        if (frame.frame->get_tree() == nullptr) {
+            // 未挂载（如 build() 阶段的首次 push）：无 Host 推进，直接跳到目标。
+            frame.frame->opacity.clear_behavior();
+            frame.frame->opacity.set_target(target);
+            return;
+        }
+        frame.frame->opacity.set_behavior(
+            animation::Behavior<float>(transition_duration_, animation::Easing::ease_out)
+        );
+        frame.frame->get_tree()->animation_host().set_target(
+            *frame.frame, frame.frame->opacity, target, scene::DirtyFlags::paint
+        );
+    }
+
+    void NanRouter::remove_top() {
+        if (frames_.empty()) {
+            return;
+        }
+        const bool can_transition = transition_enabled_ && frames_.back().frame
+            && host_ != nullptr && host_->get_tree() != nullptr;
+        if (can_transition) {
+            Frame& outgoing = frames_.back();
+            if (outgoing.active) {
+                outgoing.active = false;
+                auto ctx = make_context_for(outgoing);
+                outgoing.page->on_deactivate(ctx);
+            }
+            fade_frame(outgoing, 0.0F);
+            exiting_.push_back(std::move(outgoing));
+            frames_.pop_back();
+        }
+        else {
+            drop_frame(frames_.back());
+            frames_.pop_back();
+        }
+    }
+
+    void NanRouter::drop_completed_exits() {
+        auto* tree = host_ != nullptr ? host_->get_tree() : nullptr;
+        for (auto it = exiting_.begin(); it != exiting_.end();) {
+            Frame& frame = *it;
+            if (frame.frame && frame.frame->opacity.is_animating()) {
+                ++it;
+                continue;
+            }
+            // 生命周期清理是安全的；树 detach 延迟到 tree_commit（on_process 处于 process 阶段）。
+            if (frame.async_scope != nullptr) {
+                frame.async_scope->clear();
+            }
+            if (frame.scope != nullptr) {
+                frame.scope->clear();
+            }
+            if (auto node = frame_node(frame); tree != nullptr && node != nullptr) {
+                tree->defer_tree_mutation([host = host_, node = std::move(node)]() {
+                    host->remove_child(*node);
+                });
+            }
+            it = exiting_.erase(it);
+        }
     }
 
 } // namespace nandina::app

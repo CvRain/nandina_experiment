@@ -30,6 +30,8 @@
 namespace nandina::app
 {
 
+    class PageFrame;
+
     class NanRouter {
     public:
         explicit NanRouter(
@@ -116,10 +118,7 @@ namespace nandina::app
         template<typename PageT, typename ParamsT>
             requires std::derived_from<PageT, NanPageT<ParamsT>>
         auto replace(ParamsT params) -> PageT& {
-            if (!frames_.empty()) {
-                drop_frame(frames_.back());
-                frames_.pop_back();
-            }
+            remove_top();
             return push<PageT>(std::move(params));
         }
 
@@ -135,10 +134,7 @@ namespace nandina::app
             requires std::derived_from<PageT, NanPageT<typename PageT::Params>>
             && std::default_initializable<PageT>
         auto replace() -> PageT& {
-            if (!frames_.empty()) {
-                drop_frame(frames_.back());
-                frames_.pop_back();
-            }
+            remove_top();
             return push<PageT>();
         }
 
@@ -157,12 +153,20 @@ namespace nandina::app
         [[nodiscard]] auto request_pop_to(std::string route_key) -> bool;
         [[nodiscard]] auto request_clear() -> bool;
 
+        /// 页面转场（默认关闭=即时切换）。开启后 push 淡入、pop/replace 淡出，且淡出
+        /// 完成前保留被替换页面的生命周期（scope/async），随后才销毁。
+        void set_transition_enabled(bool enabled);
+        [[nodiscard]] auto transition_enabled() const -> bool;
+        void set_transition_duration(float seconds);
+
     private:
         using NodePtr = std::shared_ptr<scene::NanNode>;
 
         struct Frame {
             std::unique_ptr<NanPage> page;
             std::shared_ptr<scene::NanNode2D> root;
+            /// 转场包装节点（开启转场时非空，承载每页的淡入淡出 opacity）。
+            std::shared_ptr<PageFrame> frame;
             std::unique_ptr<reactive::ReactiveScope> scope;
             std::unique_ptr<AsyncScope> async_scope;
             std::string key;
@@ -174,6 +178,11 @@ namespace nandina::app
         void attach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void detach_root(const std::shared_ptr<scene::NanNode2D>& root);
         void drop_frame(Frame& frame);
+        /// 移除栈顶：开启转场时淡出并延迟 drop，否则即时 drop。
+        void remove_top();
+        [[nodiscard]] auto frame_node(const Frame& frame) const -> std::shared_ptr<scene::NanNode2D>;
+        void fade_frame(Frame& frame, float target);
+        void drop_completed_exits();
         [[nodiscard]] auto post_command(std::move_only_function<void()> command) -> bool;
         [[nodiscard]] auto make_context_for(Frame& frame) -> PageContext;
 
@@ -189,6 +198,10 @@ namespace nandina::app
         BackgroundExecutor* background_executor_ = nullptr;
         std::shared_ptr<scene::NanControl> host_;
         std::vector<Frame> frames_;
+        /// 淡出中的页面：生命周期（scope/async）保留，淡出完成后销毁。
+        std::vector<Frame> exiting_;
+        bool transition_enabled_ = false;
+        float transition_duration_ = 0.2F;
         std::shared_ptr<void> command_lifetime_ = std::make_shared<int>(0);
     };
 
