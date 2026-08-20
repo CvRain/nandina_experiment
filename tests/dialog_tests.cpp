@@ -74,6 +74,15 @@ namespace
             (void)tree.layout_root(foundation::NanSize(800.0F, 600.0F));
         }
     };
+
+    /// 模拟一帧：process（状态机完成转换）→ animation（Host 推进淡入淡出）。
+    void tick(DialogHarness& harness, const float dt) {
+        harness.dialog->on_process(dt);
+        {
+            auto phase = harness.tree.enter_phase(scene::FramePhase::animation);
+            harness.tree.advance_animations(dt);
+        }
+    }
 } // namespace
 
 TEST_CASE("dialog recipe resolves a translucent scrim and centered panel", "[dialog][theme]") {
@@ -117,8 +126,8 @@ TEST_CASE("dialog fade-in advances without error", "[dialog][animation]") {
     DialogHarness harness;
     harness.dialog->open();
     harness.layout();
-    harness.dialog->on_process(0.5F); // 越过 medium_duration，淡入结束
-    harness.dialog->on_process(0.5F); // 空闲，无操作
+    tick(harness, 0.5F); // 越过 long_duration，淡入结束
+    tick(harness, 0.5F); // 空闲，无操作
     REQUIRE(harness.dialog->is_open());
 }
 
@@ -138,6 +147,11 @@ TEST_CASE("dialog hides its content when closed", "[dialog][visibility]") {
     REQUIRE(button->is_visible_in_tree());
 
     harness.dialog->close();
+    // 淡出期间仍可见（模态），淡出完成后才隐藏。
+    REQUIRE(harness.dialog->is_visible_in_tree());
+    REQUIRE(button->is_visible_in_tree());
+    tick(harness, 0.5F); // 完成淡出
+    tick(harness, 0.5F); // closing → closed，隐藏内容
     REQUIRE_FALSE(harness.dialog->is_visible_in_tree());
     REQUIRE_FALSE(button->is_visible_in_tree());
 }
@@ -235,6 +249,9 @@ TEST_CASE("dialog override adjusts scrim and close callback fires", "[dialog][ov
 
     harness.dialog->open();
     harness.dialog->close();
+    REQUIRE(closes == 0); // 淡出完成前不触发 on_close
+    tick(harness, 0.5F);  // 完成淡出
+    tick(harness, 0.5F);  // closing → closed，触发 on_close
     REQUIRE(closes == 1);
 }
 

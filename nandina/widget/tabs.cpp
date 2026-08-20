@@ -6,6 +6,7 @@
 
 #include "primitives/box_painter.hpp"
 #include "primitives/focus_ring_painter.hpp"
+#include "../animation/animation_host.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
 #include "../scene/scene_tree.hpp"
@@ -199,11 +200,6 @@ namespace nandina::widget
 
     void Tabs::on_theme_changed(const theme::ThemeManager& manager) {
         appearance_ = manager.appearance();
-        reduced_motion_ = manager.reduced_motion();
-        if (reduced_motion_) {
-            indicator_x_.finish();
-            indicator_width_.finish();
-        }
         if (!system_explicit_) {
             system_ = manager.design_system_shared();
             theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
@@ -337,16 +333,6 @@ namespace nandina::widget
         }
     }
 
-    void Tabs::on_process(const float dt) {
-        const bool animating = !indicator_x_.is_finished() || !indicator_width_.is_finished();
-        if (!animating) {
-            return;
-        }
-        (void)indicator_x_.tick(dt);
-        (void)indicator_width_.tick(dt);
-        mark_dirty(scene::DirtyFlags::paint);
-    }
-
     auto Tabs::on_measure(const scene::LayoutConstraints constraints) -> foundation::NanSize {
         const auto style = resolved_style();
         apply_text_styles();
@@ -423,10 +409,12 @@ namespace nandina::widget
         // 空闲时吸附指示条到当前选中项（首次绘制 / 程序化选中 / 主题变化）。
         const bool has = selected_index_ >= 0
             && static_cast<std::size_t>(selected_index_) < label_texts_.size();
-        if (has && indicator_x_.is_finished() && indicator_width_.is_finished()) {
+        if (has && !indicator_x_.is_animating() && !indicator_width_.is_animating()) {
             const auto selected = static_cast<std::size_t>(selected_index_);
-            indicator_x_.reset(tab_offsets_[selected]);
-            indicator_width_.reset(label_texts_[selected]->measured_text_width());
+            indicator_x_.clear_behavior();
+            indicator_width_.clear_behavior();
+            indicator_x_.set_target(tab_offsets_[selected]);
+            indicator_width_.set_target(label_texts_[selected]->measured_text_width());
         }
     }
 
@@ -442,15 +430,31 @@ namespace nandina::widget
         const auto selected = static_cast<std::size_t>(selected_index_);
         const float target_x = tab_offsets_[selected];
         const float target_width = label_texts_[selected]->measured_text_width();
-        if (animate && !reduced_motion_ && labels_.size() > 1) {
+
+        if (animate && labels_.size() > 1) {
             const float duration = system_->tokens.motion.medium_duration;
-            indicator_x_.start(indicator_x_.value(), target_x, duration);
-            indicator_width_.start(indicator_width_.value(), target_width, duration);
-            mark_dirty(scene::DirtyFlags::paint);
+            indicator_x_.set_behavior(animation::Behavior<float>(duration));
+            indicator_width_.set_behavior(animation::Behavior<float>(duration));
         }
         else {
-            indicator_x_.reset(target_x);
-            indicator_width_.reset(target_width);
+            indicator_x_.clear_behavior();
+            indicator_width_.clear_behavior();
+        }
+
+        if (auto* tree = get_tree(); tree != nullptr) {
+            tree->animation_host().set_target(
+                *this, indicator_x_, target_x, scene::DirtyFlags::paint
+            );
+            tree->animation_host().set_target(
+                *this, indicator_width_, target_width, scene::DirtyFlags::paint
+            );
+        }
+        else {
+            // 未挂载：无 Host 推进，直接吸附。
+            indicator_x_.clear_behavior();
+            indicator_width_.clear_behavior();
+            indicator_x_.set_target(target_x);
+            indicator_width_.set_target(target_width);
         }
     }
 

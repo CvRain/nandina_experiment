@@ -2,6 +2,7 @@
 // Theme / Tabs tests.
 //
 
+#include "animation/animation_host.hpp"
 #include "render/render_device.hpp"
 #include "scene/scene_tree.hpp"
 #include "theme/theme_manager.hpp"
@@ -145,16 +146,22 @@ TEST_CASE("tabs selects by index and clamps out-of-range", "[tabs][value]") {
     REQUIRE(tabs->selected_index() == 0);
 }
 
-TEST_CASE("tabs indicator animation advances without error", "[tabs][animation]") {
-    auto tabs = widget::Tabs::create({"A", "B", "C"});
+TEST_CASE("tabs indicator animation advances via the animation host", "[tabs][animation]") {
+    // 不同长度的标签使指示条 x 与宽度都发生变化，从而同时注册两条轨道。
+    auto tabs = widget::Tabs::create({"A", "BB", "CCC"});
     scene::NanSceneTree tree;
     tree.set_root(tabs);
     REQUIRE(tree.layout_root(foundation::NanSize(280.0F, 48.0F)) >= 1);
 
-    tabs->select(1); // 触发下划线切换动画
+    tabs->select(1); // 触发下划线切换动画（注册到 AnimationHost）
     REQUIRE(tabs->selected_index() == 1);
-    tabs->on_process(0.5F); // 越过 medium_duration，动画结束
-    tabs->on_process(0.5F); // 空闲，无操作
+    REQUIRE(tree.animation_host().active_count() == 2); // indicator_x + indicator_width
+
+    {
+        auto phase = tree.enter_phase(scene::FramePhase::animation);
+        tree.advance_animations(0.5F); // 越过 medium_duration，动画结束
+    }
+    REQUIRE(tree.animation_host().active_count() == 0);
     REQUIRE(tabs->selected_index() == 1);
 }
 

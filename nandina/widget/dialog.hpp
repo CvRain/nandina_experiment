@@ -5,7 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_DIALOG_HPP
 #define NANDINA_EXPERIMENT_WIDGET_DIALOG_HPP
 
-#include "../animation/tween.hpp"
+#include "../animation/animated_property.hpp"
 #include "../scene/control.hpp"
 #include "../theme/design_system.hpp"
 #include "primitives/text.hpp"
@@ -62,6 +62,10 @@ namespace nandina::widget
         auto on_draw(render::DrawContext& context) -> void override;
         void on_process(float dt) override;
 
+        /// 淡入淡出通过 per-node opacity 作用于整个子树（含内容子节点），由场景树
+        /// AnimationHost 推进 fade_；此处与任何显式 local_opacity 相乘。
+        [[nodiscard]] auto local_opacity() const -> float override;
+
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
             -> foundation::NanSize override;
@@ -69,16 +73,21 @@ namespace nandina::widget
         [[nodiscard]] auto semantics_properties() const -> semantics::Properties override;
 
     private:
+        enum class DialogPhase { closed, opening, opened, closing };
+
         void apply_text_style();
         [[nodiscard]] auto panel_rect() const -> foundation::NanRect;
         void trap_focus(bool backwards);
+        void start_fade(float target);
+        [[nodiscard]] auto active() const noexcept -> bool {
+            return phase_ != DialogPhase::closed;
+        }
 
         primitives::Text title_text_;
         std::weak_ptr<scene::NanControl> content_;
-        animation::Tween<float> fade_;
-        bool open_ = false;
+        animation::AnimatedProperty<float> fade_ {0.0F};
+        DialogPhase phase_ = DialogPhase::closed;
         bool dismissible_ = true;
-        bool reduced_motion_ = false;
         std::function<void()> on_close_;
         std::shared_ptr<const theme::DesignSystem> system_;
         theme::ColorAppearance appearance_ = theme::ColorAppearance::light;

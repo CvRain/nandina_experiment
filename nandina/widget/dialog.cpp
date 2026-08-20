@@ -4,6 +4,7 @@
 
 #include "dialog.hpp"
 
+#include "../animation/animation_host.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/input_event.hpp"
 #include "../scene/scene_tree.hpp"
@@ -50,7 +51,6 @@ namespace nandina::widget
         system_ =
             std::make_shared<const theme::DesignSystem>(theme::design_system_from_theme(theme));
         theme_view_ = theme;
-        fade_.reset(1.0F);
         set_visible(false); // 初始关闭：隐藏面板与内容子节点。
     }
 
@@ -81,23 +81,18 @@ namespace nandina::widget
     }
 
     void Dialog::open() {
-        if (open_) {
+        if (phase_ == DialogPhase::opening || phase_ == DialogPhase::opened) {
             return;
         }
-        open_ = true;
+        phase_ = DialogPhase::opening;
         set_visible(true);
-        if (reduced_motion_) {
-            fade_.reset(1.0F);
-        }
-        else {
-            // 用 long_duration + ease_out，让面板「浮现」而非「闪现」。
-            fade_.start(
-                0.0F,
-                1.0F,
-                system_->tokens.motion.long_duration,
-                animation::Easing::ease_out
-            );
-        }
+        // 用 long_duration + ease_out，让面板「浮现」而非「闪现」。
+        fade_.set_behavior(
+            animation::Behavior<float>(
+                system_->tokens.motion.long_duration, animation::Easing::ease_out
+            )
+        );
+        start_fade(1.0F);
         request_focus();
         mark_dirty(
             scene::DirtyFlags::paint | scene::DirtyFlags::layout | scene::DirtyFlags::semantics
@@ -105,22 +100,21 @@ namespace nandina::widget
     }
 
     void Dialog::close() {
-        if (!open_) {
+        if (phase_ == DialogPhase::closed || phase_ == DialogPhase::closing) {
             return;
         }
-        open_ = false;
-        fade_.reset(1.0F);
-        set_visible(false);
-        if (on_close_) {
-            on_close_();
-        }
-        mark_dirty(
-            scene::DirtyFlags::paint | scene::DirtyFlags::layout | scene::DirtyFlags::semantics
+        phase_ = DialogPhase::closing;
+        fade_.set_behavior(
+            animation::Behavior<float>(
+                system_->tokens.motion.long_duration, animation::Easing::ease_in
+            )
         );
+        start_fade(0.0F);
+        mark_dirty(scene::DirtyFlags::paint | scene::DirtyFlags::semantics);
     }
 
     auto Dialog::is_open() const -> bool {
-        return open_;
+        return phase_ == DialogPhase::opening || phase_ == DialogPhase::opened;
     }
 
     void Dialog::set_dismissible(const bool dismissible) {
@@ -184,7 +178,6 @@ namespace nandina::widget
 
     void Dialog::on_theme_changed(const theme::ThemeManager& manager) {
         appearance_ = manager.appearance();
-        reduced_motion_ = manager.reduced_motion();
         if (!system_explicit_) {
             system_ = manager.design_system_shared();
             theme_view_ = theme::NanTheme {system_->tokens, system_->palette(appearance_)};
@@ -193,8 +186,12 @@ namespace nandina::widget
         mark_layout_dirty();
     }
 
+    auto Dialog::local_opacity() const -> float {
+        return NanNode2D::local_opacity() * fade_.value();
+    }
+
     auto Dialog::z_index_hint() const -> int {
-        return open_ ? 1 : 0;
+        return active() ? 1 : 0;
     }
 
     auto Dialog::global_bounds() const -> foundation::NanRect {
@@ -202,11 +199,11 @@ namespace nandina::widget
     }
 
     auto Dialog::contains_point(const foundation::NanPoint /*local_point*/) const -> bool {
-        return open_;
+        return active();
     }
 
     auto Dialog::is_focusable() const -> bool {
-        return open_;
+        return active();
     }
 
     auto Dialog::on_input(scene::InputEvent& event) -> bool {
@@ -240,36 +237,31 @@ namespace nandina::widget
     }
 
     auto Dialog::on_draw(render::DrawContext& context) -> void {
-        if (!open_) {
+        if (!active()) {
             return;
         }
         const auto style = resolved_style();
-        const float fade = fade_.value();
         apply_text_style();
         (void)title_text_.measure_layout(scene::LayoutConstraints::loose());
 
-        // 遮罩覆盖整个父容器（淡入）。
+        // 遮罩覆盖整个父容器。context.opacity() 已含 per-node opacity（淡入淡出）。
         const auto full = render::world_bounds_from_local(context.world_transform(), local_rect());
-        const auto scrim = style.scrim.with_alpha(style.scrim.alpha() * fade);
         primitives::BoxPainter::paint(
             context,
             full,
             theme::ResolvedBoxStyle {
-                .fill = scrim,
-                .border = scrim,
+                .fill = style.scrim,
+                .border = style.scrim,
                 .border_width = 0.0F,
                 .radius = 0.0F,
             },
             context.opacity()
         );
 
-        // 居中面板（淡入）。
+        // 居中面板（随同一 fade 淡入淡出）。
         const auto panel_world =
             render::world_bounds_from_local(context.world_transform(), panel_rect());
-        auto panel = style.panel;
-        panel.fill = panel.fill.with_alpha(panel.fill.alpha() * fade);
-        panel.border = panel.border.with_alpha(panel.border.alpha() * fade);
-        primitives::BoxPainter::paint(context, panel_world, panel, context.opacity());
+        primitives::BoxPainter::paint(context, panel_world, style.panel, context.opacity());
 
         const auto title_position = foundation::NanPoint(
             panel_world.get_left() + context.logical_to_screen(style.metrics.padding_x),
@@ -278,16 +270,25 @@ namespace nandina::widget
         title_text_.draw_at(context, title_position);
     }
 
-    void Dialog::on_process(const float dt) {
-        if (fade_.is_finished()) {
-            return;
+    void Dialog::on_process(const float /*dt*/) {
+        // 淡入淡出由 AnimationHost 推进；这里只负责状态机完成转换。
+        if (phase_ == DialogPhase::opening && !fade_.is_animating()) {
+            phase_ = DialogPhase::opened;
         }
-        (void)fade_.tick(dt);
-        mark_dirty(scene::DirtyFlags::paint);
+        else if (phase_ == DialogPhase::closing && !fade_.is_animating()) {
+            phase_ = DialogPhase::closed;
+            set_visible(false);
+            if (on_close_) {
+                on_close_();
+            }
+            mark_dirty(
+                scene::DirtyFlags::paint | scene::DirtyFlags::layout | scene::DirtyFlags::semantics
+            );
+        }
     }
 
     auto Dialog::on_measure(const scene::LayoutConstraints constraints) -> foundation::NanSize {
-        if (!open_) {
+        if (!active()) {
             return constraints.constrain(foundation::NanSize {0.0F, 0.0F});
         }
         return constraints.constrain(
@@ -296,7 +297,7 @@ namespace nandina::widget
     }
 
     auto Dialog::on_layout() -> void {
-        if (!open_) {
+        if (!active()) {
             return;
         }
         const auto style = resolved_style();
@@ -341,7 +342,7 @@ namespace nandina::widget
         return {
             .role = semantics::Role::dialog,
             .label = std::string(title()),
-            .state = {.focusable = open_, .focused = open_},
+            .state = {.focusable = active(), .focused = active()},
         };
     }
 
@@ -380,6 +381,16 @@ namespace nandina::widget
             local_rect().get_center(),
             foundation::NanSize(panel_width, panel_height)
         );
+    }
+
+    void Dialog::start_fade(const float target) {
+        if (auto* tree = get_tree(); tree != nullptr) {
+            tree->animation_host().set_target(*this, fade_, target, scene::DirtyFlags::paint);
+        }
+        else {
+            fade_.clear_behavior();
+            fade_.set_target(target);
+        }
     }
 
     void Dialog::trap_focus(const bool backwards) {
