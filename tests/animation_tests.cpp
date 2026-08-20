@@ -8,8 +8,15 @@
 #include "animation/easing.hpp"
 #include "animation/tween.hpp"
 #include "foundation/nandina_color.hpp"
+#include "reactive/scope.hpp"
+#include "reactive/signal.hpp"
 #include "scene/control.hpp"
 #include "scene/scene_tree.hpp"
+#include "theme/theme_manager.hpp"
+#include "widget/build_context.hpp"
+#include "widget/builtin_component_traits.hpp"
+#include "widget/button.hpp"
+#include "widget/label.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -41,6 +48,13 @@ static_assert(
 );
 static_assert(
     static_cast<int>(scene::FramePhase::animation) < static_cast<int>(scene::FramePhase::layout)
+);
+static_assert(widget::property::Animatable<widget::Label, decltype(widget::visual::label.color)>);
+static_assert(
+    widget::property::Animatable<widget::Button, decltype(widget::visual::container.radius)>
+);
+static_assert(
+    !widget::property::Animatable<widget::Label, decltype(widget::visual::container.radius)>
 );
 
 TEST_CASE("easing curves map 0->0 and 1->1", "[animation][easing]") {
@@ -374,4 +388,142 @@ TEST_CASE(
     REQUIRE_FALSE(probe->paint_value.is_animating());
     REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
     REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
+}
+
+TEST_CASE(
+    "builder bindings and behaviors share scene-owned property endpoints",
+    "[animation][authoring][endpoint]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+
+    const auto initial_color = foundation::NanColor::from_oklch(0.2F, 0.1F, 40.0F);
+    const auto target_color = foundation::NanColor::from_oklch(0.8F, 0.1F, 40.0F);
+    reactive::Signal<foundation::NanColor> color {graph, initial_color};
+    reactive::Signal<float> radius {graph, 4.0F};
+
+    auto label = ui.make<widget::Label>("Animated label")
+                     .bind(widget::visual::label.color, color)
+                     .behavior(
+                         widget::visual::label.color,
+                         animation::Behavior<foundation::NanColor>(1.0F, animation::Easing::linear)
+                     )
+                     .build();
+    auto button = ui.make<widget::Button>("Animated button")
+                      .behavior(
+                          widget::visual::container.radius,
+                          animation::Behavior<float>(1.0F, animation::Easing::linear)
+                      )
+                      .bind(widget::visual::container.radius, radius)
+                      .build();
+
+    auto root = std::make_shared<scene::NanControl>();
+    root->add_child(label);
+    root->add_child(button);
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(root);
+
+    const auto initial_label_endpoint = label->property(widget::visual::color_t {}).value();
+    REQUIRE(initial_label_endpoint != nullptr);
+    REQUIRE(initial_label_endpoint->approx_equals(initial_color));
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(4.0F));
+    REQUIRE(tree.animation_host().active_count() == 0);
+
+    color.set(target_color);
+    radius.set(20.0F);
+    REQUIRE(tree.animation_host().active_count() == 2);
+    REQUIRE(label->color().approx_equals(target_color));
+    REQUIRE(
+        button->visual_part(widget::visual::container_t {})
+            .property(widget::visual::radius_t {})
+            .target()
+        != nullptr
+    );
+    REQUIRE(
+        *button->visual_part(widget::visual::container_t {})
+             .property(widget::visual::radius_t {})
+             .target()
+        == Catch::Approx(20.0F)
+    );
+
+    advance(tree, 0.5F);
+    const auto midpoint = label->property(widget::visual::color_t {}).value()->oklch();
+    REQUIRE(midpoint.light == Catch::Approx(0.5F));
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(12.0F));
+
+    label->set_color(initial_color);
+    widget::property::write(*button, widget::visual::container.radius, 8.0F);
+    REQUIRE(tree.animation_host().active_count() == 2);
+    REQUIRE(label->color().approx_equals(initial_color));
+    REQUIRE(
+        *button->visual_part(widget::visual::container_t {})
+             .property(widget::visual::radius_t {})
+             .target()
+        == Catch::Approx(8.0F)
+    );
+
+    advance(tree, 1.0F);
+    REQUIRE(label->property(widget::visual::color_t {}).value()->approx_equals(initial_color));
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(8.0F));
+    REQUIRE(tree.animation_host().active_count() == 0);
+
+    const auto ignored_color = foundation::NanColor::from_oklch(0.6F, 0.2F, 180.0F);
+    scope.clear();
+    color.set(ignored_color);
+    radius.set(30.0F);
+    REQUIRE(label->color().approx_equals(initial_color));
+    REQUIRE(
+        *button->visual_part(widget::visual::container_t {})
+             .property(widget::visual::radius_t {})
+             .target()
+        == Catch::Approx(8.0F)
+    );
+}
+
+TEST_CASE(
+    "property endpoints reconcile behavior changes and cleared overrides",
+    "[animation][endpoint][lifecycle]"
+) {
+    reactive::Graph graph;
+    auto label = widget::Label::create(graph, "Label");
+    auto button = widget::Button::create("Button");
+    button->set_font_size(12.0F);
+    widget::property::set_behavior(
+        *label,
+        widget::visual::label.color,
+        animation::Behavior<foundation::NanColor>(1.0F, animation::Easing::linear)
+    );
+    widget::property::set_behavior(
+        *button,
+        widget::visual::label.font_size,
+        animation::Behavior<float>(1.0F, animation::Easing::linear)
+    );
+
+    auto root = std::make_shared<scene::NanControl>();
+    root->add_child(label);
+    root->add_child(button);
+    scene::NanSceneTree tree;
+    tree.set_root(root);
+
+    const auto target_color = foundation::NanColor::from_oklch(0.7F, 0.2F, 250.0F);
+    label->set_color(target_color);
+    button->set_font_size(24.0F);
+    REQUIRE(tree.animation_host().active_count() == 2);
+    advance(tree, 0.25F);
+
+    widget::property::set_behavior(
+        *label,
+        widget::visual::label.color,
+        animation::Behavior<foundation::NanColor>(1.0F).set_enabled(false)
+    );
+    REQUIRE(label->property(widget::visual::color_t {}).value()->approx_equals(target_color));
+    REQUIRE(tree.animation_host().active_count() == 1);
+
+    button->clear_font_size();
+    REQUIRE(tree.animation_host().active_count() == 0);
+    advance(tree, 1.0F);
+    REQUIRE(tree.animation_host().active_count() == 0);
 }
