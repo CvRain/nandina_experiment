@@ -109,10 +109,9 @@ namespace nandina::widget
         /// Bind a tracked source to a shared typed visual property path. Unsupported
         /// node/part/field combinations are rejected by the Writable concept.
         template<typename Node, visual::Path Path, typename Source>
-            requires property::Writable<Node, Path>
-                && requires(Source& source) {
-                       { source.get() } -> std::convertible_to<property::value_t<Path>>;
-                   }
+            requires property::Writable<Node, Path> && requires(Source& source) {
+                { source.get() } -> std::convertible_to<property::value_t<Path>>;
+            }
         void bind(const std::shared_ptr<Node>& target, Path path, Source& source) const {
             scope_->effect([weak = std::weak_ptr<Node>(target), path, &source] {
                 if (const auto current = weak.lock()) {
@@ -132,13 +131,10 @@ namespace nandina::widget
                                   std::declval<const BuildContext&>(),
                                   std::declval<Args>()...
                               );
-                          }) {
-                auto result = ComponentTraits<Node>::make(
-                    *this,
-                    std::forward<Args>(args)...
-                );
-                result.guard_callbacks(callback_scope_->lifetime());
-                return result;
+                          })
+            {
+                auto result = ComponentTraits<Node>::make(*this, std::forward<Args>(args)...);
+                return prepare_builder(std::move(result));
             }
             else {
                 static_assert(
@@ -147,8 +143,7 @@ namespace nandina::widget
                     "or a BuildContext-aware constructor"
                 );
                 auto result = make_scoped_component<Node>(std::forward<Args>(args)...);
-                result.guard_callbacks(callback_scope_->lifetime());
-                return result;
+                return prepare_builder(std::move(result));
             }
         }
 
@@ -181,50 +176,57 @@ namespace nandina::widget
             return authoring::from(std::move(owned));
         }
 
-    public:
+        template<typename Node>
+        [[nodiscard]] auto prepare_builder(authoring::NodeBuilder<Node> builder) const
+            -> authoring::NodeBuilder<Node> {
+            builder.guard_callbacks(callback_scope_->lifetime());
+            builder.bind_scope(*scope_);
+            return builder;
+        }
 
+    public:
         [[nodiscard]] auto row() const -> authoring::NodeBuilder<Row> {
-            return authoring::row();
+            return prepare_builder(authoring::row());
         }
 
         [[nodiscard]] auto column() const -> authoring::NodeBuilder<Column> {
-            return authoring::column();
+            return prepare_builder(authoring::column());
         }
 
         [[nodiscard]] auto flex(LayoutAxis axis = LayoutAxis::horizontal) const
             -> authoring::NodeBuilder<Flex> {
-            return authoring::flex(axis);
+            return prepare_builder(authoring::flex(axis));
         }
 
         [[nodiscard]] auto padding(foundation::NanInsets insets) const
             -> authoring::NodeBuilder<Padding> {
-            return authoring::padding(insets);
+            return prepare_builder(authoring::padding(insets));
         }
 
         [[nodiscard]] auto center() const -> authoring::NodeBuilder<Center> {
-            return authoring::center();
+            return prepare_builder(authoring::center());
         }
 
         [[nodiscard]] auto expanded(int flex_factor = 1) const -> authoring::NodeBuilder<Expanded> {
-            return authoring::expanded(flex_factor);
+            return prepare_builder(authoring::expanded(flex_factor));
         }
 
         [[nodiscard]] auto flex_item(scene::LayoutFlexPolicy policy = {}) const
             -> authoring::NodeBuilder<FlexItem> {
-            return authoring::flex_item(policy);
+            return prepare_builder(authoring::flex_item(policy));
         }
 
         [[nodiscard]] auto scroll_view(ScrollAxis axis = ScrollAxis::vertical) const
             -> authoring::NodeBuilder<ScrollView> {
-            return authoring::scroll_view(axis);
+            return prepare_builder(authoring::scroll_view(axis));
         }
 
         [[nodiscard]] auto grid(int columns = 2) const -> authoring::NodeBuilder<Grid> {
-            return authoring::grid(columns);
+            return prepare_builder(authoring::grid(columns));
         }
 
         [[nodiscard]] auto stack() const -> authoring::NodeBuilder<Stack> {
-            return authoring::stack();
+            return prepare_builder(authoring::stack());
         }
 
         template<typename Source, typename TrueFactory>
@@ -237,7 +239,7 @@ namespace nandina::widget
             auto region =
                 Region::create(*graph_, make_branch_factory(std::forward<TrueFactory>(when_true)));
             region->bind(source);
-            return authoring::from(std::move(region));
+            return prepare_builder(authoring::from(std::move(region)));
         }
 
         template<typename Source, typename TrueFactory, typename FalseFactory>
@@ -255,7 +257,7 @@ namespace nandina::widget
                 make_branch_factory(std::forward<FalseFactory>(when_false))
             );
             region->bind(source);
-            return authoring::from(std::move(region));
+            return prepare_builder(authoring::from(std::move(region)));
         }
 
         template<
@@ -309,7 +311,7 @@ namespace nandina::widget
                 std::move(update_node)
             );
             view->set_model(source);
-            return authoring::from(std::move(view));
+            return prepare_builder(authoring::from(std::move(view)));
         }
 
     private:

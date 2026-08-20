@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_VISUAL_PROPERTY_HPP
 #define NANDINA_EXPERIMENT_WIDGET_VISUAL_PROPERTY_HPP
 
+#include "../animation/behavior.hpp"
 #include "../foundation/nandina_color.hpp"
 
 #include <concepts>
@@ -67,13 +68,27 @@ namespace nandina::widget::property
     template<typename Node, typename Path, typename Value>
     concept WritableValue = Writable<Node, Path> && std::convertible_to<Value, value_t<Path>>;
 
+    template<typename Node, typename Path>
+    concept Animatable = Writable<Node, Path> && requires(Node& node) {
+        node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
+            .property(typename std::remove_cvref_t<Path>::field_type {})
+            .set_behavior(animation::Behavior<value_t<Path>>(0.0F));
+    };
+
     template<typename Node, visual::Path Path, typename Value>
         requires WritableValue<Node, Path, Value>
     void write(Node& node, Path, Value&& value) {
-        auto endpoint =
-            node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
-                .property(typename std::remove_cvref_t<Path>::field_type {});
+        auto endpoint = node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
+                            .property(typename std::remove_cvref_t<Path>::field_type {});
         endpoint.set(value_t<Path>(std::forward<Value>(value)));
+    }
+
+    template<typename Node, visual::Path Path>
+        requires Animatable<Node, Path>
+    void set_behavior(Node& node, Path, animation::Behavior<value_t<Path>> behavior) {
+        auto endpoint = node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
+                            .property(typename std::remove_cvref_t<Path>::field_type {});
+        endpoint.set_behavior(std::move(behavior));
     }
 } // namespace nandina::widget::property
 

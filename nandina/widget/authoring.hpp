@@ -7,6 +7,7 @@
 
 #include "../foundation/geometry.hpp"
 #include "../reactive/graph.hpp"
+#include "../reactive/scope.hpp"
 #include "../scene/control.hpp"
 #include "../theme/theme.hpp"
 #include "grid.hpp"
@@ -69,6 +70,11 @@ namespace nandina::widget::authoring
         /// their owning build scope has been cleared.
         auto guard_callbacks(std::weak_ptr<void> lifetime) -> NodeBuilder& {
             callback_lifetime_ = std::move(lifetime);
+            return *this;
+        }
+
+        auto bind_scope(reactive::ReactiveScope& scope) noexcept -> NodeBuilder& {
+            binding_scope_ = &scope;
             return *this;
         }
 
@@ -323,6 +329,30 @@ namespace nandina::widget::authoring
             return *this;
         }
 
+        template<visual::Path Path, typename Source>
+            requires property::Writable<Node, Path> && requires(Source& source) {
+                { source.get() } -> std::convertible_to<property::value_t<Path>>;
+            }
+        auto bind(Path path, Source& source) -> NodeBuilder& {
+            if (binding_scope_ == nullptr) {
+                throw std::logic_error("NodeBuilder property binding requires a BuildContext");
+            }
+            binding_scope_->effect([weak = std::weak_ptr<Node>(node_), path, &source] {
+                if (const auto current = weak.lock()) {
+                    property::write(*current, path, source.get());
+                }
+            });
+            return *this;
+        }
+
+        template<visual::Path Path>
+            requires property::Animatable<Node, Path>
+        auto behavior(Path path, animation::Behavior<property::value_t<Path>> behavior)
+            -> NodeBuilder& {
+            property::set_behavior(*node_, path, std::move(behavior));
+            return *this;
+        }
+
         template<typename... Child>
             requires(detail::AddableChild<Node, Child> && ...)
         auto children(Child&&... child) -> NodeBuilder& {
@@ -368,6 +398,7 @@ namespace nandina::widget::authoring
 
         std::shared_ptr<Node> node_;
         std::optional<std::weak_ptr<void>> callback_lifetime_;
+        reactive::ReactiveScope* binding_scope_ = nullptr;
     };
 
     template<typename Node, typename... Args>

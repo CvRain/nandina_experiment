@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_BOX_PRESENTATION_HPP
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_BOX_PRESENTATION_HPP
 
+#include "../../animation/property_endpoint.hpp"
 #include "../../scene/control.hpp"
 #include "../../theme/design_system.hpp"
 #include "../visual_property.hpp"
@@ -18,12 +19,27 @@ namespace nandina::widget::primitives
 {
     class BoxPresentation {
     public:
-        explicit BoxPresentation(scene::NanControl& owner) noexcept: owner_(&owner) {}
+        explicit BoxPresentation(scene::NanControl& owner) noexcept:
+            fill_(owner, scene::DirtyFlags::paint),
+            border_color_(owner, scene::DirtyFlags::paint),
+            border_width_(owner, scene::DirtyFlags::paint),
+            radius_(owner, scene::DirtyFlags::paint) {}
 
         class FillProperty {
         public:
             explicit FillProperty(BoxPresentation& box) noexcept: box_(&box) {}
-            void set(foundation::NanColor color) { box_->set_fill(std::move(color)); }
+            void set(foundation::NanColor color) {
+                box_->set_fill(std::move(color));
+            }
+            void set_behavior(animation::Behavior<foundation::NanColor> behavior) {
+                box_->fill_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const foundation::NanColor* {
+                return box_->fill_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const foundation::NanColor* {
+                return box_->fill_.target();
+            }
 
         private:
             BoxPresentation* box_;
@@ -32,7 +48,18 @@ namespace nandina::widget::primitives
         class BorderColorProperty {
         public:
             explicit BorderColorProperty(BoxPresentation& box) noexcept: box_(&box) {}
-            void set(foundation::NanColor color) { box_->set_border_color(std::move(color)); }
+            void set(foundation::NanColor color) {
+                box_->set_border_color(std::move(color));
+            }
+            void set_behavior(animation::Behavior<foundation::NanColor> behavior) {
+                box_->border_color_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const foundation::NanColor* {
+                return box_->border_color_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const foundation::NanColor* {
+                return box_->border_color_.target();
+            }
 
         private:
             BoxPresentation* box_;
@@ -41,7 +68,18 @@ namespace nandina::widget::primitives
         class BorderWidthProperty {
         public:
             explicit BorderWidthProperty(BoxPresentation& box) noexcept: box_(&box) {}
-            void set(float width) { box_->set_border_width(width); }
+            void set(float width) {
+                box_->set_border_width(width);
+            }
+            void set_behavior(animation::Behavior<float> behavior) {
+                box_->border_width_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const float* {
+                return box_->border_width_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const float* {
+                return box_->border_width_.target();
+            }
 
         private:
             BoxPresentation* box_;
@@ -50,7 +88,18 @@ namespace nandina::widget::primitives
         class RadiusProperty {
         public:
             explicit RadiusProperty(BoxPresentation& box) noexcept: box_(&box) {}
-            void set(float radius) { box_->set_radius(radius); }
+            void set(float radius) {
+                box_->set_radius(radius);
+            }
+            void set_behavior(animation::Behavior<float> behavior) {
+                box_->radius_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const float* {
+                return box_->radius_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const float* {
+                return box_->radius_.target();
+            }
 
         private:
             BoxPresentation* box_;
@@ -73,17 +122,17 @@ namespace nandina::widget::primitives
         }
 
         void apply(theme::ResolvedBoxStyle& style) const {
-            if (fill_) {
-                style.fill = *fill_;
+            if (const auto* fill = fill_.value(); fill != nullptr) {
+                style.fill = *fill;
             }
-            if (border_color_) {
-                style.border = *border_color_;
+            if (const auto* border_color = border_color_.value(); border_color != nullptr) {
+                style.border = *border_color;
             }
-            if (border_width_) {
-                style.border_width = *border_width_;
+            if (const auto* border_width = border_width_.value(); border_width != nullptr) {
+                style.border_width = *border_width;
             }
-            if (radius_) {
-                style.radius = *radius_;
+            if (const auto* radius = radius_.value(); radius != nullptr) {
+                style.radius = *radius;
             }
         }
 
@@ -95,32 +144,30 @@ namespace nandina::widget::primitives
         }
 
         void set_fill(foundation::NanColor color) {
-            fill_ = std::move(color);
-            owner_->mark_dirty(scene::DirtyFlags::paint);
+            fill_.set(std::move(color));
         }
 
         void set_border_color(foundation::NanColor color) {
-            border_color_ = std::move(color);
-            owner_->mark_dirty(scene::DirtyFlags::paint);
+            border_color_.set(std::move(color));
         }
 
         void set_border_width(const float width) {
-            require_non_negative(width, "box presentation border width must be finite and non-negative");
-            border_width_ = width;
-            owner_->mark_dirty(scene::DirtyFlags::paint);
+            require_non_negative(
+                width,
+                "box presentation border width must be finite and non-negative"
+            );
+            border_width_.set(width);
         }
 
         void set_radius(const float radius) {
             require_non_negative(radius, "box presentation radius must be finite and non-negative");
-            radius_ = radius;
-            owner_->mark_dirty(scene::DirtyFlags::paint);
+            radius_.set(radius);
         }
 
-        scene::NanControl* owner_;
-        std::optional<foundation::NanColor> fill_;
-        std::optional<foundation::NanColor> border_color_;
-        std::optional<float> border_width_;
-        std::optional<float> radius_;
+        animation::PropertyEndpoint<foundation::NanColor> fill_;
+        animation::PropertyEndpoint<foundation::NanColor> border_color_;
+        animation::PropertyEndpoint<float> border_width_;
+        animation::PropertyEndpoint<float> radius_;
     };
 } // namespace nandina::widget::primitives
 

@@ -18,12 +18,42 @@ namespace nandina::widget::primitives
         text_->set_color(std::move(color));
     }
 
+    void TextColorProperty::set_behavior(animation::Behavior<foundation::NanColor> behavior) {
+        text_->color_presentation_.set_behavior(std::move(behavior));
+    }
+
+    auto TextColorProperty::value() const noexcept -> const foundation::NanColor* {
+        return text_->color_presentation_.value();
+    }
+
+    auto TextColorProperty::target() const noexcept -> const foundation::NanColor* {
+        return text_->color_presentation_.target();
+    }
+
     void TextFontSizeProperty::set(const float size) {
         text_->set_font_size(size);
     }
 
+    void TextFontSizeProperty::set_behavior(animation::Behavior<float> behavior) {
+        text_->font_size_presentation_.set_behavior(std::move(behavior));
+    }
+
+    auto TextFontSizeProperty::value() const noexcept -> const float* {
+        return text_->font_size_presentation_.value();
+    }
+
+    auto TextFontSizeProperty::target() const noexcept -> const float* {
+        return text_->font_size_presentation_.target();
+    }
+
     Text::Text(std::string text, const ITextLayoutBackend& backend):
         text_(std::move(text), [this](const std::string& value) { apply_text(value); }),
+        color_presentation_(*this, style_.color, scene::DirtyFlags::paint),
+        font_size_presentation_(
+            *this,
+            style_.font_size,
+            scene::layout_dirty_flags | scene::DirtyFlags::paint
+        ),
         backend_(&backend) {
         update_metrics();
     }
@@ -60,6 +90,8 @@ namespace nandina::widget::primitives
         }
         const bool font_changed = style_.font != style.font;
         style_ = style;
+        color_presentation_.set(style_.color);
+        font_size_presentation_.set(style_.font_size);
         color_explicit_ = true;
         font_size_explicit_ = true;
         font_explicit_ = true;
@@ -76,8 +108,8 @@ namespace nandina::widget::primitives
 
     void Text::set_color(foundation::NanColor color) {
         style_.color = color;
+        color_presentation_.set(std::move(color));
         color_explicit_ = true;
-        mark_dirty(scene::DirtyFlags::paint);
     }
 
     auto Text::color() const -> foundation::NanColor {
@@ -89,8 +121,8 @@ namespace nandina::widget::primitives
             throw std::invalid_argument("Text font size must be finite and positive");
         }
         style_.font_size = size;
+        font_size_presentation_.set(size);
         font_size_explicit_ = true;
-        mark_layout_dirty();
         update_metrics(last_layout_constraints());
     }
 
@@ -231,9 +263,11 @@ namespace nandina::widget::primitives
 
         if (!color_explicit_) {
             style_.color = context.text_color;
+            color_presentation_.set(style_.color);
         }
         if (!font_size_explicit_ && style_.font_size != context.font_size) {
             style_.font_size = context.font_size;
+            font_size_presentation_.set(style_.font_size);
             metrics_changed = true;
         }
         if (!font_explicit_ && style_.font != context.font) {
@@ -271,7 +305,8 @@ namespace nandina::widget::primitives
     }
 
     void Text::draw_at(render::DrawContext& ctx, foundation::NanPoint position) {
-        if (layout_.lines.empty() || style_.color.alpha() <= 0.0F) {
+        const auto& color = *color_presentation_.value();
+        if (layout_.lines.empty() || color.alpha() <= 0.0F) {
             return;
         }
 
@@ -286,9 +321,9 @@ namespace nandina::widget::primitives
               )
             : render::ClipStack::Guard {nullptr, false};
 
-        const auto color = style_.color.with_alpha(style_.color.alpha() * ctx.opacity());
+        const auto draw_color = color.with_alpha(color.alpha() * ctx.opacity());
         if (renderer_ != nullptr) {
-            renderer_->draw(layout_, ctx, position, color);
+            renderer_->draw(layout_, ctx, position, draw_color);
             return;
         }
 
@@ -299,7 +334,7 @@ namespace nandina::widget::primitives
                     line.visible_text,
                     foundation::NanPoint(position.get_x(), y),
                     ctx.logical_to_screen(layout_.font_size),
-                    color
+                    draw_color
                 );
             }
             y += ctx.logical_to_screen(line.size.get_height());
@@ -326,6 +361,7 @@ namespace nandina::widget::primitives
     void Text::apply_component_color(foundation::NanColor color) {
         if (!color_explicit_) {
             style_.color = color;
+            color_presentation_.set(std::move(color));
         }
     }
 
@@ -338,15 +374,17 @@ namespace nandina::widget::primitives
             return;
         }
         style_.font_size = size;
-        mark_layout_dirty();
+        font_size_presentation_.set(size);
         update_metrics(last_layout_constraints());
     }
 
     void Text::update_metrics(scene::LayoutConstraints constraints) {
+        auto presentation_style = style_;
+        presentation_style.font_size = *font_size_presentation_.value();
         layout_ = backend_->layout(
             TextLayoutInput {
                 .text = text_.get(),
-                .style = style_,
+                .style = std::move(presentation_style),
                 .constraints = constraints,
             }
         );

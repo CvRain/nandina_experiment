@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_PRESENTATION_HPP
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_PRESENTATION_HPP
 
+#include "../../animation/property_endpoint.hpp"
 #include "../../scene/control.hpp"
 #include "../../theme/design_system.hpp"
 #include "../visual_property.hpp"
@@ -19,13 +20,24 @@ namespace nandina::widget::primitives
 {
     class TextPresentation {
     public:
-        explicit TextPresentation(scene::NanControl& owner) noexcept: owner_(&owner) {}
+        explicit TextPresentation(scene::NanControl& owner) noexcept:
+            color_(owner, scene::DirtyFlags::paint),
+            font_size_(owner, scene::layout_dirty_flags | scene::DirtyFlags::paint) {}
 
         class ColorProperty {
         public:
             explicit ColorProperty(TextPresentation& text) noexcept: text_(&text) {}
             void set(foundation::NanColor color) {
                 text_->set_color(std::move(color));
+            }
+            void set_behavior(animation::Behavior<foundation::NanColor> behavior) {
+                text_->color_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const foundation::NanColor* {
+                return text_->color_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const foundation::NanColor* {
+                return text_->color_.target();
             }
 
         private:
@@ -37,6 +49,15 @@ namespace nandina::widget::primitives
             explicit FontSizeProperty(TextPresentation& text) noexcept: text_(&text) {}
             void set(float size) {
                 text_->set_font_size(size);
+            }
+            void set_behavior(animation::Behavior<float> behavior) {
+                text_->font_size_.set_behavior(std::move(behavior));
+            }
+            [[nodiscard]] auto value() const noexcept -> const float* {
+                return text_->font_size_.value();
+            }
+            [[nodiscard]] auto target() const noexcept -> const float* {
+                return text_->font_size_.target();
             }
 
         private:
@@ -52,35 +73,30 @@ namespace nandina::widget::primitives
         }
 
         void apply(theme::ResolvedTypeStyle& style) const {
-            if (color_) {
-                style.color = *color_;
+            if (const auto* color = color_.value(); color != nullptr) {
+                style.color = *color;
             }
-            if (font_size_) {
-                style.font_size = *font_size_;
+            if (const auto* font_size = font_size_.value(); font_size != nullptr) {
+                style.font_size = *font_size;
             }
         }
 
         void apply(TextStyle& style) const {
-            if (color_) {
-                style.color = *color_;
+            if (const auto* color = color_.value(); color != nullptr) {
+                style.color = *color;
             }
-            if (font_size_) {
-                style.font_size = *font_size_;
+            if (const auto* font_size = font_size_.value(); font_size != nullptr) {
+                style.font_size = *font_size;
             }
         }
 
         void clear_font_size() noexcept {
-            if (!font_size_) {
-                return;
-            }
-            font_size_.reset();
-            owner_->mark_layout_dirty();
+            font_size_.clear();
         }
 
     private:
         void set_color(foundation::NanColor color) {
-            color_ = std::move(color);
-            owner_->mark_dirty(scene::DirtyFlags::paint);
+            color_.set(std::move(color));
         }
 
         void set_font_size(const float size) {
@@ -89,13 +105,11 @@ namespace nandina::widget::primitives
                     "text presentation font size must be finite and positive"
                 );
             }
-            font_size_ = size;
-            owner_->mark_layout_dirty();
+            font_size_.set(size);
         }
 
-        scene::NanControl* owner_;
-        std::optional<foundation::NanColor> color_;
-        std::optional<float> font_size_;
+        animation::PropertyEndpoint<foundation::NanColor> color_;
+        animation::PropertyEndpoint<float> font_size_;
     };
 } // namespace nandina::widget::primitives
 

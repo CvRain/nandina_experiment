@@ -5,9 +5,10 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_HPP
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_TEXT_HPP
 
-#include "text_layout_backend.hpp"
+#include "../../animation/property_endpoint.hpp"
 #include "../../reactive/property.hpp"
 #include "../visual_property.hpp"
+#include "text_layout_backend.hpp"
 
 #include <memory>
 #include <string>
@@ -17,7 +18,7 @@ namespace nandina::text
 {
     class FontPipeline;
     class FontPipelineCache;
-}
+} // namespace nandina::text
 
 namespace nandina::widget::primitives
 {
@@ -28,6 +29,9 @@ namespace nandina::widget::primitives
     public:
         explicit TextColorProperty(Text& text) noexcept: text_(&text) {}
         void set(foundation::NanColor color);
+        void set_behavior(animation::Behavior<foundation::NanColor> behavior);
+        [[nodiscard]] auto value() const noexcept -> const foundation::NanColor*;
+        [[nodiscard]] auto target() const noexcept -> const foundation::NanColor*;
 
     private:
         Text* text_;
@@ -37,12 +41,18 @@ namespace nandina::widget::primitives
     public:
         explicit TextFontSizeProperty(Text& text) noexcept: text_(&text) {}
         void set(float size);
+        void set_behavior(animation::Behavior<float> behavior);
+        [[nodiscard]] auto value() const noexcept -> const float*;
+        [[nodiscard]] auto target() const noexcept -> const float*;
 
     private:
         Text* text_;
     };
 
     class Text: public scene::NanControl {
+        friend class TextColorProperty;
+        friend class TextFontSizeProperty;
+
     public:
         explicit Text(
             std::string text = {},
@@ -114,6 +124,8 @@ namespace nandina::widget::primitives
 
         reactive::Property<std::string> text_;
         TextStyle style_ {};
+        animation::PropertyEndpoint<foundation::NanColor> color_presentation_;
+        animation::PropertyEndpoint<float> font_size_presentation_;
         TextLayoutResult layout_ {};
         const ITextLayoutBackend* backend_ = nullptr;
         ITextLayoutRenderer* renderer_ = nullptr;
