@@ -7,6 +7,7 @@
 
 #include "../scene/control.hpp"
 #include "animated_property.hpp"
+#include "group.hpp"
 
 #include <concepts>
 #include <cstddef>
@@ -48,6 +49,9 @@ namespace nandina::animation
 
             const T previous = property.value();
             property.set_target(std::move(target));
+            if (reduced_motion()) {
+                property.finish();
+            }
             if (!(previous == property.value())) {
                 owner.mark_dirty(dirty_flags);
             }
@@ -79,6 +83,12 @@ namespace nandina::animation
         void clear();
         [[nodiscard]] auto active_count() const noexcept -> std::size_t;
 
+        /// 组合动画（parallel/sequential/stagger）：把 Group 作为一条轨道推进，
+        /// 复用本 Host 的时钟、归约动效与 owner 取消语义。Group 按值移交并由 Host
+        /// 持有（保证其生命周期覆盖轨道），内部负责按延迟触发各 clip 并只对确实
+        /// 变化的属性传播 DirtyFlags。
+        void run(scene::NanControl& owner, Group group);
+
     private:
         struct TickResult {
             bool changed = false;
@@ -101,6 +111,10 @@ namespace nandina::animation
             scene::DirtyFlags dirty_flags
         );
         void cancel_property(const void* identity) noexcept;
+
+        /// 全局 reduced-motion policy：宿主所在场景树的 ThemeManager 归约动效时，
+        /// 新目标直跳、在途轨道立即完成。无 ThemeManager 时视为未归约。
+        [[nodiscard]] auto reduced_motion() const noexcept -> bool;
 
         scene::NanSceneTree* tree_;
         std::vector<Track> tracks_;

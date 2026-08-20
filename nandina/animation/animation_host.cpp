@@ -5,6 +5,7 @@
 #include "animation_host.hpp"
 
 #include "../scene/scene_tree.hpp"
+#include "group.hpp"
 
 #include <algorithm>
 
@@ -13,6 +14,10 @@ namespace nandina::animation
     AnimationHost::AnimationHost(scene::NanSceneTree& tree) noexcept: tree_(&tree) {}
 
     void AnimationHost::advance(const float dt) {
+        if (reduced_motion()) {
+            clear();
+            return;
+        }
         auto track = tracks_.begin();
         while (track != tracks_.end()) {
             const auto owner = track->owner.lock();
@@ -65,6 +70,30 @@ namespace nandina::animation
         return tracks_.size();
     }
 
+    void AnimationHost::run(scene::NanControl& owner, Group group) {
+        if (owner.get_tree() != tree_) {
+            throw std::invalid_argument("animation owner must belong to the host scene tree");
+        }
+        auto weak_owner = owner.weak_from_this();
+        if (weak_owner.expired()) {
+            throw std::logic_error("animation owner must be managed by shared_ptr");
+        }
+        auto shared = std::make_shared<Group>(std::move(group));
+        upsert(
+            std::move(weak_owner),
+            static_cast<const void*>(shared.get()),
+            [shared](const float dt) {
+                shared->advance(dt);
+                return TickResult {
+                    .changed = false,
+                    .active = !shared->finished(),
+                };
+            },
+            [shared] { shared->finish(); },
+            scene::DirtyFlags::none
+        );
+    }
+
     void AnimationHost::upsert(
         std::weak_ptr<scene::NanNode> owner,
         const void* identity,
@@ -96,5 +125,10 @@ namespace nandina::animation
         std::erase_if(tracks_, [identity](const Track& track) {
             return track.identity == identity;
         });
+    }
+
+    auto AnimationHost::reduced_motion() const noexcept -> bool {
+        const auto* manager = tree_->theme_manager();
+        return manager != nullptr && manager->reduced_motion();
     }
 } // namespace nandina::animation

@@ -6,6 +6,9 @@
 #include "animation/animation_host.hpp"
 #include "animation/behavior.hpp"
 #include "animation/easing.hpp"
+#include "animation/group.hpp"
+#include "animation/keyframes.hpp"
+#include "animation/spring.hpp"
 #include "animation/tween.hpp"
 #include "foundation/nandina_color.hpp"
 #include "reactive/scope.hpp"
@@ -32,6 +35,13 @@ namespace
     public:
         animation::AnimatedProperty<float> paint_value {0.0F};
         animation::AnimatedProperty<float> layout_value {0.0F};
+    };
+
+    class GroupProbe final: public scene::NanControl {
+    public:
+        animation::AnimatedProperty<float> a {0.0F};
+        animation::AnimatedProperty<float> b {0.0F};
+        animation::AnimatedProperty<float> c {0.0F};
     };
 
     void advance(scene::NanSceneTree& tree, const float dt) {
@@ -390,6 +400,101 @@ TEST_CASE(
     REQUIRE(probe->is_dirty(scene::DirtyFlags::paint));
 }
 
+TEST_CASE("reduced motion forces new targets to jump without a track", "[animation][host][reduced-motion]") {
+    scene::NanSceneTree tree;
+    theme::ThemeManager themes;
+    themes.set_motion_preference(theme::MotionPreference::reduced);
+    tree.set_theme_manager(themes);
+
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+    REQUIRE_FALSE(probe->paint_value.is_animating());
+}
+
+TEST_CASE(
+    "reduced motion toggled mid-flight finishes active tracks",
+    "[animation][host][reduced-motion]"
+) {
+    scene::NanSceneTree tree;
+    theme::ThemeManager themes;
+    tree.set_theme_manager(themes);
+
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    advance(tree, 0.25F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(2.5F));
+    REQUIRE(tree.animation_host().active_count() == 1);
+
+    themes.set_system_reduced_motion(true);
+    advance(tree, 0.25F);
+
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F));
+    REQUIRE_FALSE(probe->paint_value.is_animating());
+}
+
+TEST_CASE(
+    "reduced motion off resumes animation for new targets",
+    "[animation][host][reduced-motion]"
+) {
+    scene::NanSceneTree tree;
+    theme::ThemeManager themes;
+    tree.set_theme_manager(themes);
+    themes.set_system_reduced_motion(true);
+
+    auto probe = std::make_shared<AnimatedProbe>();
+    tree.set_root(probe);
+    probe->paint_value.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    tree.animation_host().set_target(*probe, probe->paint_value, 10.0F, scene::DirtyFlags::paint);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F)); // jumped
+
+    themes.set_system_reduced_motion(false);
+    tree.animation_host().set_target(*probe, probe->paint_value, 20.0F, scene::DirtyFlags::paint);
+    REQUIRE(tree.animation_host().active_count() == 1);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(10.0F)); // starts from current value
+
+    advance(tree, 0.5F);
+    REQUIRE(probe->paint_value.value() == Catch::Approx(15.0F));
+}
+
+TEST_CASE(
+    "builder behavior respects global reduced motion",
+    "[animation][authoring][reduced-motion]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    themes.set_motion_preference(theme::MotionPreference::reduced);
+    widget::BuildContext ui {graph, scope, themes};
+
+    reactive::Signal<float> radius {graph, 4.0F};
+    auto button = ui.make<widget::Button>("Button")
+                      .behavior(
+                          widget::visual::container.radius,
+                          animation::Behavior<float>(1.0F, animation::Easing::linear)
+                      )
+                      .bind(widget::visual::container.radius, radius)
+                      .build();
+
+    auto root = std::make_shared<scene::NanControl>();
+    root->add_child(button);
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(root);
+
+    radius.set(20.0F);
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(20.0F));
+}
+
 TEST_CASE(
     "builder bindings and behaviors share scene-owned property endpoints",
     "[animation][authoring][endpoint]"
@@ -526,4 +631,313 @@ TEST_CASE(
     REQUIRE(tree.animation_host().active_count() == 0);
     advance(tree, 1.0F);
     REQUIRE(tree.animation_host().active_count() == 0);
+}
+
+TEST_CASE("parallel group fires all clips immediately", "[animation][group]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<GroupProbe>();
+    tree.set_root(probe);
+
+    auto group = animation::Group::parallel(
+        {animation::Group::clip(
+             *probe, probe->a, 10.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe, probe->b, 20.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         )}
+    );
+    tree.animation_host().run(*probe, std::move(group));
+    REQUIRE(tree.animation_host().active_count() == 1); // 单条 group 轨道
+
+    advance(tree, 0.5F);
+    REQUIRE(probe->a.value() == Catch::Approx(5.0F));
+    REQUIRE(probe->b.value() == Catch::Approx(10.0F));
+}
+
+TEST_CASE("sequential group fires a clip only after the previous finishes", "[animation][group]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<GroupProbe>();
+    tree.set_root(probe);
+
+    auto group = animation::Group::sequential(
+        {animation::Group::clip(
+             *probe, probe->a, 10.0F, animation::Behavior<float>(0.2F, animation::Easing::linear), scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe, probe->b, 20.0F, animation::Behavior<float>(0.2F, animation::Easing::linear), scene::DirtyFlags::paint
+         )}
+    );
+    tree.animation_host().run(*probe, std::move(group));
+
+    advance(tree, 0.1F);
+    REQUIRE(probe->a.value() == Catch::Approx(5.0F));
+    REQUIRE(probe->b.value() == Catch::Approx(0.0F)); // b 尚未触发
+
+    advance(tree, 0.1F);
+    REQUIRE(probe->a.value() == Catch::Approx(10.0F)); // a 完成
+    REQUIRE(probe->b.value() == Catch::Approx(0.0F));  // b 下一帧才触发
+
+    advance(tree, 0.1F);
+    REQUIRE(probe->a.value() == Catch::Approx(10.0F));
+    REQUIRE(probe->b.value() == Catch::Approx(10.0F)); // b 触发并推进
+}
+
+TEST_CASE("stagger group fires clips at fixed intervals", "[animation][group]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<GroupProbe>();
+    tree.set_root(probe);
+
+    auto group = animation::Group::stagger(
+        {animation::Group::clip(
+             *probe,
+             probe->a,
+             10.0F,
+             animation::Behavior<float>(0.3F, animation::Easing::linear),
+             scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe,
+             probe->b,
+             20.0F,
+             animation::Behavior<float>(0.3F, animation::Easing::linear),
+             scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe,
+             probe->c,
+             30.0F,
+             animation::Behavior<float>(0.3F, animation::Easing::linear),
+             scene::DirtyFlags::paint
+         )},
+        0.2F
+    );
+    tree.animation_host().run(*probe, std::move(group));
+
+    advance(tree, 0.1F); // elapsed 0.1：a 触发
+    REQUIRE(probe->a.value() > 0.0F);
+    REQUIRE(probe->b.value() == Catch::Approx(0.0F));
+    REQUIRE(probe->c.value() == Catch::Approx(0.0F));
+
+    advance(tree, 0.1F); // elapsed 0.2：b 触发
+    REQUIRE(probe->b.value() > 0.0F);
+    REQUIRE(probe->c.value() == Catch::Approx(0.0F));
+
+    advance(tree, 0.1F); // elapsed 0.3：c 仍未触发
+    REQUIRE(probe->c.value() == Catch::Approx(0.0F));
+
+    advance(tree, 0.1F); // elapsed 0.4：c 触发
+    REQUIRE(probe->c.value() > 0.0F);
+}
+
+TEST_CASE("group finish jumps all clips to target", "[animation][group]") {
+    scene::NanSceneTree tree;
+    auto probe = std::make_shared<GroupProbe>();
+    tree.set_root(probe);
+
+    auto group = animation::Group::stagger(
+        {animation::Group::clip(
+             *probe, probe->a, 10.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe, probe->b, 20.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe, probe->c, 30.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         )},
+        0.5F
+    );
+    tree.animation_host().run(*probe, std::move(group));
+    advance(tree, 0.1F);
+    REQUIRE(probe->a.value() == Catch::Approx(1.0F)); // 仅 a 已触发
+
+    tree.animation_host().clear(); // 触发 group.finish()：所有 clip 跳转到目标
+    REQUIRE(probe->a.value() == Catch::Approx(10.0F));
+    REQUIRE(probe->b.value() == Catch::Approx(20.0F));
+    REQUIRE(probe->c.value() == Catch::Approx(30.0F));
+    REQUIRE(tree.animation_host().active_count() == 0);
+}
+
+TEST_CASE("group is cancelled when its owner exits the tree", "[animation][group]") {
+    scene::NanSceneTree tree;
+    auto root = std::make_shared<scene::NanControl>();
+    auto probe = std::make_shared<GroupProbe>();
+    root->add_child(probe);
+    tree.set_root(root);
+
+    auto group = animation::Group::stagger(
+        {animation::Group::clip(
+             *probe, probe->a, 10.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         ),
+         animation::Group::clip(
+             *probe, probe->c, 30.0F, animation::Behavior<float>(1.0F, animation::Easing::linear), scene::DirtyFlags::paint
+         )},
+        1.0F
+    );
+    tree.animation_host().run(*probe, std::move(group));
+    advance(tree, 0.1F);
+    REQUIRE(tree.animation_host().active_count() == 1);
+
+    (void)root->remove_child(*probe); // 退出树 → cancel_owner → group.finish()
+    REQUIRE(tree.animation_host().active_count() == 0);
+    REQUIRE(probe->a.value() == Catch::Approx(10.0F));
+    REQUIRE(probe->c.value() == Catch::Approx(30.0F));
+}
+
+TEST_CASE("spring overshoots and settles at target", "[animation][spring]") {
+    animation::Spring<float> spring(0.0F);
+    // 欠阻尼：ζ = c / (2√(km)) ≈ 0.35 < 1，会产生 overshoot。
+    spring.start(0.0F, 100.0F, animation::SpringSpec(200.0F, 10.0F));
+    REQUIRE_FALSE(spring.is_finished());
+
+    bool overshot = false;
+    for (int i = 0; i < 600 && !spring.is_finished(); ++i) {
+        const float v = spring.tick(1.0F / 60.0F);
+        if (v > 100.0F) {
+            overshot = true;
+        }
+    }
+    REQUIRE(spring.is_finished());
+    REQUIRE(overshot);
+    REQUIRE(spring.value() == Catch::Approx(100.0F));
+}
+
+TEST_CASE("spring retargets without resetting velocity", "[animation][spring]") {
+    animation::Spring<float> spring(0.0F);
+    spring.start(0.0F, 100.0F, animation::SpringSpec(200.0F, 10.0F));
+    (void)spring.tick(1.0F / 60.0F); // 获得初速度
+    const float before = spring.value();
+
+    spring.set_target(150.0F);
+    REQUIRE(spring.value() == Catch::Approx(before)); // 位置连续，不回跳
+    REQUIRE_FALSE(spring.is_finished());
+}
+
+TEST_CASE("spring finish jumps to target", "[animation][spring]") {
+    animation::Spring<float> spring(0.0F);
+    spring.start(0.0F, 100.0F, animation::SpringSpec(200.0F, 10.0F));
+    (void)spring.tick(1.0F / 60.0F);
+    spring.finish();
+    REQUIRE(spring.is_finished());
+    REQUIRE(spring.value() == Catch::Approx(100.0F));
+}
+
+TEST_CASE("spring spec rejects invalid parameters", "[animation][spring]") {
+    REQUIRE_THROWS_AS(animation::SpringSpec(-1.0F, 10.0F), std::invalid_argument);
+    REQUIRE_THROWS_AS(animation::SpringSpec(200.0F, -1.0F), std::invalid_argument);
+    REQUIRE_THROWS_AS(animation::SpringSpec(200.0F, 10.0F, 0.0F), std::invalid_argument);
+    REQUIRE_THROWS_AS(
+        animation::SpringSpec(std::numeric_limits<float>::infinity(), 10.0F),
+        std::invalid_argument
+    );
+}
+
+TEST_CASE("animated property supports spring mode with overshoot", "[animation][property][spring]") {
+    animation::AnimatedProperty<float> property(0.0F);
+    property.set_spring(animation::SpringSpec(200.0F, 10.0F));
+    property.set_target(100.0F);
+    REQUIRE(property.target() == Catch::Approx(100.0F));
+    REQUIRE(property.value() == Catch::Approx(0.0F)); // 从当前值起跳
+    REQUIRE(property.is_animating());
+
+    bool overshot = false;
+    for (int i = 0; i < 600 && property.is_animating(); ++i) {
+        const float v = property.tick(1.0F / 60.0F);
+        if (v > 100.0F) {
+            overshot = true;
+        }
+    }
+    REQUIRE(overshot);
+    REQUIRE(property.value() == Catch::Approx(100.0F));
+    REQUIRE_FALSE(property.is_animating());
+}
+
+TEST_CASE(
+    "animated property spring and behavior are mutually exclusive",
+    "[animation][property][spring]"
+) {
+    animation::AnimatedProperty<float> property(0.0F);
+    property.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    property.set_spring(animation::SpringSpec(200.0F, 10.0F));
+    REQUIRE_FALSE(property.behavior().has_value()); // behavior 被清除
+    REQUIRE(property.spring().has_value());
+
+    property.set_target(100.0F);
+    REQUIRE(property.is_animating());
+
+    property.clear_spring();
+    REQUIRE_FALSE(property.spring().has_value());
+    REQUIRE(property.value() == Catch::Approx(100.0F)); // 直跳回目标
+    REQUIRE_FALSE(property.is_animating());
+}
+
+TEST_CASE("keyframes interpolate across time and finish at the last frame", "[animation][keyframes]") {
+    animation::Keyframes<float> keyframes;
+    keyframes.start(
+        {{.time = 0.0F, .value = 0.0F},
+         {.time = 0.5F, .value = 10.0F},
+         {.time = 1.0F, .value = 0.0F}}
+    );
+    REQUIRE_FALSE(keyframes.is_finished());
+    REQUIRE(keyframes.value() == Catch::Approx(0.0F));
+
+    REQUIRE(keyframes.tick(0.25F) == Catch::Approx(5.0F));  // 0 → 10 中点
+    REQUIRE(keyframes.tick(0.25F) == Catch::Approx(10.0F)); // 到 0.5s
+    REQUIRE(keyframes.tick(0.25F) == Catch::Approx(5.0F));  // 10 → 0 中点
+    REQUIRE(keyframes.tick(0.25F) == Catch::Approx(0.0F));  // 到 1.0s，结束
+    REQUIRE(keyframes.is_finished());
+    REQUIRE(keyframes.target() == Catch::Approx(0.0F));
+}
+
+TEST_CASE("keyframes reject empty, non-increasing, and non-zero start", "[animation][keyframes]") {
+    animation::Keyframes<float> keyframes;
+    REQUIRE_THROWS_AS(keyframes.start({}), std::invalid_argument);
+    REQUIRE_THROWS_AS(
+        keyframes.start({{.time = 0.1F, .value = 0.0F}, {.time = 1.0F, .value = 1.0F}}),
+        std::invalid_argument
+    );
+    REQUIRE_THROWS_AS(
+        keyframes.start({{.time = 0.0F, .value = 0.0F}, {.time = 0.0F, .value = 1.0F}}),
+        std::invalid_argument
+    );
+}
+
+TEST_CASE("animated property plays keyframes and clears back to target", "[animation][property][keyframes]") {
+    animation::AnimatedProperty<float> property(0.0F);
+    property.set_keyframes(
+        {{.time = 0.0F, .value = 0.0F},
+         {.time = 0.4F, .value = 8.0F},
+         {.time = 0.8F, .value = 4.0F}}
+    );
+    REQUIRE(property.target() == Catch::Approx(4.0F)); // 末帧值
+    REQUIRE(property.is_animating());
+    REQUIRE(property.value() == Catch::Approx(0.0F));
+
+    REQUIRE(property.tick(0.2F) == Catch::Approx(4.0F)); // 0 → 8 中点
+    REQUIRE(property.tick(0.2F) == Catch::Approx(8.0F)); // 到 0.4s
+    REQUIRE(property.tick(0.2F) == Catch::Approx(6.0F)); // 8 → 4 中点
+    REQUIRE(property.tick(0.2F) == Catch::Approx(4.0F)); // 到 0.8s，结束
+    REQUIRE_FALSE(property.is_animating());
+
+    property.clear_keyframes();
+    REQUIRE_FALSE(property.keyframes().has_value());
+    REQUIRE(property.value() == Catch::Approx(4.0F));
+    REQUIRE_FALSE(property.is_animating());
+}
+
+TEST_CASE(
+    "animated property keyframes and behavior are mutually exclusive",
+    "[animation][property][keyframes]"
+) {
+    animation::AnimatedProperty<float> property(0.0F);
+    property.set_behavior(animation::Behavior<float>(1.0F, animation::Easing::linear));
+    property.set_keyframes(
+        {{.time = 0.0F, .value = 0.0F}, {.time = 1.0F, .value = 10.0F}}
+    );
+    REQUIRE_FALSE(property.behavior().has_value()); // behavior 被清除
+    REQUIRE(property.keyframes().has_value());
+
+    property.set_target(20.0F); // set_target 清除 keyframes，无 behavior 直跳
+    REQUIRE_FALSE(property.keyframes().has_value());
+    REQUIRE(property.value() == Catch::Approx(20.0F));
+    REQUIRE_FALSE(property.is_animating());
 }
