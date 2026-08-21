@@ -19,29 +19,38 @@ namespace nandina::animation
 {
     /// 阻尼弹簧物理参数：stiffness > 0，damping >= 0，mass > 0。
     struct SpringSpec {
-        float stiffness = 280.0F;
-        float damping = 26.0F;
-        float mass = 1.0F;
-
         SpringSpec() = default;
 
         SpringSpec(const float stiffness, const float damping, const float mass = 1.0F):
-            stiffness(checked(stiffness, "stiffness")),
-            damping(checked_non_negative(damping, "damping")),
-            mass(checked(mass, "mass")) {}
+            stiffness_(checked(stiffness, "stiffness")),
+            damping_(checked_non_negative(damping, "damping")),
+            mass_(checked(mass, "mass")) {}
 
-        auto set_stiffness(const float value) -> SpringSpec& {
-            stiffness = checked(value, "stiffness");
+        [[nodiscard]] auto stiffness() const noexcept -> float {
+            return stiffness_;
+        }
+
+        [[nodiscard]] auto damping() const noexcept -> float {
+            return damping_;
+        }
+
+        [[nodiscard]] auto mass() const noexcept -> float {
+            return mass_;
+        }
+
+        /// 流式 setter：`motion::spring().stiffness(280.0F).damping(26.0F)`。
+        auto stiffness(const float value) -> SpringSpec& {
+            stiffness_ = checked(value, "stiffness");
             return *this;
         }
 
-        auto set_damping(const float value) -> SpringSpec& {
-            damping = checked_non_negative(value, "damping");
+        auto damping(const float value) -> SpringSpec& {
+            damping_ = checked_non_negative(value, "damping");
             return *this;
         }
 
-        auto set_mass(const float value) -> SpringSpec& {
-            mass = checked(value, "mass");
+        auto mass(const float value) -> SpringSpec& {
+            mass_ = checked(value, "mass");
             return *this;
         }
 
@@ -59,6 +68,10 @@ namespace nandina::animation
             }
             return value;
         }
+
+        float stiffness_ = 280.0F;
+        float damping_ = 26.0F;
+        float mass_ = 1.0F;
     };
 
     template<typename T>
@@ -89,9 +102,9 @@ namespace nandina::animation
             }
 
             // 半隐式 Euler：先更新速度，再用新速度更新位置（数值更稳）。
-            const float k = spec_.stiffness;
-            const float c = spec_.damping;
-            const float m = spec_.mass;
+            const float k = spec_.stiffness();
+            const float c = spec_.damping();
+            const float m = spec_.mass();
             const T acceleration =
                 static_cast<T>((-k * (position_ - target_) - c * velocity_) / m);
             velocity_ = velocity_ + acceleration * static_cast<T>(dt);

@@ -221,6 +221,7 @@ module_animation = files(
     'animation/group.hpp',
     'animation/group.cpp',
     'animation/keyframes.hpp',
+    'animation/motion.hpp',
     'animation/property_endpoint.hpp',
     'animation/spring.hpp',
     'animation/tween.hpp',

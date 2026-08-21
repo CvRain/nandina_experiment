@@ -7,9 +7,11 @@
 
 #include "../scene/scene_tree.hpp"
 #include "animation_host.hpp"
+#include "spring.hpp"
 
 #include <concepts>
 #include <optional>
+#include <type_traits>
 #include <utility>
 
 namespace nandina::animation
@@ -51,6 +53,9 @@ namespace nandina::animation
 
         void set_behavior(Behavior<T> behavior) {
             behavior_ = std::move(behavior);
+            if constexpr (std::is_floating_point_v<T>) {
+                spring_.reset();
+            }
             if (!property_) {
                 return;
             }
@@ -69,11 +74,40 @@ namespace nandina::animation
             reconcile(previous);
         }
 
+        /// 为浮点类型安装弹簧行为（与 Behavior 互斥）。非浮点类型不可调用。
+        void set_spring(SpringSpec spec)
+            requires std::is_floating_point_v<T>
+        {
+            spring_ = std::move(spec);
+            behavior_.reset();
+            if (!property_) {
+                return;
+            }
+            const T previous = property_->value();
+            property_->set_spring(*spring_);
+            reconcile(previous);
+        }
+
+        void clear_spring()
+            requires std::is_floating_point_v<T>
+        {
+            spring_.reset();
+            if (!property_) {
+                return;
+            }
+            const T previous = property_->value();
+            property_->clear_spring();
+            reconcile(previous);
+        }
+
         void clear() {
             if (!property_) {
                 return;
             }
             property_->clear_behavior();
+            if constexpr (std::is_floating_point_v<T>) {
+                property_->clear_spring();
+            }
             if (auto* tree = owner_->get_tree(); tree != nullptr) {
                 tree->animation_host()
                     .set_target(*owner_, *property_, property_->target(), dirty_flags_);
@@ -98,10 +132,19 @@ namespace nandina::animation
             return behavior_;
         }
 
+        [[nodiscard]] auto spring() const noexcept -> std::optional<SpringSpec> {
+            return spring_;
+        }
+
     private:
         void install_behavior() {
             if (behavior_) {
                 property_->set_behavior(*behavior_);
+            }
+            if constexpr (std::is_floating_point_v<T>) {
+                if (spring_) {
+                    property_->set_spring(*spring_);
+                }
             }
         }
 
@@ -122,6 +165,7 @@ namespace nandina::animation
         scene::DirtyFlags dirty_flags_;
         std::optional<AnimatedProperty<T>> property_;
         std::optional<Behavior<T>> behavior_;
+        std::optional<SpringSpec> spring_;
     };
 } // namespace nandina::animation
 
