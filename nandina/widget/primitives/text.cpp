@@ -38,6 +38,10 @@ namespace nandina::widget::primitives
         text_->font_size_presentation_.set_behavior(std::move(behavior));
     }
 
+    void TextFontSizeProperty::set_spring(animation::SpringSpec spec) {
+        text_->font_size_presentation_.set_spring(std::move(spec));
+    }
+
     auto TextFontSizeProperty::value() const noexcept -> const float* {
         return text_->font_size_presentation_.value();
     }

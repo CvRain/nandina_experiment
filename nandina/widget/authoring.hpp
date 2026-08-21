@@ -5,6 +5,7 @@
 #ifndef NANDINA_EXPERIMENT_WIDGET_AUTHORING_HPP
 #define NANDINA_EXPERIMENT_WIDGET_AUTHORING_HPP
 
+#include "../animation/motion.hpp"
 #include "../foundation/geometry.hpp"
 #include "../reactive/graph.hpp"
 #include "../reactive/scope.hpp"
@@ -350,6 +351,22 @@ namespace nandina::widget::authoring
         auto behavior(Path path, animation::Behavior<property::value_t<Path>> behavior)
             -> NodeBuilder& {
             property::set_behavior(*node_, path, std::move(behavior));
+            return *this;
+        }
+
+        /// 声明式缓动：`.behavior(visual::container.radius, motion::tween(0.3F).easing(...))`。
+        template<visual::Path Path>
+            requires property::Animatable<Node, Path>
+        auto behavior(Path path, animation::motion::TweenSpec spec) -> NodeBuilder& {
+            property::set_behavior(*node_, path, spec.behavior<property::value_t<Path>>());
+            return *this;
+        }
+
+        /// 声明式弹簧：`.spring(visual::container.radius, motion::spring().stiffness(280.0F))`。
+        template<visual::Path Path>
+            requires property::Springable<Node, Path>
+        auto spring(Path path, animation::SpringSpec spec) -> NodeBuilder& {
+            property::set_spring(*node_, path, std::move(spec));
             return *this;
         }
 

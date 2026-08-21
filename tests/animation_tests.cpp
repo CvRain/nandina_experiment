@@ -8,6 +8,7 @@
 #include "animation/easing.hpp"
 #include "animation/group.hpp"
 #include "animation/keyframes.hpp"
+#include "animation/motion.hpp"
 #include "animation/spring.hpp"
 #include "animation/tween.hpp"
 #include "foundation/nandina_color.hpp"
@@ -65,6 +66,12 @@ static_assert(
 );
 static_assert(
     !widget::property::Animatable<widget::Label, decltype(widget::visual::container.radius)>
+);
+static_assert(
+    widget::property::Springable<widget::Button, decltype(widget::visual::container.radius)>
+);
+static_assert(
+    !widget::property::Springable<widget::Label, decltype(widget::visual::label.color)>
 );
 
 TEST_CASE("easing curves map 0->0 and 1->1", "[animation][easing]") {
@@ -940,4 +947,91 @@ TEST_CASE(
     REQUIRE_FALSE(property.keyframes().has_value());
     REQUIRE(property.value() == Catch::Approx(20.0F));
     REQUIRE_FALSE(property.is_animating());
+}
+
+TEST_CASE("motion::tween builds a behavior spec", "[animation][motion]") {
+    const auto spec = animation::motion::tween(0.24F).easing(animation::motion::ease_out);
+    const auto behavior = spec.behavior<float>();
+    REQUIRE(behavior.duration() == Catch::Approx(0.24F));
+    REQUIRE(behavior.easing() == animation::Easing::ease_out);
+    REQUIRE(behavior.enabled());
+
+    REQUIRE_THROWS_AS(animation::motion::tween(-0.1F), std::invalid_argument);
+}
+
+TEST_CASE("motion::spring builds a spring spec fluently", "[animation][motion]") {
+    const auto spec =
+        animation::motion::spring().stiffness(200.0F).damping(12.0F).mass(2.0F);
+    REQUIRE(spec.stiffness() == Catch::Approx(200.0F));
+    REQUIRE(spec.damping() == Catch::Approx(12.0F));
+    REQUIRE(spec.mass() == Catch::Approx(2.0F));
+}
+
+TEST_CASE(
+    "builder accepts motion::tween and binds a visual property",
+    "[animation][motion][authoring]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+
+    reactive::Signal<float> radius {graph, 4.0F};
+    auto button = ui.make<widget::Button>("Button")
+                      .behavior(
+                          widget::visual::container.radius,
+                          animation::motion::tween(0.4F).easing(animation::motion::ease_standard)
+                      )
+                      .bind(widget::visual::container.radius, radius)
+                      .build();
+
+    auto root = std::make_shared<scene::NanControl>();
+    root->add_child(button);
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(root);
+
+    radius.set(24.0F);
+    REQUIRE(tree.animation_host().active_count() == 1);
+    advance(tree, 0.2F);
+    // 0.4s ease_in_out 中点：半径到 24 与 4 的中点 14。
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(14.0F));
+}
+
+TEST_CASE(
+    "builder accepts motion::spring for a float visual property",
+    "[animation][motion][authoring]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope {graph};
+    theme::ThemeManager themes;
+    widget::BuildContext ui {graph, scope, themes};
+
+    reactive::Signal<float> radius {graph, 4.0F};
+    auto button = ui.make<widget::Button>("Button")
+                      .spring(
+                          widget::visual::container.radius,
+                          animation::motion::spring().stiffness(200.0F).damping(10.0F)
+                      )
+                      .bind(widget::visual::container.radius, radius)
+                      .build();
+
+    auto root = std::make_shared<scene::NanControl>();
+    root->add_child(button);
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(root);
+
+    radius.set(24.0F);
+    REQUIRE(tree.animation_host().active_count() == 1);
+
+    bool overshot = false;
+    for (int i = 0; i < 240 && tree.animation_host().active_count() > 0; ++i) {
+        advance(tree, 1.0F / 60.0F);
+        if (button->resolved_style().container.radius > 24.0F) {
+            overshot = true;
+        }
+    }
+    REQUIRE(overshot);
+    REQUIRE(button->resolved_style().container.radius == Catch::Approx(24.0F).margin(0.05F));
 }

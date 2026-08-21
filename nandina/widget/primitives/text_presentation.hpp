@@ -53,6 +53,9 @@ namespace nandina::widget::primitives
             void set_behavior(animation::Behavior<float> behavior) {
                 text_->font_size_.set_behavior(std::move(behavior));
             }
+            void set_spring(animation::SpringSpec spec) {
+                text_->font_size_.set_spring(std::move(spec));
+            }
             [[nodiscard]] auto value() const noexcept -> const float* {
                 return text_->font_size_.value();
             }

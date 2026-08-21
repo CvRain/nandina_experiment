@@ -42,6 +42,7 @@ namespace nandina::widget::primitives
         explicit TextFontSizeProperty(Text& text) noexcept: text_(&text) {}
         void set(float size);
         void set_behavior(animation::Behavior<float> behavior);
+        void set_spring(animation::SpringSpec spec);
         [[nodiscard]] auto value() const noexcept -> const float*;
         [[nodiscard]] auto target() const noexcept -> const float*;
 

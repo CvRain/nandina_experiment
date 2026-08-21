@@ -6,6 +6,7 @@
 #define NANDINA_EXPERIMENT_WIDGET_VISUAL_PROPERTY_HPP
 
 #include "../animation/behavior.hpp"
+#include "../animation/spring.hpp"
 #include "../foundation/nandina_color.hpp"
 
 #include <concepts>
@@ -75,6 +76,15 @@ namespace nandina::widget::property
             .set_behavior(animation::Behavior<value_t<Path>>(0.0F));
     };
 
+    /// 弹簧仅适用于浮点值路径。
+    template<typename Node, typename Path>
+    concept Springable = Animatable<Node, Path> && std::is_floating_point_v<value_t<Path>>
+        && requires(Node& node) {
+            node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
+                .property(typename std::remove_cvref_t<Path>::field_type {})
+                .set_spring(animation::SpringSpec());
+        };
+
     template<typename Node, visual::Path Path, typename Value>
         requires WritableValue<Node, Path, Value>
     void write(Node& node, Path, Value&& value) {
@@ -89,6 +99,14 @@ namespace nandina::widget::property
         auto endpoint = node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
                             .property(typename std::remove_cvref_t<Path>::field_type {});
         endpoint.set_behavior(std::move(behavior));
+    }
+
+    template<typename Node, visual::Path Path>
+        requires Springable<Node, Path>
+    void set_spring(Node& node, Path, animation::SpringSpec spec) {
+        auto endpoint = node.visual_part(typename std::remove_cvref_t<Path>::part_type {})
+                            .property(typename std::remove_cvref_t<Path>::field_type {});
+        endpoint.set_spring(std::move(spec));
     }
 } // namespace nandina::widget::property
 

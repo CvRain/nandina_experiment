@@ -74,6 +74,9 @@ namespace nandina::widget::primitives
             void set_behavior(animation::Behavior<float> behavior) {
                 box_->border_width_.set_behavior(std::move(behavior));
             }
+            void set_spring(animation::SpringSpec spec) {
+                box_->border_width_.set_spring(std::move(spec));
+            }
             [[nodiscard]] auto value() const noexcept -> const float* {
                 return box_->border_width_.value();
             }
@@ -93,6 +96,9 @@ namespace nandina::widget::primitives
             }
             void set_behavior(animation::Behavior<float> behavior) {
                 box_->radius_.set_behavior(std::move(behavior));
+            }
+            void set_spring(animation::SpringSpec spec) {
+                box_->radius_.set_spring(std::move(spec));
             }
             [[nodiscard]] auto value() const noexcept -> const float* {
                 return box_->radius_.value();
