@@ -4,7 +4,7 @@
 
 #include "settings_example.hpp"
 
-#include "animation/behavior.hpp"
+#include "animation/motion.hpp"
 #include "foundation/geometry.hpp"
 #include "theme/builtin_themes.hpp"
 #include "widget/controls.hpp"
@@ -367,19 +367,37 @@ namespace nandina::examples::settings
                                    .build();
 
         // 声明式动画示范：点击让圆角在 4 ↔ 24 之间平滑过渡（reduced-motion 下由 Host 直跳）。
+        // motion::tween 走固定时长缓动，motion::spring 走阻尼弹簧（带 overshoot）。
         auto& motion_radius = ui.signal<float>(4.0F);
-        auto motion_button = ui.make<widget::Button>("Animate corner radius")
+        auto motion_button = ui.make<widget::Button>("Animate radius (tween)")
                                  .behavior(
                                      widget::visual::container.radius,
-                                     animation::Behavior<float>(0.3F, animation::Easing::ease_in_out)
+                                     animation::motion::tween(0.3F).easing(
+                                         animation::motion::ease_standard
+                                     )
                                  )
                                  .bind(widget::visual::container.radius, motion_radius)
                                  .on_click([&motion_radius] {
                                      motion_radius.set(motion_radius.peek() > 12.0F ? 4.0F : 24.0F);
                                  })
                                  .build();
-        auto& motion_label = ui.computed([&motion_radius] {
-            return std::format("Corner radius · {:.0f}px", motion_radius.get());
+        auto& spring_radius = ui.signal<float>(4.0F);
+        auto spring_button = ui.make<widget::Button>("Animate radius (spring)")
+                                 .spring(
+                                     widget::visual::container.radius,
+                                     animation::motion::spring().stiffness(200.0F).damping(10.0F)
+                                 )
+                                 .bind(widget::visual::container.radius, spring_radius)
+                                 .on_click([&spring_radius] {
+                                     spring_radius.set(spring_radius.peek() > 12.0F ? 4.0F : 24.0F);
+                                 })
+                                 .build();
+        auto& motion_label = ui.computed([&motion_radius, &spring_radius] {
+            return std::format(
+                "Radius · tween {:.0f}px · spring {:.0f}px",
+                motion_radius.get(),
+                spring_radius.get()
+            );
         });
 
         auto content =
@@ -470,6 +488,7 @@ namespace nandina::examples::settings
                     cycle_treatment,
                     ui.make<widget::Label>("Motion").font_size(18.0F),
                     motion_button,
+                    spring_button,
                     ui.make<widget::Label>(motion_label)
                         .color_token(theme::ColorToken::on_surface_variant)
                 );
