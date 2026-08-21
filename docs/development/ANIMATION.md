@@ -179,6 +179,12 @@ ui.make<widget::Button>("切换状态")
 Behavior 覆盖优先级固定为：实例覆盖 → 组件 recipe motion → theme motion token → 立即更新；
 全局 reduced-motion policy 在最外层强制直跳。resolved theme 值只作为目标来源，不回写 recipe。
 
+单元 9 后续已落地 `motion::` DSL 糖层（`animation/motion.hpp`）：`motion::tween(duration).easing(...)`
+生成 `Behavior<T>`、`motion::spring().stiffness(...).damping(...)` 生成 `SpringSpec`，并经由
+`NodeBuilder::behavior(path, TweenSpec)` / `.spring(path, SpringSpec)` 接入声明式入口（spring
+仅浮点路径，由 `property::Springable` 编译期判定）。`motion::ease_*` 提供命名缓动曲线。
+`ColorSpace` / keyframes 的 DSL 形态与组件 motion slot（`builder.motion(...)`）仍留待后续。
+
 单元 9 已落地 spring：`SpringSpec`（stiffness/damping/mass，拒绝非法参数）与 `Spring<T>`
 （半隐式 Euler 积分、settle 判定、retarget 保留速度、`finish` 直跳）。`AnimatedProperty<T>`
 新增 `set_spring/clear_spring`，与 `Behavior` 互斥，浮点类型才启用（`NanColor` 等非浮点用

@@ -256,6 +256,13 @@ readable:
   clearing the lifecycle, deferring the tree detach to `tree_commit` (since `remove_child` cannot run
   in the process phase). With transitions off the router behaves exactly as before. Tests cover
   fade-in, deferred teardown on pop, and immediate teardown when disabled; 40/40 green.
+- Declarative animation (motion DSL) adds `animation/motion.hpp`: `motion::tween(duration).easing(...)`
+  builds a `Behavior<T>` and `motion::spring().stiffness(...).damping(...)` builds a `SpringSpec`, with
+  `motion::ease_*` named curves. `NodeBuilder` gains `.behavior(path, TweenSpec)` and
+  `.spring(path, SpringSpec)` (spring only for floating-point paths, gated by `property::Springable`);
+  spring is threaded through `PropertyEndpoint` / box+text presentations / `property::set_spring`.
+  `SpringSpec` fields became private with `stiffness()/damping()/mass()` getter+fluent-setter overloads.
+  The Settings example's Motion section now demonstrates both tween and spring; 40/40 green.
 - Test suite 40/40 green.
 - Next (planned follow-ups, 1.1): slider label rendering; multi-font import / custom font loading /
-  i18n language packs.
+  i18n language packs; keyframes/ColorSpace DSL sugar + component motion slots.
