@@ -210,6 +210,8 @@ module_widget = files(
     'widget/chip.cpp',
     'widget/dialog.hpp',
     'widget/dialog.cpp',
+    'widget/image.hpp',
+    'widget/image.cpp',
 )
 
 module_animation = files(
