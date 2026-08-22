@@ -52,6 +52,13 @@ render_tests = executable(
 )
 test('render', render_tests)
 
+image_tests = executable(
+    'image_tests',
+    files('image_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('image', image_tests)
+
 reactive_tests = executable(
     'reactive_tests',
     files('reactive_tests.cpp'),
