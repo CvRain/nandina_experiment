@@ -556,6 +556,52 @@ void main() {
             );
         }
 
+        [[nodiscard]] auto load_texture_from_file(
+            std::string_view path,
+            const ImageLoadOptions& options
+        ) -> TextureHandle override {
+            const std::string path_str(path);
+            Image image = LoadImage(path_str.c_str());
+            if (image.data == nullptr) {
+                return {};
+            }
+            // 可选预处理：先裁剪、再缩放、最后着色（raylib Image 均为 CPU 侧操作）。
+            if (options.crop) {
+                ImageCrop(&image, to_rl(*options.crop));
+            }
+            if (options.resize) {
+                ImageResize(
+                    &image,
+                    static_cast<int>(options.resize->get_width()),
+                    static_cast<int>(options.resize->get_height())
+                );
+            }
+            if (options.tint) {
+                ImageColorTint(&image, to_rl(*options.tint));
+            }
+            const auto texture = LoadTextureFromImage(image);
+            UnloadImage(image);
+            if (texture.id == 0) {
+                return {};
+            }
+            // RGBA 图片用双线性过滤（与 glyph atlas 的点采样区分），缩放更平滑。
+            SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
+            const TextureHandle handle {.value = next_texture_handle_++};
+            textures_.emplace(handle.value, texture);
+            return handle;
+        }
+
+        [[nodiscard]] auto texture_size(TextureHandle texture) -> NanSize override {
+            const auto found = textures_.find(texture.value);
+            if (found == textures_.end()) {
+                return NanSize {};
+            }
+            return NanSize(
+                static_cast<float>(found->second.width),
+                static_cast<float>(found->second.height)
+            );
+        }
+
     private:
         std::unordered_map<std::uint64_t, ::Texture2D> textures_;
         std::uint64_t next_texture_handle_ = 1;

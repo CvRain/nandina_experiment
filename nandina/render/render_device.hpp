@@ -13,6 +13,7 @@
 #include "../foundation/nandina_color.hpp"
 
 #include <cstdint>
+#include <optional>
 #include <span>
 #include <string_view>
 
@@ -21,6 +22,7 @@ namespace nandina::render
     using foundation::NanColor;
     using foundation::NanPoint;
     using foundation::NanRect;
+    using foundation::NanSize;
 
     struct TextureHandle {
         std::uint64_t value = 0;
@@ -30,6 +32,13 @@ namespace nandina::render
         }
 
         auto operator==(const TextureHandle&) const -> bool = default;
+    };
+
+    /// 图片加载时的可选预处理（在 raylib Image 上执行，像素坐标）。
+    struct ImageLoadOptions {
+        std::optional<NanRect> crop = std::nullopt;  // 先裁剪
+        std::optional<NanSize> resize = std::nullopt; // 再缩放到目标尺寸
+        std::optional<NanColor> tint = std::nullopt;  // 最后着色（ImageColorTint）
     };
 
     /// Abstract drawing device. Coordinates are world-space (screen pixels, y down).
@@ -139,6 +148,23 @@ namespace nandina::render
             const NanRect& /*destination*/,
             const NanColor& /*tint*/
         ) {}
+
+        /// 从文件路径加载 RGBA 图片纹理（可带 crop/resize/tint 预处理）；失败返回空 handle。
+        /// 默认 no-op（录制/无窗口设备覆写）。
+        [[nodiscard]] virtual auto load_texture_from_file(
+            std::string_view path,
+            const ImageLoadOptions& options = {}
+        ) -> TextureHandle {
+            (void)path;
+            (void)options;
+            return {};
+        }
+
+        /// 查询纹理自然像素尺寸；无效 handle 返回 {0,0}。默认 no-op。
+        [[nodiscard]] virtual auto texture_size(TextureHandle texture) -> NanSize {
+            (void)texture;
+            return NanSize {};
+        }
 
         // ---- capability queries (let nodes pick a fallback path) ----
         [[nodiscard]] virtual auto supports_rounded_rect() const -> bool {
