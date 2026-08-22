@@ -263,6 +263,16 @@ readable:
   spring is threaded through `PropertyEndpoint` / box+text presentations / `property::set_spring`.
   `SpringSpec` fields became private with `stiffness()/damping()/mass()` getter+fluent-setter overloads.
   The Settings example's Motion section now demonstrates both tween and spring; 40/40 green.
-- Test suite 40/40 green.
+- Image/texture subsystem (Stage 1–3) adds RGBA image loading on the existing texture abstraction:
+  `IRenderDevice::load_texture_from_file(path, ImageLoadOptions)` + `texture_size(handle)` (default
+  no-op; raylib backend via `LoadImage → ImageCrop/ImageResize/ImageColorTint → LoadTextureFromImage`
+  + bilinear filter), plus `widget::Image` (`NanControl`) with lazy load, natural size, `tint ×
+  per-node opacity`, `source_rect` crop, `stretch/contain/cover` scaling + contain alignment, and
+  `set_load_options` preprocessing. Loading is file-path based; nanres stays deferred. The Settings
+  About page shows a brand image (`assets/nandina_logo.png` copied beside the executable via meson
+  `configure_file`). Tests cover load-once, rects, crop, contain/cover/alignment, failed-load
+  fallback, opacity, and load-options passthrough; 41/41 green.
+- Test suite 41/41 green.
 - Next (planned follow-ups, 1.1): slider label rendering; multi-font import / custom font loading /
-  i18n language packs; keyframes/ColorSpace DSL sugar + component motion slots.
+  i18n language packs; keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas +
+  audio (raylib audio) as separate media milestones.

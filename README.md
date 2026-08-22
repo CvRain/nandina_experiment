@@ -103,3 +103,4 @@ sqlite3、tomlplusplus、box2d（可选）、Catch2。C++26（clang/gcc）。
 - `docs/development/SOFT_SHADOWS.md` —— 软阴影设计。
 - `docs/development/ANIMATION.md` —— 动画系统设计（1.1 施工图）。
 - `docs/development/PHASE8_RENDER_THEME_PLAN.md` —— Phase 8 计划与决策。
+- `docs/development/IMAGE_TEXTURE.md` —— 图片/纹理子系统设计（1.1，文件路径加载、nanres 延后）。
