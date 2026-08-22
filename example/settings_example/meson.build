@@ -11,6 +11,13 @@ settings_example_dep = declare_dependency(
     dependencies: [nandina_dep],
 )
 
+# 把示例图片复制到可执行文件同目录，供运行时按相对路径加载（nanres 集成延后）。
+configure_file(
+    input: 'assets/nandina_logo.png',
+    output: 'nandina_logo.png',
+    copy: true,
+)
+
 executable(
     'nandina_settings_example',
     files('settings_main.cpp'),

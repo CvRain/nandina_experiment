@@ -501,12 +501,17 @@ namespace nandina::examples::settings
         auto ui = context.ui();
         auto& router = context.router();
 
+        // 图片/纹理子系统示范：按文件路径（相对可执行文件目录）加载一张品牌图。
+        auto logo = widget::Image::create("nandina_logo.png");
+        logo->set_size(foundation::NanSize(360.0F, 200.0F));
+
         auto content =
             ui.column()
                 .gap(12.0F)
                 .cross_alignment(widget::LayoutAlignment::stretch)
                 .children(
                     section_heading(ui, "About"),
+                    logo,
                     ui.make<widget::Label>("Nandina is a C++ + raylib game-engine-as-UI framework")
                         .color_token(theme::ColorToken::on_surface_variant),
                     ui.make<widget::Button>("Open component detail")
