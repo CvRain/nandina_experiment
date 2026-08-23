@@ -125,3 +125,21 @@ TEST_CASE("slider style resolves semantic theme colors", "[slider][theme]") {
     REQUIRE(style.active_track.box.fill.oklch().light == Catch::Approx(0.72F));
     REQUIRE(style.thumb.box.radius == Catch::Approx(11.0F));
 }
+
+TEST_CASE("slider value label opt-in increases measured height and tracks value", "[slider][label]") {
+    auto slider = std::make_shared<widget::Slider>("Zoom", 0.5F, 0.0F, 1.0F, 0.1F);
+    REQUIRE_FALSE(slider->show_value_label());
+    REQUIRE(slider->value_label_text() == "0.5");
+
+    const auto base = slider->measure_layout(scene::LayoutConstraints::loose());
+    slider->set_show_value_label(true);
+    REQUIRE(slider->show_value_label());
+    const auto with_label = slider->measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(with_label.get_height() > base.get_height());
+
+    // 开启后不额外占高（重复调用幂等），值标签随 value 更新。
+    const auto again = slider->measure_layout(scene::LayoutConstraints::loose());
+    REQUIRE(again.get_height() == Catch::Approx(with_label.get_height()));
+    slider->set_value(0.9F);
+    REQUIRE(slider->value_label_text() == "0.9");
+}
