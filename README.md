@@ -88,12 +88,12 @@ sqlite3、tomlplusplus、box2d（可选）、Catch2。C++26（clang/gcc）。
 
 ## 当前状态与路线图
 
-- **1.0（收尾中）**：上述能力全部落地；`tests/` 40/40 绿。
-- **1.1（进行中）**：声明式可定制动画系统（typed visual property、
-  `AnimatedProperty<T>` + `Behavior`、AnimationHost、Builder bind/behavior endpoint 已完成；
-  后续为 per-node opacity、Dialog 淡出/内容淡入、组合器）；
-  slider label 渲染；多字体导入 / 自定义字体加载 / i18n 语言包。
-- **1.2（规划）**：spring 物理、keyframes、路由转场；Vulkan/SDL 后端评估。
+- **1.0（收尾中）**：上述能力全部落地；`tests/` 41/41 绿。
+- **1.1（进行中）**：声明式可定制动画系统（per-node opacity、Dialog 淡出/内容淡入、
+  组合器、spring/keyframes、`motion::` DSL、router 转场）与图片/纹理子系统（`widget::Image`
+  裁剪/缩放/对齐 + raylib 预处理）已完成；slider value label 渲染已完成；
+  多字体导入 / 自定义字体加载 / i18n 语言包。
+- **1.2（规划）**：路由转场细化、音频（raylib audio）；Vulkan/SDL 后端评估。
 
 ## 文档索引
 

@@ -272,7 +272,13 @@ readable:
   About page shows a brand image (`assets/nandina_logo.png` copied beside the executable via meson
   `configure_file`). Tests cover load-once, rects, crop, contain/cover/alignment, failed-load
   fallback, opacity, and load-options passthrough; 41/41 green.
+- Slider value label: `widget::Slider` gains an optional value label (`set_show_value_label`) that renders
+  the current `numeric_text(value)` above the track using a shared `primitives::Text` (inherited font,
+  `on_surface_variant` color when not from style context). Opt-in so existing layout is unchanged;
+  enabling it adds label height to `on_measure` and pushes the track down in `on_draw`. The Settings
+  General page opts in for the interface-scale slider. Tests cover opt-in height increase, value-text
+  tracking, and idempotence; 41/41 green.
 - Test suite 41/41 green.
-- Next (planned follow-ups, 1.1): slider label rendering; multi-font import / custom font loading /
-  i18n language packs; keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas +
-  audio (raylib audio) as separate media milestones.
+- Next (planned follow-ups, 1.1): multi-font import / custom font loading / i18n language packs;
+  keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas + audio (raylib audio)
+  as separate media milestones.
