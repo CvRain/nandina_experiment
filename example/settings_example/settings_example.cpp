@@ -204,7 +204,11 @@ namespace nandina::examples::settings
                         0.75F,
                         1.5F,
                         0.05F
-                    ),
+                    )
+                        .configure([](widget::Slider& slider) {
+                            // 值标签：在轨道上方显示当前值（raw value），并随拖动实时更新。
+                            slider.set_show_value_label(true);
+                        }),
                     ui.make<widget::Select>(
                         store.language,
                         std::vector<std::string> {"English", "中文", "日本語", "Test str"}
