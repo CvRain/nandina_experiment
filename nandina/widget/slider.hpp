@@ -8,6 +8,7 @@
 #include "../reactive/event.hpp"
 #include "../scene/control.hpp"
 #include "../theme/design_system.hpp"
+#include "primitives/text.hpp"
 
 #include <functional>
 #include <memory>
@@ -52,6 +53,18 @@ namespace nandina::widget
         void set_on_change(std::function<void(float)> callback);
         [[nodiscard]] auto value_changed() const -> const reactive::Event<float>&;
 
+        /// 在轨道上方显示当前值文本标签；关闭时不占额外高度（默认关闭）。
+        void set_show_value_label(bool show);
+        [[nodiscard]] auto show_value_label() const -> bool;
+        /// 值标签当前渲染的数字文本（未开启时仍随 value 更新）。
+        [[nodiscard]] auto value_label_text() const -> std::string_view;
+
+        void set_text_pipeline(primitives::TextPipeline pipeline);
+        [[nodiscard]] auto text_pipeline() const -> primitives::TextPipeline;
+        void apply_default_text_pipeline(const primitives::TextPipeline& pipeline) override;
+        void apply_font_context(text::FontPipelineCache& context) override;
+        void on_style_context_changed(const theme::ResolvedStyleContext& context) override;
+
         /// 高级接口：以完整 NanTheme 覆盖控件主题（不再跟随系统切换）。
         void set_theme(theme::NanTheme theme);
         /// 当前生效主题视图（tokens + 当前外观 palette），遗留读取兼容。
@@ -78,7 +91,9 @@ namespace nandina::widget
         void set_user_value(float value);
         void update_from_pointer(foundation::NanPoint screen_position);
         void update_visual_state();
+        void apply_value_label_style();
 
+        primitives::Text value_text_;
         std::string label_;
         /// 解析用的设计系统快照（树内 = ThemeManager 的有效快照；detached = 回退）。
         std::shared_ptr<const theme::DesignSystem> system_;
@@ -97,6 +112,7 @@ namespace nandina::widget
         bool hovered_ = false;
         bool dragging_ = false;
         bool focused_ = false;
+        bool show_value_label_ = false;
         std::function<void(float)> on_change_;
         reactive::Event<float> value_changed_;
     };
