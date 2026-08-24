@@ -299,10 +299,15 @@ namespace nandina::widget
             std::max(0.0F, local_rect().get_width() - padding_x_ * 2.0F);
         update_scroll(logical_viewport_width);
         const float padding = ctx.logical_to_screen(padding_x_);
+        // 让最后一个字形在 content box 右缘得以完整显示：在内容框宽度基础上放出一个
+        // 字形悬垂余量（advance 之外的墨迹 1~2px），否则近满时末字形的右侧墨迹被裁。
+        const float overhang = ctx.logical_to_screen(
+            primitives::glyph_overhang_allowance(edit_.style().font_size)
+        );
         const auto viewport = foundation::NanRect::from_xywh(
             world.get_left() + padding,
             world.get_top(),
-            std::max(0.0F, world.get_width() - padding * 2.0F),
+            std::max(0.0F, world.get_width() - padding * 2.0F + overhang),
             world.get_height()
         );
         auto clip = ctx.clip().push(viewport);

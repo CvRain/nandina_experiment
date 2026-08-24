@@ -62,6 +62,23 @@ namespace nandina::text
         }
     }
 
+    auto FontLoader::load_file(const std::filesystem::path& path, const std::uint32_t face_index)
+        -> FontResult<std::shared_ptr<FreeTypeFontFace>> {
+        try {
+            auto face = std::make_shared<FreeTypeFontFace>(path, static_cast<long>(face_index));
+            return face;
+        }
+        catch (const std::exception& exception) {
+            return std::unexpected(
+                FontError {
+                    .code = FontErrorCode::invalid_font,
+                    .operation = "font.load_file",
+                    .message = exception.what(),
+                }
+            );
+        }
+    }
+
     void FontLoader::invalidate(const resource::ResourceId id) {
         std::lock_guard lock(mutex_);
         std::erase_if(cache_, [id](const auto& entry) { return entry.first.resource_id == id; });

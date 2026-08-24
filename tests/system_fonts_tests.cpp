@@ -74,6 +74,24 @@ TEST_CASE("find_cjk_font_in returns nullopt when absent", "[text][system-fonts]"
     REQUIRE_FALSE(found.has_value());
 }
 
+TEST_CASE("find_system_font_in matches a filename substring, case-insensitively", "[text][system-fonts]") {
+    TempDirectory directory;
+    directory.write_font("FreeSerifItalic.otf");
+    directory.write_font("unrelated.ttf");
+
+    const auto found = text::find_system_font_in({directory.path()}, "freeserif");
+    REQUIRE(found.has_value());
+    REQUIRE(found->filename() == "FreeSerifItalic.otf");
+}
+
+TEST_CASE("find_system_font_in returns nullopt when absent or hint empty", "[text][system-fonts]") {
+    TempDirectory directory;
+    directory.write_font("LiberationSans-Regular.ttf");
+
+    REQUIRE_FALSE(text::find_system_font_in({directory.path()}, "noto").has_value());
+    REQUIRE_FALSE(text::find_system_font_in({directory.path()}, "").has_value());
+}
+
 TEST_CASE("system_font_directories returns at least one directory", "[text][system-fonts]") {
     const auto directories = text::system_font_directories();
     REQUIRE_FALSE(directories.empty());

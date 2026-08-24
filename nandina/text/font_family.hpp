@@ -19,6 +19,8 @@ namespace nandina::text
         std::uint32_t face_index = 0;
         int weight = 400;
         FontSlant slant = FontSlant::normal;
+        /// 直接持有已加载 face（文件导入）；否则走 resource。
+        std::shared_ptr<FreeTypeFontFace> direct_face;
     };
 
     struct FontRequest {
@@ -40,6 +42,15 @@ namespace nandina::text
         [[nodiscard]] auto
         register_family(resource::ResourceKey family, std::vector<FontFaceSpec> faces)
             -> FontResult<void>;
+        /// 用已加载的 face 直接注册一个 family（文件导入；不走资源系统）。
+        /// 若 family 已存在则追加该 face——同族可含 regular/bold/italic 等多个变体，
+        /// resolve 按 weight/slant 匹配最近的一个。
+        [[nodiscard]] auto register_face(
+            resource::ResourceKey family,
+            std::shared_ptr<FreeTypeFontFace> face,
+            int weight = 400,
+            FontSlant slant = FontSlant::normal
+        ) -> FontResult<void>;
         [[nodiscard]] auto add_alias(resource::ResourceKey alias, resource::ResourceKey family)
             -> FontResult<void>;
         [[nodiscard]] auto

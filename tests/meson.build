@@ -17,6 +17,8 @@ test('contrast', contrast_tests)
 font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'api' / 'fonts' / 'Inconsolata-Regular.ab.ttf'
 rtl_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'shape' / 'data' / 'text-rendering-tests' / 'fonts' / 'TestShapeAran.ttf'
 arabic_mark_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'shape' / 'data' / 'in-house' / 'fonts' / '65984dfce552a785f564422aadf4715fa07795ad.ttf'
+bold_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'api' / 'fonts' / 'NotoSans-Bold.ttf'
+italic_font_test_path = meson.project_source_root() / 'subprojects' / 'harfbuzz' / 'test' / 'api' / 'fonts' / 'notosansitalic.ttf'
 font_tests = executable(
     'font_tests',
     files('font_tests.cpp'),
@@ -24,6 +26,8 @@ font_tests = executable(
         '-DNANDINA_TEST_FONT_PATH="' + font_test_path + '"',
         '-DNANDINA_RTL_TEST_FONT_PATH="' + rtl_font_test_path + '"',
         '-DNANDINA_ARABIC_MARK_TEST_FONT_PATH="' + arabic_mark_font_test_path + '"',
+        '-DNANDINA_BOLD_TEST_FONT_PATH="' + bold_font_test_path + '"',
+        '-DNANDINA_ITALIC_TEST_FONT_PATH="' + italic_font_test_path + '"',
     ],
     dependencies : [nandina_dep, catch2_with_main_dep],
 )

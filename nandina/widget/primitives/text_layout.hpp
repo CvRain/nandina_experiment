@@ -9,6 +9,7 @@
 #include "../../scene/control.hpp"
 #include "../../text/font_family.hpp"
 
+#include <algorithm>
 #include <cstddef>
 #include <cstdint>
 #include <string>
@@ -24,6 +25,16 @@ namespace nandina::widget::primitives
         wrap,
         scale,
     };
+
+    /// 允许字形墨迹在 measured advance 之外悬垂的余量（逻辑 px）。
+    ///
+    /// 字形位图在渲染时按其物理像素网格吸附（见 GlyphAtlasTexture::draw），且次像素下
+    /// 最后一个字形的右侧墨迹可能比其 x_advance 多出 1~2px（尤其是全宽 CJK 与比例字体
+    /// 混排）。若把文字裁剪到 measured advance，会把这部分墨迹裁掉。本函数给出覆盖该
+    /// 悬垂幅度的余量，随字号缩放并保底 2px；仅用于"裁剪出文本"的一侧（右侧）。
+    [[nodiscard]] inline auto glyph_overhang_allowance(float font_size) -> float {
+        return std::max(2.0F, font_size * 0.08F);
+    }
 
     struct TextStyle {
         foundation::NanColor color = foundation::NanColor::from(

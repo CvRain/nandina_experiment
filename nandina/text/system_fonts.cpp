@@ -9,6 +9,7 @@
 #include <cctype>
 #include <cstdlib>
 #include <string>
+#include <string_view>
 #include <vector>
 
 namespace nandina::text
@@ -130,8 +131,47 @@ namespace nandina::text
         return best;
     }
 
+    auto find_system_font_in(
+        const std::vector<std::filesystem::path>& directories,
+        std::string_view file_hint
+    ) -> std::optional<std::filesystem::path> {
+        const auto needle = ascii_lower(file_hint);
+        if (needle.empty()) {
+            return std::nullopt;
+        }
+        for (const auto& directory: directories) {
+            std::error_code error;
+            std::filesystem::recursive_directory_iterator iterator(
+                directory,
+                std::filesystem::directory_options::skip_permission_denied,
+                error
+            );
+            if (error) {
+                continue;
+            }
+            const std::filesystem::recursive_directory_iterator end;
+            while (iterator != end) {
+                const auto& entry = *iterator;
+                if (entry.is_regular_file(error) && !error && is_font_file(entry.path())
+                    && ascii_lower(entry.path().filename().string()).find(needle) != std::string::npos)
+                {
+                    return entry.path();
+                }
+                iterator.increment(error);
+                if (error) {
+                    error.clear();
+                }
+            }
+        }
+        return std::nullopt;
+    }
+
     auto find_system_cjk_font() -> std::optional<std::filesystem::path> {
         return find_cjk_font_in(system_font_directories());
+    }
+
+    auto find_system_font(std::string_view file_hint) -> std::optional<std::filesystem::path> {
+        return find_system_font_in(system_font_directories(), file_hint);
     }
 
     auto

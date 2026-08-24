@@ -14,6 +14,7 @@
 
 #include <filesystem>
 #include <optional>
+#include <string_view>
 #include <vector>
 
 namespace nandina::text
@@ -25,8 +26,18 @@ namespace nandina::text
     [[nodiscard]] auto find_cjk_font_in(const std::vector<std::filesystem::path>& directories)
         -> std::optional<std::filesystem::path>;
 
+    /// 在给定目录中按文件名子串（大小写不敏感）查找首个字体文件。
+    [[nodiscard]] auto find_system_font_in(
+        const std::vector<std::filesystem::path>& directories,
+        std::string_view file_hint
+    ) -> std::optional<std::filesystem::path>;
+
     /// 便捷入口：在系统字体目录中查找 CJK 字体。
     [[nodiscard]] auto find_system_cjk_font() -> std::optional<std::filesystem::path>;
+
+    /// 便捷入口：在系统字体目录中按文件名子串查找首个字体文件。
+    [[nodiscard]] auto find_system_font(std::string_view file_hint)
+        -> std::optional<std::filesystem::path>;
 
     /// 把系统 CJK 字体挂载为资源并注册为默认回退。无 CJK 字体时返回 false。
     [[nodiscard]] auto

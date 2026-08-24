@@ -2,7 +2,10 @@
 // FreeType font-face integration tests.
 //
 
+#include "resource/resource_manager.hpp"
 #include "text/font_face.hpp"
+#include "text/font_family.hpp"
+#include "text/font_loader.hpp"
 #include "text/glyph_atlas.hpp"
 #include "text/glyph_run_renderer.hpp"
 #include "text/harfbuzz_text_backend.hpp"
@@ -112,6 +115,14 @@ namespace
 
     [[nodiscard]] auto test_font_path() -> std::filesystem::path {
         return std::filesystem::path(NANDINA_TEST_FONT_PATH);
+    }
+
+    [[nodiscard]] auto bold_test_font_path() -> std::filesystem::path {
+        return std::filesystem::path(NANDINA_BOLD_TEST_FONT_PATH);
+    }
+
+    [[nodiscard]] auto italic_test_font_path() -> std::filesystem::path {
+        return std::filesystem::path(NANDINA_ITALIC_TEST_FONT_PATH);
     }
 
     [[nodiscard]] auto rtl_test_font_path() -> std::filesystem::path {
@@ -703,4 +714,136 @@ TEST_CASE("Text draws HarfBuzz layouts through the glyph atlas renderer", "[text
     REQUIRE(value->layout_result().lines.front().glyphs.size() == 2);
     REQUIRE(device.draws == 2);
     REQUIRE(device.text_draws == 0);
+}
+
+TEST_CASE("FontLoader loads a font face from a file path", "[text][font-import]") {
+    resource::ResourceManager resources;
+    text::FontLoader loader {resources};
+    const auto face = loader.load_file(test_font_path());
+    REQUIRE(face.has_value());
+    REQUIRE_FALSE((*face)->family_name().empty());
+
+    const auto missing = loader.load_file(std::filesystem::path("missing-nandina-font.ttf"));
+    REQUIRE_FALSE(missing.has_value());
+}
+
+TEST_CASE("FontFamilyRegistry register_face resolves a direct file face", "[text][font-import]") {
+    resource::ResourceManager resources;
+    text::FontLoader loader {resources};
+    text::FontFamilyRegistry registry;
+
+    const auto face = loader.load_file(test_font_path());
+    REQUIRE(face.has_value());
+    REQUIRE(registry.register_face(resource::ResourceKey("imported"), *face).has_value());
+
+    const auto resolved = registry.resolve(
+        text::FontRequest {.family = resource::ResourceKey("imported")},
+        loader
+    );
+    REQUIRE(resolved.has_value());
+    REQUIRE(resolved->faces.size() == 1);
+    REQUIRE(resolved->faces.front() == *face);
+}
+
+TEST_CASE("Clipped text leaves room for the last glyph's ink overhang", "[text][render][clip]") {
+    struct ClipRecordingDevice final: render::IRenderDevice {
+        foundation::NanRect last_clip;
+        bool has_clip = false;
+
+        void begin_frame() override {}
+        void end_frame() override {}
+        void set_clip(const foundation::NanRect& rect) override {
+            last_clip = rect;
+            has_clip = true;
+        }
+        void clear_clip() override {}
+        void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
+        void draw_rect_outline(
+            const foundation::NanRect&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_rounded_rect(
+            const foundation::NanRect&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_line(
+            const foundation::NanPoint&,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_circle(
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+        void draw_text(
+            std::string_view,
+            const foundation::NanPoint&,
+            float,
+            const foundation::NanColor&
+        ) override {}
+    };
+
+    // 输入框 value text 使用 TextOverflow::clip；若把 text 裁剪到 measured advance，
+    // 最后一个字形超出 advance 的 1~2px 墨迹（全宽 CJK 与比例窄字符混排）会被裁。
+    widget::primitives::Text control("1f中文");
+    control.set_overflow(widget::primitives::TextOverflow::clip);
+    control.set_font_size(24.0F);
+    control.measure_layout(scene::LayoutConstraints::loose());
+    const float measured_width = control.measured_text_width();
+    REQUIRE(measured_width > 0.0F);
+
+    ClipRecordingDevice device;
+    render::DrawContext context(device);
+    control.draw_at(context, foundation::NanPoint(50.0F, 60.0F));
+
+    const auto expected_right = 50.0F + context.logical_to_screen(
+        measured_width + widget::primitives::glyph_overhang_allowance(control.laid_out_font_size())
+    );
+    REQUIRE(device.has_clip);
+    // 裁剪右缘要放到 measured advance 之外，封住末字形墨迹悬垂。
+    REQUIRE(device.last_clip.get_right() == Catch::Approx(expected_right));
+    REQUIRE(device.last_clip.get_right() > 50.0F + measured_width);
+}
+
+TEST_CASE("FontFamilyRegistry matches multiple face variants by weight and slant", "[text][font-import]") {
+    resource::ResourceManager resources;
+    text::FontLoader loader {resources};
+    text::FontFamilyRegistry registry;
+
+    const auto regular = loader.load_file(test_font_path());
+    const auto bold = loader.load_file(bold_test_font_path());
+    const auto italic = loader.load_file(italic_test_font_path());
+    REQUIRE(regular.has_value());
+    REQUIRE(bold.has_value());
+    REQUIRE(italic.has_value());
+
+    // 同一 family 追加多个 face 变体（多字体导入）：regular / bold / italic。
+    REQUIRE(registry.register_face(resource::ResourceKey("mixed"), *regular, 400).has_value());
+    REQUIRE(registry.register_face(resource::ResourceKey("mixed"), *bold, 700).has_value());
+    REQUIRE(
+        registry
+            .register_face(resource::ResourceKey("mixed"), *italic, 400, text::FontSlant::italic)
+            .has_value()
+    );
+
+    const auto resolve = [&](int weight, text::FontSlant slant) -> std::shared_ptr<text::FreeTypeFontFace> {
+        const auto result = registry.resolve(
+            text::FontRequest {
+                .family = resource::ResourceKey("mixed"),
+                .weight = weight,
+                .slant = slant,
+            },
+            loader
+        );
+        REQUIRE(result.has_value());
+        return result->faces.front();
+    };
+
+    REQUIRE(resolve(700, text::FontSlant::normal) == *bold);
+    REQUIRE(resolve(400, text::FontSlant::italic) == *italic);
+    REQUIRE(resolve(400, text::FontSlant::normal) == *regular);
 }

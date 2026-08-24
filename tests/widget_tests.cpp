@@ -1029,7 +1029,14 @@ TEST_CASE("TextStyle updates text measurement and drawing style", "[widget][text
     REQUIRE(dev.texts.front().text == text->text());
     REQUIRE(dev.texts[0].alpha == Catch::Approx(0.5F));
     REQUIRE(dev.clips.size() == 1);
-    REQUIRE(dev.clips.front().get_width() == Catch::Approx(40.0F));
+    // clip 在 constrained 宽度上再放出一个字形悬垂余量，避免末字形墨迹被裁。
+    REQUIRE(
+        dev.clips.front().get_width()
+        == Catch::Approx(
+            40.0F
+            + widget::primitives::glyph_overhang_allowance(text->laid_out_font_size())
+        )
+    );
     REQUIRE(dev.clip_clears == 1);
 }
 

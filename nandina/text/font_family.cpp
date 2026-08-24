@@ -37,6 +37,43 @@ namespace nandina::text
         return {};
     }
 
+    auto FontFamilyRegistry::register_face(
+        resource::ResourceKey family,
+        std::shared_ptr<FreeTypeFontFace> face,
+        const int weight,
+        const FontSlant slant
+    ) -> FontResult<void> {
+        if (!face) {
+            return std::unexpected(font_error(FontErrorCode::no_matching_face, "null face"));
+        }
+        if (weight < 1 || weight > 1000) {
+            return std::unexpected(
+                font_error(FontErrorCode::no_matching_face, "invalid face weight")
+            );
+        }
+        FontFaceSpec spec {
+            .resource = resource::ResourceKey(std::string("font/direct")),
+            .face_index = 0,
+            .weight = weight,
+            .slant = slant,
+            .direct_face = std::move(face),
+        };
+        std::unique_lock lock(mutex_);
+        if (aliases_.contains(family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::duplicate_family, "face key clashes with a family alias")
+            );
+        }
+        if (const auto existing = families_.find(family); existing != families_.end()) {
+            // 追加一个 face 变体：同族可含 regular/bold/italic 多个 face，按 weight/slant 匹配。
+            existing->second.faces.push_back(std::move(spec));
+        }
+        else {
+            families_.emplace(std::move(family), Family {.faces = {std::move(spec)}});
+        }
+        return {};
+    }
+
     auto FontFamilyRegistry::add_alias(resource::ResourceKey alias, resource::ResourceKey family)
         -> FontResult<void> {
         std::unique_lock lock(mutex_);
@@ -177,6 +214,11 @@ namespace nandina::text
                 }
             }
             if (!best) {
+                continue;
+            }
+            if (best->direct_face) {
+                result.specs.push_back(*best);
+                result.faces.push_back(best->direct_face);
                 continue;
             }
             const auto identity = std::pair(std::string(best->resource.value()), best->face_index);

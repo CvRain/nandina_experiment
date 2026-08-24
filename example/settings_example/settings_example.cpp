@@ -6,6 +6,7 @@
 
 #include "animation/motion.hpp"
 #include "foundation/geometry.hpp"
+#include "text/system_fonts.hpp"
 #include "theme/builtin_themes.hpp"
 #include "widget/controls.hpp"
 #include "widget/layout.hpp"
@@ -62,6 +63,29 @@ namespace nandina::examples::settings
         // 内置主题族：注册 butter / fluent / material，默认 butter；Appearance 页可切换。
         theme::register_default_theme_families(ui.theme_manager());
         (void)ui.theme_manager().activate_family("butter");
+
+        // 自定义字体导入（文件路径加载，nanres 集成延后）：把输出目录的 demo-font.ttf
+        // 作为 "demo" family 注册，About 页用它渲染等宽文本。重复注册（重复构建）静默忽略。
+        if (context.has_resource_services()) {
+            auto face = context.font_loader().load_file("demo-font.ttf");
+            if (face) {
+                (void)context.font_families().register_face(resource::ResourceKey("demo"), *face);
+            }
+            // 多字体导入：从系统字体目录查找并注册多个 family，供不同组件/实例按需选用。
+            const auto register_system_family = [&context](const char* hint, const char* family) {
+                if (const auto path = text::find_system_font(hint)) {
+                    if (auto loaded = context.font_loader().load_file(*path)) {
+                        (void)context.font_families().register_face(
+                            resource::ResourceKey(family),
+                            *loaded
+                        );
+                    }
+                }
+            };
+            register_system_family("FreeSerif", "serif");
+            register_system_family("FreeSans", "sans");
+            register_system_family("AdwaitaMono", "mono");
+        }
 
         // 主题族切换挂在常驻 shell（Appearance 页的 Select 驱动它），跨页保持生效。
         auto* themes = &ui.theme_manager();
@@ -518,6 +542,36 @@ namespace nandina::examples::settings
                     logo,
                     ui.make<widget::Label>("Nandina is a C++ + raylib game-engine-as-UI framework")
                         .color_token(theme::ColorToken::on_surface_variant),
+                    // 自定义字体示范：用 ShellPage::build 注册的 "demo" family（Inconsolata 等宽）。
+                    ui.make<widget::Label>("Custom font: the quick brown fox")
+                        .font_size(18.0F)
+                        .color_token(theme::ColorToken::on_surface_variant)
+                        .configure([](widget::Label& label) {
+                            label.set_font_family(resource::ResourceKey("demo"));
+                        }),
+                    // 多字体导入示范：不同组件/实例使用不同 family（serif 标题、sans 正文、
+                    // mono 代码、两个按钮用不同字体）。
+                    ui.make<widget::Label>("Typeface demo")
+                        .font_size(20.0F)
+                        .configure([](widget::Label& label) {
+                            label.set_font_family(resource::ResourceKey("serif"));
+                        }),
+                    ui.make<widget::Label>("Body text in a sans typeface.")
+                        .configure([](widget::Label& label) {
+                            label.set_font_family(resource::ResourceKey("sans"));
+                        }),
+                    ui.make<widget::Label>("code: fn main() {}")
+                        .configure([](widget::Label& label) {
+                            label.set_font_family(resource::ResourceKey("mono"));
+                        }),
+                    ui.make<widget::Button>("Serif button")
+                        .configure([](widget::Button& button) {
+                            button.set_font_family(resource::ResourceKey("serif"));
+                        }),
+                    ui.make<widget::Button>("Sans button")
+                        .configure([](widget::Button& button) {
+                            button.set_font_family(resource::ResourceKey("sans"));
+                        }),
                     ui.make<widget::Button>("Open component detail")
                         .on_click([&router] {
                             (void)router.request_push<DetailPage>(DetailParams {

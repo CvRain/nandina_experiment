@@ -319,7 +319,11 @@ namespace nandina::widget::primitives
                   foundation::NanRect::from_xywh(
                       position.get_x(),
                       position.get_y(),
-                      ctx.logical_to_screen(layout_.size.get_width()),
+                      // 测量 advance 之外允许字形墨迹悬垂 1~2px，否则最后一个字形的
+                      // 右侧墨迹会被裁掉（见 glyph_overhang_allowance）。
+                      ctx.logical_to_screen(
+                          layout_.size.get_width() + glyph_overhang_allowance(layout_.font_size)
+                      ),
                       ctx.logical_to_screen(layout_.size.get_height())
                   )
               )

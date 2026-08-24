@@ -5,6 +5,7 @@
 #include "font_face.hpp"
 
 #include <expected>
+#include <filesystem>
 #include <map>
 #include <mutex>
 
@@ -46,6 +47,10 @@ namespace nandina::text
         [[nodiscard]] auto load(resource::ResourceId id, std::uint32_t face_index = 0)
             -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
         [[nodiscard]] auto load(resource::ResourceHandle resource, std::uint32_t face_index = 0)
+            -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
+
+        /// 从文件路径直接加载字体（不经过资源系统；nanres 集成延后）。
+        [[nodiscard]] auto load_file(const std::filesystem::path& path, std::uint32_t face_index = 0)
             -> FontResult<std::shared_ptr<FreeTypeFontFace>>;
 
         void invalidate(resource::ResourceId id);

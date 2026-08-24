@@ -278,7 +278,35 @@ readable:
   enabling it adds label height to `on_measure` and pushes the track down in `on_draw`. The Settings
   General page opts in for the interface-scale slider. Tests cover opt-in height increase, value-text
   tracking, and idempotence; 41/41 green.
+- Custom font import (file-path basis, nanres deferred just like images):
+  `FontLoader::load_file(path, face_index=0)` loads a `FreeTypeFontFace` straight from a filesystem
+  path (no resource system), and `FontFamilyRegistry::register_face(family, face, weight, slant)`
+  registers that loaded face directly (non-null face required) via a new `FontFaceSpec::direct_face`
+  member that `resolve` short-circuits (skipping the resource `load`/dedup path). The Settings example
+  registers `assets/demo-font.ttf` (an Inconsolata copy) as the `"demo"` family in `ShellPage::build`
+  and renders an About-page label with `set_font_family("demo")`; registration is guarded by
+  `PageContext::has_resource_services()` so the headless settings tests (no font services) don't throw.
+  Tests cover file load + missing-file error and registry resolve returning the same direct face;
+  41/41 green.
+- Multi-font import: `register_face` now appends a face to an existing family (instead of rejecting a
+  duplicate), so a family can hold regular/bold/italic variants loaded as separate files, and `resolve`
+  picks the closest face by weight then slant. Tests register regular (400) + bold (700) + italic (400
+  italic) under one family and assert each request resolves to the matching face; 41/41 green.
+- Per-component font assignment: `text::find_system_font(file_hint)` locates a font file by name
+  substring in the system font directories (so devs can import from `/usr/share/fonts`), then
+  `load_file(path)` + `register_face(family, ...)` registers it, and `set_font_family` assigns it per
+  component/instance (Button/Label/TextField all expose it; a Card title is just a child Label). The
+  Settings About page registers `serif`/`sans`/`mono` families from system fonts and shows a serif
+  title, sans body, mono code line, and two buttons on different families. Tests cover
+  `find_system_font_in` (substring match, absent, empty hint); 41/41 green.
+- Glyph-overhang clip fix: a clipped Text (`overflow = clip`, e.g. a `TextField` value) clipped to
+  its measured advance width, which cut 1–2 px off the last glyph's ink when a full-width CJK glyph
+  was mixed with proportional narrow latin/digits (the glyph atlas snaps bitmaps to the physical
+  pixel grid, so the last glyph's right ink can exceed its `x_advance`). `glyph_overhang_allowance`
+  (`max(2px, 8% × font_size)`) now widens the right edge of both the `Text::draw_at` clip and the
+  `TextField` viewport clip so the last glyph renders fully. Tests cover the widened clip and updated
+  the widget clip assertion; 41/41 green.
 - Test suite 41/41 green.
-- Next (planned follow-ups, 1.1): multi-font import / custom font loading / i18n language packs;
+- Next (planned follow-ups, 1.1): i18n language packs;
   keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas + audio (raylib audio)
   as separate media milestones.

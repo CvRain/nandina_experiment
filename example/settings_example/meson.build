@@ -11,10 +11,16 @@ settings_example_dep = declare_dependency(
     dependencies: [nandina_dep],
 )
 
-# 把示例图片复制到可执行文件同目录，供运行时按相对路径加载（nanres 集成延后）。
+# 把示例图片与自定义字体复制到可执行文件同目录，供运行时按相对路径加载
+# （nanres 集成延后；图片/字体统一使用输出目录相对路径）。
 configure_file(
     input: 'assets/nandina_logo.png',
     output: 'nandina_logo.png',
+    copy: true,
+)
+configure_file(
+    input: 'assets/demo-font.ttf',
+    output: 'demo-font.ttf',
     copy: true,
 )
 
