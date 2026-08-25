@@ -17,12 +17,20 @@ namespace nandina::resource
         std::optional<bool> streaming;
     };
 
+    /// 针对单个资源 key 的显式覆盖（`[[resources]]`），优先级高于 glob 规则。
+    struct ResourceOverride {
+        std::optional<std::string> media_type;
+        std::optional<ManifestStorage> storage;
+        std::optional<bool> streaming;
+    };
+
     struct ResourcePolicy {
         std::string package_id;
         std::filesystem::path base_directory;
         std::vector<ResourceScanRoot> roots;
         std::vector<std::string> excludes;
         std::vector<ResourcePolicyRule> rules;
+        std::map<ResourceKey, ResourceOverride> overrides;
         std::map<ResourceKey, ResourceKey> aliases;
         bool include_hidden = false;
         bool allow_symlinks = false;

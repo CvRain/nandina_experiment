@@ -194,6 +194,28 @@ namespace nandina::resource
                     policy.rules.push_back(std::move(rule));
                 }
             }
+            if (const auto* overrides = document["resources"].as_array()) {
+                for (const auto& node: *overrides) {
+                    const auto* table = node.as_table();
+                    if (!table) { return std::unexpected("resources entries must be tables"); }
+                    const auto key_text = (*table)["key"].value<std::string>();
+                    const auto key = key_text ? ResourceKey::parse(*key_text) : std::nullopt;
+                    if (!key_text || key_text->empty() || !key) {
+                        return std::unexpected("resources[].key must be a canonical key");
+                    }
+                    ResourceOverride override {};
+                    override.media_type = (*table)["media_type"].value<std::string>();
+                    if (const auto storage = (*table)["storage"].value<std::string>()) {
+                        override.storage = storage_from_string(*storage);
+                        if (!override.storage) { return std::unexpected("resources[].storage is invalid"); }
+                    }
+                    override.streaming = (*table)["streaming"].value<bool>();
+                    if (policy.overrides.contains(*key)) {
+                        return std::unexpected("duplicate resources override for key: " + key_text.value());
+                    }
+                    policy.overrides.emplace(std::move(*key), std::move(override));
+                }
+            }
             if (const auto* aliases = document["aliases"].as_table()) {
                 for (const auto& [alias, target_node]: *aliases) {
                     const auto target = target_node.value<std::string>();
@@ -316,10 +338,17 @@ namespace nandina::resource
                                       .lexically_normal();
             ManifestStorage storage = ManifestStorage::automatic;
             bool streaming = false;
+            std::string media_type = scanned.media_type;
             for (const auto& rule: policy.rules) {
                 if (!glob_matches(rule.glob, scanned.key.value())) { continue; }
                 if (rule.storage) { storage = *rule.storage; }
                 if (rule.streaming) { streaming = *rule.streaming; }
+            }
+            // per-key overrides win over glob rules（`[[resources]]`）。
+            if (const auto found = policy.overrides.find(scanned.key); found != policy.overrides.end()) {
+                if (found->second.storage) { storage = *found->second.storage; }
+                if (found->second.streaming) { streaming = *found->second.streaming; }
+                if (found->second.media_type) { media_type = *found->second.media_type; }
             }
             const LockedResource* identity = nullptr;
             if (const auto found = by_source.find(relative.generic_string()); found != by_source.end()) {
@@ -344,7 +373,7 @@ namespace nandina::resource
                 .id = resource_id,
                 .key = scanned.key,
                 .source = relative,
-                .media_type = scanned.media_type,
+                .media_type = std::move(media_type),
                 .size = scanned.size,
                 .sha256 = *hash,
                 .storage = storage,

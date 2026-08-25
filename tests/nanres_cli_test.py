@@ -177,6 +177,35 @@ def main() -> int:
         assert ambiguous.returncode == 1
         assert "ambiguous content-hash move" in ambiguous.stderr
 
+        # per-resource overrides（[[resources]]）：对单个 key 覆盖 media_type / storage，
+        # 优先级高于 glob 规则与自动检测。
+        override_root = root / "override"
+        override_assets = override_root / "assets"
+        override_assets.mkdir(parents=True)
+        (override_assets / "plain.txt").write_text("data", encoding="ascii")
+        (override_root / "resources.toml").write_text(
+            'package = "org.nandina.override"\n'
+            'embed_threshold = 100\n\n'
+            '[[resources]]\n'
+            'key = "plain.txt"\n'
+            'media_type = "text/custom"\n'
+            'storage = "external"\n',
+            encoding="utf-8",
+        )
+        assert run(nanres, override_root, "scan").returncode == 0
+        override_lock = tomllib.loads((override_root / "resources.lock.toml").read_text(encoding="utf-8"))
+        override_item = {item["key"]: item for item in override_lock["resources"]}["plain.txt"]
+        assert override_item["media_type"] == "text/custom", override_item
+        assert override_item["storage"] == "external", override_item
+
+        (override_root / "resources.toml").write_text(
+            'package = "org.nandina.override"\n'
+            '[[resources]]\n'
+            'key = "not a canonical/key"\n',
+            encoding="utf-8",
+        )
+        assert run(nanres, override_root, "scan").returncode == 1
+
         deferred = run(nanres, root, "watch")
         assert deferred.returncode == 3
         assert "hot-reload" in deferred.stderr
