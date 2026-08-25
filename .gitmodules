@@ -28,3 +28,6 @@
 [submodule "subprojects/tomlplusplus"]
 	path = subprojects/tomlplusplus
 	url = https://github.com/marzer/tomlplusplus.git
+[submodule "subprojects/nlohmann_json"]
+	path = subprojects/nlohmann_json
+	url = https://github.com/nlohmann/json.git

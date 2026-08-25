@@ -29,6 +29,7 @@ module_fundation = files(
     'foundation/transform2d.cpp',
     'foundation/utf8.hpp',
     'foundation/utf8.cpp',
+    'foundation/json.hpp',
     'foundation/nan_logger.hpp',
     'foundation/nan_logger.cpp',
 )
@@ -63,6 +64,8 @@ module_resource = files(
     'resource/resource_scanner.cpp',
     'resource/platform_resource_locator.hpp',
     'resource/platform_resource_locator.cpp',
+    'resource/build_location.hpp',
+    'resource/build_location.cpp',
     'resource/backends/memory_backend.hpp',
     'resource/backends/memory_backend.cpp',
     'resource/backends/builtin_backend.hpp',
@@ -259,7 +262,7 @@ if box2d_dep.found()
 endif
 
 # 创建静态库
-nandina_dependencies = [spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep, tomlplusplus_dep]
+nandina_dependencies = [spdlog_dep, raylib_dep, freetype_dep, harfbuzz_dep, fribidi_dep, utf8proc_dep, sqlite3_dep, tomlplusplus_dep, nlohmann_json_dep]
 nandina_cpp_args = [
     '-DNANDINA_BUILTIN_DEFAULT_FONT_SIZE=' + builtin_font_size.to_string(),
     '-DNANDINA_BUILTIN_DEFAULT_FONT_LICENSE_SIZE=' + builtin_font_license_size.to_string(),

@@ -8,6 +8,7 @@
 #include "../foundation/nan_logger.hpp"
 #include "../resource/backends/builtin_backend.hpp"
 #include "../resource/backends/sqlite_backend.hpp"
+#include "../resource/build_location.hpp"
 #include "../resource/platform_resource_locator.hpp"
 #include "../text/system_fonts.hpp"
 
@@ -76,7 +77,25 @@ namespace nandina::app
         }
         int priority = 1000;
         for (const auto& location: locator->resource_roots()) {
-            const auto database = location.root / config.resource_package;
+            // 开发期：优先消费 build-tree 元数据 resource-location.json，挂载其指向的
+            // 构建树包；release/install 无此文件时回落直查 `<root>/resources.db`。
+            std::filesystem::path database = location.root / config.resource_package;
+            std::filesystem::path external_root = location.root;
+            const auto metadata_path = location.root / "resource-location.json";
+            std::error_code metadata_error;
+            if (std::filesystem::exists(metadata_path, metadata_error) && !metadata_error) {
+                if (const auto metadata = resource::read_build_location_metadata(metadata_path)) {
+                    database = metadata->package_root / metadata->database;
+                    external_root = metadata->package_root;
+                }
+                else {
+                    log::get("app.application").warn(
+                        "NanApplication: {}: {}",
+                        metadata_path.string(),
+                        metadata.error()
+                    );
+                }
+            }
             std::error_code error;
             if (!std::filesystem::exists(database, error)) {
                 if (error) {
@@ -90,7 +109,7 @@ namespace nandina::app
             auto backend = resource::SQLiteBackend::open({
                 .name = "package:" + database.string(),
                 .database = database,
-                .external_root = location.root,
+                .external_root = external_root,
             });
             if (!backend) {
                 throw std::runtime_error(

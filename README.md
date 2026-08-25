@@ -84,7 +84,7 @@ meson test -C buildDir --no-rebuild          # 40/40
 ```
 
 依赖经 Meson subprojects 拉取：raylib、spdlog、freetype、harfbuzz、fribidi、utf8proc、
-sqlite3、tomlplusplus、box2d（可选）、Catch2。C++26（clang/gcc）。
+sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（clang/gcc）。
 
 ## 当前状态与路线图
 

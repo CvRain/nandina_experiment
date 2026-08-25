@@ -1,5 +1,6 @@
 #include "app/nan_application.hpp"
 #include "app/nan_router.hpp"
+#include "resource/build_location.hpp"
 #include "resource/resource.hpp"
 #include "scene/control.hpp"
 #include "widget/controls.hpp"
@@ -8,6 +9,8 @@
 
 #include <filesystem>
 #include <fstream>
+
+#include <sqlite3.h>
 
 using namespace nandina;
 
@@ -168,6 +171,93 @@ TEST_CASE("NanApplication rejects malformed discovered packages", "[app][resourc
         }),
         std::runtime_error
     );
+    std::error_code error;
+    std::filesystem::remove_all(root, error);
+}
+
+namespace
+{
+    void exec(sqlite3* db, const char* sql) {
+        char* message = nullptr;
+        const int result = sqlite3_exec(db, sql, nullptr, nullptr, &message);
+        if (message) { sqlite3_free(message); }
+        REQUIRE(result == SQLITE_OK);
+    }
+
+    void create_package_database(const std::filesystem::path& path) {
+        sqlite3* db = nullptr;
+        REQUIRE(sqlite3_open(path.string().c_str(), &db) == SQLITE_OK);
+        exec(db, "PRAGMA application_id=1312902724; PRAGMA user_version=1;");
+        exec(db,
+            "CREATE TABLE resources("
+            "id BLOB PRIMARY KEY, resource_key TEXT NOT NULL UNIQUE, media_type TEXT NOT NULL,"
+            "storage INTEGER NOT NULL, data BLOB, external_path TEXT, size INTEGER NOT NULL);"
+            "CREATE TABLE aliases(alias TEXT PRIMARY KEY, resource_id BLOB NOT NULL);"
+        );
+        exec(db,
+            "INSERT INTO resources VALUES("
+            "X'20112233445546778899aabbccddeeff','assets/hello','text/plain',0,"
+            "X'68656c6c6f',NULL,5);"
+        );
+        REQUIRE(sqlite3_close(db) == SQLITE_OK);
+    }
+} // namespace
+
+TEST_CASE("NanApplication mounts the build-tree package from resource-location.json", "[app][resource][d2]") {
+    const auto root = std::filesystem::temp_directory_path()
+        / ("nandina-d2-" + resource::ResourceId::random().to_string());
+    std::filesystem::create_directories(root / "resources");       // executable-relative resources root
+    std::filesystem::create_directories(root / "build-package");   // the pointed build-tree package
+
+    create_package_database(root / "build-package" / "resources.db");
+    {
+        std::ofstream metadata(root / "resources" / "resource-location.json");
+        metadata << "{\"package_id\":\"org.nandina.d2\",\"package_root\":\""
+                 << (root / "build-package").string()
+                 << "\",\"database\":\"resources.db\"}\n";
+    }
+
+    // executable_path = root/application => executable-relative root = root/resources,
+    // which holds only resource-location.json (no direct resources.db), so the package
+    // is reachable only through the build metadata.
+    app::NanApplication application(app::NanApplicationConfig {
+        .application_id = "org.nandina.d2",
+        .executable_path = root / "application",
+        .environment = {{"HOME", "/nonexistent-home"}},
+    });
+
+    const auto hello = application.resources().require(resource::ResourceKey("assets/hello"));
+    REQUIRE(hello.has_value());
+    REQUIRE((*hello)->size() == 5);
+    REQUIRE((*hello)->bytes()[0] == 'h');
+
+    std::error_code error;
+    std::filesystem::remove_all(root, error);
+}
+
+TEST_CASE("read_build_location_metadata parses, rejects missing, and rejects malformed", "[resource][d2]") {
+    const auto root = std::filesystem::temp_directory_path()
+        / ("nandina-d2-meta-" + resource::ResourceId::random().to_string());
+    std::filesystem::create_directories(root);
+
+    const auto valid =
+        resource::read_build_location_metadata(root / "resource-location.json");
+    REQUIRE_FALSE(valid.has_value()); // missing file
+
+    {
+        std::ofstream file(root / "resource-location.json");
+        file << "{\"package_id\":\"org.nandina.meta\",\"package_root\":\"/tmp/pkg\",\"database\":\"resources.db\"}";
+    }
+    const auto parsed = resource::read_build_location_metadata(root / "resource-location.json");
+    REQUIRE(parsed.has_value());
+    REQUIRE(parsed->package_id == "org.nandina.meta");
+    REQUIRE(parsed->package_root == std::filesystem::path("/tmp/pkg"));
+    REQUIRE(parsed->database == "resources.db");
+
+    { std::ofstream file(root / "resource-location.json"); file << "{not json"; }
+    const auto malformed = resource::read_build_location_metadata(root / "resource-location.json");
+    REQUIRE_FALSE(malformed.has_value());
+
     std::error_code error;
     std::filesystem::remove_all(root, error);
 }

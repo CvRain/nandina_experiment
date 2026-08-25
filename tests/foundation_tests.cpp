@@ -3,6 +3,7 @@
 //
 
 #include "foundation/nan_logger.hpp"
+#include "foundation/json.hpp"
 #include "foundation/utf8.hpp"
 
 #include <catch2/catch_test_macros.hpp>
@@ -169,4 +170,19 @@ TEST_CASE("UTF-8 grapheme ranges follow UAX 29 boundaries", "[foundation][utf8][
     const auto flag_ranges = foundation::utf8::grapheme_ranges(flag);
     REQUIRE(flag_ranges.size() == 1);
     REQUIRE(flag_ranges.front().length == flag.size());
+}
+
+TEST_CASE("JSON wrapper parses documents and maps errors", "[foundation][json]") {
+    const auto root = foundation::parse_json(
+        R"({"format":1,"package_id":"org.nandina.d2","meta":{"ok":true},"items":[1,2]})"
+    );
+    REQUIRE(root.has_value());
+    REQUIRE(root->is_object());
+    REQUIRE((*root)["package_id"] == "org.nandina.d2");
+    REQUIRE((*root)["meta"]["ok"].get<bool>());
+    REQUIRE((*root)["items"].is_array());
+
+    REQUIRE_FALSE(foundation::parse_json(R"({"a":})").has_value());
+    REQUIRE_FALSE(foundation::parse_json(R"({"a":1} trailing)").has_value());
+    REQUIRE_FALSE(foundation::parse_json(R"(not json)").has_value());
 }

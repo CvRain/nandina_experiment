@@ -81,6 +81,8 @@ fribidi_subproj = subproject(
         'tests=false',
     ],
 )
+# nlohmann/json 是 header-only meson 项目（Git submodule，见 .gitmodules）。
+nlohmann_json_subproj = subproject('nlohmann_json')
 
 # 获取依赖（静态库）
 spdlog_dep = spdlog_subproj.dependency('spdlog')
@@ -92,6 +94,7 @@ tomlplusplus_dep = tomlplusplus_subproj.dependency('tomlplusplus_tomlplusplus')
 freetype_dep = freetype_subproj.get_variable('freetype_dep')
 harfbuzz_dep = harfbuzz_subproj.get_variable('libharfbuzz_dep')
 fribidi_dep = fribidi_subproj.get_variable('libfribidi_dep')
+nlohmann_json_dep = nlohmann_json_subproj.get_variable('nlohmann_json_dep')
 physics2d_option = get_option('physics2d')
 box2d_dep = disabler()
 if not physics2d_option.disabled()

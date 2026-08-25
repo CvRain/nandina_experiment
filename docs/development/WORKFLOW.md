@@ -306,6 +306,15 @@ readable:
   (`max(2px, 8% × font_size)`) now widens the right edge of both the `Text::draw_at` clip and the
   `TextField` viewport clip so the last glyph renders fully. Tests cover the widened clip and updated
   the widget clip assertion; 41/41 green.
+- D2 runtime metadata consumption: `NanApplication` now reads a `resource-location.json` at each
+  scanned resource root and mounts the pointed build-tree package at that root's priority, falling
+  back to the direct `<root>/resources.db` when no metadata is present (release/install). This wires
+  the dev flow "put assets → meson compile → application resolves the build-tree package" without a
+  source-tree copy or manual sync. Infrastructure: nlohmann/json vendored as a git submodule with a
+  thin `foundation::parse_json` wrapper, plus `resource::read_build_location_metadata`. Tests cover
+  the JSON wrapper, metadata parse/missing/
+  malformed, and a NanApplication that resolves a package reachable only through the metadata;
+  41/41 green. Per-resource overrides remain the next D2 increment.
 - Test suite 41/41 green.
 - Next (planned follow-ups, 1.1): i18n language packs;
   keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas + audio (raylib audio)
