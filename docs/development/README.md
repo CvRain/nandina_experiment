@@ -14,6 +14,33 @@ The current authority is the code under `nandina/` plus tests under `tests/`. Ol
 
 The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
 
+## Current Development Approach
+
+This section records the operative decisions behind the current 1.x line so later rounds do not
+re-derive them. The detailed contracts live in the sections that follow; this is the "why", not the
+"what".
+
+- **One unit per round, docs first.** Each round lands one reviewable logical unit: record the design
+  in the phase/roadmap doc, implement minimally, add focused tests, run the full suite, and commit
+  with `type(scope): 中文` after user review. See `WORKFLOW.md` §1–§3 for the exact gates.
+- **File-path loading first, nanres later.** Images and fonts load from filesystem paths
+  (`IRenderDevice::load_texture_from_file`, `FontLoader::load_file`) with files copied beside the
+  executable via `meson configure_file(copy)`. `nanres` packaging is deferred for the examples until
+  the toolchain is a real consumer need; the full `nanres` pipeline (scan/validate/lock/pack/install,
+  D1–D2) remains exported and tested for applications that want it.
+- **Third-party libraries are vendored as git submodules, never re-implemented.** JSON uses
+  nlohmann/json through a thin `foundation::parse_json` wrapper; TOML uses toml++; shaping uses
+  FreeType/HarfBuzz/FriBidi/utf8proc. We do not hand-roll a parser or a shaping stack.
+- **Typography is a family problem, not a widget flag.** `FontFamilyRegistry` owns logical
+  families/faces/fallbacks; `FontLoader::load_file` imports any path; `register_face` appends
+  regular/bold/italic variants resolved by weight then slant; `find_system_font` discovers paths in
+  system font directories; widgets request a family per component/instance via `set_font_family`.
+- **Animation is host-driven, not per-widget.** `AnimatedProperty<T>` + a single scene-tree
+  `AnimationHost` drive tween/spring/keyframes (`motion::` DSL, `Group` combinators) with
+  reduced-motion centralized in the host; widgets only own logical targets.
+- **Render stays behind `IRenderDevice`.** New drawing (text glyph atlases, images, soft shadows,
+  rounded clips) goes through the device abstraction; raylib types never leak into public headers.
+
 ## Architectural Constraints
 
 - Prefer zero RTTI wiring in framework code. Use virtual capability hooks such as `as_node2d()`, `as_control()`, `layout_flex_factor()`, or event type tags before `dynamic_cast`-style solutions.
@@ -956,8 +983,8 @@ Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina s
 
 #### D2. Convention-Driven Resources
 
-Status: initial convention mode, build-tree package metadata, and runtime metadata consumption
-implemented; per-resource overrides remain.
+Status: complete — convention mode, build-tree package metadata, runtime metadata consumption, and
+per-resource overrides are implemented.
 
 The normal application layout is:
 
@@ -985,7 +1012,21 @@ put files under resources/assets/
 
 No source-tree copying or manual package synchronization is required. A build metadata file may point development runtime lookup at the package in the build tree; release lookup remains executable-relative and install-prefix based.
 
-The resource build helper now writes a generated `resource-location.json` beside `resources.db`. It records the package ID, build-tree package root, and database filename. This file is development metadata only: it is generated, must not be hand-edited or committed, and its absolute build path must never be embedded into a release binary. Runtime metadata consumption is now wired in: `NanApplication` reads a `resource-location.json` at each scanned resource root (nlohmann/json is vendored as a git submodule and wrapped by `foundation/json.hpp`'s `parse_json`) and mounts the pointed build-tree package at that root's priority, falling back to the direct `<root>/resources.db` when no metadata file is present (release/install). Per-resource overrides remain the next D2 increment.
+The resource build helper now writes a generated `resource-location.json` beside `resources.db`. It records the package ID, build-tree package root, and database filename. This file is development metadata only: it is generated, must not be hand-edited or committed, and its absolute build path must never be embedded into a release binary. Runtime metadata consumption is now wired in: `NanApplication` reads a `resource-location.json` at each scanned resource root (nlohmann/json is vendored as a git submodule and wrapped by `foundation/json.hpp`'s `parse_json`) and mounts the pointed build-tree package at that root's priority, falling back to the direct `<root>/resources.db` when no metadata file is present (release/install).
+
+Per-resource overrides are expressed as explicit `[[resources]]` entries keyed by logical key; they win over glob `[[rules]]` and over signature/extension media-type detection:
+
+```toml
+embed_threshold = 1048576
+
+[[resources]]
+key = "assets/logo.png"
+media_type = "image/png"   # 覆盖自动检测
+storage = "embedded"       # auto | embedded | external
+streaming = false
+```
+
+`storage` and `streaming` participate in the same lock/package decisions as glob rules; `media_type` overrides the scanned type in `resources.lock.toml`. A `[[resources]]` key must be a canonical `ResourceKey`, must not repeat, and only needs the fields the project wants to override.
 
 Do not replace the manifest with Lua. Resource identity and build inputs must remain statically inspectable, deterministic, cacheable, IDE-editable, and safe in cross builds. A future Lua or Python script may be an explicit asset generator whose declared outputs enter the normal scan root; it must not become the resource inventory, identity, or lifecycle engine.
 

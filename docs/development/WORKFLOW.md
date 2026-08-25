@@ -104,6 +104,12 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
+**Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 41/41 green.
+The resource-delivery line R0–R10 and developer-experience D1–D2 are complete (D2 now includes
+runtime build-tree package lookup and `[[resources]]` per-resource overrides). Next up is D3
+(`nandina` CLI + application template); i18n is deferred past 1.0. Detailed history follows:
+
 - Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). The full D6
   component order — Badge, Card, ProgressBar, RadioButton — is now complete
   against the template frozen in §4.
@@ -314,8 +320,14 @@ readable:
   thin `foundation::parse_json` wrapper, plus `resource::read_build_location_metadata`. Tests cover
   the JSON wrapper, metadata parse/missing/
   malformed, and a NanApplication that resolves a package reachable only through the metadata;
-  41/41 green. Per-resource overrides remain the next D2 increment.
+  41/41 green.
+- D2 per-resource overrides: `resources.toml` gains `[[resources]]` entries keyed by canonical
+  `ResourceKey` (`key`, plus optional `media_type` / `storage` / `streaming`) that override the glob
+  `[[rules]]` and signature/extension detection for one resource. `build_resource_lock` applies glob
+  rules first, then the per-key override (media_type/storage/streaming), so the lock and package
+  honor the explicit choice. `nanres-cli` tests cover a media_type + storage override and reject an
+  invalid key; 41/41 green. D2 is now complete; D3 (`nandina` CLI + template) is next.
 - Test suite 41/41 green.
-- Next (planned follow-ups, 1.1): i18n language packs;
-  keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas + audio (raylib audio)
-  as separate media milestones.
+- Next (planned follow-ups, 1.1): D3 `nandina` CLI + application template; i18n language packs
+  (deferred past 1.0); keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas
+  + audio (raylib audio) as separate media milestones.

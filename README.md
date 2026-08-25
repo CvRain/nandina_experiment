@@ -61,9 +61,12 @@ Layout, input, text, render device, platform window
 - **动画**：easing + `Tween<T>`；`Behavior<T>` 与 `AnimatedProperty<T>` 完成 target/value
   值语义；typed property endpoint 将 Builder `.bind/.behavior`、命令式 setter 与场景树
   `AnimationHost` 汇入同一 target，并在 reactive 与 layout 之间只推进活跃轨道。
-  Tabs 下划线与 Dialog 淡入仍待迁移到 Host。
+  Tabs 下划线与 Dialog 淡入已迁移到 Host；`spring`/`keyframes`/`motion::` DSL、组合器
+  （parallel/sequential/stagger）与 router 页面转场也已落地，全局 reduced-motion 由 Host 统一。
 - **字体**：系统字体发现 + CJK 回退（Noto Sans CJK / 思源黑体 / Sarasa / 苹方 / 微软雅黑 /
-  文泉驿…），内置拉丁字体缺字自动落系统字体。
+  文泉驿…）；`FontLoader::load_file`（任意路径）+ `register_face` 同族多字重/斜体变体 +
+  `find_system_font`（在 `/usr/share/fonts` 按名取路径），多 family 可按组件/实例分配字体。
+- **图片**：`widget::Image` 文件路径加载 + 裁剪/缩放/对齐 + raylib 预处理（crop/resize/tint）。
 - **可访问性**：semantics 树（Role/State/Action），全部交互组件具备键盘可达 + 焦点环。
 
 ## 示例
@@ -88,13 +91,13 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
 
 ## 当前状态与路线图
 
-- **1.0（收尾中）**：上述能力全部落地；`tests/` 41/41 绿。
-- **1.1（进行中）**：声明式可定制动画系统（per-node opacity、Dialog 淡出/内容淡入、
-  组合器、spring/keyframes、`motion::` DSL、router 转场）与图片/纹理子系统（`widget::Image`
-  裁剪/缩放/对齐 + raylib 预处理）已完成；slider value label 渲染已完成；字体导入内完成：
-  `FontLoader::load_file`（任意路径）+ `register_face` 同族追加变体并按 weight/slant 匹配 +
-  `find_system_font`（可在 `/usr/share/fonts` 按名取路径），多 family 可分别配给不同组件/实例
-  （About 页 serif 标题 / sans 正文 / mono 代码 / 两个按钮不同字体）；剩 i18n 语言包。
+- **1.0（收尾中）**：核心引擎（场景树/响应式/组件/主题/路由/文本/可访问性）全部落地；
+  `tests/` 41/41 绿。资源交付工具链 `nanres`（扫描/校验/锁/打包/安装）R0–R10 完成，
+  D2 的运行时 build-tree 包定位（`resource-location.json`）与 per-resource 覆盖（`[[resources]]`）
+  已落地；D3（`nandina` CLI + 应用模板）与 D4（交叉编译/CI 分发）待做。
+- **1.1（进行中）**：声明式可定制动画系统（per-node opacity、组合器、spring/keyframes、
+  `motion::` DSL、router 转场）、图片/纹理子系统、slider value label、自定义字体/多字体导入 +
+  `find_system_font` 均已完成；i18n 语言包按约定延后到 1.0 之后。
 - **1.2（规划）**：路由转场细化、音频（raylib audio）；Vulkan/SDL 后端评估。
 
 ## 文档索引
