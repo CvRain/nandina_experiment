@@ -106,11 +106,10 @@ readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
 accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 42/42 green.
-The resource-delivery line R0–R10 and the experiment-local D1–D3 prototype are complete. C2.1 is
-now active: extract `nandina` into the sibling `NandinaCLI` repository and replace compiled-in
-source paths/default symlinks with layered sources/mirrors, a locked SDK, verified cache, and pinned
-Meson wrap. The active sequence is the C0-C8 Linux 1.0 closure contract in
-`1.0_ACCEPTANCE.md`: finish C2.1, connect packaged images, complete basic desktop editing, make the
+The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
+NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4 is now active: complete
+basic desktop editing commands and committed CJK input verification. The active sequence is the
+C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: complete basic desktop editing, make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote it to the official repository through
 `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
 
@@ -273,22 +272,23 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   spring is threaded through `PropertyEndpoint` / box+text presentations / `property::set_spring`.
   `SpringSpec` fields became private with `stiffness()/damping()/mass()` getter+fluent-setter overloads.
   The Settings example's Motion section now demonstrates both tween and spring; 40/40 green.
-- Image/texture subsystem (Stage 1–3) adds RGBA image loading on the existing texture abstraction:
+- Image/texture subsystem (Stage 1–4) adds RGBA image loading on the existing texture abstraction:
   `IRenderDevice::load_texture_from_file(path, ImageLoadOptions)` + `texture_size(handle)` (default
   no-op; raylib backend via `LoadImage → ImageCrop/ImageResize/ImageColorTint → LoadTextureFromImage`
   + bilinear filter), plus `widget::Image` (`NanControl`) with lazy load, natural size, `tint ×
   per-node opacity`, `source_rect` crop, `stretch/contain/cover` scaling + contain alignment, and
-  `set_load_options` preprocessing. Loading is file-path based; nanres stays deferred. The Settings
-  About page shows a brand image (`assets/nandina_logo.png` copied beside the executable via meson
-  `configure_file`). Tests cover load-once, rects, crop, contain/cover/alignment, failed-load
-  fallback, opacity, and load-options passthrough; 41/41 green.
+  `set_load_options` preprocessing. C3 adds `load_texture_from_memory`, `res://` resolution through
+  the BuildContext-injected ResourceManager, and safe missing/invalid/non-image fallback without
+  per-frame retries. The Settings About logo now comes from its nanres package and build-tree
+  metadata. Tests cover both file and package paths, service injection, source switching, bytes/media
+  type/options passthrough, layout/draw behavior, and failures; 42/42 green.
 - Slider value label: `widget::Slider` gains an optional value label (`set_show_value_label`) that renders
   the current `numeric_text(value)` above the track using a shared `primitives::Text` (inherited font,
   `on_surface_variant` color when not from style context). Opt-in so existing layout is unchanged;
   enabling it adds label height to `on_measure` and pushes the track down in `on_draw`. The Settings
   General page opts in for the interface-scale slider. Tests cover opt-in height increase, value-text
   tracking, and idempotence; 41/41 green.
-- Custom font import (file-path basis, nanres deferred just like images):
+- Custom font import (file-path basis; packaged fonts remain a later unit):
   `FontLoader::load_file(path, face_index=0)` loads a `FreeTypeFontFace` straight from a filesystem
   path (no resource system), and `FontFamilyRegistry::register_face(family, face, weight, slant)`
   registers that loaded face directly (non-null face required) via a new `FontFaceSpec::direct_face`
@@ -372,7 +372,7 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
 - Test suite 42/42 green.
-- Next (1.0 closure): C3 packaged image path. New templates, i18n,
+- Next (1.0 closure): C4 desktop edit commands. New templates, i18n,
   keyframes/ColorSpace sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

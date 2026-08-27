@@ -5,6 +5,8 @@
 #include "image.hpp"
 
 #include "../render/draw_context.hpp"
+#include "../resource/resource_manager.hpp"
+#include "../resource/resource_uri.hpp"
 
 #include <algorithm>
 #include <utility>
@@ -30,6 +32,21 @@ namespace nandina::widget
 
     auto Image::source() const -> std::string_view {
         return source_;
+    }
+
+    void Image::set_resource_manager(resource::ResourceManager* resources) {
+        if (resources_ == resources) {
+            return;
+        }
+        resources_ = resources;
+        texture_ = {};
+        natural_size_ = foundation::NanSize {};
+        loaded_ = false;
+        mark_layout_dirty();
+    }
+
+    auto Image::resource_manager() const noexcept -> resource::ResourceManager* {
+        return resources_;
     }
 
     void Image::set_tint(const foundation::NanColor tint) {
@@ -112,7 +129,31 @@ namespace nandina::widget
             return;
         }
         loaded_ = true; // 即使失败也标记，避免每帧重试。
-        texture_ = device.load_texture_from_file(source_, load_options_);
+        if (source_.starts_with("res://")) {
+            if (!resources_) {
+                return;
+            }
+            const auto uri = resource::ResourceUri::parse(source_);
+            if (!uri || uri->scheme() != resource::ResourceUriScheme::res) {
+                return;
+            }
+            const auto key = uri->resource_key();
+            if (!key) {
+                return;
+            }
+            const auto loaded = resources_->require(*key);
+            if (!loaded || !(*loaded)->media_type().starts_with("image/")) {
+                return;
+            }
+            texture_ = device.load_texture_from_memory(
+                (*loaded)->bytes(),
+                (*loaded)->media_type(),
+                load_options_
+            );
+        }
+        else {
+            texture_ = device.load_texture_from_file(source_, load_options_);
+        }
         natural_size_ = device.texture_size(texture_);
         if (natural_size_.get_width() > 0.0F || natural_size_.get_height() > 0.0F) {
             mark_layout_dirty();

@@ -160,6 +160,19 @@ namespace nandina::render
             return {};
         }
 
+        /// 从已编码图片字节加载 RGBA 纹理；media_type 用于选择解码器，失败返回空 handle。
+        /// 默认 no-op（录制/无窗口设备按需覆写）。
+        [[nodiscard]] virtual auto load_texture_from_memory(
+            std::span<const std::uint8_t> bytes,
+            std::string_view media_type,
+            const ImageLoadOptions& options = {}
+        ) -> TextureHandle {
+            (void)bytes;
+            (void)media_type;
+            (void)options;
+            return {};
+        }
+
         /// 查询纹理自然像素尺寸；无效 handle 返回 {0,0}。默认 no-op。
         [[nodiscard]] virtual auto texture_size(TextureHandle texture) -> NanSize {
             (void)texture;

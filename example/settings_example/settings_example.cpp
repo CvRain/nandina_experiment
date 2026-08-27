@@ -529,8 +529,8 @@ namespace nandina::examples::settings
         auto ui = context.ui();
         auto& router = context.router();
 
-        // 图片/纹理子系统示范：按文件路径（相对可执行文件目录）加载一张品牌图。
-        auto logo = widget::Image::create("nandina_logo.png");
+        // 图片/纹理子系统示范：从 nanres 包按稳定逻辑键加载品牌图。
+        auto logo = ui.make<widget::Image>("res://nandina_logo.png").build();
         logo->set_size(foundation::NanSize(360.0F, 200.0F));
 
         auto content =

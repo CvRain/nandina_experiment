@@ -19,6 +19,11 @@
 #include <string>
 #include <string_view>
 
+namespace nandina::resource
+{
+    class ResourceManager;
+}
+
 namespace nandina::widget
 {
     /// 图片如何适配其布局尺寸。
@@ -43,6 +48,10 @@ namespace nandina::widget
 
         void set_source(std::string path);
         [[nodiscard]] auto source() const -> std::string_view;
+
+        /// 设置用于解析 res:// 资源的非 owning 服务；切换服务后下次绘制重新加载。
+        void set_resource_manager(resource::ResourceManager* resources);
+        [[nodiscard]] auto resource_manager() const noexcept -> resource::ResourceManager*;
 
         void set_tint(foundation::NanColor tint);
         [[nodiscard]] auto tint() const -> foundation::NanColor;
@@ -81,6 +90,7 @@ namespace nandina::widget
         [[nodiscard]] auto compute_rects(const foundation::NanRect& world) const -> DrawRects;
 
         std::string source_;
+        resource::ResourceManager* resources_ = nullptr;
         render::TextureHandle texture_ {};
         foundation::NanSize natural_size_ {};
         foundation::NanColor tint_ = foundation::NanColor::from_hex(0xFFFFFF);

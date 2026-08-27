@@ -1,0 +1,13 @@
+format = 1
+package_id = "org.nandina.example"
+
+[[resources]]
+id = "bdbbbbca-b397-46a2-98e8-dbf1ce52882d"
+key = "nandina_logo.png"
+source = "../assets/nandina_logo.png"
+media_type = "image/png"
+size = 1599
+sha256 = "50530d58c671944a4f3c83d1f273fb7dc1a017cacc014cb61af9b8d1de46a2f7"
+storage = "auto"
+streaming = false
+revision = 1

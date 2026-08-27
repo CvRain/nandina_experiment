@@ -33,11 +33,10 @@ re-derive them. The detailed contracts live in the sections that follow; this is
 - **One unit per round, docs first.** Each round lands one reviewable logical unit: record the design
   in the phase/roadmap doc, implement minimally, add focused tests, run the full suite, and commit
   with `type(scope): 中文` after user review. See `WORKFLOW.md` §1–§3 for the exact gates.
-- **File-path loading first, nanres later.** Images and fonts load from filesystem paths
-  (`IRenderDevice::load_texture_from_file`, `FontLoader::load_file`) with files copied beside the
-  executable via `meson configure_file(copy)`. `nanres` packaging is deferred for the examples until
-  the toolchain is a real consumer need; the full `nanres` pipeline (scan/validate/lock/pack/install,
-  D1–D2) remains exported and tested for applications that want it.
+- **Packaged application images, explicit file-path escape hatch.** `widget::Image` accepts
+  `res://<ResourceKey>` and loads immutable package bytes through `ResourceManager`; ordinary paths
+  still use `IRenderDevice::load_texture_from_file`. The Settings logo is the first real nanres
+  example consumer. Custom imported fonts remain file-path based until their package migration unit.
 - **Third-party libraries are vendored as git submodules, never re-implemented.** JSON uses
   nlohmann/json through a thin `foundation::parse_json` wrapper; TOML uses toml++; shaping uses
   FreeType/HarfBuzz/FriBidi/utf8proc. We do not hand-roll a parser or a shaping stack.
@@ -385,7 +384,7 @@ Status: complete in `9b0933d`.
 
 Status: complete in `9b0933d`; Meson authoring simplified in the current change.
 
-The example previously built a SQLite resource package with an always-stale Meson custom target around `nanres_build_helper.py`. During the example restructure, resource packaging was removed from the example: each example is now a plain application without a project package, and `resources.toml`/`resources.lock.toml` plus the bundled CJK font are no longer shipped under `example/`. The `nanres` toolchain itself remains exported through `nandina_resource_toolchain` and continues to be exercised by the `nanres-cli`, `nanres-install`, `nanres-build-workflow`, and `nandina-subproject-fixture` tests.
+The example previously built a SQLite resource package with an always-stale Meson custom target around `nanres_build_helper.py`. During the example restructure, resource packaging was removed while the application layout stabilized. C3 restores a minimal package for the Settings brand image, making the example a real `res://` consumer without restoring the former bundled CJK font pack. The `nanres` toolchain remains exported through `nandina_resource_toolchain` and is also exercised by the `nanres-cli`, `nanres-install`, `nanres-build-workflow`, and `nandina-subproject-fixture` tests.
 
 Fully offline builds use compatible system dependencies or pre-populated Meson `subprojects/packagecache` archives for the pinned wraps. Configure/build never downloads Sarasa Gothic or other optional resource packs implicitly. Generated SQLite fallback source trees, build outputs, resource databases, package fingerprints, and lock-update temporaries remain outside source control; generated `resources.lock.toml` is the intentional exception and is committed as application inventory.
 

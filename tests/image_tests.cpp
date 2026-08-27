@@ -5,8 +5,11 @@
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
 #include "render/render_device.hpp"
+#include "resource/backends/memory_backend.hpp"
+#include "resource/resource_manager.hpp"
 #include "scene/scene_tree.hpp"
-#include "widget/image.hpp"
+#include "theme/theme_manager.hpp"
+#include "widget/controls.hpp"
 
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
@@ -29,6 +32,9 @@ namespace
         };
 
         std::vector<std::string> loaded;
+        int memory_loads = 0;
+        std::vector<std::uint8_t> loaded_bytes;
+        std::string loaded_media_type;
         int draw_regions = 0;
         std::vector<Region> regions;
         bool fail_loads = false;
@@ -73,6 +79,21 @@ namespace
 
         [[nodiscard]] auto texture_size(render::TextureHandle) -> foundation::NanSize override {
             return size_to_return;
+        }
+
+        [[nodiscard]] auto load_texture_from_memory(
+            std::span<const std::uint8_t> bytes,
+            std::string_view media_type,
+            const render::ImageLoadOptions& options
+        ) -> render::TextureHandle override {
+            if (fail_loads) {
+                return {};
+            }
+            ++memory_loads;
+            loaded_bytes.assign(bytes.begin(), bytes.end());
+            loaded_media_type = media_type;
+            last_options = options;
+            return render::TextureHandle {.value = static_cast<std::uint64_t>(memory_loads + 100)};
         }
 
         void draw_texture_region(
@@ -241,4 +262,133 @@ TEST_CASE("image passes load options to the device", "[image]") {
     REQUIRE(dev.last_options.resize->get_width() == Catch::Approx(32.0F));
     REQUIRE(dev.last_options.resize->get_height() == Catch::Approx(32.0F));
     REQUIRE(dev.last_options.tint.has_value());
+}
+
+TEST_CASE(
+    "image loads res URI bytes through the resource manager exactly once",
+    "[image][resource]"
+) {
+    auto backend = std::make_shared<resource::MemoryBackend>("images");
+    const std::vector<std::uint8_t> png_bytes {0x89, 0x50, 0x4E, 0x47};
+    REQUIRE(backend
+                ->insert(
+                    resource::ResourceId::random(),
+                    resource::ResourceKey("assets/hero.png"),
+                    "image/png",
+                    png_bytes
+                )
+                .has_value());
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+
+    TextureRecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto image = widget::Image::create("res://assets/hero.png");
+    image->set_resource_manager(&resources);
+    image->set_load_options(
+        render::ImageLoadOptions {
+            .resize = foundation::NanSize(24.0F, 12.0F),
+        }
+    );
+    tree.set_root(image);
+    (void)tree.layout_root(foundation::NanSize(200.0F, 100.0F));
+
+    tree.draw(dev);
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 1);
+    REQUIRE(dev.loaded.empty());
+    REQUIRE(dev.loaded_bytes == png_bytes);
+    REQUIRE(dev.loaded_media_type == "image/png");
+    REQUIRE(dev.last_options.resize.has_value());
+    REQUIRE(dev.draw_regions == 2);
+}
+
+TEST_CASE("image res URI failures are safe and are not retried", "[image][resource]") {
+    TextureRecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto image = widget::Image::create("res://missing.png");
+    tree.set_root(image);
+    (void)tree.layout_root(foundation::NanSize(100.0F, 100.0F));
+
+    tree.draw(dev);
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 0);
+    REQUIRE(dev.loaded.empty());
+    REQUIRE(dev.draw_regions == 0);
+
+    auto backend = std::make_shared<resource::MemoryBackend>("documents");
+    REQUIRE(backend
+                ->insert(
+                    resource::ResourceId::random(),
+                    resource::ResourceKey("readme.txt"),
+                    "text/plain",
+                    std::vector<std::uint8_t> {'n', 'o'}
+                )
+                .has_value());
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+    image->set_resource_manager(&resources);
+    image->set_source("res://still-missing.png");
+
+    tree.draw(dev);
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 0);
+    REQUIRE(dev.draw_regions == 0);
+
+    image->set_source("res://readme.txt");
+
+    tree.draw(dev);
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 0);
+    REQUIRE(dev.draw_regions == 0);
+}
+
+TEST_CASE("image switches between packaged resources and file paths", "[image][resource]") {
+    auto backend = std::make_shared<resource::MemoryBackend>("images");
+    REQUIRE(backend
+                ->insert(
+                    resource::ResourceId::random(),
+                    resource::ResourceKey("logo.png"),
+                    "image/png",
+                    std::vector<std::uint8_t> {1, 2, 3}
+                )
+                .has_value());
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+
+    TextureRecordingDevice dev;
+    scene::NanSceneTree tree;
+    auto image = widget::Image::create("res://logo.png");
+    image->set_resource_manager(&resources);
+    tree.set_root(image);
+    (void)tree.layout_root(foundation::NanSize(100.0F, 100.0F));
+
+    tree.draw(dev);
+    image->set_source("logo-from-disk.png");
+    tree.draw(dev);
+    image->set_source("res://logo.png");
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 2);
+    REQUIRE(dev.loaded == std::vector<std::string> {"logo-from-disk.png"});
+    REQUIRE(dev.draw_regions == 3);
+}
+
+TEST_CASE(
+    "BuildContext injects resource services into authored images",
+    "[image][resource][authoring]"
+) {
+    reactive::Graph graph;
+    reactive::ReactiveScope scope(graph);
+    theme::ThemeManager themes;
+    resource::ResourceManager resources;
+    widget::BuildContext ui(graph, scope, themes, &resources);
+
+    auto image = ui.make<widget::Image>("res://logo.png").build();
+
+    REQUIRE(image->resource_manager() == &resources);
 }

@@ -15,6 +15,7 @@
 #include "dialog.hpp"
 #include "divider.hpp"
 #include "label.hpp"
+#include "image.hpp"
 #include "progress_bar.hpp"
 #include "radio_button.hpp"
 #include "radio_group.hpp"
@@ -27,6 +28,17 @@
 
 namespace nandina::widget
 {
+    template<>
+    struct ComponentTraits<Image> {
+        [[nodiscard]] static auto make(const BuildContext& ui, std::string source = {})
+            -> authoring::NodeBuilder<Image> {
+            return authoring::make<Image>(std::move(source))
+                .configure([resources = ui.resource_manager()](Image& image) {
+                    image.set_resource_manager(resources);
+                });
+        }
+    };
+
     template<>
     struct ComponentTraits<Label> {
         [[nodiscard]] static auto make(const BuildContext& ui, std::string text = {})

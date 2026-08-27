@@ -15,6 +15,7 @@
 #include <algorithm>
 #include <cmath>
 #include <cstdint>
+#include <limits>
 #include <memory>
 #include <optional>
 #include <span>
@@ -48,6 +49,32 @@ namespace nandina::render
                 pixels.push_back(::Color {255, 255, 255, value});
             }
             return pixels;
+        }
+
+        [[nodiscard]] auto image_extension(const std::string_view media_type)
+            -> std::optional<std::string_view> {
+            if (media_type == "image/png") {
+                return ".png";
+            }
+            if (media_type == "image/jpeg") {
+                return ".jpg";
+            }
+            if (media_type == "image/webp") {
+                return ".webp";
+            }
+            if (media_type == "image/bmp") {
+                return ".bmp";
+            }
+            if (media_type == "image/gif") {
+                return ".gif";
+            }
+            if (media_type == "image/qoi") {
+                return ".qoi";
+            }
+            if (media_type == "image/tga") {
+                return ".tga";
+            }
+            return std::nullopt;
         }
 
     } // namespace
@@ -562,6 +589,43 @@ void main() {
         ) -> TextureHandle override {
             const std::string path_str(path);
             Image image = LoadImage(path_str.c_str());
+            return upload_image(image, options);
+        }
+
+        [[nodiscard]] auto load_texture_from_memory(
+            const std::span<const std::uint8_t> bytes,
+            const std::string_view media_type,
+            const ImageLoadOptions& options
+        ) -> TextureHandle override {
+            const auto extension = image_extension(media_type);
+            if (!extension || bytes.empty()
+                || bytes.size() > static_cast<std::size_t>(std::numeric_limits<int>::max()))
+            {
+                return {};
+            }
+            const std::string extension_str(*extension);
+            Image image = LoadImageFromMemory(
+                extension_str.c_str(),
+                bytes.data(),
+                static_cast<int>(bytes.size())
+            );
+            return upload_image(image, options);
+        }
+
+        [[nodiscard]] auto texture_size(TextureHandle texture) -> NanSize override {
+            const auto found = textures_.find(texture.value);
+            if (found == textures_.end()) {
+                return NanSize {};
+            }
+            return NanSize(
+                static_cast<float>(found->second.width),
+                static_cast<float>(found->second.height)
+            );
+        }
+
+    private:
+        [[nodiscard]] auto upload_image(Image image, const ImageLoadOptions& options)
+            -> TextureHandle {
             if (image.data == nullptr) {
                 return {};
             }
@@ -590,19 +654,6 @@ void main() {
             textures_.emplace(handle.value, texture);
             return handle;
         }
-
-        [[nodiscard]] auto texture_size(TextureHandle texture) -> NanSize override {
-            const auto found = textures_.find(texture.value);
-            if (found == textures_.end()) {
-                return NanSize {};
-            }
-            return NanSize(
-                static_cast<float>(found->second.width),
-                static_cast<float>(found->second.height)
-            );
-        }
-
-    private:
         std::unordered_map<std::uint64_t, ::Texture2D> textures_;
         std::uint64_t next_texture_handle_ = 1;
         /// SDF 抗锯齿着色器与 1x1 白纹理（懒加载）。

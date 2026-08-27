@@ -109,7 +109,7 @@ namespace nandina::app
         }
 
         [[nodiscard]] auto ui() -> widget::BuildContext {
-            return widget::BuildContext(graph(), scope(), theme_manager());
+            return widget::BuildContext(graph(), scope(), theme_manager(), resources_);
         }
 
         [[nodiscard]] auto has_store() const -> bool {

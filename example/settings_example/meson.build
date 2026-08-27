@@ -11,13 +11,16 @@ settings_example_dep = declare_dependency(
     dependencies: [nandina_dep],
 )
 
-# 把示例图片与自定义字体复制到可执行文件同目录，供运行时按相对路径加载
-# （nanres 集成延后；图片/字体统一使用输出目录相对路径）。
-configure_file(
-    input: 'assets/nandina_logo.png',
-    output: 'nandina_logo.png',
-    copy: true,
+# 品牌图进入 nanres 包；build helper 同时写入可执行文件旁的 resource-location.json。
+settings_resources = custom_target(
+    'nandina-settings-resources',
+    input: files('resources/resources.toml'),
+    output: 'resources',
+    command: [nanres_build_helper, 'build', nanres, '@INPUT@', '@OUTPUT@'],
+    build_by_default: true,
+    build_always_stale: true,
 )
+# 自定义字体仍保留文件路径加载；字体包迁移不属于 C3。
 configure_file(
     input: 'assets/demo-font.ttf',
     output: 'demo-font.ttf',

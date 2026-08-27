@@ -20,6 +20,11 @@
 #include <utility>
 #include <vector>
 
+namespace nandina::resource
+{
+    class ResourceManager;
+}
+
 namespace nandina::widget
 {
     namespace build_context_detail
@@ -36,9 +41,10 @@ namespace nandina::widget
         BuildContext(
             reactive::Graph& graph,
             reactive::ReactiveScope& scope,
-            theme::ThemeManager& themes
+            theme::ThemeManager& themes,
+            resource::ResourceManager* resources = nullptr
         ) noexcept:
-            BuildContext(graph, scope, themes, scope) {}
+            BuildContext(graph, scope, themes, scope, resources) {}
 
         [[nodiscard]] auto graph() const noexcept -> reactive::Graph& {
             return *graph_;
@@ -56,9 +62,13 @@ namespace nandina::widget
             return *themes_;
         }
 
+        [[nodiscard]] auto resource_manager() const noexcept -> resource::ResourceManager* {
+            return resources_;
+        }
+
         [[nodiscard]] auto with_scope(reactive::ReactiveScope& scope) const noexcept
             -> BuildContext {
-            return BuildContext(*graph_, scope, *themes_, *callback_scope_);
+            return BuildContext(*graph_, scope, *themes_, *callback_scope_, resources_);
         }
 
         template<typename T, typename... Args>
@@ -152,12 +162,14 @@ namespace nandina::widget
             reactive::Graph& graph,
             reactive::ReactiveScope& scope,
             theme::ThemeManager& themes,
-            reactive::ReactiveScope& callback_scope
+            reactive::ReactiveScope& callback_scope,
+            resource::ResourceManager* resources
         ) noexcept:
             graph_(&graph),
             scope_(&scope),
             themes_(&themes),
-            callback_scope_(&callback_scope) {}
+            callback_scope_(&callback_scope),
+            resources_(resources) {}
 
         template<typename Node, typename... Args>
         [[nodiscard]] auto make_scoped_component(Args&&... args) const
@@ -334,6 +346,7 @@ namespace nandina::widget
         reactive::ReactiveScope* scope_;
         theme::ThemeManager* themes_;
         reactive::ReactiveScope* callback_scope_;
+        resource::ResourceManager* resources_ = nullptr;
     };
 
 } // namespace nandina::widget
