@@ -7,10 +7,12 @@
 #ifndef NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP
 #define NANDINA_EXPERIMENT_THEME_VISUAL_STATE_HPP
 
+#include <cstdint>
+
 namespace nandina::theme
 {
     /** Checkbox 交互状态。 */
-    enum class CheckboxVisualState {
+    enum class CheckboxVisualState: std::uint8_t {
         normal,
         hovered,
         pressed,
@@ -19,7 +21,7 @@ namespace nandina::theme
     };
 
     /** Slider 交互状态。 */
-    enum class SliderVisualState {
+    enum class SliderVisualState: std::uint8_t {
         normal,
         hovered,
         dragging,
@@ -52,7 +54,7 @@ namespace nandina::theme
     }
 
     /** Button 语义色家族。 */
-    enum class ButtonTone {
+    enum class ButtonTone: std::uint8_t {
         primary,
         secondary,
         neutral,
@@ -60,7 +62,7 @@ namespace nandina::theme
     };
 
     /** Button 视觉处理方式。 */
-    enum class ButtonTreatment {
+    enum class ButtonTreatment: std::uint8_t {
         filled,
         tonal,
         outlined,
@@ -69,14 +71,14 @@ namespace nandina::theme
     };
 
     /** Button 尺寸档位。 */
-    enum class ButtonSize {
+    enum class ButtonSize: std::uint8_t {
         small,
         medium,
         large,
     };
 
     /** Button 交互状态。 */
-    enum class ButtonVisualState {
+    enum class ButtonVisualState: std::uint8_t {
         normal,
         hovered,
         pressed,
@@ -85,7 +87,7 @@ namespace nandina::theme
     };
 
     /** Switch 交互状态。 */
-    enum class SwitchVisualState {
+    enum class SwitchVisualState: std::uint8_t {
         normal,
         hovered,
         pressed,
@@ -94,13 +96,13 @@ namespace nandina::theme
     };
 
     /** ProgressBar 交互状态（确定性进度条：非交互，仅 normal / disabled）。 */
-    enum class ProgressBarVisualState {
+    enum class ProgressBarVisualState: std::uint8_t {
         normal,
         disabled,
     };
 
     /** RadioButton 交互状态。 */
-    enum class RadioButtonVisualState {
+    enum class RadioButtonVisualState: std::uint8_t {
         normal,
         hovered,
         pressed,
@@ -109,14 +111,14 @@ namespace nandina::theme
     };
 
     /** Tabs 交互状态。 */
-    enum class TabsVisualState {
+    enum class TabsVisualState: std::uint8_t {
         normal,
         focused,
         disabled,
     };
 
     /** Select 交互状态。 */
-    enum class SelectVisualState {
+    enum class SelectVisualState: std::uint8_t {
         normal,
         focused,
         disabled,
