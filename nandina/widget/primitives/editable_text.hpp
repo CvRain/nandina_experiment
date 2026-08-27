@@ -6,12 +6,14 @@
 #define NANDINA_EXPERIMENT_WIDGET_PRIMITIVES_EDITABLE_TEXT_HPP
 
 #include "../../scene/control.hpp"
+#include "../../scene/clipboard.hpp"
 #include "text.hpp"
 
 #include <functional>
 #include <optional>
 #include <string>
 #include <string_view>
+#include <vector>
 
 namespace nandina::widget::primitives
 {
@@ -47,6 +49,7 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto has_selection() const -> bool;
         void select_all();
         void clear_selection();
+        [[nodiscard]] auto selected_text() const -> std::string;
 
         void set_read_only(bool value);
         [[nodiscard]] auto read_only() const -> bool;
@@ -57,6 +60,10 @@ namespace nandina::widget::primitives
         [[nodiscard]] auto composition() const -> const std::optional<TextComposition>&;
 
         void set_on_change(std::function<void(std::string_view)> callback);
+
+        auto execute_edit_command(scene::EditCommand command, scene::IClipboard* clipboard) -> bool;
+        [[nodiscard]] auto can_undo() const noexcept -> bool;
+        [[nodiscard]] auto can_redo() const noexcept -> bool;
 
         [[nodiscard]] auto text_node() -> Text&;
         [[nodiscard]] auto text_node() const -> const Text&;
@@ -78,6 +85,18 @@ namespace nandina::widget::primitives
             -> foundation::NanSize override;
 
     private:
+        struct EditSnapshot {
+            std::string value;
+            std::size_t caret = 0;
+            TextAffinity caret_affinity = TextAffinity::downstream;
+            TextSelection selection;
+        };
+
+        [[nodiscard]] auto snapshot() const -> EditSnapshot;
+        void record_undo();
+        void restore(EditSnapshot snapshot);
+        void undo();
+        void redo();
         void insert_text(std::string_view text);
         void erase_before_caret();
         void erase_after_caret();
@@ -101,6 +120,8 @@ namespace nandina::widget::primitives
         std::optional<TextComposition> composition_;
         Text text_;
         std::function<void(std::string_view)> on_change_;
+        std::vector<EditSnapshot> undo_stack_;
+        std::vector<EditSnapshot> redo_stack_;
     };
 
 } // namespace nandina::widget::primitives

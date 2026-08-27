@@ -298,6 +298,21 @@ public:
     std::shared_ptr<widget::Button> remove;
 };
 
+class MemoryClipboard final: public scene::IClipboard {
+public:
+    [[nodiscard]] auto read_text() const -> std::optional<std::string> override {
+        return text;
+    }
+
+    auto write_text(const std::string_view value) -> bool override {
+        text = std::string(value);
+        return writable;
+    }
+
+    std::optional<std::string> text;
+    bool writable = true;
+};
+
 auto opaque_color(float light) -> foundation::NanColor {
     return foundation::NanColor::from(
         foundation::NanOklch{.light = light, .chroma = 0.1F, .hue = 120.0F, .alpha = 1.0F});
@@ -1541,6 +1556,90 @@ TEST_CASE("EditableText selection replaces and deletes once", "[widget][editable
     REQUIRE(changes.size() == 2);
 }
 
+TEST_CASE("EditableText clipboard commands preserve UTF-8 selections", "[widget][editable-text][clipboard]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("A中文B");
+    edit->set_selection(widget::primitives::TextSelection {
+        .anchor = 1,
+        .focus = 7,
+    });
+    MemoryClipboard clipboard;
+    scene::NanSceneTree tree;
+    tree.set_clipboard(clipboard);
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+    const scene::KeyModifiers primary {.ctrl = true};
+
+    tree.dispatch_key(scene::KeyEvent(67, scene::KeyEvent::Action::press, primary));
+    REQUIRE(clipboard.text == "中文");
+    REQUIRE(edit->value() == "A中文B");
+
+    tree.dispatch_key(scene::KeyEvent(88, scene::KeyEvent::Action::press, primary));
+    REQUIRE(edit->value() == "AB");
+    REQUIRE(edit->caret() == 1);
+
+    tree.dispatch_key(scene::KeyEvent(86, scene::KeyEvent::Action::press, primary));
+    REQUIRE(edit->value() == "A中文B");
+
+    tree.dispatch_key(scene::KeyEvent(90, scene::KeyEvent::Action::press, primary));
+    REQUIRE(edit->value() == "AB");
+    tree.dispatch_key(scene::KeyEvent(
+        90,
+        scene::KeyEvent::Action::press,
+        {.shift = true, .ctrl = true}
+    ));
+    REQUIRE(edit->value() == "A中文B");
+}
+
+TEST_CASE("EditableText undo redo tracks committed CJK and clears redo branches", "[widget][editable-text][undo][utf8]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>();
+    scene::NanSceneTree tree;
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+    const scene::KeyModifiers command {.super = true};
+
+    tree.dispatch_text_input(scene::TextInputEvent("中文"));
+    tree.dispatch_text_input(scene::TextInputEvent("输入"));
+    REQUIRE(edit->value() == "中文输入");
+    REQUIRE(edit->can_undo());
+    edit->set_value(std::string(edit->value()));
+    REQUIRE(edit->can_undo());
+
+    tree.dispatch_key(scene::KeyEvent(90, scene::KeyEvent::Action::press, command));
+    REQUIRE(edit->value() == "中文");
+    REQUIRE(edit->can_redo());
+    tree.dispatch_key(scene::KeyEvent(89, scene::KeyEvent::Action::press, command));
+    REQUIRE(edit->value() == "中文输入");
+
+    tree.dispatch_key(scene::KeyEvent(90, scene::KeyEvent::Action::press, command));
+    tree.dispatch_text_input(scene::TextInputEvent("测试"));
+    REQUIRE(edit->value() == "中文测试");
+    REQUIRE_FALSE(edit->can_redo());
+    tree.dispatch_key(scene::KeyEvent(89, scene::KeyEvent::Action::press, command));
+    REQUIRE(edit->value() == "中文测试");
+}
+
+TEST_CASE("EditableText read-only shortcuts copy without mutating", "[widget][editable-text][clipboard][state]") {
+    auto edit = std::make_shared<widget::primitives::EditableText>("只读");
+    MemoryClipboard clipboard;
+    clipboard.text = "替换";
+    scene::NanSceneTree tree;
+    tree.set_clipboard(clipboard);
+    tree.set_root(edit);
+    tree.set_focus(edit.get());
+
+    tree.dispatch_text_input(scene::TextInputEvent("历史"));
+    edit->set_read_only(true);
+    const scene::KeyModifiers primary {.ctrl = true};
+    tree.dispatch_key(scene::KeyEvent(65, scene::KeyEvent::Action::press, primary));
+    tree.dispatch_key(scene::KeyEvent(67, scene::KeyEvent::Action::press, primary));
+    REQUIRE(clipboard.text == "只读历史");
+
+    tree.dispatch_key(scene::KeyEvent(88, scene::KeyEvent::Action::press, primary));
+    tree.dispatch_key(scene::KeyEvent(86, scene::KeyEvent::Action::press, primary));
+    tree.dispatch_key(scene::KeyEvent(90, scene::KeyEvent::Action::press, primary));
+    REQUIRE(edit->value() == "只读历史");
+}
+
 TEST_CASE("EditableText read-only and composition state preserve value", "[widget][editable-text][state]") {
     auto edit = std::make_shared<widget::primitives::EditableText>("value");
     edit->set_read_only(true);
@@ -1653,16 +1752,29 @@ TEST_CASE("TextField exposes semantic states and submit", "[widget][text-field][
     REQUIRE(field->invalid());
 
     scene::NanSceneTree tree;
+    MemoryClipboard clipboard;
+    clipboard.text = "mutated";
+    tree.set_clipboard(clipboard);
     tree.set_root(field);
     tree.set_focus(field.get());
     tree.dispatch_key(scene::KeyEvent(257, scene::KeyEvent::Action::press));
     REQUIRE(submissions == std::vector<std::string> {"value"});
+    (void)tree.update_semantics();
+    REQUIRE_FALSE(tree.perform_semantics_action(
+        field->semantics_id(),
+        {.action = semantics::Action::set_value, .value = "mutated"}
+    ));
 
     field->set_disabled(true);
     REQUIRE(field->disabled());
     REQUIRE_FALSE(field->is_focusable());
     REQUIRE(tree.focused_node() == nullptr);
     tree.dispatch_text_input(scene::TextInputEvent("x"));
+    tree.dispatch_key(scene::KeyEvent(
+        86,
+        scene::KeyEvent::Action::press,
+        {.ctrl = true}
+    ));
     REQUIRE(field->value() == "value");
 
     RecordingDevice dev;

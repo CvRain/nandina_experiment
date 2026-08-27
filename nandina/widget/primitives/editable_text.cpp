@@ -24,7 +24,13 @@ namespace nandina::widget::primitives
         constexpr int key_home = 268;
         constexpr int key_end = 269;
         constexpr int key_a = 65;
+        constexpr int key_c = 67;
+        constexpr int key_v = 86;
+        constexpr int key_x = 88;
+        constexpr int key_y = 89;
+        constexpr int key_z = 90;
         constexpr float caret_width = 1.0F;
+        constexpr std::size_t history_limit = 100;
 
         [[nodiscard]] auto
         clamp_grapheme_boundary(const std::string_view text, const std::size_t offset)
@@ -64,11 +70,16 @@ namespace nandina::widget::primitives
     }
 
     void EditableText::set_value(std::string value) {
+        if (value_ == value) {
+            return;
+        }
         value_ = std::move(value);
         caret_ = clamp_grapheme_boundary(value_, caret_);
         caret_affinity_ = TextAffinity::downstream;
         clear_selection();
         clear_composition();
+        undo_stack_.clear();
+        redo_stack_.clear();
         sync_text();
     }
 
@@ -135,6 +146,15 @@ namespace nandina::widget::primitives
         };
     }
 
+    auto EditableText::selected_text() const -> std::string {
+        if (!has_selection()) {
+            return {};
+        }
+        const auto lower = std::min(selection_.anchor, selection_.focus);
+        const auto upper = std::max(selection_.anchor, selection_.focus);
+        return value_.substr(lower, upper - lower);
+    }
+
     void EditableText::set_read_only(const bool value) {
         read_only_ = value;
     }
@@ -160,6 +180,55 @@ namespace nandina::widget::primitives
 
     void EditableText::set_on_change(std::function<void(std::string_view)> callback) {
         on_change_ = std::move(callback);
+    }
+
+    auto EditableText::execute_edit_command(
+        const scene::EditCommand command,
+        scene::IClipboard* clipboard
+    ) -> bool {
+        switch (command) {
+            case scene::EditCommand::select_all:
+                select_all();
+                return true;
+            case scene::EditCommand::copy:
+                if (clipboard != nullptr && has_selection()) {
+                    (void)clipboard->write_text(selected_text());
+                }
+                return true;
+            case scene::EditCommand::cut:
+                if (!read_only_ && clipboard != nullptr && has_selection()
+                    && clipboard->write_text(selected_text()))
+                {
+                    erase_selection();
+                }
+                return true;
+            case scene::EditCommand::paste:
+                if (!read_only_ && clipboard != nullptr) {
+                    if (const auto text = clipboard->read_text(); text && !text->empty()) {
+                        insert_text(*text);
+                    }
+                }
+                return true;
+            case scene::EditCommand::undo:
+                if (!read_only_) {
+                    undo();
+                }
+                return true;
+            case scene::EditCommand::redo:
+                if (!read_only_) {
+                    redo();
+                }
+                return true;
+        }
+        return false;
+    }
+
+    auto EditableText::can_undo() const noexcept -> bool {
+        return !undo_stack_.empty();
+    }
+
+    auto EditableText::can_redo() const noexcept -> bool {
+        return !redo_stack_.empty();
     }
 
     auto EditableText::text_node() -> Text& {
@@ -267,12 +336,39 @@ namespace nandina::widget::primitives
             }
             case scene::EventType::key: {
                 auto& key_event = static_cast<scene::KeyEvent&>(event);
-                if (key_event.is_pressed() && key_event.modifiers().ctrl
-                    && key_event.keycode() == key_a)
-                {
-                    select_all();
-                    event.accept();
-                    return true;
+                const auto modifiers = key_event.modifiers();
+                const bool primary = modifiers.ctrl || modifiers.super;
+                if (key_event.is_pressed() && primary) {
+                    std::optional<scene::EditCommand> command;
+                    switch (key_event.keycode()) {
+                        case key_a:
+                            command = scene::EditCommand::select_all;
+                            break;
+                        case key_c:
+                            command = scene::EditCommand::copy;
+                            break;
+                        case key_x:
+                            command = scene::EditCommand::cut;
+                            break;
+                        case key_v:
+                            command = scene::EditCommand::paste;
+                            break;
+                        case key_y:
+                            command = scene::EditCommand::redo;
+                            break;
+                        case key_z:
+                            command = modifiers.shift ? scene::EditCommand::redo
+                                                      : scene::EditCommand::undo;
+                            break;
+                        default:
+                            break;
+                    }
+                    if (command) {
+                        auto* clipboard = is_inside_tree() ? get_tree()->clipboard() : nullptr;
+                        (void)execute_edit_command(*command, clipboard);
+                        event.accept();
+                        return true;
+                    }
                 }
                 if (key_event.is_pressed() && key_event.keycode() == key_backspace) {
                     if (!read_only_) {
@@ -330,10 +426,61 @@ namespace nandina::widget::primitives
         return measured;
     }
 
+    auto EditableText::snapshot() const -> EditSnapshot {
+        return EditSnapshot {
+            .value = value_,
+            .caret = caret_,
+            .caret_affinity = caret_affinity_,
+            .selection = selection_,
+        };
+    }
+
+    void EditableText::record_undo() {
+        if (undo_stack_.size() == history_limit) {
+            undo_stack_.erase(undo_stack_.begin());
+        }
+        undo_stack_.push_back(snapshot());
+        redo_stack_.clear();
+    }
+
+    void EditableText::restore(EditSnapshot state) {
+        value_ = std::move(state.value);
+        caret_ = state.caret;
+        caret_affinity_ = state.caret_affinity;
+        selection_ = state.selection;
+        clear_composition();
+        sync_text();
+        emit_change();
+    }
+
+    void EditableText::undo() {
+        if (undo_stack_.empty()) {
+            return;
+        }
+        redo_stack_.push_back(snapshot());
+        auto previous = std::move(undo_stack_.back());
+        undo_stack_.pop_back();
+        restore(std::move(previous));
+    }
+
+    void EditableText::redo() {
+        if (redo_stack_.empty()) {
+            return;
+        }
+        if (undo_stack_.size() == history_limit) {
+            undo_stack_.erase(undo_stack_.begin());
+        }
+        undo_stack_.push_back(snapshot());
+        auto next = std::move(redo_stack_.back());
+        redo_stack_.pop_back();
+        restore(std::move(next));
+    }
+
     void EditableText::insert_text(std::string_view text) {
         if (text.empty()) {
             return;
         }
+        record_undo();
         if (has_selection()) {
             const auto lower = std::min(selection_.anchor, selection_.focus);
             const auto upper = std::max(selection_.anchor, selection_.focus);
@@ -366,6 +513,7 @@ namespace nandina::widget::primitives
         if (previous == nullptr) {
             return;
         }
+        record_undo();
         value_.erase(previous->offset, previous->length);
         caret_ = previous->offset;
         caret_affinity_ = TextAffinity::downstream;
@@ -382,6 +530,7 @@ namespace nandina::widget::primitives
         if (next == graphemes.end()) {
             return;
         }
+        record_undo();
         value_.erase(next->offset, next->length);
         caret_affinity_ = TextAffinity::downstream;
         clear_selection();
@@ -393,6 +542,7 @@ namespace nandina::widget::primitives
         if (!has_selection()) {
             return;
         }
+        record_undo();
         const auto lower = std::min(selection_.anchor, selection_.focus);
         const auto upper = std::max(selection_.anchor, selection_.focus);
         value_.erase(lower, upper - lower);

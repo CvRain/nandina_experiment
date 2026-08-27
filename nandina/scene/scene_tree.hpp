@@ -9,6 +9,7 @@
 #include "../theme/theme_manager.hpp"
 #include "../semantics/semantics.hpp"
 #include "frame_scheduler.hpp"
+#include "clipboard.hpp"
 #include "input_event.hpp"
 #include "node2d.hpp"
 
@@ -96,6 +97,9 @@ namespace nandina::scene
         [[nodiscard]] auto theme_manager() const noexcept -> theme::ThemeManager*;
         [[nodiscard]] auto animation_host() noexcept -> animation::AnimationHost&;
         [[nodiscard]] auto animation_host() const noexcept -> const animation::AnimationHost&;
+        void set_clipboard(IClipboard& clipboard) noexcept;
+        void clear_clipboard() noexcept;
+        [[nodiscard]] auto clipboard() const noexcept -> IClipboard*;
 
         // ---- accessibility semantics ----
 
@@ -225,6 +229,7 @@ namespace nandina::scene
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         text::FontPipelineCache* font_context_ = nullptr;
         theme::ThemeManager* theme_manager_ = nullptr;
+        IClipboard* clipboard_ = nullptr;
         semantics::Tree semantics_tree_;
         foundation::NanTransform2D semantics_transform_;
         bool semantics_dirty_ = true;

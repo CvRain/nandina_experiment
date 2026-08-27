@@ -959,7 +959,8 @@ that real policy rather than maintaining a visual-only preference.
 - Camera2D, offscreen/custom viewports, physics interpolation polish, broader Box2D joints, and advanced spatial queries.
 - Sprite/shape convenience nodes, particles, audio, navigation, scene serialization, and ECS remain optional future game-facing work rather than requirements for the application framework.
 - Virtualized lists, richer Anchor layout, and retained render caches.
-- Native IME, clipboard/undo, UAX #14, emoji and rich text.
+- Native IME pre-edit/candidate positioning, UAX #14, emoji and rich text. C4 owns committed
+  Unicode input plus clipboard and undo/redo; see `TEXT_EDITING.md`.
 - System font discovery as an explicit application feature.
 
 ## Iteration Workflow

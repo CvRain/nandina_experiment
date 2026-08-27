@@ -80,6 +80,7 @@ module_scene = files(
     'scene/canvas_layer.hpp',
     'scene/canvas_layer.cpp',
     'scene/frame_scheduler.hpp',
+    'scene/clipboard.hpp',
     'scene/input_event.hpp',
     'scene/node.hpp',
     'scene/node.cpp',

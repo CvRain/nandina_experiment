@@ -107,8 +107,9 @@ readable:
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
 accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 42/42 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
-NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4 is now active: complete
-basic desktop editing commands and committed CJK input verification. The active sequence is the
+NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
+commands now pass 42/42 through the platform-neutral contract in `TEXT_EDITING.md`; the active gate
+is recording committed CJK input in a real Linux desktop session. The active sequence is the
 C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: complete basic desktop editing, make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote it to the official repository through
 `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
@@ -282,6 +283,12 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   per-frame retries. The Settings About logo now comes from its nanres package and build-tree
   metadata. Tests cover both file and package paths, service injection, source switching, bytes/media
   type/options passthrough, layout/draw behavior, and failures; 42/42 green.
+- Desktop edit commands add a scene-owned non-owning `IClipboard` service, a raylib UTF-8 clipboard
+  backend, and platform-neutral select/copy/cut/paste/undo/redo intents. EditableText keeps a bounded
+  value/caret/selection history, accepts Ctrl or Super shortcuts, preserves grapheme boundaries,
+  clears divergent redo branches, and prevents read-only/disabled shortcut or semantics mutation.
+  Committed CJK and in-memory clipboard tests pass in the 42/42 suite; native pre-edit/candidate
+  positioning is a documented 1.x limitation, and the real Linux IME check remains the C4 gate.
 - Slider value label: `widget::Slider` gains an optional value label (`set_show_value_label`) that renders
   the current `numeric_text(value)` above the track using a shared `primitives::Text` (inherited font,
   `on_surface_variant` color when not from style context). Opt-in so existing layout is unchanged;
@@ -372,7 +379,7 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
 - Test suite 42/42 green.
-- Next (1.0 closure): C4 desktop edit commands. New templates, i18n,
+- Next (1.0 closure): finish the C4 Linux IME manual gate, then C5 platform truth. New templates, i18n,
   keyframes/ColorSpace sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

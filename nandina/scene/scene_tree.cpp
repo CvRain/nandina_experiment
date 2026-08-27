@@ -290,6 +290,18 @@ namespace nandina::scene
         return theme_manager_;
     }
 
+    void NanSceneTree::set_clipboard(IClipboard& clipboard) noexcept {
+        clipboard_ = &clipboard;
+    }
+
+    void NanSceneTree::clear_clipboard() noexcept {
+        clipboard_ = nullptr;
+    }
+
+    auto NanSceneTree::clipboard() const noexcept -> IClipboard* {
+        return clipboard_;
+    }
+
     auto NanSceneTree::animation_host() noexcept -> animation::AnimationHost& {
         return *animation_host_;
     }

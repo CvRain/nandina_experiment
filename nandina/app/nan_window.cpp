@@ -12,6 +12,7 @@
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
 #include "../scene/control.hpp"
+#include "../scene/clipboard.hpp"
 #include "../scene/input_event.hpp"
 
 #include <raylib.h>
@@ -52,6 +53,25 @@ namespace nandina::app
                 tree.dispatch_mouse_button(ev);
             }
         }
+
+        class RaylibClipboard final: public scene::IClipboard {
+        public:
+            [[nodiscard]] auto read_text() const -> std::optional<std::string> override {
+                const auto* text = GetClipboardText();
+                return text != nullptr ? std::optional<std::string>(text) : std::nullopt;
+            }
+
+            auto write_text(const std::string_view text) -> bool override {
+                if (text.find('\0') != std::string_view::npos) {
+                    return false;
+                }
+                const std::string owned(text);
+                SetClipboardText(owned.c_str());
+                return true;
+            }
+        };
+
+        RaylibClipboard raylib_clipboard;
 
     } // namespace
 
@@ -122,6 +142,7 @@ namespace nandina::app
 
         InitWindow(config_.width, config_.height, config_.title.c_str());
         SetTargetFPS(config_.target_fps);
+        tree_.set_clipboard(raylib_clipboard);
 
         device_ = render::make_raylib_device();
         font_pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
@@ -134,6 +155,7 @@ namespace nandina::app
         if (!pipeline) {
             font_pipeline_cache_.reset();
             device_.reset();
+            tree_.clear_clipboard();
             CloseWindow();
             throw std::runtime_error(
                 "NanWindow: cannot create default text pipeline: " + pipeline.error().message
@@ -341,6 +363,7 @@ namespace nandina::app
         font_pipeline_cache_.reset();
         router_.reset();
         device_.reset();
+        tree_.clear_clipboard();
         CloseWindow();
         opened_ = false;
         log::get("app.window").info("NanWindow: closed");
