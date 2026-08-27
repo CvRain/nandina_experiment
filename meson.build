@@ -6,6 +6,7 @@ project(
 
 fs = import('fs')
 python = import('python').find_installation('python3')
+nandina_source_root = meson.current_source_dir()
 
 embed_binary = executable(
     'nandina_embed_binary',
@@ -137,6 +138,9 @@ nanres = executable(
     dependencies: [nandina_dep, tomlplusplus_dep, openssl_dep],
     install: true,
 )
+# D3：项目级工作流 CLI（脚手架/体检），只依赖 C++ 标准库，不链接框架运行时。
+# 放在 tools/ 子目录，构建产物为 buildDir/tools/nandina。
+subdir('tools')
 nanres_build_helper = [python, files('tools/nanres_build_helper.py')]
 nanres_install_helper = [python, files('tools/nanres_install.py')]
 nandina_resource_toolchain = {

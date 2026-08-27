@@ -269,6 +269,13 @@ test(
     nanres_cli_test,
     args: [nanres, nanres_package_probe],
 )
+nandina_cli_test = find_program('nandina_cli_test.py')
+test(
+    'nandina-cli',
+    nandina_cli_test,
+    args: [nandina, meson.project_source_root()],
+    timeout: 300,
+)
 nanres_install_test = find_program('nanres_install_test.py')
 test(
     'nanres-install',
