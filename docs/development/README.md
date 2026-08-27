@@ -12,6 +12,16 @@ The upper layers rebuild a desktop/frontend authoring surface: reactive state, s
 
 The current authority is the code under `nandina/` plus tests under `tests/`. Older v1/v2 material is useful for semantics and naming, but it is not the active contract.
 
+The active release-closure authority is [`1.0_ACCEPTANCE.md`](1.0_ACCEPTANCE.md). It defines the
+Linux 1.0 support profile, acceptance gates, and ordered closure units. Once the candidate is
+accepted, [`1.0_PROMOTION_PLAN.md`](1.0_PROMOTION_PLAN.md) governs the history-preserving migration
+to the official `/workspace/Cpp/NandinaUI` repository, the experiment-branch archive, and the 2.0
+experiment/production split.
+
+[`NANDINA_CLI_DISTRIBUTION.md`](NANDINA_CLI_DISTRIBUTION.md) defines the independent NandinaCLI
+repository, layered source/mirror configuration, locked SDK resolution, verified cache, and SDK
+artifact contract introduced by C2.1.
+
 The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
 
 ## Current Development Approach
@@ -1032,15 +1042,55 @@ Do not replace the manifest with Lua. Resource identity and build inputs must re
 
 #### D3. Application Template And `nandina` CLI
 
-Status: planned after D2.
+Status: the C2 local-source workflow is complete (`new` + `build` + `run` + `doctor` +
+`--version`/`--help`). C2.1 now owns the sibling `NandinaCLI` repository. Commits `3716bbd`,
+`a6722f9`, `742c02d`, `3f33ba7`, and `71f27f4` implement the independent C++20 build,
+registry/archive provider, layered and CLI-editable sources/mirrors, size/SHA-256 cache,
+provider-neutral lock generation, migrated `build`/`run`/`doctor`, Git forks pinned to exact
+commits, explicit path development mode, Ed25519-signed indexes, and platform-selected
+process/config/cache/path backends. C2.1's code contract is complete under
+`NANDINA_CLI_DISTRIBUTION.md`; native Windows/macOS validation remains a D4 support gate and the
+built-in official release key is provisioned during C6.
 
-`nanres` remains focused on scanning, validation, lock management, and package creation. A separate `nandina` command owns project-level actions such as `new`, `build`, `run`, `doctor`, and high-level resource edits. The first template should provide Hello World, the default `resources/` layout, a minimal manifest, and a Meson subproject declaration. Todo and Physics Canvas templates follow once the exported API is stable.
+`nanres` remains focused on scanning, validation, lock management, and package creation. A separate `nandina` command owns project-level actions such as `new`, `build`, `run`, `doctor`, and high-level resource edits. The first template provides Hello World, the default `resources/` layout, a minimal manifest, and a Meson subproject declaration. Todo and Physics Canvas templates follow once the exported API is stable.
+
+`nandina new <path> [--package <package-id>] [--nandina-source <path>]` scaffolds the application
+files: `meson.build`
+(`subproject('nandina')` + the D1 `nandina_resource_toolchain` custom target + an executable),
+`src/main.cpp` (a minimal `app::run<MainPage>` program), `resources/resources.toml`
+(`package = ...`), `resources/assets/.gitkeep`, `.nandina/target`, and `.gitignore`. The binary lives
+in `tools/` so its build output
+(`buildDir/tools/nandina`) does not collide with the `nandina/` library directory. By default the
+generated project links the Nandina source configured into the CLI; `--nandina-source` selects an
+explicit checkout. Generation happens in a sibling staging directory and is published only after
+all files plus the source link exist.
+
+`nandina build [path] [--build-dir <path>]` configures a missing build directory and then compiles
+it; later calls reuse the Meson configuration. `nandina run [path] [--build-dir <path>]
+[--no-build] [-- <args...>]` uses that same directory, resolves the executable through
+`.nandina/target`, forwards application arguments without a shell, and returns the application's
+exit code. `nandina doctor [path]` checks Meson >= 1.3, Ninja >= 1.10, CMake, the selected C++
+compiler, Python 3, pkg-config, Git, OpenSSL >= 3.0, and a real C++26 compile/link probe. With a
+project path it also validates the resource manifest, CLI target metadata, Nandina source link or
+wrap, and recursively checked-out Nandina dependencies.
+
+The release compiler baseline is GCC 16+ or Clang 21+ with a matching standard library that passes
+the C++26 probe (`std::expected`, `std::move_only_function`, and `std::println`). `nandina-cli`
+executes `new -> build -> doctor -> run --no-build`, verifies incremental build-directory reuse,
+the generated resource package/lock/metadata, argument forwarding, and child exit-code propagation,
+and covers default/explicit source plus invalid input paths. A pinned official wrap/submodule
+belongs to C6/C8.
 
 #### D4. Distribution And CI
 
 Status: planned after D3.
 
 Document recursive submodule checkout, test clean application builds, offline/default builds, native host-tool builds for cross compilation, executable-relative/package-prefix lookup, deterministic lock/package regeneration, and system/user installation trees. Nandina-as-Git-submodule is a supported development mode; a release archive/wrap remains a future distribution option, not a second resource model.
+
+For 1.0, D4 owns the CI/sanitizer gates, release metadata, SDK bundle/index publishing, and
+source/install distribution verification. The source-resolution contract itself is frozen in C2.1
+so later platform and release work consumes one stable model. The accepted tree is released only
+after the official-repository promotion and re-verification defined by `1.0_PROMOTION_PLAN.md`.
 
 Resource configuration decisions:
 

@@ -105,10 +105,14 @@ Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
-accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 41/41 green.
-The resource-delivery line R0–R10 and developer-experience D1–D2 are complete (D2 now includes
-runtime build-tree package lookup and `[[resources]]` per-resource overrides). Next up is D3
-(`nandina` CLI + application template); i18n is deferred past 1.0. Detailed history follows:
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 42/42 green.
+The resource-delivery line R0–R10 and the experiment-local D1–D3 prototype are complete. C2.1 is
+now active: extract `nandina` into the sibling `NandinaCLI` repository and replace compiled-in
+source paths/default symlinks with layered sources/mirrors, a locked SDK, verified cache, and pinned
+Meson wrap. The active sequence is the C0-C8 Linux 1.0 closure contract in
+`1.0_ACCEPTANCE.md`: finish C2.1, connect packaged images, complete basic desktop editing, make the
+Linux platform promise truthful, finish D4, freeze an RC, and promote it to the official repository through
+`1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
 
 - Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). The full D6
   component order — Badge, Card, ProgressBar, RadioButton — is now complete
@@ -327,7 +331,48 @@ runtime build-tree package lookup and `[[resources]]` per-resource overrides). N
   rules first, then the per-key override (media_type/storage/streaming), so the lock and package
   honor the explicit choice. `nanres-cli` tests cover a media_type + storage override and reject an
   invalid key; 41/41 green. D2 is now complete; D3 (`nandina` CLI + template) is next.
-- Test suite 41/41 green.
-- Next (planned follow-ups, 1.1): D3 `nandina` CLI + application template; i18n language packs
-  (deferred past 1.0); keyframes/ColorSpace DSL sugar + component motion slots; image 9-patch/atlas
-  + audio (raylib audio) as separate media milestones.
+- D3 first slice (`nandina` CLI): a standalone `tools/nandina` executable adds `nandina new <path>
+  [--package <id>]` (scaffolds `meson.build` with the `nandina` subproject + D1 resource toolchain,
+  `src/main.cpp` with `app::run<MainPage>`, `resources/resources.toml`, `resources/assets/.gitkeep`,
+  `.gitignore`) and `nandina doctor` (checks meson/ninja/c++ on PATH) plus `--version`/`--help`. The
+  binary lives in `tools/` so its build output does not collide with the `nandina/` library dir.
+  `nandina-cli` tests cover scaffold contents, duplicate/non-empty rejection, `--version`, and
+  `doctor`; 42/42 green. `build`/`run`/resource-edits remain D3 follow-ups.
+- C1 D3 scaffold closure: `nandina new` now embeds the current Nandina source as its default local
+  source, accepts `--nandina-source` for an explicit checkout, links it at `subprojects/nandina`,
+  writes the project into a sibling staging directory, and publishes only after generation
+  succeeds. `nandina-cli` now runs a network-disabled Meson configure and full compile of the
+  generated Hello application and verifies its executable, resource database, build metadata, and
+  generated lock; explicit source, invalid source, non-empty destination, and existing empty
+  destination paths are covered. A pinned official source strategy remains part of C6/C8.
+- C2 D3 workflow closure: `nandina build` configures missing build directories and reuses existing
+  Meson state; `nandina run` shares that directory, supports `--no-build`, forwards arguments
+  without a shell, and propagates the application exit code. `nandina doctor` now checks minimum
+  Meson/Ninja versions, the remaining required tools, OpenSSL >= 3.0, a real C++26 compile/link
+  probe, and generated-project metadata/source/submodule integrity. The CLI test exercises the
+  complete `new -> build -> doctor -> run` path and incremental reuse.
+- C2.1 distribution architecture: `NandinaCLI` becomes an independent C++20 repository; official
+  SDK archives, custom registries, mirrors, Git forks, and local paths share a provider-neutral
+  resolution contract. Projects pin the resolved artifact/revision in `nandina.lock`, expose it to
+  Meson through `nandina.wrap`, and reuse a content-addressed verified cache. See
+  `NANDINA_CLI_DISTRIBUTION.md`.
+- C2.1 independent CLI slices: `NandinaCLI` commit `3716bbd` bootstraps the registry/archive
+  provider, size/SHA-256 verified cache, offline reuse, and no-symlink pinned project generation.
+  Commit `a6722f9` adds system/user/project/explicit source layering, project-owned custom source
+  declarations, mirror-aware locked builds, shared Meson package cache, and the migrated
+  `build`/`run`/`doctor` workflow. Commit `742c02d` adds provider-neutral locks, CLI-managed source
+  add/remove/enable/disable, Git fork resolution to an exact commit with clean offline checkout
+  reuse, and explicit path development links checked by build/doctor. The fixture covers registry,
+  Git, and path project creation/build behavior plus missing trust and lock traversal rejection.
+  Commit `3f33ba7` adds Ed25519 detached signatures, online/offline index verification, explicit
+  `--insecure` registries, signing-key fingerprints in locks, and rejection of index tampering or
+  configured key replacement. Commit `71f27f4` adds platform-selected POSIX/Windows backends for
+  process execution, native configuration/cache paths, UTF-8/native path conversion, atomic
+  metadata replacement, executable suffixes, and explicit development links. Linux tests exercise
+  Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
+  premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
+- Test suite 42/42 green.
+- Next (1.0 closure): C3 packaged image path. New templates, i18n,
+  keyframes/ColorSpace sugar, component motion
+  slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
+  explicitly requires them.
