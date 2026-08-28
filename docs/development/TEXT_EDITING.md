@@ -1,6 +1,6 @@
 # 桌面文本编辑（C4）
 
-> 状态：自动化实现完成；GNOME Wayland + fcitx5 手工验收进行中，跨应用粘贴修复待复验。
+> 状态：自动化实现完成；GNOME Wayland + fcitx5 手工验收进行中，剪贴板桥接二次修复待复验。
 
 ## 1. 范围
 
@@ -51,14 +51,19 @@ stdin 写入和命令失败。
 
 - 环境：GNOME Wayland，fcitx5；raylib/GLFW 实际经 XWayland 运行。
 - 已通过：Profile name 可顺利提交中文；Ctrl+A、Ctrl+Z、Ctrl+Y 正常。
+- 二次复验已通过：Ctrl+Shift+Z 正常。
 - 修复前失败：无法把其他应用中的文本通过 Ctrl+V 粘贴进 TextField。原因是 X11 selection
   后端不能在该会话中可靠读取 Wayland clipboard；现已增加 `wl-paste` / `wl-copy` 桥接，等待
   同一环境复验后关闭此项。
+- 首次修复复验失败：Ctrl+C/X 不能产生可粘贴文本，Ctrl+X 也不删除选择。`wl-copy` 要求三个
+  标准文件描述符全部有效，而 GUI 启动环境可能关闭 stdout/stderr；旧 `popen` 桥接因此返回
+  失败，剪切按“复制成功后再删除”的安全语义保留原文。二次修复改用 `posix_spawnp`，在子进程
+  文件动作中显式连接 stdin 管道并将 stdout/stderr 接到 `/dev/null`，等待同一环境复验。
 - 已知限制：输入法候选框出现在窗口外并与窗口左侧对齐，而不是跟随 Profile name caret。
   这是上述 XIM input style 和缺失 caret spot API 的结果，记为 1.x 限制，不阻塞 committed
   CJK 输入的 1.0 基本可用目标。
 
-C4 只有在修复版完成跨应用 Ctrl+V（以及尚未记录的 Ctrl+C/X、Ctrl+Shift+Z）手工复验后关闭。
+C4 只有在二次修复版完成 Ctrl+C/X、应用内/跨应用粘贴手工复验后关闭。
 
 自动化验证：`meson compile -C buildDir`、`meson test -C buildDir widget --print-errorlogs`、
 `meson test -C buildDir --print-errorlogs`（43/43）与 `git diff --check` 均通过。
