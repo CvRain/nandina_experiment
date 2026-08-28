@@ -230,11 +230,12 @@ namespace nandina::widget
     }
 
     auto TextField::on_input(scene::InputEvent& event) -> bool {
+        auto* clipboard = is_inside_tree() ? get_tree()->clipboard() : nullptr;
         if (event.type() == scene::EventType::focus_enter) {
             focused_ = !disabled_;
             apply_theme();
             mark_semantics_dirty();
-            return edit_.on_input(event);
+            return edit_.handle_input(event, clipboard);
         }
         else if (event.type() == scene::EventType::focus_leave) {
             focused_ = false;
@@ -242,7 +243,7 @@ namespace nandina::widget
             edit_.clear_composition();
             apply_theme();
             mark_semantics_dirty();
-            return edit_.on_input(event);
+            return edit_.handle_input(event, clipboard);
         }
         if (disabled_) {
             return false;
@@ -278,7 +279,7 @@ namespace nandina::widget
                 return true;
             }
         }
-        return edit_.on_input(event);
+        return edit_.handle_input(event, clipboard);
     }
 
     void TextField::on_draw(render::DrawContext& ctx) {

@@ -2,6 +2,7 @@
 
 #include "app/detail/linux_clipboard.hpp"
 
+#include <cstdlib>
 #include <optional>
 
 #include <unistd.h>
@@ -88,4 +89,17 @@ TEST_CASE(
         );
     }
     REQUIRE(write_succeeded);
+}
+
+TEST_CASE(
+    "Wayland clipboard bridge exchanges text with the active compositor",
+    "[app][clipboard][linux][integration]"
+) {
+    if (std::getenv("NANDINA_WAYLAND_CLIPBOARD_INTEGRATION") == nullptr) {
+        SKIP("requires an active Wayland compositor");
+    }
+
+    constexpr std::string_view sentinel = "nandina-wayland-integration-中文";
+    REQUIRE(app::detail::write_wayland_clipboard(sentinel));
+    REQUIRE(app::detail::read_wayland_clipboard() == sentinel);
 }

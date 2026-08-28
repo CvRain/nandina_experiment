@@ -1590,6 +1590,35 @@ TEST_CASE("EditableText clipboard commands preserve UTF-8 selections", "[widget]
     REQUIRE(edit->value() == "A中文B");
 }
 
+TEST_CASE(
+    "TextField forwards clipboard shortcuts to its embedded editor",
+    "[widget][text-field][clipboard]"
+) {
+    auto field = std::make_shared<widget::TextField>("A中文B", "");
+    field->editable_text().set_selection(widget::primitives::TextSelection {
+        .anchor = 1,
+        .focus = 7,
+    });
+    MemoryClipboard clipboard;
+    scene::NanSceneTree tree;
+    tree.set_clipboard(clipboard);
+    tree.set_root(field);
+    tree.set_focus(field.get());
+    const scene::KeyModifiers primary {.ctrl = true};
+
+    tree.dispatch_key(scene::KeyEvent(67, scene::KeyEvent::Action::press, primary));
+    REQUIRE(clipboard.text == "中文");
+    REQUIRE(field->value() == "A中文B");
+
+    tree.dispatch_key(scene::KeyEvent(88, scene::KeyEvent::Action::press, primary));
+    REQUIRE(clipboard.text == "中文");
+    REQUIRE(field->value() == "AB");
+
+    clipboard.text = "替换";
+    tree.dispatch_key(scene::KeyEvent(86, scene::KeyEvent::Action::press, primary));
+    REQUIRE(field->value() == "A替换B");
+}
+
 TEST_CASE("EditableText undo redo tracks committed CJK and clears redo branches", "[widget][editable-text][undo][utf8]") {
     auto edit = std::make_shared<widget::primitives::EditableText>();
     scene::NanSceneTree tree;

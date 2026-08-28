@@ -314,7 +314,10 @@ namespace nandina::widget::primitives
         return true;
     }
 
-    auto EditableText::on_input(scene::InputEvent& event) -> bool {
+    auto EditableText::handle_input(
+        scene::InputEvent& event,
+        scene::IClipboard* clipboard
+    ) -> bool {
         switch (event.type()) {
             case scene::EventType::focus_enter:
                 focused_ = true;
@@ -364,7 +367,6 @@ namespace nandina::widget::primitives
                             break;
                     }
                     if (command) {
-                        auto* clipboard = is_inside_tree() ? get_tree()->clipboard() : nullptr;
                         (void)execute_edit_command(*command, clipboard);
                         event.accept();
                         return true;
@@ -413,6 +415,11 @@ namespace nandina::widget::primitives
                 return false;
         }
         return false;
+    }
+
+    auto EditableText::on_input(scene::InputEvent& event) -> bool {
+        auto* clipboard = is_inside_tree() ? get_tree()->clipboard() : nullptr;
+        return handle_input(event, clipboard);
     }
 
     void EditableText::on_draw(render::DrawContext& ctx) {

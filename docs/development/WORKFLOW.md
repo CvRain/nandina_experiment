@@ -109,11 +109,12 @@ accessibility) and the 1.1 authoring/animation/image/font work are landed; `test
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
 commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
-fcitx5 committed CJK input and Ctrl+A/Z/Y/Shift+Z are now manually recorded; the active gate is
-retesting the descriptor-safe `wl-clipboard` bridge for copy, cut, and paste. The active
-sequence is the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: complete basic desktop
-editing, make the Linux platform promise truthful, finish D4, freeze an RC, and promote it to the
-official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
+fcitx5 committed CJK input and desktop commands are manually recorded. Hyprland end-to-end and
+owner clipboard acceptance pass after fixing the embedded-editor clipboard ownership boundary.
+C4 is closed; the active sequence is the C0-C8 Linux 1.0 closure contract in
+`1.0_ACCEPTANCE.md`: make the Linux platform promise truthful, finish D4, freeze an RC, and promote
+it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
+history follows:
 
 - Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). The full D6
   component order — Badge, Card, ProgressBar, RadioButton — is now complete
@@ -292,9 +293,9 @@ official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. 
   clears divergent redo branches, and prevents read-only/disabled shortcut or semantics mutation.
   Committed CJK and in-memory clipboard tests pass; Linux command bridge tests cover UTF-8 I/O and
   failure handling. GNOME Wayland + fcitx5 committed input passes manually, while native
-  pre-edit/candidate positioning is a documented 1.x limitation. The initial GUI-session write
-  failed when `wl-copy` inherited closed stdout/stderr; the bridge now uses `posix_spawnp` file
-  actions, and copy/cut/paste await retest.
+  pre-edit/candidate positioning is a documented 1.x limitation. The remaining C/X/V failure was
+  caused by the `TextField`-embedded editor querying its own unattached tree instead of receiving
+  the host field's clipboard. Hyprland end-to-end injection and owner acceptance now pass; C4 is closed.
 - Slider value label: `widget::Slider` gains an optional value label (`set_show_value_label`) that renders
   the current `numeric_text(value)` above the track using a shared `primitives::Text` (inherited font,
   `on_surface_variant` color when not from style context). Opt-in so existing layout is unchanged;
@@ -385,7 +386,7 @@ official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. 
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
 - Test suite 43/43 green.
-- Next (1.0 closure): finish the C4 Linux clipboard/shortcut manual gate, then C5 platform truth. New templates, i18n,
-  keyframes/ColorSpace sugar, component motion
+- Next (1.0 closure): execute C5 Linux platform truth. New templates, i18n, keyframes/ColorSpace
+  sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

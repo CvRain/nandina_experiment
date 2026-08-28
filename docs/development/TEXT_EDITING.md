@@ -1,6 +1,6 @@
 # 桌面文本编辑（C4）
 
-> 状态：自动化实现完成；GNOME Wayland + fcitx5 手工验收进行中，剪贴板桥接二次修复待复验。
+> 状态：C4 完成；自动化、GNOME Wayland + fcitx5 输入及 Hyprland 剪贴板验收通过。
 
 ## 1. 范围
 
@@ -53,17 +53,19 @@ stdin 写入和命令失败。
 - 已通过：Profile name 可顺利提交中文；Ctrl+A、Ctrl+Z、Ctrl+Y 正常。
 - 二次复验已通过：Ctrl+Shift+Z 正常。
 - 修复前失败：无法把其他应用中的文本通过 Ctrl+V 粘贴进 TextField。原因是 X11 selection
-  后端不能在该会话中可靠读取 Wayland clipboard；现已增加 `wl-paste` / `wl-copy` 桥接，等待
-  同一环境复验后关闭此项。
-- 首次修复复验失败：Ctrl+C/X 不能产生可粘贴文本，Ctrl+X 也不删除选择。`wl-copy` 要求三个
-  标准文件描述符全部有效，而 GUI 启动环境可能关闭 stdout/stderr；旧 `popen` 桥接因此返回
-  失败，剪切按“复制成功后再删除”的安全语义保留原文。二次修复改用 `posix_spawnp`，在子进程
-  文件动作中显式连接 stdin 管道并将 stdout/stderr 接到 `/dev/null`，等待同一环境复验。
+  后端不能在该会话中可靠读取 Wayland clipboard；现已增加 `wl-paste` / `wl-copy` 桥接。
+- 首次修复复验失败：Ctrl+C/X 不能产生可粘贴文本，Ctrl+X 也不删除选择。真实调试确认平台
+  桥接可以直接读写 Hyprland clipboard；实际根因是 `TextField` 内嵌的 `EditableText` 不是
+  场景树节点，快捷键处理从自身查询 `NanSceneTree` 时总是得到空 clipboard。修复后由宿主
+  `TextField` 显式传入场景树 clipboard，并增加针对完整 `TextField` 的 C/X/V 回归测试。
+- 代理端到端验证：在真实 Hyprland/XWayland Settings 窗口注入 Ctrl+A/C、Ctrl+A/X、Ctrl+V，
+  并通过 `wl-paste` 验证应用内恢复及外部→应用→外部 UTF-8 往返均通过。
+- 项目负责人复验通过：Ctrl+C/X、应用内 Ctrl+V 和应用内外复制粘贴均可用。
 - 已知限制：输入法候选框出现在窗口外并与窗口左侧对齐，而不是跟随 Profile name caret。
   这是上述 XIM input style 和缺失 caret spot API 的结果，记为 1.x 限制，不阻塞 committed
   CJK 输入的 1.0 基本可用目标。
 
-C4 只有在二次修复版完成 Ctrl+C/X、应用内/跨应用粘贴手工复验后关闭。
+C4 已关闭。原生 pre-edit/候选框定位继续作为 1.x 明确限制跟踪。
 
 自动化验证：`meson compile -C buildDir`、`meson test -C buildDir widget --print-errorlogs`、
 `meson test -C buildDir --print-errorlogs`（43/43）与 `git diff --check` 均通过。
