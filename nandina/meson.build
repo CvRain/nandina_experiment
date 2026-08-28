@@ -253,6 +253,12 @@ module_app = files(
     'app/nan_window.hpp',
     'app/nan_window.cpp',
 )
+if host_machine.system() == 'linux'
+    module_app += files(
+        'app/detail/linux_clipboard.hpp',
+        'app/detail/linux_clipboard.cpp',
+    )
+endif
 
 module_physics2d = []
 if box2d_dep.found()

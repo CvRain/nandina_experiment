@@ -7,6 +7,10 @@
 #include "nan_window.hpp"
 #include "nan_application.hpp"
 
+#if defined(__linux__)
+#include "detail/linux_clipboard.hpp"
+#endif
+
 #include "../foundation/nan_logger.hpp"
 #include "../foundation/utf8.hpp"
 #include "../render/backends/raylib_device.hpp"
@@ -18,6 +22,7 @@
 #include <raylib.h>
 
 #include <algorithm>
+#include <cstdlib>
 #include <utility>
 
 namespace nandina::app
@@ -54,9 +59,16 @@ namespace nandina::app
             }
         }
 
-        class RaylibClipboard final: public scene::IClipboard {
+        class DesktopClipboard final: public scene::IClipboard {
         public:
             [[nodiscard]] auto read_text() const -> std::optional<std::string> override {
+#if defined(__linux__)
+                if (detail::is_wayland_session(std::getenv("WAYLAND_DISPLAY"))) {
+                    if (auto text = detail::read_wayland_clipboard()) {
+                        return text;
+                    }
+                }
+#endif
                 const auto* text = GetClipboardText();
                 return text != nullptr ? std::optional<std::string>(text) : std::nullopt;
             }
@@ -65,13 +77,19 @@ namespace nandina::app
                 if (text.find('\0') != std::string_view::npos) {
                     return false;
                 }
+#if defined(__linux__)
+                if (detail::is_wayland_session(std::getenv("WAYLAND_DISPLAY")) &&
+                    detail::write_wayland_clipboard(text)) {
+                    return true;
+                }
+#endif
                 const std::string owned(text);
                 SetClipboardText(owned.c_str());
                 return true;
             }
         };
 
-        RaylibClipboard raylib_clipboard;
+        DesktopClipboard desktop_clipboard;
 
     } // namespace
 
@@ -142,7 +160,7 @@ namespace nandina::app
 
         InitWindow(config_.width, config_.height, config_.title.c_str());
         SetTargetFPS(config_.target_fps);
-        tree_.set_clipboard(raylib_clipboard);
+        tree_.set_clipboard(desktop_clipboard);
 
         device_ = render::make_raylib_device();
         font_pipeline_cache_ = std::make_unique<text::FontPipelineCache>(

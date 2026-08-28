@@ -105,14 +105,15 @@ Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
-accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 42/42 green.
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 43/43 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
-commands now pass 42/42 through the platform-neutral contract in `TEXT_EDITING.md`; the active gate
-is recording committed CJK input in a real Linux desktop session. The active sequence is the
-C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: complete basic desktop editing, make the
-Linux platform promise truthful, finish D4, freeze an RC, and promote it to the official repository through
-`1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
+commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
+fcitx5 committed CJK input and Ctrl+A/Z/Y are now manually recorded; the active gate is retesting
+the new `wl-clipboard` bridge for cross-application paste and the remaining shortcuts. The active
+sequence is the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: complete basic desktop
+editing, make the Linux platform promise truthful, finish D4, freeze an RC, and promote it to the
+official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed history follows:
 
 - Phase 8 Steps 0–8 are complete (see PHASE8_RENDER_THEME_PLAN.md). The full D6
   component order — Badge, Card, ProgressBar, RadioButton — is now complete
@@ -283,12 +284,15 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   per-frame retries. The Settings About logo now comes from its nanres package and build-tree
   metadata. Tests cover both file and package paths, service injection, source switching, bytes/media
   type/options passthrough, layout/draw behavior, and failures; 42/42 green.
-- Desktop edit commands add a scene-owned non-owning `IClipboard` service, a raylib UTF-8 clipboard
-  backend, and platform-neutral select/copy/cut/paste/undo/redo intents. EditableText keeps a bounded
+- Desktop edit commands add a scene-owned non-owning `IClipboard` service, a desktop UTF-8 clipboard
+  backend, and platform-neutral select/copy/cut/paste/undo/redo intents. Linux Wayland sessions use
+  `wl-paste` / `wl-copy` before the raylib fallback so an XWayland window can exchange text with native
+  Wayland applications. EditableText keeps a bounded
   value/caret/selection history, accepts Ctrl or Super shortcuts, preserves grapheme boundaries,
   clears divergent redo branches, and prevents read-only/disabled shortcut or semantics mutation.
-  Committed CJK and in-memory clipboard tests pass in the 42/42 suite; native pre-edit/candidate
-  positioning is a documented 1.x limitation, and the real Linux IME check remains the C4 gate.
+  Committed CJK and in-memory clipboard tests pass; Linux command bridge tests cover UTF-8 I/O and
+  failure handling. GNOME Wayland + fcitx5 committed input passes manually, while native
+  pre-edit/candidate positioning is a documented 1.x limitation and cross-app paste awaits retest.
 - Slider value label: `widget::Slider` gains an optional value label (`set_show_value_label`) that renders
   the current `numeric_text(value)` above the track using a shared `primitives::Text` (inherited font,
   `on_surface_variant` color when not from style context). Opt-in so existing layout is unchanged;
@@ -378,8 +382,8 @@ Linux platform promise truthful, finish D4, freeze an RC, and promote it to the 
   metadata replacement, executable suffixes, and explicit development links. Linux tests exercise
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
-- Test suite 42/42 green.
-- Next (1.0 closure): finish the C4 Linux IME manual gate, then C5 platform truth. New templates, i18n,
+- Test suite 43/43 green.
+- Next (1.0 closure): finish the C4 Linux clipboard/shortcut manual gate, then C5 platform truth. New templates, i18n,
   keyframes/ColorSpace sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

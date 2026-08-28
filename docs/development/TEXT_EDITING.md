@@ -1,6 +1,6 @@
 # 桌面文本编辑（C4）
 
-> 状态：自动化实现完成（42/42）；Linux committed CJK 手工验收待完成。
+> 状态：自动化实现完成；GNOME Wayland + fcitx5 手工验收进行中，跨应用粘贴修复待复验。
 
 ## 1. 范围
 
@@ -11,7 +11,9 @@ pre-edit 绘制与候选框定位不在 1.0 基本闭环内。
 ## 2. 平台边界
 
 `scene::IClipboard` 是 UTF-8 文本剪贴板的最小平台边界；`NanSceneTree` 持有非 owning 服务，
-测试可注入内存实现，`NanWindow` 注入 raylib 的 `GetClipboardText` / `SetClipboardText` 后端。
+测试可注入内存实现。`NanWindow` 在 Linux Wayland 会话优先通过 `wl-paste` / `wl-copy`
+访问 compositor 剪贴板，命令不可用或失败时回退 raylib 的 `GetClipboardText` /
+`SetClipboardText`；其他平台继续使用 raylib 后端。Wayland 支持配置应安装 `wl-clipboard`。
 控件和编辑 primitive 不直接包含 raylib 类型或调用平台 API。
 
 `scene::EditCommand` 表达平台无关意图：`select_all/copy/cut/paste/undo/redo`。桌面键位在
@@ -27,9 +29,12 @@ redo。复制和全选在只读状态可用；剪切、粘贴、撤销、重做�
 
 ## 4. IME 与 CJK 约束
 
-raylib 当前窗口边界只提供 `GetCharPressed` 的 committed Unicode codepoint 队列，没有公开
-原生 pre-edit 文本、候选列表或候选框位置 API。因此 1.0 支持已提交 CJK 文本输入，并将原生
-pre-edit/候选框定位明确记录为 1.x 限制，不伪装为已实现。
+当前 raylib 构建使用 GLFW X11 后端，在 GNOME Wayland 中经 XWayland 运行。它通过
+`GetCharPressed` 提供 committed Unicode codepoint 队列，但 GLFW 的 X11 input context 使用
+`XIMPreeditNothing | XIMStatusNothing`，没有向 Nandina 暴露 pre-edit 文本、候选列表或 caret
+spot。因此 1.0 支持已提交 CJK 文本输入，并将原生 pre-edit/候选框定位明确记录为 1.x 限制，
+不伪装为已实现。直接切换 raylib 到原生 Wayland 也不能自动补齐 Wayland text-input 协议，且
+可能破坏当前可用的 fcitx5 committed 输入，所以不作为本次剪贴板修复。
 
 Linux 手工验收：
 
@@ -39,7 +44,21 @@ Linux 手工验收：
 4. 记录 X11/Wayland、桌面环境、输入法与观察到的 pre-edit/候选框限制。
 
 自动化验收覆盖 UTF-8/CJK committed 输入、选择剪贴板、撤销/重做、redo 分支失效、
-Ctrl/Super 键位以及只读/禁用不变性。
+Ctrl/Super 键位以及只读/禁用不变性；Linux 聚焦测试覆盖 Wayland 会话检测、UTF-8 命令输出、
+stdin 写入和命令失败。
 
-自动化验证：`meson compile -C buildDir`、`meson test -C buildDir --print-errorlogs`
-（42/42）与 `git diff --check` 均通过。C4 只有在完成并记录上述 Linux 手工验收后才关闭。
+### 4.1 2026-08-28 手工记录
+
+- 环境：GNOME Wayland，fcitx5；raylib/GLFW 实际经 XWayland 运行。
+- 已通过：Profile name 可顺利提交中文；Ctrl+A、Ctrl+Z、Ctrl+Y 正常。
+- 修复前失败：无法把其他应用中的文本通过 Ctrl+V 粘贴进 TextField。原因是 X11 selection
+  后端不能在该会话中可靠读取 Wayland clipboard；现已增加 `wl-paste` / `wl-copy` 桥接，等待
+  同一环境复验后关闭此项。
+- 已知限制：输入法候选框出现在窗口外并与窗口左侧对齐，而不是跟随 Profile name caret。
+  这是上述 XIM input style 和缺失 caret spot API 的结果，记为 1.x 限制，不阻塞 committed
+  CJK 输入的 1.0 基本可用目标。
+
+C4 只有在修复版完成跨应用 Ctrl+V（以及尚未记录的 Ctrl+C/X、Ctrl+Shift+Z）手工复验后关闭。
+
+自动化验证：`meson compile -C buildDir`、`meson test -C buildDir widget --print-errorlogs`、
+`meson test -C buildDir --print-errorlogs`（43/43）与 `git diff --check` 均通过。

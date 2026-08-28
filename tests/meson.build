@@ -125,6 +125,15 @@ viewport_scaling_tests = executable(
 )
 test('viewport-scaling', viewport_scaling_tests)
 
+if host_machine.system() == 'linux'
+    linux_clipboard_tests = executable(
+        'linux_clipboard_tests',
+        files('linux_clipboard_tests.cpp'),
+        dependencies : [nandina_dep, catch2_with_main_dep],
+    )
+    test('linux-clipboard', linux_clipboard_tests)
+endif
+
 button_tests = executable(
     'button_tests',
     files('button_tests.cpp'),
