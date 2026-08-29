@@ -105,14 +105,15 @@ Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
-accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 43/43 green.
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 44/44 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
 commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
 fcitx5 committed CJK input and desktop commands are manually recorded. Hyprland end-to-end and
 owner clipboard acceptance pass after fixing the embedded-editor clipboard ownership boundary.
-C4 is closed; the active sequence is the C0-C8 Linux 1.0 closure contract in
-`1.0_ACCEPTANCE.md`: make the Linux platform promise truthful, finish D4, freeze an RC, and promote
+C4 is closed; C5 is active and its platform facts/manual gate are tracked in `LINUX_PLATFORM.md`.
+The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
+Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
 history follows:
 

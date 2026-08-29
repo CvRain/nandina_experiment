@@ -21,7 +21,6 @@
 
 #include <raylib.h>
 
-#include <algorithm>
 #include <cstdlib>
 #include <utility>
 
@@ -150,6 +149,9 @@ namespace nandina::app
         if (config_.vsync) {
             flags |= FLAG_VSYNC_HINT;
         }
+        if (config_.high_dpi) {
+            flags |= FLAG_WINDOW_HIGHDPI;
+        }
         if (config_.resizable) {
             flags |= FLAG_WINDOW_RESIZABLE;
         }
@@ -267,23 +269,27 @@ namespace nandina::app
         }
     }
 
-    void NanWindow::update_viewport_mapping() {
+    void NanWindow::update_viewport_mapping(const foundation::NanSize screen_size) {
         if (!config_.viewport) {
             viewport_mapping_.reset();
             return;
         }
-        viewport_mapping_ = make_viewport_mapping(
-            foundation::NanSize(
-                static_cast<float>(GetScreenWidth()),
-                static_cast<float>(GetScreenHeight())
-            ),
-            *config_.viewport
-        );
+        viewport_mapping_ = make_viewport_mapping(screen_size, *config_.viewport);
     }
 
     void NanWindow::tick() {
         const float dt = GetFrameTime();
-        update_viewport_mapping();
+        const auto metrics = make_window_metrics(
+            foundation::NanSize(
+                static_cast<float>(GetScreenWidth()),
+                static_cast<float>(GetScreenHeight())
+            ),
+            foundation::NanSize(
+                static_cast<float>(GetRenderWidth()),
+                static_cast<float>(GetRenderHeight())
+            )
+        );
+        update_viewport_mapping(metrics.screen_size);
         auto deferred_effects = app_.graph().defer_effects();
 
         {
@@ -323,11 +329,8 @@ namespace nandina::app
             tree_.advance_animations(dt);
         }
 
-        const auto window_size = foundation::NanSize(
-            static_cast<float>(GetScreenWidth()),
-            static_cast<float>(GetScreenHeight())
-        );
-        const auto logical_size = viewport_mapping_ ? viewport_mapping_->logical_size : window_size;
+        const auto logical_size = viewport_mapping_ ? viewport_mapping_->logical_size
+                                                    : metrics.screen_size;
         (void)tree_.layout_root(logical_size);
 
         {
@@ -349,8 +352,7 @@ namespace nandina::app
                                    : foundation::NanTransform2D {},
                 {
                     .logical_to_screen = viewport_mapping_ ? viewport_mapping_->scale : 1.0F,
-                    .screen_to_physical = static_cast<float>(GetRenderWidth())
-                        / static_cast<float>(std::max(1, GetScreenWidth()))
+                    .screen_to_physical = metrics.screen_to_physical,
                 }
             };
             tree_.render(ctx);

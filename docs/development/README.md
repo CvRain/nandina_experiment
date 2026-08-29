@@ -22,6 +22,9 @@ experiment/production split.
 repository, layered source/mirror configuration, locked SDK resolution, verified cache, and SDK
 artifact contract introduced by C2.1.
 
+[`LINUX_PLATFORM.md`](LINUX_PLATFORM.md) records the C5 Linux process/resource paths, window and
+framebuffer coordinate contract, X11/XWayland limitations, teardown order, and Settings manual gate.
+
 The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
 
 ## Current Development Approach

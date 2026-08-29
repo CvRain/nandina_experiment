@@ -125,6 +125,13 @@ viewport_scaling_tests = executable(
 )
 test('viewport-scaling', viewport_scaling_tests)
 
+window_metrics_tests = executable(
+    'window_metrics_tests',
+    files('window_metrics_tests.cpp'),
+    dependencies : [nandina_dep, catch2_with_main_dep],
+)
+test('window-metrics', window_metrics_tests)
+
 if host_machine.system() == 'linux'
     linux_clipboard_tests = executable(
         'linux_clipboard_tests',

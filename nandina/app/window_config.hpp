@@ -34,6 +34,8 @@ namespace nandina::app
         bool msaa = true;
         /// 是否垂直同步 (通常配合 target_fps)。
         bool vsync = true;
+        /// 请求平台后端启用高 DPI 内容倍率，并分别维护窗口与 framebuffer 尺寸。
+        bool high_dpi = true;
 
         /// 每帧清屏背景色。nullopt（默认）= 跟随当前外观的调色板背景
         /// （`palette.background`），随 light/dark 切换实时变化；

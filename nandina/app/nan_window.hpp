@@ -30,6 +30,7 @@
 #include "nan_router.hpp"
 #include "viewport_scaling.hpp"
 #include "window_config.hpp"
+#include "window_metrics.hpp"
 
 #include <memory>
 #include <optional>
@@ -111,7 +112,7 @@ namespace nandina::app
 
     private:
         void poll_and_dispatch_input();
-        void update_viewport_mapping();
+        void update_viewport_mapping(foundation::NanSize screen_size);
 
         NanApplication& app_;
         WindowConfig config_;

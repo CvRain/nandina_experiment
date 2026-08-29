@@ -234,6 +234,8 @@ module_animation = files(
 )
 
 module_app = files(
+    'app/window_metrics.hpp',
+    'app/window_metrics.cpp',
     'app/viewport_scaling.hpp',
     'app/viewport_scaling.cpp',
     'app/ui_dispatcher.hpp',
