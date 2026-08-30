@@ -21,6 +21,7 @@
 namespace nandina::render
 {
     class IRenderDevice;
+    class TextureCache;
 } // namespace nandina::render
 
 namespace nandina::animation
@@ -92,6 +93,9 @@ namespace nandina::scene
         void set_font_context(text::FontPipelineCache& context) noexcept;
         void clear_font_context() noexcept;
         [[nodiscard]] auto font_context() const noexcept -> text::FontPipelineCache*;
+        void set_texture_cache(render::TextureCache& cache) noexcept;
+        void clear_texture_cache() noexcept;
+        [[nodiscard]] auto texture_cache() const noexcept -> render::TextureCache*;
         void set_theme_manager(theme::ThemeManager& manager);
         void clear_theme_manager() noexcept;
         [[nodiscard]] auto theme_manager() const noexcept -> theme::ThemeManager*;
@@ -228,6 +232,7 @@ namespace nandina::scene
         bool has_mouse_pos_ = false;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;
         text::FontPipelineCache* font_context_ = nullptr;
+        render::TextureCache* texture_cache_ = nullptr;
         theme::ThemeManager* theme_manager_ = nullptr;
         IClipboard* clipboard_ = nullptr;
         semantics::Tree semantics_tree_;

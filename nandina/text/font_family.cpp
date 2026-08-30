@@ -152,16 +152,23 @@ namespace nandina::text
             default_family = default_family_;
             default_fallbacks = default_fallbacks_;
         }
-        auto family = request.family
-            ? *request.family
-            : default_family.value_or(resource::ResourceKey("font/default"));
-        if (const auto alias = aliases.find(family); alias != aliases.end()) {
-            family = alias->second;
+        std::optional<resource::ResourceKey> family = request.family;
+        if (family) {
+            if (const auto alias = aliases.find(*family); alias != aliases.end()) {
+                family = alias->second;
+            }
+            if (!families.contains(*family)) {
+                family = default_family;
+            }
         }
-        if (!families.contains(family)) {
-            return std::unexpected(
-                font_error(FontErrorCode::unknown_family, "requested font family does not exist")
-            );
+        else {
+            family = default_family;
+        }
+        if (!family || !families.contains(*family)) {
+            return std::unexpected(font_error(
+                FontErrorCode::unknown_family,
+                "font request cannot resolve a registered or default family"
+            ));
         }
 
         std::vector<resource::ResourceKey> order;
@@ -178,7 +185,14 @@ namespace nandina::text
             }
             return true;
         };
-        if (!append(append, family)) {
+        if (!append(append, *family)) {
+            return std::unexpected(
+                font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected")
+            );
+        }
+        if (default_family && !visited.contains(*default_family)
+            && !append(append, *default_family))
+        {
             return std::unexpected(
                 font_error(FontErrorCode::invalid_fallback, "font fallback cycle detected")
             );
@@ -193,6 +207,7 @@ namespace nandina::text
 
         ResolvedFontFamily result;
         std::set<std::pair<std::string, std::uint32_t>> loaded;
+        std::optional<FontError> load_error;
         for (const auto& current: order) {
             const auto& candidates = families.at(current).faces;
             const FontFaceSpec* best = nullptr;
@@ -227,12 +242,18 @@ namespace nandina::text
             }
             auto face = loader.load(best->resource, best->face_index);
             if (!face) {
-                return std::unexpected(face.error());
+                if (!load_error) {
+                    load_error = face.error();
+                }
+                continue;
             }
             result.specs.push_back(*best);
             result.faces.push_back(*face);
         }
         if (result.faces.empty()) {
+            if (load_error) {
+                return std::unexpected(std::move(*load_error));
+            }
             return std::unexpected(
                 font_error(FontErrorCode::no_matching_face, "font family resolved no faces")
             );

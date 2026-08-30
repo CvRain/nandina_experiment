@@ -6,8 +6,52 @@ id = "bdbbbbca-b397-46a2-98e8-dbf1ce52882d"
 key = "nandina_logo.png"
 source = "../assets/nandina_logo.png"
 media_type = "image/png"
-size = 1599
-sha256 = "50530d58c671944a4f3c83d1f273fb7dc1a017cacc014cb61af9b8d1de46a2f7"
+size = 6405041
+sha256 = "3583e92a1fff25907af98e7507c8a7ab64161dfe6f5720cf66fd0a965ddaa572"
+storage = "auto"
+streaming = false
+revision = 2
+
+[[resources]]
+id = "6fd97e6d-1e35-4272-9fc0-2e5cab37e12c"
+key = "random_wallpaper-1.jpg"
+source = "../assets/random_wallpaper-1.jpg"
+media_type = "image/jpeg"
+size = 9942740
+sha256 = "198104735e342dc2e5d48d4b88d5917119ae668d3c1b67c5507ed90b68af82ff"
+storage = "auto"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "94032b10-9931-43c4-b973-5b6caf37c577"
+key = "random_wallpaper-1.png"
+source = "../assets/random_wallpaper-1.png"
+media_type = "image/png"
+size = 10452408
+sha256 = "6d7845751709b1f87b9ee7ddf8c42fde07a7d9cfea6ad6248319b167e1155d77"
+storage = "auto"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "e109c9a2-b488-4c45-884b-7120fc7a9e7c"
+key = "random_wallpaper.jpg"
+source = "../assets/random_wallpaper.jpg"
+media_type = "image/jpeg"
+size = 6163279
+sha256 = "8471796181d3b4a38fef60599d694f29be98e7b9a64d4cb5766083fa7e271cf6"
+storage = "auto"
+streaming = false
+revision = 1
+
+[[resources]]
+id = "745bc658-90af-4d85-8efc-fd213c3c2ae0"
+key = "random_wallpaper.png"
+source = "../assets/random_wallpaper.png"
+media_type = "image/png"
+size = 7780990
+sha256 = "699828b0223f61484d1c63ef66ab93ddc89274905b03a599d6a93fb4f92d06b8"
 storage = "auto"
 streaming = false
 revision = 1

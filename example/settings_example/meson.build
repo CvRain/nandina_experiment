@@ -2,7 +2,7 @@
 
 settings_example_library = static_library(
     'nandina_settings_example_components',
-    files('settings_example.cpp', 'settings_example.hpp'),
+    files('settings_example.cpp', 'settings_example.hpp', 'gallery_page.cpp', 'gallery_page.hpp'),
     dependencies: [nandina_dep],
 )
 settings_example_dep = declare_dependency(

@@ -3,7 +3,7 @@
 //
 // 一张按文件路径加载的图片：首次绘制时懒加载 RGBA 纹理，把自然尺寸作为默认尺寸，
 // 支持 tint 着色、source_rect 裁剪、stretch/contain/cover 缩放与 contain 对齐，
-// per-node opacity 自动合成。纹理句柄由渲染设备拥有，节点只引用。
+// per-node opacity 自动合成。节点持有共享 RAII 纹理；窗口缓存负责跨页面复用与有界驻留。
 //
 
 #ifndef NANDINA_EXPERIMENT_WIDGET_IMAGE_HPP
@@ -22,6 +22,12 @@
 namespace nandina::resource
 {
     class ResourceManager;
+}
+
+namespace nandina::render
+{
+    class CachedTexture;
+    class TextureCache;
 }
 
 namespace nandina::widget
@@ -53,6 +59,9 @@ namespace nandina::widget
         void set_resource_manager(resource::ResourceManager* resources);
         [[nodiscard]] auto resource_manager() const noexcept -> resource::ResourceManager*;
 
+        void set_texture_cache(render::TextureCache* cache);
+        [[nodiscard]] auto texture_cache() const noexcept -> render::TextureCache*;
+
         void set_tint(foundation::NanColor tint);
         [[nodiscard]] auto tint() const -> foundation::NanColor;
 
@@ -75,6 +84,7 @@ namespace nandina::widget
         [[nodiscard]] auto load_options() const -> const render::ImageLoadOptions&;
 
         auto on_draw(render::DrawContext& ctx) -> void override;
+        void apply_texture_cache(render::TextureCache& cache) override;
 
     protected:
         [[nodiscard]] auto on_measure(scene::LayoutConstraints constraints)
@@ -91,7 +101,8 @@ namespace nandina::widget
 
         std::string source_;
         resource::ResourceManager* resources_ = nullptr;
-        render::TextureHandle texture_ {};
+        render::TextureCache* texture_cache_ = nullptr;
+        std::shared_ptr<render::CachedTexture> texture_;
         foundation::NanSize natural_size_ {};
         foundation::NanColor tint_ = foundation::NanColor::from_hex(0xFFFFFF);
         render::ImageLoadOptions load_options_ {};

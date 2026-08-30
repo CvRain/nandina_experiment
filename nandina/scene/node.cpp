@@ -354,6 +354,8 @@
 
     void NanNode::apply_font_context(text::FontPipelineCache& /*context*/) {}
 
+    void NanNode::apply_texture_cache(render::TextureCache& /*cache*/) {}
+
     void NanNode::on_style_context_changed(
         const theme::ResolvedStyleContext& /*context*/
     ) {}
@@ -396,6 +398,9 @@
         }
         if (auto* context = tree->font_context(); context != nullptr) {
             apply_font_context(*context);
+        }
+        if (auto* cache = tree->texture_cache(); cache != nullptr) {
+            apply_texture_cache(*cache);
         }
         if (const auto* manager = tree->theme_manager(); manager != nullptr) {
             on_theme_changed(*manager);

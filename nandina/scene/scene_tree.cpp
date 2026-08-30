@@ -265,6 +265,18 @@ namespace nandina::scene
         return font_context_;
     }
 
+    void NanSceneTree::set_texture_cache(render::TextureCache& cache) noexcept {
+        texture_cache_ = &cache;
+    }
+
+    void NanSceneTree::clear_texture_cache() noexcept {
+        texture_cache_ = nullptr;
+    }
+
+    auto NanSceneTree::texture_cache() const noexcept -> render::TextureCache* {
+        return texture_cache_;
+    }
+
     void NanSceneTree::set_theme_manager(theme::ThemeManager& manager) {
         if (theme_manager_ == &manager) {
             return;

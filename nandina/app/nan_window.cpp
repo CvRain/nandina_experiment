@@ -165,6 +165,8 @@ namespace nandina::app
         tree_.set_clipboard(desktop_clipboard);
 
         device_ = render::make_raylib_device();
+        texture_cache_ = std::make_unique<render::TextureCache>(*device_);
+        tree_.set_texture_cache(*texture_cache_);
         font_pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
             *device_,
             app_.font_loader(),
@@ -173,7 +175,10 @@ namespace nandina::app
         tree_.set_font_context(*font_pipeline_cache_);
         auto pipeline = font_pipeline_cache_->get({});
         if (!pipeline) {
+            tree_.clear_font_context();
             font_pipeline_cache_.reset();
+            tree_.clear_texture_cache();
+            texture_cache_.reset();
             device_.reset();
             tree_.clear_clipboard();
             CloseWindow();
@@ -378,9 +383,11 @@ namespace nandina::app
         tree_.set_root(nullptr);
         tree_.clear_default_text_pipeline();
         tree_.clear_font_context();
+        tree_.clear_texture_cache();
         default_text_pipeline_.reset();
         default_font_pipeline_.reset();
         font_pipeline_cache_.reset();
+        texture_cache_.reset();
         router_.reset();
         device_.reset();
         tree_.clear_clipboard();

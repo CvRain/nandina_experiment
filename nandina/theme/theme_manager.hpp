@@ -29,6 +29,14 @@ namespace nandina::theme
         std::string dark_theme;
     };
 
+    /** Latest platform preference snapshot supplied by the application host. */
+    struct SystemPreferences {
+        ColorAppearance appearance = ColorAppearance::light;
+        bool reduced_motion = false;
+
+        auto operator==(const SystemPreferences&) const -> bool = default;
+    };
+
     class ThemeManager;
 
     /** 主题 revision 观察者（SceneTree 实现，向挂载节点广播 on_theme_changed）。 */
@@ -89,6 +97,13 @@ namespace nandina::theme
         void register_theme_family(std::string name, DesignSystem system);
 
         void set_preference(ThemePreference preference);
+        /**
+         * Atomically replace the host-supplied platform snapshot.
+         * Publishes at most one revision, and only when an effective preference changes.
+         */
+        void set_system_preferences(SystemPreferences preferences);
+        [[nodiscard]] auto system_preferences() const noexcept -> SystemPreferences;
+        /// Convenience update for hosts that receive appearance separately.
         void set_system_appearance(ColorAppearance appearance);
 
         [[nodiscard]] auto theme() const -> const NanTheme&;
@@ -97,6 +112,7 @@ namespace nandina::theme
         [[nodiscard]] auto preference() const noexcept -> ThemePreference;
         [[nodiscard]] auto appearance() const noexcept -> ColorAppearance;
         void set_motion_preference(MotionPreference preference);
+        /// Convenience update for hosts that receive motion separately.
         void set_system_reduced_motion(bool reduced);
         [[nodiscard]] auto motion_preference() const noexcept -> MotionPreference;
         [[nodiscard]] auto reduced_motion() const noexcept -> bool;
@@ -123,9 +139,8 @@ namespace nandina::theme
         std::string active_name_ = "default";
         std::string active_family_;
         ThemePreference preference_ = ThemePreference::system;
-        ColorAppearance system_appearance_ = ColorAppearance::light;
         MotionPreference motion_preference_ = MotionPreference::system;
-        bool system_reduced_motion_ = false;
+        SystemPreferences system_preferences_;
         std::shared_ptr<const NanStyle> style_ = default_style();
         std::shared_ptr<const DesignSystem> system_;
         std::shared_ptr<const DesignSystem> effective_;

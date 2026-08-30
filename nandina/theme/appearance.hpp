@@ -16,7 +16,12 @@ namespace nandina::theme
         dark,
     };
 
-    /// User-facing appearance preference. `system` follows the OS appearance.
+    /**
+     * User-facing appearance preference.
+     *
+     * `system` resolves from the latest SystemPreferences snapshot supplied by the platform host.
+     * ThemeManager does not observe the operating system itself and falls back to light.
+     */
     enum class ThemePreference {
         system,
         light,

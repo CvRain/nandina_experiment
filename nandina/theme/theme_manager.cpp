@@ -209,16 +209,44 @@ namespace nandina::theme
         if (preference_ == preference) {
             return;
         }
+        const auto previous = appearance();
         preference_ = preference;
-        sync_to_effective();
+        if (appearance() != previous) {
+            sync_to_effective();
+        }
+    }
+
+    void ThemeManager::set_system_preferences(const SystemPreferences preferences) {
+        if (system_preferences_ == preferences) {
+            return;
+        }
+
+        const auto previous_appearance = appearance();
+        const bool previous_reduced_motion = reduced_motion();
+        system_preferences_ = preferences;
+        const bool appearance_changed = appearance() != previous_appearance;
+        const bool motion_changed = reduced_motion() != previous_reduced_motion;
+
+        if (appearance_changed) {
+            const auto previous_revision = revision_;
+            sync_to_effective();
+            if (motion_changed && revision_ == previous_revision) {
+                publish_revision();
+            }
+        }
+        else if (motion_changed) {
+            publish_revision();
+        }
+    }
+
+    auto ThemeManager::system_preferences() const noexcept -> SystemPreferences {
+        return system_preferences_;
     }
 
     void ThemeManager::set_system_appearance(const ColorAppearance appearance) {
-        if (system_appearance_ == appearance) {
-            return;
-        }
-        system_appearance_ = appearance;
-        sync_to_effective();
+        auto preferences = system_preferences_;
+        preferences.appearance = appearance;
+        set_system_preferences(preferences);
     }
 
     auto ThemeManager::theme() const -> const NanTheme& {
@@ -244,9 +272,9 @@ namespace nandina::theme
             case ThemePreference::dark:
                 return ColorAppearance::dark;
             case ThemePreference::system:
-                return system_appearance_;
+                return system_preferences_.appearance;
         }
-        return system_appearance_;
+        return system_preferences_.appearance;
     }
 
     void ThemeManager::set_motion_preference(const MotionPreference preference) {
@@ -258,14 +286,9 @@ namespace nandina::theme
     }
 
     void ThemeManager::set_system_reduced_motion(const bool reduced) {
-        if (system_reduced_motion_ == reduced) {
-            return;
-        }
-        const bool previous = reduced_motion();
-        system_reduced_motion_ = reduced;
-        if (reduced_motion() != previous) {
-            publish_revision();
-        }
+        auto preferences = system_preferences_;
+        preferences.reduced_motion = reduced;
+        set_system_preferences(preferences);
     }
 
     auto ThemeManager::motion_preference() const noexcept -> MotionPreference {
@@ -273,7 +296,10 @@ namespace nandina::theme
     }
 
     auto ThemeManager::reduced_motion() const noexcept -> bool {
-        return resolve_reduced_motion(motion_preference_, system_reduced_motion_);
+        return resolve_reduced_motion(
+            motion_preference_,
+            system_preferences_.reduced_motion
+        );
     }
 
     auto ThemeManager::revision() const noexcept -> std::uint64_t {

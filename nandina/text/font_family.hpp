@@ -59,6 +59,11 @@ namespace nandina::text
         [[nodiscard]] auto set_default_family(resource::ResourceKey family) -> FontResult<void>;
         [[nodiscard]] auto set_default_fallbacks(std::vector<resource::ResourceKey> families)
             -> FontResult<void>;
+        /**
+         * Resolve the requested family, its fallbacks, then the default family and default
+         * fallbacks. Unknown families and individual face-load failures continue down that chain;
+         * resolution fails only when the complete chain provides no usable face.
+         */
         [[nodiscard]] auto resolve(const FontRequest& request, FontLoader& loader) const
             -> FontResult<ResolvedFontFamily>;
 

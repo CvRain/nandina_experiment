@@ -99,6 +99,8 @@ module_semantics = files(
 
 module_render = files(
     'render/render_device.hpp',
+    'render/texture_cache.hpp',
+    'render/texture_cache.cpp',
     'render/clip_stack.hpp',
     'render/draw_context.hpp',
     'render/backends/sdf_primitive_geometry.hpp',

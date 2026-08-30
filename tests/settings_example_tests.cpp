@@ -1,17 +1,24 @@
 #include "settings_example.hpp"
+#include "gallery_page.hpp"
 
 #include "app/nan_router.hpp"
 #include "app/ui_dispatcher.hpp"
 #include "foundation/contrast.hpp"
 #include "foundation/geometry.hpp"
 #include "render/render_device.hpp"
+#include "resource/backends/builtin_backend.hpp"
+#include "resource/resource_manager.hpp"
 #include "scene/input_event.hpp"
 #include "scene/scene_tree.hpp"
 #include "semantics/semantics.hpp"
+#include "text/font_family.hpp"
+#include "text/font_loader.hpp"
+#include "text/font_pipeline.hpp"
 #include "theme/theme_manager.hpp"
 #include "widget/button.hpp"
 #include "widget/checkbox.hpp"
 #include "widget/label.hpp"
+#include "widget/image.hpp"
 #include "widget/radio_button.hpp"
 #include "widget/slider.hpp"
 #include "widget/switch.hpp"
@@ -20,7 +27,9 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <span>
 #include <string_view>
+#include <vector>
 
 using namespace nandina;
 namespace settings = nandina::examples::settings;
@@ -54,6 +63,19 @@ namespace
             float,
             const foundation::NanColor&
         ) override {}
+        [[nodiscard]] auto supports_alpha_textures() const -> bool override {
+            return true;
+        }
+        [[nodiscard]] auto create_alpha_texture(
+            int,
+            int,
+            std::span<const std::uint8_t>
+        ) -> render::TextureHandle override {
+            return {.value = next_texture++};
+        }
+
+    private:
+        std::uint64_t next_texture = 1;
     };
 
     template<typename Node, typename Predicate>
@@ -446,4 +468,147 @@ TEST_CASE(
         )
         == nullptr
     );
+}
+
+TEST_CASE(
+    "settings About navigation falls back when optional font families are unavailable",
+    "[example][settings][font][router]"
+) {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    resource::ResourceManager resources;
+    (void)resources.mount(resource::BuiltinBackend::create(), -1000);
+    text::FontLoader font_loader(resources);
+    text::FontFamilyRegistry font_families;
+    REQUIRE(text::register_builtin_default_font_family(font_families).has_value());
+    RecordingDevice device;
+    text::FontPipelineCache font_cache(device, font_loader, font_families);
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        &resources,
+        &font_loader,
+        &font_families,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_font_context(font_cache);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
+
+    auto* about_nav = button_named(*router.host(), "About");
+    REQUIRE(about_nav != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        about_nav->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    std::size_t drained = 0;
+    REQUIRE_NOTHROW(drained = dispatcher.drain());
+    REQUIRE(drained == 1);
+    REQUIRE_NOTHROW(settle_transition(tree));
+
+    auto* custom_font = find_node<widget::Label>(
+        *router.host(),
+        [](const widget::Label& label) {
+            return label.text() == "Custom font: the quick brown fox";
+        }
+    );
+    REQUIRE(custom_font != nullptr);
+    REQUIRE(custom_font->font().family == resource::ResourceKey("demo"));
+    REQUIRE(custom_font->text_pipeline().backend != nullptr);
+    REQUIRE(custom_font->text_pipeline().renderer != nullptr);
+}
+
+TEST_CASE("settings gallery exposes all packaged image samples", "[example][settings][gallery]") {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    settings::SettingsStore store {graph};
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>()
+    };
+    (void)router.push<settings::GalleryPage>();
+
+    std::vector<std::string> sources;
+    const auto collect = [&sources](const auto& self, scene::NanNode& node) -> void {
+        if (auto* image = dynamic_cast<widget::Image*>(&node); image != nullptr) {
+            sources.emplace_back(image->source());
+        }
+        for (std::size_t index = 0; index < node.child_count(); ++index) {
+            self(self, *node.get_child(index));
+        }
+    };
+    collect(collect, *router.host());
+
+    REQUIRE(sources == std::vector<std::string> {
+        "res://random_wallpaper.png",
+        "res://random_wallpaper.jpg",
+        "res://random_wallpaper-1.png",
+        "res://random_wallpaper-1.jpg",
+    });
+}
+
+TEST_CASE(
+    "settings nested router inherits application resource services",
+    "[example][settings][gallery][resources]"
+) {
+    reactive::Graph graph;
+    theme::ThemeManager themes;
+    settings::SettingsStore store {graph};
+    app::UiDispatcher dispatcher;
+    resource::ResourceManager resources;
+    (void)resources.mount(resource::BuiltinBackend::create(), -1000);
+    text::FontLoader font_loader(resources);
+    text::FontFamilyRegistry font_families;
+    REQUIRE(text::register_builtin_default_font_family(font_families).has_value());
+    app::NanRouter router {
+        graph,
+        themes,
+        &store,
+        app::nan_type_key<settings::SettingsStore>(),
+        &resources,
+        &font_loader,
+        &font_families,
+        &dispatcher
+    };
+    (void)router.push<settings::ShellPage>();
+
+    scene::NanSceneTree tree;
+    tree.set_theme_manager(themes);
+    tree.set_root(router.host());
+    REQUIRE(tree.layout_root(foundation::NanSize(960.0F, 640.0F)) >= 1);
+
+    auto* gallery_nav = button_named(*router.host(), "Gallery");
+    REQUIRE(gallery_nav != nullptr);
+    REQUIRE(tree.update_semantics());
+    REQUIRE(tree.perform_semantics_action(
+        gallery_nav->semantics_id(),
+        {.action = semantics::Action::activate}
+    ));
+    REQUIRE(dispatcher.drain() == 1);
+    settle_transition(tree);
+
+    std::vector<widget::Image*> images;
+    const auto collect = [&images](const auto& self, scene::NanNode& node) -> void {
+        if (auto* image = dynamic_cast<widget::Image*>(&node); image != nullptr) {
+            images.push_back(image);
+        }
+        for (std::size_t index = 0; index < node.child_count(); ++index) {
+            self(self, *node.get_child(index));
+        }
+    };
+    collect(collect, *router.host());
+    REQUIRE(images.size() == 4);
+    for (const auto* image : images) {
+        REQUIRE(image->resource_manager() == &resources);
+    }
 }

@@ -1,7 +1,7 @@
 # Linux 平台契约（C5）
 
-> 状态：C5.1 窗口指标/DPI 自动化已实现，等待 Settings 实机验收；C5.2 系统外观与动效
-> 语义仍待收紧。本文记录 Linux 1.0 的真实边界，不代表 Windows 或 macOS 支持。
+> 状态：C5.1 窗口指标/DPI 与 C5.2 系统偏好契约已实现；当前电脑初步验收通过，等待第二台
+> 电脑联合复验。本文记录 Linux 1.0 的真实边界，不代表 Windows 或 macOS 支持。
 
 ## 1. 支持栈
 
@@ -58,16 +58,26 @@ resize 不改变设计视口或用户界面缩放：响应式窗口使用新的 
 仍共享同一个 viewport mapping。
 
 正常退出由 `NanApplication::run()` 调用 `NanWindow::close()`。顺序为：执行窗口
-`on_teardown()`，清空 router，分离场景根，释放文本/font cache 与渲染设备，清除 clipboard
-服务，最后关闭原生窗口。析构函数仅为异常路径提供已打开窗口的兜底关闭。
+`on_teardown()`，清空 router，分离场景根，清除字体/纹理上下文，释放默认字体、字体 LRU、
+图片纹理 LRU，再释放渲染设备，清除 clipboard 服务，最后关闭原生窗口。这样所有 RAII
+纹理都能在设备有效期间调用 `destroy_texture()`。析构函数仅为异常路径提供已打开窗口的
+兜底关闭；详细资源所有权见 `RESOURCE_RESIDENCY.md`。
 
-## 5. 系统外观与动效现状
+## 5. 系统外观与动效
 
-当前 `ThemeManager` 没有 Linux 平台观察器。`ThemePreference::system` 只读取最后一次通过
-`set_system_appearance()` 注入的快照，未注入时为 light；`MotionPreference::system` 只读取
-`set_system_reduced_motion()`，未注入时为 full motion。现有 `ThemePreference::system` 注释仍有
-“自动跟随 OS”的过度承诺，必须在 C5.2 修改 API 注释和文档，或实现真实平台 adapter，之后
-才能关闭 C5。
+Linux 1.0 不承诺自动观察桌面设置。`ThemeManager` 是平台无关核心，`system` 表示“最后由
+应用宿主注入的平台偏好快照”，不是内部 DBus、GTK、portal 或命令轮询：
+
+- `ThemePreference::system` 读取 `SystemPreferences::appearance`，未注入时回退 light；
+- `MotionPreference::system` 读取 `SystemPreferences::reduced_motion`，未注入时回退 full
+  motion；
+- 宿主通过 `set_system_preferences()` 原子更新两项，最多发布一次 revision；
+- `set_system_appearance()` 与 `set_system_reduced_motion()` 是分项事件的便利入口；
+- 应用显式选择 light/dark 或 full/reduced 时，系统快照仍会保存，但不会触发无效 revision。
+
+未来 Linux adapter 可以从 xdg-desktop-portal/DBus 获取真实状态后调用这个边界，不需要改变
+控件、动画或主题解析层。1.0 没有安装该 adapter，因此 Settings 选择 `system` 时使用上述
+默认回退；这一限制必须保留在发布说明中。
 
 ## 6. Settings 手工验收
 
@@ -76,12 +86,15 @@ resize 不改变设计视口或用户界面缩放：响应式窗口使用新的 
 1. 在 1x 显示配置启动 Settings，确认窗口、文字、图片与 pointer hit target 正常。
 2. 在非 1x 显示配置重新启动，确认文字清晰、尺寸不翻倍、caret/选择/clip 与控件对齐。
 3. 两种倍率下拖动调整窗口，确认响应式布局、50% 控件宽度、输入与语义焦点保持一致。
-4. 使用纯键盘遍历并操作控件，分别切换 light/dark 与 reduced/full motion。
+4. 使用纯键盘遍历并操作控件，分别切换 light/dark 与 reduced/full motion；重新选择
+   `System` 时确认 1.0 无 adapter 的回退为 light/full，而不是暗示自动跟随桌面。
 5. 使用 fcitx5 提交 CJK，并复验应用内外复制粘贴；候选框位置按已知限制记录。
 6. 关闭窗口并再次启动，确认 teardown 无崩溃、资源与剪贴板服务没有残留故障。
+7. 在 Components/About 间反复切换，确认第二次进入不再成批重建相同 1024×1024 字体图集，
+   About Logo 不重复上传；窗口关闭时缓存纹理全部在渲染设备之前释放。
 
 自动化覆盖 1x、2x、resize 后重新计算、整数 framebuffer 舍入、非法尺寸和非均匀倍率策略；
-实机结果未记录前，C5.1 不标记完成。
+第二台设备的联合实机记录补齐前，整个 C5 不标记完成。
 
 ### 6.1 2026-08-29 初步实机记录
 

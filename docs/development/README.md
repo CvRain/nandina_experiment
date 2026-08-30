@@ -25,6 +25,9 @@ artifact contract introduced by C2.1.
 [`LINUX_PLATFORM.md`](LINUX_PLATFORM.md) records the C5 Linux process/resource paths, window and
 framebuffer coordinate contract, X11/XWayland limitations, teardown order, and Settings manual gate.
 
+[`RESOURCE_RESIDENCY.md`](RESOURCE_RESIDENCY.md) records the C5.3 separation between Router page
+instances and window-owned font/image residency, including LRU budgets and teardown invariants.
+
 The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
 
 ## Current Development Approach
@@ -38,8 +41,11 @@ re-derive them. The detailed contracts live in the sections that follow; this is
   with `type(scope): 中文` after user review. See `WORKFLOW.md` §1–§3 for the exact gates.
 - **Packaged application images, explicit file-path escape hatch.** `widget::Image` accepts
   `res://<ResourceKey>` and loads immutable package bytes through `ResourceManager`; ordinary paths
-  still use `IRenderDevice::load_texture_from_file`. The Settings logo is the first real nanres
-  example consumer. Custom imported fonts remain file-path based until their package migration unit.
+  still use `IRenderDevice::load_texture_from_file`. Matching images share a window-scoped bounded
+  RAII texture cache, so rebuilt pages do not duplicate uploads and eviction releases the backend
+  texture. The Settings logo is the first real nanres example consumer. Custom imported fonts remain
+  file-path based until their package migration unit. The Settings Gallery page exercises four
+  packaged PNG/JPEG resources with bounded, aspect-preserving preview uploads.
 - **Third-party libraries are vendored as git submodules, never re-implemented.** JSON uses
   nlohmann/json through a thin `foundation::parse_json` wrapper; TOML uses toml++; shaping uses
   FreeType/HarfBuzz/FriBidi/utf8proc. We do not hand-roll a parser or a shaping stack.
@@ -100,7 +106,7 @@ The DSL acceptance test is behavioral equivalence: an imperative page and its au
 | --- | --- |
 | `foundation` | Geometry, color, color spaces, decomposed `NanTransform2D`, and the backend-neutral logging service. |
 | `scene` | `NanNode`, `NanNode2D`, `NanSceneTree`, input events, focus/hover, deferred delete, `NanControl`. |
-| `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, raylib backend, analytic SDF UI primitives. |
+| `render` | `IRenderDevice`, `DrawContext`, `ClipStack`, bounded shared image textures, raylib backend, analytic SDF UI primitives. |
 | `reactive` | `Graph`, `Signal`, `Computed`, `Effect`, `EffectScope`, `ReactiveScope`, batching. |
 | `resource` | Stable UUID/key identities, immutable handles, bounded streams, resource URIs/platform locations, prioritized manager, builtin/memory/directory/SQLite backends. |
 | `text` | FreeType/HarfBuzz/FriBidi/utf8proc layout, fallback families, atlases, resource font loading, pipeline cache. |
@@ -241,7 +247,7 @@ The current text stack is a shared capability used by semantic text controls:
 - `Label` is the semantic text control and can bind to `Signal<std::string>` or `Computed<std::string>`.
 - `Button` measures and draws through an internal `Text` primitive.
 - `EditableText` and `TextField` forward the same pipeline to their value and placeholder text.
-- The production path supports FreeType metrics/rasterization, HarfBuzz shaping, FriBidi ordering, utf8proc grapheme segmentation, fallback faces, glyph atlases, and alpha-texture rendering.
+- The production path supports FreeType metrics/rasterization, HarfBuzz shaping, FriBidi ordering, utf8proc grapheme segmentation, fallback faces, glyph atlases, alpha-texture rendering, and bounded window-level pipeline residency.
 
 Text limitations:
 
@@ -306,7 +312,7 @@ The text, clipping, editing, layout, interactive example, and R1-R10 resource-de
 | R6 SQLite package/sidecars | Complete in `9b0933d`. | Runtime-compatible SQLite packages, alias rows, policy/size-based BLOB selection, UUID-named external sidecars, atomic rebuilds, and fingerprint skips. |
 | R7 Meson build/install | Complete in `9b0933d`, simplified after it. | Policy-only automatic scan/validate/package target, build-tree executable-relative output, datadir install helper, and user/system prefix layout tests. |
 | R8 Application bootstrap | Complete in `9b0933d`. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
-| R9 Window text pipeline | Complete in `9b0933d`. | Render-device-scoped default FontPipelineCache, scene-context inheritance, explicit override preservation, and ordered scene/GPU teardown. |
+| R9 Window text pipeline | Complete in `9b0933d`; bounded residency added by C5.3. | Render-device-scoped default FontPipelineCache, scene-context inheritance, LRU retention, explicit override preservation, and ordered scene/GPU teardown. |
 | R10 Cleanup/verification | Complete in `9b0933d`. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
 | A4 Declarative regions | Complete. | Imperative `IfRegion` and keyed `ForEach`, stable child movement, item scopes, and a Todo acceptance migration without whole-list refresh. |
 
@@ -318,7 +324,7 @@ Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line break
 
 `BuiltinBackend` is a read-only process-shared lowest-priority source for framework resources. It embeds the Caskaydia Cove default font and its OFL license in `libnandina`, exposes stable `fonts/default` and license resources, and supports the `families/default-ui` registration contract without filesystem or system-font dependencies. `MemoryBackend` supports runtime/test overrides. `DirectoryBackend` consumes explicit caller-provided entries and returns owned file snapshots. Read-only `SQLiteBackend` supports canonical key/UUID lookup, aliases, BLOBs, relative external files, size checks, and schema identification through `application_id`/`user_version`. SQLite remains a private C API implementation; Meson prefers a compatible system package and provides a pinned checksum-verified static amalgamation fallback.
 
-`FreeTypeFontFace` can retain a resource-backed memory face. `FontLoader` caches by `(ResourceId, face_index)`, `FontFamilyRegistry` resolves aliases/weight/slant/fallback order, and render-device-scoped `FontPipelineCache` owns HarfBuzz, per-face atlases/textures, and renderer bindings. The Todo example exercises this stack entirely through application/window bootstrap and scene inheritance.
+`FreeTypeFontFace` can retain a resource-backed memory face. `FontLoader` caches by `(ResourceId, face_index)`, `FontFamilyRegistry` resolves aliases/weight/slant/fallback order, and render-device-scoped `FontPipelineCache` owns HarfBuzz, per-face atlases/textures, renderer bindings, and a bounded strong-reference LRU layered over its weak lookup. `TextureCache` provides the matching window-scoped RAII/LRU boundary for ordinary images. Page replacement may rebuild widgets without forcing unchanged render resources to rebuild. The Todo example exercises the font stack entirely through application/window bootstrap and scene inheritance.
 
 ### Active Resource Delivery Sequence
 
@@ -401,7 +407,13 @@ Status: complete in `9b0933d`.
 
 Status: complete in `9b0933d`.
 
-After render-device creation and before `on_setup()`, `NanWindow` resolves the application default family and owns the render-device-scoped `FontPipelineCache`, `FontPipeline`, and backend-neutral `TextPipeline`. `NanSceneTree` carries that default pipeline context. Nodes receive it when entering the tree through a zero-RTTI virtual capability; Text/Label, Button, EditableText, and TextField inherit it, including dynamically added subtrees and internal text primitives. An explicit `set_text_pipeline()`, layout backend, or renderer remains authoritative and is never overwritten by context inheritance. Close clears router frames and the scene root, removes the tree context, then releases FontPipeline, cache, and finally the render device, so no page/widget retains raw renderer pointers after GPU text resources are destroyed.
+After render-device creation and before `on_setup()`, `NanWindow` resolves the application default family and owns the render-device-scoped `FontPipelineCache`, `FontPipeline`, backend-neutral `TextPipeline`, and shared `TextureCache`. `NanSceneTree` carries both resource contexts. Nodes receive them when entering the tree through zero-RTTI virtual capabilities; Text/Label, Button, EditableText, and TextField inherit the font context, while Image inherits the texture cache, including dynamically added subtrees and internal primitives. An explicit `set_text_pipeline()`, layout backend, or renderer remains authoritative and is never overwritten by context inheritance. Close clears router frames and the scene root, removes both tree contexts, then releases font/image caches and finally the render device, so no page/widget retains backend resource handles after GPU resources are destroyed.
+
+Font resolution walks the requested family, its fallbacks, the registered application default, and
+the default fallback chain. Unknown families and individual unavailable font resources continue to
+the next usable face. Optional example or system fonts therefore degrade to the portable built-in
+family instead of throwing during dynamic page attachment. Exhausting the complete chain remains a
+configuration/resource error and is still reported.
 
 #### R10. Example Cleanup And Install Validation
 
@@ -627,7 +639,7 @@ Status: complete.
 
 Stabilize the theme model before A9 can freeze it into authoring helpers. Theme colors have three distinct layers: complete 50-950 `NanColorScale` values form reusable `NanReferencePalette` authoring inputs; each concrete light or dark `NanTheme` owns a resolved `NanColorScheme`; component variants and interaction states continue to live in `NanStyle`. Runtime widgets therefore depend on semantic names such as `background`, `primary`, `success`, `warning`, `focus_ring`, and `selection`, never on a raw shade number.
 
-`ThemeManager` groups named concrete themes into families. A family supplies light and dark variants, while `ThemePreference` selects system, forced light, or forced dark appearance. Platform adapters report operating-system changes through `set_system_appearance()`; the cross-platform theme core does not poll native APIs. Revisions are published only when the effective concrete theme changes.
+`ThemeManager` groups named concrete themes into families. A family supplies light and dark variants, while `ThemePreference` selects system, forced light, or forced dark appearance. The cross-platform theme core does not poll native APIs: an optional platform host atomically injects its latest appearance and reduced-motion snapshot through `set_system_preferences()`. Without an adapter, `system` deliberately falls back to light and full motion. Revisions are published only when an effective preference changes.
 
 `styles.toml` preserves direct semantic color arrays and additionally accepts reference palettes and families:
 
@@ -934,10 +946,11 @@ Status: complete for shared tokens and effective preference resolution; componen
 as a separate review unit.
 
 `NanTokens::motion` defines reusable short, medium, and long durations in seconds. `ThemeManager`
-owns a `system/full/reduced` application preference plus the current platform reduced-motion value,
-and exposes one effective `reduced_motion()` decision. Observers receive a revision only when that
-effective decision changes, so attached components can cancel or complete animation without a
-parallel settings channel. Button ripple now consumes this policy rather than adding a
+owns a `system/full/reduced` application preference plus the latest host-supplied
+`SystemPreferences` snapshot, and exposes one effective `reduced_motion()` decision. The default
+snapshot is light plus full motion; no automatic OS observer is implied. Observers receive a revision
+only when an effective decision changes, so attached components can cancel or complete animation
+without a parallel settings channel. Button ripple now consumes this policy rather than adding a
 Button-specific accessibility flag.
 
 ### A25. Button Ripple Feedback

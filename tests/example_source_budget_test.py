@@ -26,9 +26,9 @@ if bootstrap_lines > 30:
 # Settings showcase, and the interactive style-variant switchers; 360 covered the
 # Divider and Button treatment switchers. The router-driven dashboard (store +
 # ShellPage + section pages + parameterized DetailPage) grows the example into a
-# multi-page application structure, hence the raise to 700.
-if application_lines > 700:
-    raise SystemExit(f"settings example exceeds budget: {application_lines} > 700")
+# multi-page application structure, hence the raise to 720 for the Gallery resource diagnostic.
+if application_lines > 720:
+    raise SystemExit(f"settings example exceeds budget: {application_lines} > 720")
 
 source = "\n".join(path.read_text(encoding="utf-8") for path in application)
 for forbidden in (

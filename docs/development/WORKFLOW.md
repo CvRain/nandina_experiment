@@ -105,13 +105,18 @@ Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
-accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 44/44 green.
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 43/43 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
 commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
 fcitx5 committed CJK input and desktop commands are manually recorded. Hyprland end-to-end and
 owner clipboard acceptance pass after fixing the embedded-editor clipboard ownership boundary.
 C4 is closed; C5 is active and its platform facts/manual gate are tracked in `LINUX_PLATFORM.md`.
+The first-device C5.1 DPI/resize baseline is committed. C5.2 now defines `system` appearance and
+motion as one host-injected snapshot with light/full fallback; it deliberately installs no implicit
+Linux desktop observer. C5.3 is now the active code-bearing closure: window-scoped bounded font and
+image residency prevents Router replacement from repeatedly rebuilding unchanged GPU resources while
+leaving page-instance semantics unchanged. The second-device combined manual record remains open.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -159,8 +164,11 @@ history follows:
   sidebar and a **nested `NanRouter`** (real QML-StackView-style content stack),
   with section pages (General/Appearance/Components/About) backed by a shared
   `SettingsStore`, plus a parameterized `DetailPage` demonstrating push/pop.
+  Nested routers must receive the host page's resource, font-loader, and font-family
+  services (`PageContext::resources()`, `font_loader()`, and `font_families()`) so
+  `res://` images and custom fonts continue to resolve after section navigation.
   The bootstrap migrated to `use_store` + `run_page<ShellPage>`; the example
-  budget test now permits `NanPageT`/`route_key` (raised to 700 lines).
+  budget test now permits `NanPageT`/`route_key` (raised to 720 lines for Gallery diagnostics).
 - Dialog/Modal landed: a modal overlay (`scrim` + centered panel + title +
   content) with `dialog` semantics, Escape/scrim-click dismissal (configurable),
   a within-panel Tab focus trap, and full-screen positioning via a new `Stack`
@@ -286,6 +294,16 @@ history follows:
   per-frame retries. The Settings About logo now comes from its nanres package and build-tree
   metadata. Tests cover both file and package paths, service injection, source switching, bytes/media
   type/options passthrough, layout/draw behavior, and failures; 42/42 green.
+- C5.3 separates page and render-resource lifetime. `NanWindow` owns a scene-injected
+  `TextureCache`; Image now holds shared RAII textures, reuses matching file/nanres + preprocessing
+  keys across rebuilt pages, and destroys uncached/evicted textures deterministically. The existing
+  `FontPipelineCache` gains bounded strong-reference LRU residency keyed by font request/options, so
+  the weak lookup no longer expires immediately with the last Text on a replaced page. Both caches
+  enforce entry and estimated-byte budgets while active node references remain valid. Router
+  push/pop/replace and Store semantics are unchanged; see `RESOURCE_RESIDENCY.md`.
+- The Settings Gallery page exercises the four packaged PNG/JPEG samples added under
+  `example/settings_example/assets`, using `res://` keys and aspect-preserving bounded previews
+  before GPU upload. This is an image-path diagnostic surface, not a new release capability.
 - Desktop edit commands add a scene-owned non-owning `IClipboard` service, a desktop UTF-8 clipboard
   backend, and platform-neutral select/copy/cut/paste/undo/redo intents. Linux Wayland sessions use
   `wl-paste` / `wl-copy` before the raylib fallback so an XWayland window can exchange text with native

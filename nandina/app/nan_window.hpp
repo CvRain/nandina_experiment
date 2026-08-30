@@ -25,6 +25,7 @@
 #define NANDINA_EXPERIMENT_APP_NAN_WINDOW_HPP
 
 #include "../render/render_device.hpp"
+#include "../render/texture_cache.hpp"
 #include "../scene/scene_tree.hpp"
 #include "../text/font_pipeline.hpp"
 #include "nan_router.hpp"
@@ -119,6 +120,7 @@ namespace nandina::app
         scene::NanSceneTree tree_;
         std::unique_ptr<NanRouter> router_;
         std::unique_ptr<render::IRenderDevice> device_;
+        std::unique_ptr<render::TextureCache> texture_cache_;
         std::unique_ptr<text::FontPipelineCache> font_pipeline_cache_;
         std::shared_ptr<text::FontPipeline> default_font_pipeline_;
         std::optional<widget::primitives::TextPipeline> default_text_pipeline_;

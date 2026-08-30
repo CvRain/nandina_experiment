@@ -31,6 +31,7 @@ namespace nandina::scene
 namespace nandina::render
 {
     class DrawContext;
+    class TextureCache;
 } // namespace nandina::render
 
 namespace nandina::widget::primitives
@@ -254,6 +255,7 @@ namespace nandina::scene
 
         virtual void apply_default_text_pipeline(const widget::primitives::TextPipeline& pipeline);
         virtual void apply_font_context(text::FontPipelineCache& context);
+        virtual void apply_texture_cache(render::TextureCache& cache);
 
         virtual void on_style_context_changed(const theme::ResolvedStyleContext& context);
         virtual void on_theme_changed(const theme::ThemeManager& manager);

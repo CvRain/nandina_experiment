@@ -1,5 +1,6 @@
 #include "font_pipeline.hpp"
 
+#include <limits>
 #include <stdexcept>
 
 namespace nandina::text
@@ -50,11 +51,13 @@ namespace nandina::text
     FontPipelineCache::FontPipelineCache(
         render::IRenderDevice& device,
         FontLoader& loader,
-        const FontFamilyRegistry& families
+        const FontFamilyRegistry& families,
+        const FontPipelineCacheLimits limits
     ):
         device_(&device),
         loader_(&loader),
-        families_(&families) {}
+        families_(&families),
+        limits_(limits) {}
 
     auto FontPipelineCache::get(FontRequest request, const FontPipelineOptions options)
         -> FontResult<std::shared_ptr<FontPipeline>> {
@@ -65,8 +68,10 @@ namespace nandina::text
             .options = options,
         };
         std::lock_guard lock(mutex_);
+        prune_expired();
         if (const auto found = cache_.find(key); found != cache_.end()) {
             if (auto cached = found->second.lock()) {
+                retain(key, cached, options);
                 return cached;
             }
         }
@@ -77,6 +82,7 @@ namespace nandina::text
         try {
             auto pipeline = std::make_shared<FontPipeline>(*device_, std::move(*family), options);
             cache_[key] = pipeline;
+            retain(key, pipeline, options);
             return pipeline;
         }
         catch (const std::exception& exception) {
@@ -92,5 +98,88 @@ namespace nandina::text
     void FontPipelineCache::clear() {
         std::lock_guard lock(mutex_);
         cache_.clear();
+        retained_.clear();
+        retained_bytes_ = 0;
+    }
+
+    auto FontPipelineCache::retained_pipeline_count() const -> std::size_t {
+        std::lock_guard lock(mutex_);
+        return retained_.size();
+    }
+
+    auto FontPipelineCache::retained_bytes() const -> std::size_t {
+        std::lock_guard lock(mutex_);
+        return retained_bytes_;
+    }
+
+    void FontPipelineCache::retain(
+        const Key& key,
+        const std::shared_ptr<FontPipeline>& pipeline,
+        const FontPipelineOptions options
+    ) {
+        for (auto it = retained_.begin(); it != retained_.end(); ++it) {
+            if (it->key == key) {
+                retained_bytes_ -= it->estimated_bytes;
+                retained_.erase(it);
+                break;
+            }
+        }
+        const auto bytes = estimate_bytes(*pipeline, options);
+        if (retained_bytes_ > std::numeric_limits<std::size_t>::max() - bytes) {
+            retained_bytes_ = std::numeric_limits<std::size_t>::max();
+        }
+        else {
+            retained_bytes_ += bytes;
+        }
+        retained_.push_front(
+            RetainedPipeline {.key = key, .pipeline = pipeline, .estimated_bytes = bytes}
+        );
+        trim();
+    }
+
+    void FontPipelineCache::trim() {
+        while (!retained_.empty()
+               && (retained_.size() > limits_.max_retained_pipelines
+                   || retained_bytes_ > limits_.max_retained_bytes))
+        {
+            const auto bytes = retained_.back().estimated_bytes;
+            retained_bytes_ = retained_bytes_ >= bytes ? retained_bytes_ - bytes : 0;
+            retained_.pop_back();
+        }
+        prune_expired();
+    }
+
+    void FontPipelineCache::prune_expired() {
+        for (auto it = cache_.begin(); it != cache_.end();) {
+            if (it->second.expired()) {
+                it = cache_.erase(it);
+            }
+            else {
+                ++it;
+            }
+        }
+    }
+
+    auto FontPipelineCache::estimate_bytes(
+        const FontPipeline& pipeline,
+        const FontPipelineOptions options
+    ) -> std::size_t {
+        constexpr std::size_t raylib_bytes_per_atlas_pixel = 5;
+        const auto width = static_cast<std::size_t>(options.atlas_width);
+        const auto height = static_cast<std::size_t>(options.atlas_height);
+        const auto faces = pipeline.font_count();
+        if (width == 0 || height == 0 || faces == 0) {
+            return 0;
+        }
+        constexpr auto maximum = std::numeric_limits<std::size_t>::max();
+        if (width > maximum / height) {
+            return maximum;
+        }
+        const auto pixels = width * height;
+        if (pixels > maximum / raylib_bytes_per_atlas_pixel) {
+            return maximum;
+        }
+        const auto bytes_per_face = pixels * raylib_bytes_per_atlas_pixel;
+        return faces > maximum / bytes_per_face ? maximum : faces * bytes_per_face;
     }
 } // namespace nandina::text

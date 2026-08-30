@@ -4,7 +4,9 @@
 
 #include "image.hpp"
 
+#include "../foundation/nan_logger.hpp"
 #include "../render/draw_context.hpp"
+#include "../render/texture_cache.hpp"
 #include "../resource/resource_manager.hpp"
 #include "../resource/resource_uri.hpp"
 
@@ -47,6 +49,21 @@ namespace nandina::widget
 
     auto Image::resource_manager() const noexcept -> resource::ResourceManager* {
         return resources_;
+    }
+
+    void Image::set_texture_cache(render::TextureCache* cache) {
+        if (texture_cache_ == cache) {
+            return;
+        }
+        texture_cache_ = cache;
+        texture_.reset();
+        natural_size_ = foundation::NanSize {};
+        loaded_ = false;
+        mark_layout_dirty();
+    }
+
+    auto Image::texture_cache() const noexcept -> render::TextureCache* {
+        return texture_cache_;
     }
 
     void Image::set_tint(const foundation::NanColor tint) {
@@ -114,7 +131,11 @@ namespace nandina::widget
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const auto rects = compute_rects(world);
         const auto tint = tint_.with_alpha(tint_.alpha() * ctx.opacity());
-        ctx.device().draw_texture_region(texture_, rects.source, rects.destination, tint);
+        ctx.device().draw_texture_region(texture_->handle(), rects.source, rects.destination, tint);
+    }
+
+    void Image::apply_texture_cache(render::TextureCache& cache) {
+        set_texture_cache(&cache);
     }
 
     auto Image::on_measure(const scene::LayoutConstraints constraints) -> foundation::NanSize {
@@ -131,30 +152,81 @@ namespace nandina::widget
         loaded_ = true; // 即使失败也标记，避免每帧重试。
         if (source_.starts_with("res://")) {
             if (!resources_) {
+                log::get("widget.image").warn(
+                    "Image: resource manager unavailable for {}",
+                    source_
+                );
                 return;
             }
             const auto uri = resource::ResourceUri::parse(source_);
             if (!uri || uri->scheme() != resource::ResourceUriScheme::res) {
+                log::get("widget.image").warn("Image: invalid resource URI {}", source_);
                 return;
             }
             const auto key = uri->resource_key();
             if (!key) {
+                log::get("widget.image").warn("Image: resource URI has no key {}", source_);
                 return;
             }
             const auto loaded = resources_->require(*key);
-            if (!loaded || !(*loaded)->media_type().starts_with("image/")) {
+            if (!loaded) {
+                log::get("widget.image").warn(
+                    "Image: resource lookup failed for {}: {}",
+                    source_,
+                    loaded.error().message
+                );
                 return;
             }
-            texture_ = device.load_texture_from_memory(
-                (*loaded)->bytes(),
-                (*loaded)->media_type(),
-                load_options_
-            );
+            if (!*loaded) {
+                log::get("widget.image").warn("Image: resource not found for {}", source_);
+                return;
+            }
+            if (!(*loaded)->media_type().starts_with("image/")) {
+                log::get("widget.image").warn(
+                    "Image: resource is not an image {} ({})",
+                    source_,
+                    (*loaded)->media_type()
+                );
+                return;
+            }
+            if (texture_cache_ != nullptr) {
+                texture_ = texture_cache_->load_memory(
+                    (*loaded)->id().to_string(),
+                    (*loaded)->bytes(),
+                    (*loaded)->media_type(),
+                    load_options_
+                );
+            }
+            else {
+                const auto handle = device.load_texture_from_memory(
+                    (*loaded)->bytes(),
+                    (*loaded)->media_type(),
+                    load_options_
+                );
+                if (handle) {
+                    texture_ = std::make_shared<render::CachedTexture>(
+                        device, handle, device.texture_size(handle)
+                    );
+                }
+            }
         }
         else {
-            texture_ = device.load_texture_from_file(source_, load_options_);
+            if (texture_cache_ != nullptr) {
+                texture_ = texture_cache_->load_file(source_, load_options_);
+            }
+            else {
+                const auto handle = device.load_texture_from_file(source_, load_options_);
+                if (handle) {
+                    texture_ = std::make_shared<render::CachedTexture>(
+                        device, handle, device.texture_size(handle)
+                    );
+                }
+            }
         }
-        natural_size_ = device.texture_size(texture_);
+        if (!texture_) {
+            log::get("widget.image").warn("Image: texture decode/upload failed for {}", source_);
+        }
+        natural_size_ = texture_ != nullptr ? texture_->size() : foundation::NanSize {};
         if (natural_size_.get_width() > 0.0F || natural_size_.get_height() > 0.0F) {
             mark_layout_dirty();
         }

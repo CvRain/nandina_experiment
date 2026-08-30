@@ -120,6 +120,8 @@ raylib 根据 media type 选择解码扩展名，调用 `LoadImageFromMemory` �
 crop/resize/tint 与纹理上传流程。Settings 示例的品牌图进入 `resources.toml` 管理的包，
 `NanApplicationConfig::for_process` 通过可执行文件旁的 `resource-location.json` 挂载 build-tree
 包，About 页使用 `res://nandina_logo.png`，不再依赖复制到输出目录的散文件。
+构建配置显式启用 raylib 的 `SUPPORT_FILEFORMAT_JPG`，因此 `image/jpeg` 资源与 PNG 一样可在
+内存路径中解码；下游自定义 raylib 构建也必须保留该选项才能支持 JPEG。
 
 验证：`image`、`application-resource`、`settings-example` 聚焦测试通过；完整
 `meson compile -C buildDir` 与 `meson test -C buildDir --print-errorlogs` 通过（42/42）。

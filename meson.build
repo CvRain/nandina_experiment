@@ -23,7 +23,10 @@ spdlog_options.add_cmake_defines({})
 
 # 配置 raylib 的CMake选项
 raylib_options = cmake.subproject_options()
-raylib_options.add_cmake_defines({})
+raylib_options.add_cmake_defines({
+    'CUSTOMIZE_BUILD': 'ON',
+    'SUPPORT_FILEFORMAT_JPG': 'ON',
+})
 
 # 配置 utf8proc 的 CMake 选项
 utf8proc_options = cmake.subproject_options()

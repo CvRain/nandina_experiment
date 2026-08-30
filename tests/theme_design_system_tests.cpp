@@ -69,9 +69,13 @@ namespace
     class RevisionProbe final: public theme::ThemeObserver {
     public:
         std::uint64_t changes = 0;
+        theme::ColorAppearance last_appearance = theme::ColorAppearance::light;
+        bool last_reduced_motion = false;
 
-        void on_theme_revision_changed(const theme::ThemeManager& /*manager*/) override {
+        void on_theme_revision_changed(const theme::ThemeManager& manager) override {
             ++changes;
+            last_appearance = manager.appearance();
+            last_reduced_motion = manager.reduced_motion();
         }
         void on_theme_manager_destroyed(const theme::ThemeManager& /*manager*/) noexcept override {}
     };
@@ -309,6 +313,88 @@ TEST_CASE("motion preference resolves system and explicit reduced motion", "[the
     manager.set_motion_preference(theme::MotionPreference::system);
     REQUIRE_FALSE(manager.reduced_motion());
     REQUIRE(probe.changes == 4);
+
+    manager.remove_observer(probe);
+}
+
+TEST_CASE(
+    "system preference snapshot updates appearance and motion atomically",
+    "[theme][manager][atomic][platform]"
+) {
+    theme::ThemeManager manager;
+    RevisionProbe probe;
+    manager.add_observer(probe);
+    const theme::SystemPreferences default_preferences {
+        .appearance = theme::ColorAppearance::light,
+        .reduced_motion = false,
+    };
+
+    REQUIRE(manager.system_preferences() == default_preferences);
+    REQUIRE(manager.appearance() == theme::ColorAppearance::light);
+    REQUIRE_FALSE(manager.reduced_motion());
+
+    manager.set_system_preferences({
+        .appearance = theme::ColorAppearance::dark,
+        .reduced_motion = true,
+    });
+
+    REQUIRE(manager.appearance() == theme::ColorAppearance::dark);
+    REQUIRE(manager.reduced_motion());
+    REQUIRE(probe.changes == 1);
+    REQUIRE(probe.last_appearance == theme::ColorAppearance::dark);
+    REQUIRE(probe.last_reduced_motion);
+
+    manager.set_system_preferences(manager.system_preferences());
+    REQUIRE(probe.changes == 1);
+
+    manager.remove_observer(probe);
+}
+
+TEST_CASE(
+    "explicit preferences mask platform snapshot revisions",
+    "[theme][manager][platform]"
+) {
+    theme::ThemeManager manager;
+    manager.set_preference(theme::ThemePreference::light);
+    manager.set_motion_preference(theme::MotionPreference::full);
+    RevisionProbe probe;
+    manager.add_observer(probe);
+    const theme::SystemPreferences platform_preferences {
+        .appearance = theme::ColorAppearance::dark,
+        .reduced_motion = true,
+    };
+
+    manager.set_system_preferences(platform_preferences);
+
+    REQUIRE(manager.system_preferences() == platform_preferences);
+    REQUIRE(manager.appearance() == theme::ColorAppearance::light);
+    REQUIRE_FALSE(manager.reduced_motion());
+    REQUIRE(probe.changes == 0);
+
+    manager.set_preference(theme::ThemePreference::system);
+    REQUIRE(manager.appearance() == theme::ColorAppearance::dark);
+    REQUIRE(probe.changes == 1);
+
+    manager.set_motion_preference(theme::MotionPreference::system);
+    REQUIRE(manager.reduced_motion());
+    REQUIRE(probe.changes == 2);
+
+    manager.remove_observer(probe);
+}
+
+TEST_CASE(
+    "equivalent explicit appearance does not publish a revision",
+    "[theme][manager][appearance]"
+) {
+    theme::ThemeManager manager;
+    RevisionProbe probe;
+    manager.add_observer(probe);
+
+    manager.set_preference(theme::ThemePreference::light);
+
+    REQUIRE(manager.preference() == theme::ThemePreference::light);
+    REQUIRE(manager.appearance() == theme::ColorAppearance::light);
+    REQUIRE(probe.changes == 0);
 
     manager.remove_observer(probe);
 }

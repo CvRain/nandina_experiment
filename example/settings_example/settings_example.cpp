@@ -4,6 +4,8 @@
 
 #include "settings_example.hpp"
 
+#include "gallery_page.hpp"
+
 #include "animation/motion.hpp"
 #include "foundation/geometry.hpp"
 #include "text/system_fonts.hpp"
@@ -102,9 +104,9 @@ namespace nandina::examples::settings
             context.theme_manager(),
             &store,
             app::nan_type_key<SettingsStore>(),
-            nullptr,
-            nullptr,
-            nullptr,
+            context.has_resource_services() ? &context.resources() : nullptr,
+            context.has_resource_services() ? &context.font_loader() : nullptr,
+            context.has_resource_services() ? &context.font_families() : nullptr,
             &context.dispatcher(),
             nullptr
         );
@@ -134,6 +136,10 @@ namespace nandina::examples::settings
                     nav_button(
                         "Components",
                         [this] { (void)content_->request_replace<ComponentsPage>(); }
+                    ),
+                    nav_button(
+                        "Gallery",
+                        [this] { (void)content_->request_replace<GalleryPage>(); }
                     ),
                     nav_button("About", [this] { (void)content_->request_replace<AboutPage>(); })
                 )
@@ -532,6 +538,11 @@ namespace nandina::examples::settings
         // 图片/纹理子系统示范：从 nanres 包按稳定逻辑键加载品牌图。
         auto logo = ui.make<widget::Image>("res://nandina_logo.png").build();
         logo->set_size(foundation::NanSize(360.0F, 200.0F));
+        logo->set_load_options(
+            render::ImageLoadOptions {
+                .resize = foundation::NanSize(720.0F, 391.0F),
+            }
+        );
 
         auto content =
             ui.column()

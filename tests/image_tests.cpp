@@ -5,6 +5,7 @@
 #include "foundation/geometry.hpp"
 #include "foundation/nandina_color.hpp"
 #include "render/render_device.hpp"
+#include "render/texture_cache.hpp"
 #include "resource/backends/memory_backend.hpp"
 #include "resource/resource_manager.hpp"
 #include "scene/scene_tree.hpp"
@@ -22,6 +23,10 @@ using namespace nandina;
 
 namespace
 {
+    [[nodiscard]] auto resource_id(std::string_view value) -> resource::ResourceId {
+        return *resource::ResourceId::parse(value);
+    }
+
     /// 记录纹理调用，验证 load / size / draw_texture_region 的调用序与参数。
     class TextureRecordingDevice final: public render::IRenderDevice {
     public:
@@ -36,6 +41,7 @@ namespace
         std::vector<std::uint8_t> loaded_bytes;
         std::string loaded_media_type;
         int draw_regions = 0;
+        std::vector<render::TextureHandle> destroyed;
         std::vector<Region> regions;
         bool fail_loads = false;
         foundation::NanSize size_to_return {64.0F, 32.0F};
@@ -104,6 +110,10 @@ namespace
         ) override {
             ++draw_regions;
             regions.push_back(Region {source, destination, tint});
+        }
+
+        void destroy_texture(const render::TextureHandle texture) override {
+            destroyed.push_back(texture);
         }
     };
 } // namespace
@@ -376,6 +386,89 @@ TEST_CASE("image switches between packaged resources and file paths", "[image][r
     REQUIRE(dev.memory_loads == 2);
     REQUIRE(dev.loaded == std::vector<std::string> {"logo-from-disk.png"});
     REQUIRE(dev.draw_regions == 3);
+    REQUIRE(dev.destroyed.size() == 2);
+}
+
+TEST_CASE("window texture cache reuses a packaged image across node lifetimes", "[image][cache]") {
+    auto backend = std::make_shared<resource::MemoryBackend>("images");
+    REQUIRE(backend
+                ->insert(
+                    resource_id("00112233-4455-4677-8899-aabbccddeeff"),
+                    resource::ResourceKey("logo.png"),
+                    "image/png",
+                    std::vector<std::uint8_t> {1, 2, 3}
+                )
+                .has_value());
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+
+    TextureRecordingDevice dev;
+    render::TextureCache cache(dev);
+    scene::NanSceneTree tree;
+    tree.set_texture_cache(cache);
+
+    auto first = widget::Image::create("res://logo.png");
+    first->set_resource_manager(&resources);
+    tree.set_root(first);
+    tree.draw(dev);
+    tree.set_root(nullptr);
+    first.reset();
+
+    auto second = widget::Image::create("res://logo.png");
+    second->set_resource_manager(&resources);
+    tree.set_root(second);
+    tree.draw(dev);
+
+    REQUIRE(dev.memory_loads == 1);
+    REQUIRE(dev.draw_regions == 2);
+    REQUIRE(dev.destroyed.empty());
+    REQUIRE(cache.retained_entries() == 1);
+}
+
+TEST_CASE("texture cache keys include image preprocessing options", "[image][cache]") {
+    TextureRecordingDevice dev;
+    render::TextureCache cache(dev);
+
+    const auto original = cache.load_file("hero.png");
+    const auto resized = cache.load_file(
+        "hero.png",
+        render::ImageLoadOptions {.resize = foundation::NanSize(32.0F, 32.0F)}
+    );
+    const auto original_again = cache.load_file("hero.png");
+
+    REQUIRE(original != nullptr);
+    REQUIRE(resized != nullptr);
+    REQUIRE(original_again == original);
+    REQUIRE(dev.loaded.size() == 2);
+    REQUIRE(cache.retained_entries() == 2);
+}
+
+TEST_CASE("texture cache evicts inactive least-recently-used textures", "[image][cache]") {
+    TextureRecordingDevice dev;
+    render::TextureCache cache(
+        dev,
+        render::TextureCacheLimits {
+            .max_retained_entries = 1,
+            .max_retained_bytes = 1024U * 1024U,
+        }
+    );
+
+    std::weak_ptr<render::CachedTexture> first_weak;
+    {
+        auto first = cache.load_file("first.png");
+        REQUIRE(first != nullptr);
+        first_weak = first;
+    }
+    REQUIRE_FALSE(first_weak.expired());
+
+    {
+        auto second = cache.load_file("second.png");
+        REQUIRE(second != nullptr);
+    }
+
+    REQUIRE(first_weak.expired());
+    REQUIRE(dev.destroyed.size() == 1);
+    REQUIRE(cache.retained_entries() == 1);
 }
 
 TEST_CASE(

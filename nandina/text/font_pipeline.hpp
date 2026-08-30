@@ -5,6 +5,7 @@
 #include "glyph_atlas.hpp"
 #include "glyph_run_renderer.hpp"
 
+#include <list>
 #include <map>
 #include <mutex>
 
@@ -38,17 +39,25 @@ namespace nandina::text
         std::unique_ptr<GlyphRunRenderer> renderer_;
     };
 
+    struct FontPipelineCacheLimits {
+        std::size_t max_retained_pipelines = 16;
+        std::size_t max_retained_bytes = 128U * 1024U * 1024U;
+    };
+
     class FontPipelineCache final {
     public:
         FontPipelineCache(
             render::IRenderDevice& device,
             FontLoader& loader,
-            const FontFamilyRegistry& families
+            const FontFamilyRegistry& families,
+            FontPipelineCacheLimits limits = {}
         );
 
         [[nodiscard]] auto get(FontRequest request, FontPipelineOptions options = {})
             -> FontResult<std::shared_ptr<FontPipeline>>;
         void clear();
+        [[nodiscard]] auto retained_pipeline_count() const -> std::size_t;
+        [[nodiscard]] auto retained_bytes() const -> std::size_t;
 
     private:
         struct Key {
@@ -59,11 +68,32 @@ namespace nandina::text
             auto operator<=>(const Key&) const = default;
         };
 
+        struct RetainedPipeline {
+            Key key;
+            std::shared_ptr<FontPipeline> pipeline;
+            std::size_t estimated_bytes = 0;
+        };
+
+        void retain(
+            const Key& key,
+            const std::shared_ptr<FontPipeline>& pipeline,
+            FontPipelineOptions options
+        );
+        void trim();
+        void prune_expired();
+        [[nodiscard]] static auto estimate_bytes(
+            const FontPipeline& pipeline,
+            FontPipelineOptions options
+        ) -> std::size_t;
+
         render::IRenderDevice* device_;
         FontLoader* loader_;
         const FontFamilyRegistry* families_;
-        std::mutex mutex_;
+        FontPipelineCacheLimits limits_;
+        mutable std::mutex mutex_;
         std::map<Key, std::weak_ptr<FontPipeline>> cache_;
+        std::list<RetainedPipeline> retained_;
+        std::size_t retained_bytes_ = 0;
     };
 } // namespace nandina::text
 #endif

@@ -9,6 +9,10 @@
 
 namespace nandina::theme
 {
+    /**
+     * User-facing motion preference. `system` resolves from the latest host-supplied
+     * SystemPreferences snapshot; ThemeManager falls back to full motion.
+     */
     enum class MotionPreference : std::uint8_t {
         system,
         full,
