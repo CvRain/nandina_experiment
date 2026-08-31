@@ -26,10 +26,7 @@ namespace nandina::widget
             return;
         }
         source_ = std::move(path);
-        texture_ = {};
-        natural_size_ = foundation::NanSize {};
-        loaded_ = false;
-        mark_layout_dirty();
+        reset_load();
     }
 
     auto Image::source() const -> std::string_view {
@@ -41,10 +38,7 @@ namespace nandina::widget
             return;
         }
         resources_ = resources;
-        texture_ = {};
-        natural_size_ = foundation::NanSize {};
-        loaded_ = false;
-        mark_layout_dirty();
+        reset_load();
     }
 
     auto Image::resource_manager() const noexcept -> resource::ResourceManager* {
@@ -56,10 +50,7 @@ namespace nandina::widget
             return;
         }
         texture_cache_ = cache;
-        texture_.reset();
-        natural_size_ = foundation::NanSize {};
-        loaded_ = false;
-        mark_layout_dirty();
+        reset_load();
     }
 
     auto Image::texture_cache() const noexcept -> render::TextureCache* {
@@ -113,20 +104,54 @@ namespace nandina::widget
 
     void Image::set_load_options(render::ImageLoadOptions options) {
         load_options_ = std::move(options);
-        texture_ = {};
-        natural_size_ = foundation::NanSize {};
-        loaded_ = false;
-        mark_layout_dirty();
+        reset_load();
     }
 
     auto Image::load_options() const -> const render::ImageLoadOptions& {
         return load_options_;
     }
 
+    void Image::set_load_mode(const ImageLoadMode mode) {
+        if (load_mode_ == mode)
+            return;
+        load_mode_ = mode;
+        reset_load();
+    }
+
+    auto Image::load_mode() const noexcept -> ImageLoadMode {
+        return load_mode_;
+    }
+
+    auto Image::load_state() const noexcept -> ImageLoadState {
+        return load_state_;
+    }
+
+    void Image::set_placeholder_color(const foundation::NanColor color) {
+        placeholder_color_ = color;
+        mark_dirty(scene::DirtyFlags::paint);
+    }
+
+    void Image::clear_placeholder_color() {
+        placeholder_color_.reset();
+        mark_dirty(scene::DirtyFlags::paint);
+    }
+
+    auto Image::placeholder_color() const -> const std::optional<foundation::NanColor>& {
+        return placeholder_color_;
+    }
+
     auto Image::on_draw(render::DrawContext& ctx) -> void {
         ensure_loaded(ctx.device());
         if (!texture_) {
-            return; // 未指定源或加载失败：不绘制。
+            if (placeholder_color_) {
+                const auto world =
+                    render::world_bounds_from_local(ctx.world_transform(), local_rect());
+                ctx.device().draw_rect(
+                    world,
+                    placeholder_color_->with_alpha(placeholder_color_->alpha() * ctx.opacity())
+                );
+            }
+            return;
         }
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const auto rects = compute_rects(world);
@@ -146,48 +171,78 @@ namespace nandina::widget
     }
 
     void Image::ensure_loaded(render::IRenderDevice& device) {
-        if (loaded_ || source_.empty()) {
+        if (load_state_ != ImageLoadState::idle || source_.empty()) {
             return;
         }
-        loaded_ = true; // 即使失败也标记，避免每帧重试。
+        load_state_ = ImageLoadState::loading;
         if (source_.starts_with("res://")) {
             if (!resources_) {
-                log::get("widget.image").warn(
-                    "Image: resource manager unavailable for {}",
-                    source_
-                );
+                log::get("widget.image")
+                    .warn("Image: resource manager unavailable for {}", source_);
+                load_state_ = ImageLoadState::failed;
                 return;
             }
             const auto uri = resource::ResourceUri::parse(source_);
             if (!uri || uri->scheme() != resource::ResourceUriScheme::res) {
                 log::get("widget.image").warn("Image: invalid resource URI {}", source_);
+                load_state_ = ImageLoadState::failed;
                 return;
             }
             const auto key = uri->resource_key();
             if (!key) {
                 log::get("widget.image").warn("Image: resource URI has no key {}", source_);
+                load_state_ = ImageLoadState::failed;
                 return;
             }
             const auto loaded = resources_->require(*key);
             if (!loaded) {
-                log::get("widget.image").warn(
-                    "Image: resource lookup failed for {}: {}",
-                    source_,
-                    loaded.error().message
-                );
+                log::get("widget.image")
+                    .warn(
+                        "Image: resource lookup failed for {}: {}",
+                        source_,
+                        loaded.error().message
+                    );
+                load_state_ = ImageLoadState::failed;
                 return;
             }
             if (!*loaded) {
                 log::get("widget.image").warn("Image: resource not found for {}", source_);
+                load_state_ = ImageLoadState::failed;
                 return;
             }
             if (!(*loaded)->media_type().starts_with("image/")) {
-                log::get("widget.image").warn(
-                    "Image: resource is not an image {} ({})",
-                    source_,
-                    (*loaded)->media_type()
-                );
+                log::get("widget.image")
+                    .warn(
+                        "Image: resource is not an image {} ({})",
+                        source_,
+                        (*loaded)->media_type()
+                    );
+                load_state_ = ImageLoadState::failed;
                 return;
+            }
+            const bool wants_async = texture_cache_ != nullptr
+                && load_mode_ != ImageLoadMode::synchronous
+                && texture_cache_->supports_async_loading();
+            if (wants_async) {
+                const auto generation = load_generation_;
+                const auto source = source_;
+                const auto weak =
+                    std::weak_ptr<Image>(std::static_pointer_cast<Image>(shared_from_this()));
+                if (texture_cache_->load_memory_async(
+                        (*loaded)->id().to_string(),
+                        std::shared_ptr<const void>(*loaded),
+                        (*loaded)->bytes(),
+                        (*loaded)->media_type(),
+                        load_options_,
+                        [weak, generation, source](std::shared_ptr<render::CachedTexture> texture) {
+                            if (const auto image = weak.lock()) {
+                                image->complete_async(generation, source, std::move(texture));
+                            }
+                        }
+                    ))
+                {
+                    return;
+                }
             }
             if (texture_cache_ != nullptr) {
                 texture_ = texture_cache_->load_memory(
@@ -205,7 +260,9 @@ namespace nandina::widget
                 );
                 if (handle) {
                     texture_ = std::make_shared<render::CachedTexture>(
-                        device, handle, device.texture_size(handle)
+                        device,
+                        handle,
+                        device.texture_size(handle)
                     );
                 }
             }
@@ -218,7 +275,9 @@ namespace nandina::widget
                 const auto handle = device.load_texture_from_file(source_, load_options_);
                 if (handle) {
                     texture_ = std::make_shared<render::CachedTexture>(
-                        device, handle, device.texture_size(handle)
+                        device,
+                        handle,
+                        device.texture_size(handle)
                     );
                 }
             }
@@ -226,9 +285,39 @@ namespace nandina::widget
         if (!texture_) {
             log::get("widget.image").warn("Image: texture decode/upload failed for {}", source_);
         }
+        load_state_ = texture_ ? ImageLoadState::ready : ImageLoadState::failed;
         natural_size_ = texture_ != nullptr ? texture_->size() : foundation::NanSize {};
         if (natural_size_.get_width() > 0.0F || natural_size_.get_height() > 0.0F) {
             mark_layout_dirty();
+        }
+    }
+
+    void Image::reset_load() {
+        ++load_generation_;
+        texture_.reset();
+        natural_size_ = foundation::NanSize {};
+        load_state_ = ImageLoadState::idle;
+        mark_layout_dirty();
+    }
+
+    void Image::complete_async(
+        const std::uint64_t generation,
+        std::string source,
+        std::shared_ptr<render::CachedTexture> texture
+    ) {
+        if (generation != load_generation_ || source != source_)
+            return;
+        texture_ = std::move(texture);
+        load_state_ = texture_ ? ImageLoadState::ready : ImageLoadState::failed;
+        natural_size_ = texture_ ? texture_->size() : foundation::NanSize {};
+        if (!texture_) {
+            log::get("widget.image").warn("Image: texture decode/upload failed for {}", source_);
+        }
+        if (natural_size_.get_width() > 0.0F || natural_size_.get_height() > 0.0F) {
+            mark_layout_dirty();
+        }
+        else {
+            mark_dirty(scene::DirtyFlags::paint);
         }
     }
 

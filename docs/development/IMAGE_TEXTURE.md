@@ -91,6 +91,7 @@ auto image = ui.make<widget::Image>("res://images/hero.png");
 | 2（完成） | Image 能力补全（source_rect 裁剪、缩放/对齐模式） | 裁剪/缩放/对齐测试 |
 | 3（完成） | 图片调整（resize/crop/tint，raylib `Image` 处理）+ 示例接入 | 示例展示图片 + 调整；全量绿 |
 | 4（C3，完成） | `ResourceManager/package bytes → Image → texture`，示例改用 nanres 包 | `res://` 加载、服务注入、失败降级和真实打包示例均有自动化覆盖；42/42 |
+| 5（C5.4，完成） | 打包图片后台解码 + UI 上传 + placeholder + pending 合并 | 首帧不解码/上传、线程边界和单次共享上传测试 |
 
 ## 5. 验收条件（Stage 1）
 
@@ -125,3 +126,10 @@ crop/resize/tint 与纹理上传流程。Settings 示例的品牌图进入 `reso
 
 验证：`image`、`application-resource`、`settings-example` 聚焦测试通过；完整
 `meson compile -C buildDir` 与 `meson test -C buildDir --print-errorlogs` 通过（42/42）。
+
+## 7. Stage 5：异步首次加载（C5.4）
+
+窗口级 `TextureCache` 接收后台执行器、UI dispatcher 和 `IImageDecoder`。打包图片先显示可选
+placeholder，后台完成 decode/crop/resize/tint 后，仅在 UI 线程调用
+`IRenderDevice::create_rgba_texture()`。相同资源与预处理键的 pending 请求只解码和上传一次。
+完整线程、状态和后续 I/O/可见性计划见 `ASYNC_IMAGE_LOADING.md`。

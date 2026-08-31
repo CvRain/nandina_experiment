@@ -15,6 +15,7 @@
 #include <catch2/catch_approx.hpp>
 #include <catch2/catch_test_macros.hpp>
 
+#include <deque>
 #include <memory>
 #include <string>
 #include <vector>
@@ -41,6 +42,8 @@ namespace
         std::vector<std::uint8_t> loaded_bytes;
         std::string loaded_media_type;
         int draw_regions = 0;
+        int drawn_rects = 0;
+        int rgba_uploads = 0;
         std::vector<render::TextureHandle> destroyed;
         std::vector<Region> regions;
         bool fail_loads = false;
@@ -51,10 +54,14 @@ namespace
         void end_frame() override {}
         void set_clip(const foundation::NanRect&) override {}
         void clear_clip() override {}
-        void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {}
-        void draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        void draw_rect(const foundation::NanRect&, const foundation::NanColor&) override {
+            ++drawn_rects;
         }
-        void draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        void
+        draw_rect_outline(const foundation::NanRect&, float, const foundation::NanColor&) override {
+        }
+        void
+        draw_rounded_rect(const foundation::NanRect&, float, const foundation::NanColor&) override {
         }
         void draw_line(
             const foundation::NanPoint&,
@@ -71,10 +78,9 @@ namespace
             const foundation::NanColor&
         ) override {}
 
-        [[nodiscard]] auto load_texture_from_file(
-            std::string_view path,
-            const render::ImageLoadOptions& options
-        ) -> render::TextureHandle override {
+        [[nodiscard]] auto
+        load_texture_from_file(std::string_view path, const render::ImageLoadOptions& options)
+            -> render::TextureHandle override {
             if (fail_loads) {
                 return {};
             }
@@ -115,6 +121,48 @@ namespace
         void destroy_texture(const render::TextureHandle texture) override {
             destroyed.push_back(texture);
         }
+
+        [[nodiscard]] auto create_rgba_texture(int, int, std::span<const std::uint8_t>)
+            -> render::TextureHandle override {
+            ++rgba_uploads;
+            return render::TextureHandle {.value = static_cast<std::uint64_t>(200 + rgba_uploads)};
+        }
+    };
+
+    class RecordingDecoder final: public render::IImageDecoder {
+    public:
+        int calls = 0;
+
+        [[nodiscard]] auto decode_memory(
+            std::span<const std::uint8_t>,
+            std::string_view,
+            const render::ImageLoadOptions&
+        ) -> render::DecodedImage override {
+            ++calls;
+            return render::DecodedImage {
+                .width = 2,
+                .height = 1,
+                .rgba = std::vector<std::uint8_t>(8, 255),
+            };
+        }
+    };
+
+    class ManualTaskQueue {
+    public:
+        [[nodiscard]] auto submit(std::move_only_function<void()> task) -> bool {
+            tasks.push_back(std::move(task));
+            return true;
+        }
+
+        void drain() {
+            while (!tasks.empty()) {
+                auto task = std::move(tasks.front());
+                tasks.pop_front();
+                task();
+            }
+        }
+
+        std::deque<std::move_only_function<void()>> tasks;
     };
 } // namespace
 
@@ -423,6 +471,155 @@ TEST_CASE("window texture cache reuses a packaged image across node lifetimes", 
     REQUIRE(dev.draw_regions == 2);
     REQUIRE(dev.destroyed.empty());
     REQUIRE(cache.retained_entries() == 1);
+}
+
+TEST_CASE(
+    "async packaged image shows a placeholder before UI-thread upload",
+    "[image][cache][async]"
+) {
+    auto backend = std::make_shared<resource::MemoryBackend>("images");
+    REQUIRE(backend
+                ->insert(
+                    resource_id("10213243-5465-4768-899a-abbccddeeff0"),
+                    resource::ResourceKey("hero.png"),
+                    "image/png",
+                    std::vector<std::uint8_t> {1, 2, 3}
+                )
+                .has_value());
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+        }
+    );
+    scene::NanSceneTree tree;
+    tree.set_texture_cache(cache);
+    auto image = widget::Image::create("res://hero.png");
+    image->set_resource_manager(&resources);
+    image->set_size(foundation::NanSize(100.0F, 50.0F));
+    image->set_load_mode(widget::ImageLoadMode::asynchronous);
+    image->set_placeholder_color(foundation::NanColor::from_hex(0x808080));
+    tree.set_root(image);
+    (void)tree.layout_root(foundation::NanSize(100.0F, 50.0F));
+
+    tree.draw(device);
+    REQUIRE(image->load_state() == widget::ImageLoadState::loading);
+    REQUIRE(device.drawn_rects == 1);
+    REQUIRE(device.draw_regions == 0);
+    REQUIRE(device.rgba_uploads == 0);
+    REQUIRE(decoder->calls == 0);
+
+    background.drain();
+    REQUIRE(decoder->calls == 1);
+    REQUIRE(device.rgba_uploads == 0);
+    REQUIRE(ui.tasks.size() == 1);
+
+    ui.drain();
+    REQUIRE(image->load_state() == widget::ImageLoadState::ready);
+    REQUIRE(device.rgba_uploads == 1);
+    REQUIRE(image->natural_size() == foundation::NanSize(2.0F, 1.0F));
+
+    tree.draw(device);
+    REQUIRE(device.drawn_rects == 1);
+    REQUIRE(device.draw_regions == 1);
+}
+
+TEST_CASE("async texture cache merges matching pending decodes", "[image][cache][async]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    std::shared_ptr<render::CachedTexture> first;
+    std::shared_ptr<render::CachedTexture> second;
+
+    REQUIRE(cache.load_memory_async(
+        "same-resource",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [&first](auto texture) { first = std::move(texture); }
+    ));
+    REQUIRE(cache.load_memory_async(
+        "same-resource",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [&second](auto texture) { second = std::move(texture); }
+    ));
+    REQUIRE(background.tasks.size() == 1);
+
+    background.drain();
+    ui.drain();
+
+    REQUIRE(decoder->calls == 1);
+    REQUIRE(device.rgba_uploads == 1);
+    REQUIRE(first != nullptr);
+    REQUIRE(second == first);
+}
+
+TEST_CASE("destroyed texture cache drops background decode completion", "[image][cache][async]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    auto cache = std::make_unique<render::TextureCache>(
+        device,
+        render::TextureCacheLimits {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    REQUIRE(cache->load_memory_async(
+        "closing-resource",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [](auto) {}
+    ));
+
+    cache.reset();
+    background.drain();
+
+    REQUIRE(decoder->calls == 1);
+    REQUIRE(ui.tasks.empty());
+    REQUIRE(device.rgba_uploads == 0);
 }
 
 TEST_CASE("texture cache keys include image preprocessing options", "[image][cache]") {

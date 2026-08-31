@@ -114,9 +114,11 @@ owner clipboard acceptance pass after fixing the embedded-editor clipboard owner
 C4 is closed; C5 is active and its platform facts/manual gate are tracked in `LINUX_PLATFORM.md`.
 The first-device C5.1 DPI/resize baseline is committed. C5.2 now defines `system` appearance and
 motion as one host-injected snapshot with light/full fallback; it deliberately installs no implicit
-Linux desktop observer. C5.3 is now the active code-bearing closure: window-scoped bounded font and
-image residency prevents Router replacement from repeatedly rebuilding unchanged GPU resources while
-leaving page-instance semantics unchanged. The second-device combined manual record remains open.
+Linux desktop observer. C5.3 window-scoped bounded font/image residency prevents Router replacement
+from repeatedly rebuilding unchanged GPU resources while leaving page-instance semantics unchanged.
+C5.4 moves packaged-image CPU decode/preprocessing to background workers, keeps GPU upload on the UI
+thread, displays fixed placeholders, and merges matching pending requests. C5.5–C5.6 retain package
+I/O cancellation/budgets and viewport-aware loading. The second-device manual record remains open.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -303,7 +305,9 @@ history follows:
   push/pop/replace and Store semantics are unchanged; see `RESOURCE_RESIDENCY.md`.
 - The Settings Gallery page exercises the four packaged PNG/JPEG samples added under
   `example/settings_example/assets`, using `res://` keys and aspect-preserving bounded previews
-  before GPU upload. This is an image-path diagnostic surface, not a new release capability.
+  before GPU upload. It enters with fixed `surface_variant` placeholders while CPU decode/resize
+  runs in the shared background executor; decoded RGBA uploads return to the UI thread. This is an
+  image-path diagnostic and performance surface, not a new release capability.
 - Desktop edit commands add a scene-owned non-owning `IClipboard` service, a desktop UTF-8 clipboard
   backend, and platform-neutral select/copy/cut/paste/undo/redo intents. Linux Wayland sessions use
   `wl-paste` / `wl-copy` before the raylib fallback so an XWayland window can exchange text with native
@@ -405,7 +409,8 @@ history follows:
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
 - Test suite 43/43 green.
-- Next (1.0 closure): execute C5 Linux platform truth. New templates, i18n, keyframes/ColorSpace
+- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.5 package-I/O budgets and C5.6
+  viewport-aware loading before the remaining Linux platform gate. New templates, i18n, keyframes/ColorSpace
   sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

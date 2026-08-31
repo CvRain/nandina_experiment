@@ -305,7 +305,8 @@ void main() {
             const NanColor& color
         ) override {
             if (circle_radius <= 0.0F || clip_rect.get_width() <= 0.0F
-                || clip_rect.get_height() <= 0.0F) {
+                || clip_rect.get_height() <= 0.0F)
+            {
                 return;
             }
             const float corner = std::clamp(
@@ -398,13 +399,7 @@ void main() {
                 DrawCircleV(to_rl(*line_a), half_width, color);
             }
             else if (mode == detail::SdfPrimitiveMode::outline) {
-                DrawRectangleRoundedLinesEx(
-                    to_rl(rect),
-                    roundness,
-                    16,
-                    half_width * 2.0F,
-                    color
-                );
+                DrawRectangleRoundedLinesEx(to_rl(rect), roundness, 16, half_width * 2.0F, color);
             }
             else if (corner > 0.0F) {
                 DrawRectangleRounded(to_rl(rect), roundness, 16, color);
@@ -429,9 +424,9 @@ void main() {
                 draw_aa_fallback(rect, radius, half_width, mode, color, line_a, line_b);
                 return;
             }
-            const auto quad = mode == detail::SdfPrimitiveMode::segment
+            const auto quad = mode == detail::SdfPrimitiveMode::segment ? rect
+                : mode == detail::SdfPrimitiveMode::clipped_circle
                 ? rect
-                : mode == detail::SdfPrimitiveMode::clipped_circle ? rect
                 : detail::sdf_quad_bounds(rect, mode, half_width);
             const ::Rectangle shape_rl = to_rl(rect);
             const ::Rectangle quad_rl = to_rl(quad);
@@ -447,18 +442,8 @@ void main() {
             const float color_v[4] = {rgba.x, rgba.y, rgba.z, rgba.w};
             const int mode_value = static_cast<int>(mode);
             BeginShaderMode(aa_shader_);
-            SetShaderValue(
-                aa_shader_,
-                aa_loc_shape_rect_,
-                shape_rect_v,
-                SHADER_UNIFORM_VEC4
-            );
-            SetShaderValue(
-                aa_shader_,
-                aa_loc_quad_rect_,
-                quad_rect_v,
-                SHADER_UNIFORM_VEC4
-            );
+            SetShaderValue(aa_shader_, aa_loc_shape_rect_, shape_rect_v, SHADER_UNIFORM_VEC4);
+            SetShaderValue(aa_shader_, aa_loc_quad_rect_, quad_rect_v, SHADER_UNIFORM_VEC4);
             if (aa_loc_radius_ >= 0) {
                 SetShaderValue(aa_shader_, aa_loc_radius_, radius_v, SHADER_UNIFORM_VEC2);
             }
@@ -583,10 +568,30 @@ void main() {
             );
         }
 
-        [[nodiscard]] auto load_texture_from_file(
-            std::string_view path,
-            const ImageLoadOptions& options
+        [[nodiscard]] auto create_rgba_texture(
+            const int width,
+            const int height,
+            const std::span<const std::uint8_t> rgba
         ) -> TextureHandle override {
+            if (width <= 0 || height <= 0
+                || rgba.size()
+                    != static_cast<std::size_t>(width) * static_cast<std::size_t>(height) * 4U)
+            {
+                return {};
+            }
+            Image image {
+                .data = const_cast<std::uint8_t*>(rgba.data()),
+                .width = width,
+                .height = height,
+                .mipmaps = 1,
+                .format = PIXELFORMAT_UNCOMPRESSED_R8G8B8A8,
+            };
+            return retain_texture(LoadTextureFromImage(image));
+        }
+
+        [[nodiscard]] auto
+        load_texture_from_file(std::string_view path, const ImageLoadOptions& options)
+            -> TextureHandle override {
             const std::string path_str(path);
             Image image = LoadImage(path_str.c_str());
             return upload_image(image, options);
@@ -645,9 +650,12 @@ void main() {
             }
             const auto texture = LoadTextureFromImage(image);
             UnloadImage(image);
-            if (texture.id == 0) {
+            return retain_texture(texture);
+        }
+
+        [[nodiscard]] auto retain_texture(const ::Texture2D texture) -> TextureHandle {
+            if (texture.id == 0)
                 return {};
-            }
             // RGBA 图片用双线性过滤（与 glyph atlas 的点采样区分），缩放更平滑。
             SetTextureFilter(texture, TEXTURE_FILTER_BILINEAR);
             const TextureHandle handle {.value = next_texture_handle_++};

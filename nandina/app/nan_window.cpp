@@ -8,15 +8,15 @@
 #include "nan_application.hpp"
 
 #if defined(__linux__)
-#include "detail/linux_clipboard.hpp"
+    #include "detail/linux_clipboard.hpp"
 #endif
 
 #include "../foundation/nan_logger.hpp"
 #include "../foundation/utf8.hpp"
 #include "../render/backends/raylib_device.hpp"
 #include "../render/draw_context.hpp"
-#include "../scene/control.hpp"
 #include "../scene/clipboard.hpp"
+#include "../scene/control.hpp"
 #include "../scene/input_event.hpp"
 
 #include <raylib.h>
@@ -77,8 +77,9 @@ namespace nandina::app
                     return false;
                 }
 #if defined(__linux__)
-                if (detail::is_wayland_session(std::getenv("WAYLAND_DISPLAY")) &&
-                    detail::write_wayland_clipboard(text)) {
+                if (detail::is_wayland_session(std::getenv("WAYLAND_DISPLAY"))
+                    && detail::write_wayland_clipboard(text))
+                {
                     return true;
                 }
 #endif
@@ -165,7 +166,20 @@ namespace nandina::app
         tree_.set_clipboard(desktop_clipboard);
 
         device_ = render::make_raylib_device();
-        texture_cache_ = std::make_unique<render::TextureCache>(*device_);
+        texture_cache_ = std::make_unique<render::TextureCache>(
+            *device_,
+            render::TextureCacheLimits {},
+            render::TextureCacheAsyncServices {
+                .decoder = render::make_raylib_image_decoder(),
+                .submit_background =
+                    [this](std::move_only_function<void()> task) {
+                        return app_.background_executor().submit(std::move(task));
+                    },
+                .post_ui = [this](
+                               std::move_only_function<void()> task
+                           ) { return app_.dispatcher().post(std::move(task)); },
+            }
+        );
         tree_.set_texture_cache(*texture_cache_);
         font_pipeline_cache_ = std::make_unique<text::FontPipelineCache>(
             *device_,
@@ -190,12 +204,8 @@ namespace nandina::app
         default_text_pipeline_ = default_font_pipeline_->pipeline();
         opened_ = true;
 
-        log::get("app.window").info(
-            "NanWindow: opened {}x{} \"{}\"",
-            config_.width,
-            config_.height,
-            config_.title
-        );
+        log::get("app.window")
+            .info("NanWindow: opened {}x{} \"{}\"", config_.width, config_.height, config_.title);
         on_setup();
     }
 
@@ -207,8 +217,8 @@ namespace nandina::app
         const auto mx = static_cast<float>(GetMouseX());
         const auto my = static_cast<float>(GetMouseY());
         const foundation::NanPoint screen_pos {mx, my};
-        const auto pos = viewport_mapping_ ? viewport_mapping_->screen_to_logical(screen_pos)
-                                           : screen_pos;
+        const auto pos =
+            viewport_mapping_ ? viewport_mapping_->screen_to_logical(screen_pos) : screen_pos;
 
         // Mouse move (only when actually moved).
         if (!has_mouse_) {
@@ -224,7 +234,10 @@ namespace nandina::app
                 : foundation::NanPoint {last_mouse_x_, last_mouse_y_};
             scene::MouseMoveEvent ev {
                 pos,
-                foundation::NanPoint {pos.get_x() - previous.get_x(), pos.get_y() - previous.get_y()}
+                foundation::NanPoint {
+                    pos.get_x() - previous.get_x(),
+                    pos.get_y() - previous.get_y()
+                }
             };
             tree_.dispatch_mouse_move(ev);
             last_mouse_x_ = mx;
@@ -334,15 +347,15 @@ namespace nandina::app
             tree_.advance_animations(dt);
         }
 
-        const auto logical_size = viewport_mapping_ ? viewport_mapping_->logical_size
-                                                    : metrics.screen_size;
+        const auto logical_size =
+            viewport_mapping_ ? viewport_mapping_->logical_size : metrics.screen_size;
         (void)tree_.layout_root(logical_size);
 
         {
             auto phase = tree_.enter_phase(scene::FramePhase::semantics);
             tree_.set_semantics_transform(
                 viewport_mapping_ ? viewport_mapping_->transform()
-                                   : foundation::NanTransform2D::identity()
+                                  : foundation::NanTransform2D::identity()
             );
             (void)tree_.update_semantics();
         }
@@ -353,8 +366,7 @@ namespace nandina::app
         {
             render::DrawContext ctx {
                 *device_,
-                viewport_mapping_ ? viewport_mapping_->transform()
-                                   : foundation::NanTransform2D {},
+                viewport_mapping_ ? viewport_mapping_->transform() : foundation::NanTransform2D {},
                 {
                     .logical_to_screen = viewport_mapping_ ? viewport_mapping_->scale : 1.0F,
                     .screen_to_physical = metrics.screen_to_physical,

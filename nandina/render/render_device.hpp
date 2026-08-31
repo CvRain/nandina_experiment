@@ -36,9 +36,9 @@ namespace nandina::render
 
     /// 图片加载时的可选预处理（在 raylib Image 上执行，像素坐标）。
     struct ImageLoadOptions {
-        std::optional<NanRect> crop = std::nullopt;  // 先裁剪
+        std::optional<NanRect> crop = std::nullopt; // 先裁剪
         std::optional<NanSize> resize = std::nullopt; // 再缩放到目标尺寸
-        std::optional<NanColor> tint = std::nullopt;  // 最后着色（ImageColorTint）
+        std::optional<NanColor> tint = std::nullopt; // 最后着色（ImageColorTint）
     };
 
     /// Abstract drawing device. Coordinates are world-space (screen pixels, y down).
@@ -142,6 +142,16 @@ namespace nandina::render
 
         virtual void destroy_texture(TextureHandle /*texture*/) {}
 
+        /// Upload tightly packed RGBA8 pixels. This is a render-thread operation;
+        /// callers may decode pixels in the background but must upload on the UI thread.
+        [[nodiscard]] virtual auto create_rgba_texture(
+            int /*width*/,
+            int /*height*/,
+            std::span<const std::uint8_t> /*rgba*/
+        ) -> TextureHandle {
+            return {};
+        }
+
         virtual void draw_texture_region(
             TextureHandle /*texture*/,
             const NanRect& /*source*/,
@@ -151,10 +161,9 @@ namespace nandina::render
 
         /// 从文件路径加载 RGBA 图片纹理（可带 crop/resize/tint 预处理）；失败返回空 handle。
         /// 默认 no-op（录制/无窗口设备覆写）。
-        [[nodiscard]] virtual auto load_texture_from_file(
-            std::string_view path,
-            const ImageLoadOptions& options = {}
-        ) -> TextureHandle {
+        [[nodiscard]] virtual auto
+        load_texture_from_file(std::string_view path, const ImageLoadOptions& options = {})
+            -> TextureHandle {
             (void)path;
             (void)options;
             return {};

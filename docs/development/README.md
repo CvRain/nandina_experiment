@@ -28,6 +28,9 @@ framebuffer coordinate contract, X11/XWayland limitations, teardown order, and S
 [`RESOURCE_RESIDENCY.md`](RESOURCE_RESIDENCY.md) records the C5.3 separation between Router page
 instances and window-owned font/image residency, including LRU budgets and teardown invariants.
 
+[`ASYNC_IMAGE_LOADING.md`](ASYNC_IMAGE_LOADING.md) records the C5.4 background decode/UI upload
+boundary, placeholder state machine, pending-request merging, and the remaining I/O/lazy-load work.
+
 The 1.x desktop backend uses raylib for rendering, windowing, and input; raylib currently supplies its native desktop window through GLFW. SDL is intentionally not built or linked because no Nandina source consumes it and carrying a second platform stack increases clean-build cost. A Vulkan renderer plus SDL window backend may be evaluated after 2.0 if explicit graphics APIs, multi-window behavior, or platform requirements justify it. Any future backend must remain behind the existing window and render-device boundaries rather than becoming a dormant 1.x dependency.
 
 ## Current Development Approach
@@ -43,7 +46,9 @@ re-derive them. The detailed contracts live in the sections that follow; this is
   `res://<ResourceKey>` and loads immutable package bytes through `ResourceManager`; ordinary paths
   still use `IRenderDevice::load_texture_from_file`. Matching images share a window-scoped bounded
   RAII texture cache, so rebuilt pages do not duplicate uploads and eviction releases the backend
-  texture. The Settings logo is the first real nanres example consumer. Custom imported fonts remain
+  texture. Packaged images decode/resize on background workers, optionally paint a fixed placeholder,
+  then upload on the UI thread; matching pending requests merge. The Settings logo is the first real
+  nanres example consumer. Custom imported fonts remain
   file-path based until their package migration unit. The Settings Gallery page exercises four
   packaged PNG/JPEG resources with bounded, aspect-preserving preview uploads.
 - **Third-party libraries are vendored as git submodules, never re-implemented.** JSON uses

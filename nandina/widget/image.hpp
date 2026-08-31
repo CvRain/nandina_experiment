@@ -14,6 +14,7 @@
 #include "../render/render_device.hpp"
 #include "../scene/control.hpp"
 
+#include <cstdint>
 #include <memory>
 #include <optional>
 #include <string>
@@ -28,22 +29,25 @@ namespace nandina::render
 {
     class CachedTexture;
     class TextureCache;
-}
+} // namespace nandina::render
 
 namespace nandina::widget
 {
+    enum class ImageLoadMode { automatic, synchronous, asynchronous };
+    enum class ImageLoadState { idle, loading, ready, failed };
+
     /// 图片如何适配其布局尺寸。
     enum class ImageScale {
         stretch, // 拉伸填满（可能变形）
         contain, // 等比缩放完整放入（留白）
-        cover,   // 等比缩放铺满（裁剪溢出）
+        cover, // 等比缩放铺满（裁剪溢出）
     };
 
     /// contain 空余区域的放置位置（对 stretch/cover 无影响）。
     enum class ImageAlignment {
         center,
         start, // 左上
-        end,   // 右下
+        end, // 右下
     };
 
     class Image: public scene::NanControl {
@@ -83,6 +87,14 @@ namespace nandina::widget
         void set_load_options(render::ImageLoadOptions options);
         [[nodiscard]] auto load_options() const -> const render::ImageLoadOptions&;
 
+        void set_load_mode(ImageLoadMode mode);
+        [[nodiscard]] auto load_mode() const noexcept -> ImageLoadMode;
+        [[nodiscard]] auto load_state() const noexcept -> ImageLoadState;
+
+        void set_placeholder_color(foundation::NanColor color);
+        void clear_placeholder_color();
+        [[nodiscard]] auto placeholder_color() const -> const std::optional<foundation::NanColor>&;
+
         auto on_draw(render::DrawContext& ctx) -> void override;
         void apply_texture_cache(render::TextureCache& cache) override;
 
@@ -97,6 +109,12 @@ namespace nandina::widget
         };
 
         void ensure_loaded(render::IRenderDevice& device);
+        void reset_load();
+        void complete_async(
+            std::uint64_t generation,
+            std::string source,
+            std::shared_ptr<render::CachedTexture> texture
+        );
         [[nodiscard]] auto compute_rects(const foundation::NanRect& world) const -> DrawRects;
 
         std::string source_;
@@ -107,9 +125,12 @@ namespace nandina::widget
         foundation::NanColor tint_ = foundation::NanColor::from_hex(0xFFFFFF);
         render::ImageLoadOptions load_options_ {};
         std::optional<foundation::NanRect> source_rect_;
+        std::optional<foundation::NanColor> placeholder_color_;
         ImageScale scale_mode_ = ImageScale::stretch;
         ImageAlignment alignment_ = ImageAlignment::center;
-        bool loaded_ = false;
+        ImageLoadMode load_mode_ = ImageLoadMode::automatic;
+        ImageLoadState load_state_ = ImageLoadState::idle;
+        std::uint64_t load_generation_ = 0;
     };
 } // namespace nandina::widget
 

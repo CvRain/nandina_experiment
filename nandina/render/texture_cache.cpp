@@ -16,18 +16,16 @@ namespace nandina::render
             {
                 return 0;
             }
-            const long double bytes = static_cast<long double>(width)
-                * static_cast<long double>(height) * 4.0L;
+            const long double bytes =
+                static_cast<long double>(width) * static_cast<long double>(height) * 4.0L;
             if (bytes >= static_cast<long double>(std::numeric_limits<std::size_t>::max())) {
                 return std::numeric_limits<std::size_t>::max();
             }
             return static_cast<std::size_t>(bytes);
         }
 
-        [[nodiscard]] auto same_options(
-            const ImageLoadOptions& lhs,
-            const ImageLoadOptions& rhs
-        ) -> bool {
+        [[nodiscard]] auto same_options(const ImageLoadOptions& lhs, const ImageLoadOptions& rhs)
+            -> bool {
             return lhs.crop == rhs.crop && lhs.resize == rhs.resize && lhs.tint == rhs.tint;
         }
     } // namespace
@@ -60,17 +58,23 @@ namespace nandina::render
         return estimated_bytes_;
     }
 
-    TextureCache::TextureCache(IRenderDevice& device, const TextureCacheLimits limits):
-        device_(&device), limits_(limits) {}
+    TextureCache::TextureCache(
+        IRenderDevice& device,
+        const TextureCacheLimits limits,
+        TextureCacheAsyncServices async
+    ):
+        device_(&device),
+        limits_(limits),
+        async_(std::move(async)) {}
 
     TextureCache::~TextureCache() {
+        alive_->store(false, std::memory_order_release);
+        pending_.clear();
         clear();
     }
 
-    auto TextureCache::load_file(
-        const std::string_view path,
-        const ImageLoadOptions& options
-    ) -> std::shared_ptr<CachedTexture> {
+    auto TextureCache::load_file(const std::string_view path, const ImageLoadOptions& options)
+        -> std::shared_ptr<CachedTexture> {
         if (path.empty()) {
             return {};
         }
@@ -88,9 +92,8 @@ namespace nandina::render
         if (!handle) {
             return {};
         }
-        auto texture = std::make_shared<CachedTexture>(
-            *device_, handle, device_->texture_size(handle)
-        );
+        auto texture =
+            std::make_shared<CachedTexture>(*device_, handle, device_->texture_size(handle));
         index(key, texture);
         retain(key, texture);
         return texture;
@@ -119,15 +122,99 @@ namespace nandina::render
         if (!handle) {
             return {};
         }
-        auto texture = std::make_shared<CachedTexture>(
-            *device_, handle, device_->texture_size(handle)
-        );
+        auto texture =
+            std::make_shared<CachedTexture>(*device_, handle, device_->texture_size(handle));
         index(key, texture);
         retain(key, texture);
         return texture;
     }
 
+    auto TextureCache::load_memory_async(
+        const std::string_view cache_key,
+        std::shared_ptr<const void> bytes_owner,
+        const std::span<const std::uint8_t> bytes,
+        const std::string_view media_type,
+        const ImageLoadOptions& options,
+        AsyncCompletion completion
+    ) -> bool {
+        if (!supports_async_loading() || cache_key.empty() || !bytes_owner || bytes.empty()
+            || media_type.empty() || !completion)
+        {
+            return false;
+        }
+        Key key {
+            .kind = SourceKind::memory,
+            .source = std::string(cache_key),
+            .media_type = std::string(media_type),
+            .options = options,
+        };
+        if (auto cached = find(key)) {
+            retain(key, cached);
+            completion(std::move(cached));
+            return true;
+        }
+        const auto pending = std::ranges::find_if(pending_, [&key](const PendingEntry& entry) {
+            return same_key(entry.key, key);
+        });
+        if (pending != pending_.end()) {
+            pending->completions.push_back(std::move(completion));
+            return true;
+        }
+        pending_.push_back(
+            PendingEntry {
+                .key = key,
+                .completions = {},
+            }
+        );
+        pending_.back().completions.push_back(std::move(completion));
+
+        auto decoder = async_.decoder;
+        auto post_ui = async_.post_ui;
+        const auto alive = std::weak_ptr<std::atomic_bool>(alive_);
+        const auto generation = generation_;
+        auto* cache = this;
+        const bool submitted = async_.submit_background([decoder = std::move(decoder),
+                                                         post_ui = std::move(post_ui),
+                                                         alive,
+                                                         cache,
+                                                         key,
+                                                         generation,
+                                                         bytes_owner = std::move(bytes_owner),
+                                                         bytes,
+                                                         media_type = std::string(media_type),
+                                                         options]() mutable {
+            (void)bytes_owner;
+            auto decoded = decoder->decode_memory(bytes, media_type, options);
+            const auto guard = alive.lock();
+            if (!guard || !guard->load(std::memory_order_acquire))
+                return;
+            (void)post_ui([alive,
+                           cache,
+                           key = std::move(key),
+                           decoded = std::move(decoded),
+                           generation]() mutable {
+                const auto current = alive.lock();
+                if (!current || !current->load(std::memory_order_acquire))
+                    return;
+                cache->finish_async(std::move(key), std::move(decoded), generation);
+            });
+        });
+        if (submitted)
+            return true;
+
+        std::erase_if(pending_, [&key](const PendingEntry& entry) {
+            return same_key(entry.key, key);
+        });
+        return false;
+    }
+
+    auto TextureCache::supports_async_loading() const noexcept -> bool {
+        return static_cast<bool>(async_);
+    }
+
     void TextureCache::clear() {
+        ++generation_;
+        pending_.clear();
         index_.clear();
         retained_.clear();
         retained_bytes_ = 0;
@@ -181,8 +268,37 @@ namespace nandina::render
         std::erase_if(index_, [](const IndexedEntry& entry) { return entry.texture.expired(); });
     }
 
+    void TextureCache::finish_async(Key key, DecodedImage decoded, const std::uint64_t generation) {
+        if (generation != generation_)
+            return;
+        const auto pending = std::ranges::find_if(pending_, [&key](const PendingEntry& entry) {
+            return same_key(entry.key, key);
+        });
+        if (pending == pending_.end())
+            return;
+        auto completions = std::move(pending->completions);
+        pending_.erase(pending);
+
+        std::shared_ptr<CachedTexture> texture;
+        if (decoded.valid()) {
+            const auto handle =
+                device_->create_rgba_texture(decoded.width, decoded.height, decoded.rgba);
+            if (handle) {
+                texture = std::make_shared<CachedTexture>(
+                    *device_,
+                    handle,
+                    NanSize(static_cast<float>(decoded.width), static_cast<float>(decoded.height))
+                );
+                index(key, texture);
+                retain(key, texture);
+            }
+        }
+        for (auto& completion: completions)
+            completion(texture);
+    }
+
     auto TextureCache::same_key(const Key& lhs, const Key& rhs) -> bool {
-        return lhs.kind == rhs.kind && lhs.source == rhs.source
-            && lhs.media_type == rhs.media_type && same_options(lhs.options, rhs.options);
+        return lhs.kind == rhs.kind && lhs.source == rhs.source && lhs.media_type == rhs.media_type
+            && same_options(lhs.options, rhs.options);
     }
 } // namespace nandina::render

@@ -5,9 +5,13 @@
 #ifndef NANDINA_EXPERIMENT_RENDER_TEXTURE_CACHE_HPP
 #define NANDINA_EXPERIMENT_RENDER_TEXTURE_CACHE_HPP
 
+#include "image_decoder.hpp"
 #include "render_device.hpp"
 
+#include <atomic>
 #include <cstddef>
+#include <cstdint>
+#include <functional>
 #include <list>
 #include <memory>
 #include <span>
@@ -42,18 +46,30 @@ namespace nandina::render
         std::size_t max_retained_bytes = 128U * 1024U * 1024U;
     };
 
+    struct TextureCacheAsyncServices {
+        std::shared_ptr<IImageDecoder> decoder;
+        std::function<bool(std::move_only_function<void()>)> submit_background;
+        std::function<bool(std::move_only_function<void()>)> post_ui;
+
+        [[nodiscard]] explicit operator bool() const noexcept {
+            return decoder != nullptr && submit_background && post_ui;
+        }
+    };
+
     class TextureCache final {
     public:
-        explicit TextureCache(IRenderDevice& device, TextureCacheLimits limits = {});
+        explicit TextureCache(
+            IRenderDevice& device,
+            TextureCacheLimits limits = {},
+            TextureCacheAsyncServices async = {}
+        );
         ~TextureCache();
 
         TextureCache(const TextureCache&) = delete;
         auto operator=(const TextureCache&) -> TextureCache& = delete;
 
-        [[nodiscard]] auto load_file(
-            std::string_view path,
-            const ImageLoadOptions& options = {}
-        ) -> std::shared_ptr<CachedTexture>;
+        [[nodiscard]] auto load_file(std::string_view path, const ImageLoadOptions& options = {})
+            -> std::shared_ptr<CachedTexture>;
 
         [[nodiscard]] auto load_memory(
             std::string_view cache_key,
@@ -61,6 +77,21 @@ namespace nandina::render
             std::string_view media_type,
             const ImageLoadOptions& options = {}
         ) -> std::shared_ptr<CachedTexture>;
+
+        using AsyncCompletion = std::move_only_function<void(std::shared_ptr<CachedTexture>)>;
+
+        /// Decode packaged bytes on a worker, then upload/cache on the UI thread.
+        /// `bytes_owner` must own the storage referenced by `bytes` until completion.
+        [[nodiscard]] auto load_memory_async(
+            std::string_view cache_key,
+            std::shared_ptr<const void> bytes_owner,
+            std::span<const std::uint8_t> bytes,
+            std::string_view media_type,
+            const ImageLoadOptions& options,
+            AsyncCompletion completion
+        ) -> bool;
+
+        [[nodiscard]] auto supports_async_loading() const noexcept -> bool;
 
         void clear();
         [[nodiscard]] auto retained_entries() const noexcept -> std::size_t;
@@ -86,18 +117,28 @@ namespace nandina::render
             std::shared_ptr<CachedTexture> texture;
         };
 
+        struct PendingEntry {
+            Key key;
+            std::vector<AsyncCompletion> completions;
+        };
+
         [[nodiscard]] auto find(const Key& key) -> std::shared_ptr<CachedTexture>;
         void index(Key key, const std::shared_ptr<CachedTexture>& texture);
         void retain(const Key& key, std::shared_ptr<CachedTexture> texture);
         void trim();
         void prune_expired();
+        void finish_async(Key key, DecodedImage decoded, std::uint64_t generation);
         [[nodiscard]] static auto same_key(const Key& lhs, const Key& rhs) -> bool;
 
         IRenderDevice* device_;
         TextureCacheLimits limits_;
+        TextureCacheAsyncServices async_;
         std::vector<IndexedEntry> index_;
         std::list<RetainedEntry> retained_;
+        std::vector<PendingEntry> pending_;
         std::size_t retained_bytes_ = 0;
+        std::uint64_t generation_ = 0;
+        std::shared_ptr<std::atomic_bool> alive_ = std::make_shared<std::atomic_bool>(true);
     };
 } // namespace nandina::render
 
