@@ -1,5 +1,7 @@
 #include "texture_cache.hpp"
 
+#include "../resource/resource_manager.hpp"
+
 #include <algorithm>
 #include <cmath>
 #include <limits>
@@ -153,68 +155,171 @@ namespace nandina::render
             completion(std::move(cached));
             return true;
         }
-        const auto pending = std::ranges::find_if(pending_, [&key](const PendingEntry& entry) {
-            return same_key(entry.key, key);
-        });
-        if (pending != pending_.end()) {
+        if (auto* pending = find_pending(key)) {
             pending->completions.push_back(std::move(completion));
             return true;
         }
-        pending_.push_back(
-            PendingEntry {
-                .key = key,
-                .completions = {},
-            }
-        );
-        pending_.back().completions.push_back(std::move(completion));
-
         auto decoder = async_.decoder;
-        auto post_ui = async_.post_ui;
-        const auto alive = std::weak_ptr<std::atomic_bool>(alive_);
-        const auto generation = generation_;
-        auto* cache = this;
-        const bool submitted = async_.submit_background([decoder = std::move(decoder),
-                                                         post_ui = std::move(post_ui),
-                                                         alive,
-                                                         cache,
-                                                         key,
-                                                         generation,
-                                                         bytes_owner = std::move(bytes_owner),
-                                                         bytes,
-                                                         media_type = std::string(media_type),
-                                                         options]() mutable {
-            (void)bytes_owner;
-            auto decoded = decoder->decode_memory(bytes, media_type, options);
-            const auto guard = alive.lock();
-            if (!guard || !guard->load(std::memory_order_acquire))
-                return;
-            (void)post_ui([alive,
-                           cache,
-                           key = std::move(key),
-                           decoded = std::move(decoded),
-                           generation]() mutable {
-                const auto current = alive.lock();
-                if (!current || !current->load(std::memory_order_acquire))
-                    return;
-                cache->finish_async(std::move(key), std::move(decoded), generation);
-            });
-        });
-        if (submitted)
-            return true;
-
-        std::erase_if(pending_, [&key](const PendingEntry& entry) {
-            return same_key(entry.key, key);
-        });
-        return false;
+        const auto attempts = async_.max_load_attempts;
+        PendingEntry entry {
+            .key = key,
+            .completions = {},
+            .load = [decoder = std::move(decoder),
+                     bytes_owner = std::move(bytes_owner),
+                     bytes,
+                     media_type = std::string(media_type),
+                     options,
+                     attempts]() mutable -> DecodedImage {
+                (void)bytes_owner;
+                for (std::size_t attempt = 0; attempt < attempts; ++attempt) {
+                    auto decoded = decoder->decode_memory(bytes, media_type, options);
+                    if (decoded.valid()) { return decoded; }
+                }
+                return DecodedImage {};
+            },
+            .encoded_bytes = bytes.size(),
+            .submitted = false,
+        };
+        entry.completions.push_back(std::move(completion));
+        pending_.push_back(std::move(entry));
+        drain_pending();
+        return true;
     }
 
     auto TextureCache::supports_async_loading() const noexcept -> bool {
         return static_cast<bool>(async_);
     }
 
+    auto TextureCache::load_resource_async(
+        resource::ResourceManager& resources,
+        resource::ResourceKey key,
+        const ImageLoadOptions& options,
+        AsyncCompletion completion
+    ) -> bool {
+        if (!supports_async_loading() || !completion) {
+            return false;
+        }
+        const Key cache_key {
+            .kind = SourceKind::memory,
+            .source = std::string(key.value()),
+            .media_type = {},
+            .options = options,
+        };
+        if (auto cached = find(cache_key)) {
+            retain(cache_key, cached);
+            completion(std::move(cached));
+            return true;
+        }
+        if (auto* pending = find_pending(cache_key)) {
+            pending->completions.push_back(std::move(completion));
+            return true;
+        }
+        auto decoder = async_.decoder;
+        const auto attempts = async_.max_load_attempts;
+        PendingEntry entry {
+            .key = cache_key,
+            .completions = {},
+            .load = [decoder = std::move(decoder), &resources, key, options, attempts]() mutable
+                -> DecodedImage {
+                for (std::size_t attempt = 0; attempt < attempts; ++attempt) {
+                    auto loaded = resources.require(key);
+                    if (loaded && *loaded) {
+                        auto decoded = decoder->decode_memory(
+                            (*loaded)->bytes(),
+                            (*loaded)->media_type(),
+                            options
+                        );
+                        if (decoded.valid()) { return decoded; }
+                    }
+                }
+                return DecodedImage {};
+            },
+            .encoded_bytes = 0,
+            .submitted = false,
+        };
+        entry.completions.push_back(std::move(completion));
+        pending_.push_back(std::move(entry));
+        drain_pending();
+        return true;
+    }
+
+    auto TextureCache::find_pending(const Key& key) -> PendingEntry* {
+        const auto found = std::ranges::find_if(
+            pending_,
+            [&key](const PendingEntry& entry) { return same_key(entry.key, key); }
+        );
+        return found != pending_.end() ? &*found : nullptr;
+    }
+
+    auto TextureCache::submit_pending(PendingEntry& entry) -> bool {
+        if (entry.submitted) {
+            return true;
+        }
+        if (inflight_decodes_ >= async_.max_concurrent_decodes) {
+            return false;
+        }
+        if (entry.encoded_bytes <= async_.max_inflight_encoded_bytes
+            && inflight_encoded_bytes_ + entry.encoded_bytes > async_.max_inflight_encoded_bytes)
+        {
+            return false;
+        }
+        entry.submitted = true;
+        ++inflight_decodes_;
+        inflight_encoded_bytes_ += entry.encoded_bytes;
+
+        auto load = std::move(entry.load);
+        auto post_ui = async_.post_ui;
+        const auto alive = std::weak_ptr<std::atomic_bool>(alive_);
+        const auto generation = generation_;
+        auto* cache = this;
+        auto key = entry.key;
+        const bool submitted = async_.submit_background(
+            [load = std::move(load),
+             post_ui = std::move(post_ui),
+             alive,
+             cache,
+             generation,
+             key = std::move(key)]() mutable {
+                const auto guard = alive.lock();
+                if (!guard || !guard->load(std::memory_order_acquire)) {
+                    return;
+                }
+                auto decoded = load();
+                if (!guard->load(std::memory_order_acquire)) {
+                    return;
+                }
+                (void)post_ui([alive,
+                               cache,
+                               key = std::move(key),
+                               decoded = std::move(decoded),
+                               generation]() mutable {
+                    const auto current = alive.lock();
+                    if (!current || !current->load(std::memory_order_acquire)) {
+                        return;
+                    }
+                    cache->finish_async(std::move(key), std::move(decoded), generation);
+                });
+            }
+        );
+        if (!submitted) {
+            entry.submitted = false;
+            --inflight_decodes_;
+            inflight_encoded_bytes_ -= entry.encoded_bytes;
+        }
+        return submitted;
+    }
+
+    void TextureCache::drain_pending() {
+        for (auto& entry: pending_) {
+            (void)submit_pending(entry);
+        }
+    }
+
     void TextureCache::clear() {
         ++generation_;
         pending_.clear();
+        inflight_decodes_ = 0;
+        inflight_encoded_bytes_ = 0;
         index_.clear();
         retained_.clear();
         retained_bytes_ = 0;
@@ -276,6 +381,10 @@ namespace nandina::render
         });
         if (pending == pending_.end())
             return;
+        if (pending->submitted) {
+            --inflight_decodes_;
+            inflight_encoded_bytes_ -= pending->encoded_bytes;
+        }
         auto completions = std::move(pending->completions);
         pending_.erase(pending);
 
@@ -295,6 +404,8 @@ namespace nandina::render
         }
         for (auto& completion: completions)
             completion(texture);
+
+        drain_pending();
     }
 
     auto TextureCache::same_key(const Key& lhs, const Key& rhs) -> bool {

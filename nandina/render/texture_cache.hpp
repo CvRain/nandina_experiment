@@ -8,6 +8,8 @@
 #include "image_decoder.hpp"
 #include "render_device.hpp"
 
+#include "../resource/resource.hpp"
+
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
@@ -18,6 +20,11 @@
 #include <string>
 #include <string_view>
 #include <vector>
+
+namespace nandina::resource
+{
+    class ResourceManager;
+}
 
 namespace nandina::render
 {
@@ -50,6 +57,10 @@ namespace nandina::render
         std::shared_ptr<IImageDecoder> decoder;
         std::function<bool(std::move_only_function<void()>)> submit_background;
         std::function<bool(std::move_only_function<void()>)> post_ui;
+        /// C5.5b 预算与重试：并发解码数上限、在途 encoded 字节预算、失败重试次数。
+        std::size_t max_concurrent_decodes = 2;
+        std::size_t max_inflight_encoded_bytes = 64U * 1024U * 1024U;
+        std::size_t max_load_attempts = 2;
 
         [[nodiscard]] explicit operator bool() const noexcept {
             return decoder != nullptr && submit_background && post_ui;
@@ -91,6 +102,15 @@ namespace nandina::render
             AsyncCompletion completion
         ) -> bool;
 
+        /// 后台完成 res:// 资源读取 + CPU 解码，UI 线程只上传纹理（C5.5）。缓存键由
+        /// 资源 key 文本与预处理选项组成；失败时以空纹理完成回调。
+        [[nodiscard]] auto load_resource_async(
+            resource::ResourceManager& resources,
+            resource::ResourceKey key,
+            const ImageLoadOptions& options,
+            AsyncCompletion completion
+        ) -> bool;
+
         [[nodiscard]] auto supports_async_loading() const noexcept -> bool;
 
         void clear();
@@ -120,6 +140,10 @@ namespace nandina::render
         struct PendingEntry {
             Key key;
             std::vector<AsyncCompletion> completions;
+            /// 后台读取 + 解码 + 重试，产出 RGBA（后台线程执行）。
+            std::move_only_function<DecodedImage()> load;
+            std::size_t encoded_bytes = 0;
+            bool submitted = false;
         };
 
         [[nodiscard]] auto find(const Key& key) -> std::shared_ptr<CachedTexture>;
@@ -127,6 +151,9 @@ namespace nandina::render
         void retain(const Key& key, std::shared_ptr<CachedTexture> texture);
         void trim();
         void prune_expired();
+        [[nodiscard]] auto find_pending(const Key& key) -> PendingEntry*;
+        [[nodiscard]] auto submit_pending(PendingEntry& entry) -> bool;
+        void drain_pending();
         void finish_async(Key key, DecodedImage decoded, std::uint64_t generation);
         [[nodiscard]] static auto same_key(const Key& lhs, const Key& rhs) -> bool;
 
@@ -137,6 +164,8 @@ namespace nandina::render
         std::list<RetainedEntry> retained_;
         std::vector<PendingEntry> pending_;
         std::size_t retained_bytes_ = 0;
+        std::size_t inflight_decodes_ = 0;
+        std::size_t inflight_encoded_bytes_ = 0;
         std::uint64_t generation_ = 0;
         std::shared_ptr<std::atomic_bool> alive_ = std::make_shared<std::atomic_bool>(true);
     };

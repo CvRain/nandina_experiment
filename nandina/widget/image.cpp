@@ -194,6 +194,30 @@ namespace nandina::widget
                 load_state_ = ImageLoadState::failed;
                 return;
             }
+            const bool wants_async = texture_cache_ != nullptr
+                && load_mode_ != ImageLoadMode::synchronous
+                && texture_cache_->supports_async_loading();
+            if (wants_async) {
+                // C5.5：整条 res:// 读取 + 解码在后台，UI 线程只上传；这里不再 require。
+                const auto generation = load_generation_;
+                const auto source = source_;
+                const auto weak =
+                    std::weak_ptr<Image>(std::static_pointer_cast<Image>(shared_from_this()));
+                if (texture_cache_->load_resource_async(
+                        *resources_,
+                        *key,
+                        load_options_,
+                        [weak, generation, source](std::shared_ptr<render::CachedTexture> texture) {
+                            if (const auto image = weak.lock()) {
+                                image->complete_async(generation, source, std::move(texture));
+                            }
+                        }
+                    ))
+                {
+                    return;
+                }
+                // 后台提交失败：回退同步路径。
+            }
             const auto loaded = resources_->require(*key);
             if (!loaded) {
                 log::get("widget.image")
@@ -219,30 +243,6 @@ namespace nandina::widget
                     );
                 load_state_ = ImageLoadState::failed;
                 return;
-            }
-            const bool wants_async = texture_cache_ != nullptr
-                && load_mode_ != ImageLoadMode::synchronous
-                && texture_cache_->supports_async_loading();
-            if (wants_async) {
-                const auto generation = load_generation_;
-                const auto source = source_;
-                const auto weak =
-                    std::weak_ptr<Image>(std::static_pointer_cast<Image>(shared_from_this()));
-                if (texture_cache_->load_memory_async(
-                        (*loaded)->id().to_string(),
-                        std::shared_ptr<const void>(*loaded),
-                        (*loaded)->bytes(),
-                        (*loaded)->media_type(),
-                        load_options_,
-                        [weak, generation, source](std::shared_ptr<render::CachedTexture> texture) {
-                            if (const auto image = weak.lock()) {
-                                image->complete_async(generation, source, std::move(texture));
-                            }
-                        }
-                    ))
-                {
-                    return;
-                }
             }
             if (texture_cache_ != nullptr) {
                 texture_ = texture_cache_->load_memory(

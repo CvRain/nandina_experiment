@@ -147,6 +147,33 @@ namespace
         }
     };
 
+    /// 前 N 次失败、之后成功的解码器，用于验证失败重试。
+    class FlakyDecoder final: public render::IImageDecoder {
+    public:
+        explicit FlakyDecoder(int failures_before_success): failures_(failures_before_success) {}
+
+        [[nodiscard]] auto decode_memory(
+            std::span<const std::uint8_t>,
+            std::string_view,
+            const render::ImageLoadOptions&
+        ) -> render::DecodedImage override {
+            ++calls;
+            if (calls <= failures_) {
+                return render::DecodedImage {};
+            }
+            return render::DecodedImage {
+                .width = 2,
+                .height = 1,
+                .rgba = std::vector<std::uint8_t>(8, 255),
+            };
+        }
+
+        int calls = 0;
+
+    private:
+        int failures_ = 0;
+    };
+
     class ManualTaskQueue {
     public:
         [[nodiscard]] auto submit(std::move_only_function<void()> task) -> bool {
@@ -163,6 +190,38 @@ namespace
         }
 
         std::deque<std::move_only_function<void()>> tasks;
+    };
+
+    /// 包装 MemoryBackend 并记录按 key 的 find 次数，用于证明资源读取发生在后台。
+    class RecordingBackend final: public resource::IResourceBackend {
+    public:
+        explicit RecordingBackend(std::string name):
+            inner_(std::make_shared<resource::MemoryBackend>(std::move(name))) {}
+
+        [[nodiscard]] auto name() const noexcept -> std::string_view override {
+            return inner_->name();
+        }
+        [[nodiscard]] auto find(const resource::ResourceKey& key) const -> resource::ResourceLookup
+            override {
+            ++key_finds;
+            return inner_->find(key);
+        }
+        [[nodiscard]] auto find(resource::ResourceId id) const -> resource::ResourceLookup override {
+            return inner_->find(id);
+        }
+        [[nodiscard]] auto insert(
+            resource::ResourceId id,
+            resource::ResourceKey key,
+            std::string media_type,
+            std::vector<std::uint8_t> bytes
+        ) {
+            return inner_->insert(id, std::move(key), std::move(media_type), std::move(bytes));
+        }
+
+        mutable int key_finds = 0;
+
+    private:
+        std::shared_ptr<resource::MemoryBackend> inner_;
     };
 } // namespace
 
@@ -537,6 +596,66 @@ TEST_CASE(
     REQUIRE(device.draw_regions == 1);
 }
 
+TEST_CASE("async resource load reads and decodes on the background worker", "[image][cache][async]") {
+    auto backend = std::make_shared<RecordingBackend>("images");
+    REQUIRE(
+        backend
+            ->insert(
+                resource_id("10213243-5465-4768-899a-abbccddeeff0"),
+                resource::ResourceKey("hero.png"),
+                "image/png",
+                std::vector<std::uint8_t> {1, 2, 3}
+            )
+            .has_value()
+    );
+    resource::ResourceManager resources;
+    (void)resources.mount(backend);
+
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+        }
+    );
+    scene::NanSceneTree tree;
+    tree.set_texture_cache(cache);
+    auto image = widget::Image::create("res://hero.png");
+    image->set_resource_manager(&resources);
+    image->set_size(foundation::NanSize(100.0F, 50.0F));
+    image->set_load_mode(widget::ImageLoadMode::asynchronous);
+    image->set_placeholder_color(foundation::NanColor::from_hex(0x808080));
+    tree.set_root(image);
+    (void)tree.layout_root(foundation::NanSize(100.0F, 50.0F));
+
+    tree.draw(device);
+    // C5.5：UI 线程只显示占位，既不读资源也不解码。
+    REQUIRE(image->load_state() == widget::ImageLoadState::loading);
+    REQUIRE(backend->key_finds == 0);
+    REQUIRE(decoder->calls == 0);
+    REQUIRE(device.rgba_uploads == 0);
+
+    background.drain();
+    // 后台任务内完成 res:// 读取 + 解码，仍未上传 GPU。
+    REQUIRE(backend->key_finds == 1);
+    REQUIRE(decoder->calls == 1);
+    REQUIRE(device.rgba_uploads == 0);
+    REQUIRE(ui.tasks.size() == 1);
+
+    ui.drain();
+    REQUIRE(image->load_state() == widget::ImageLoadState::ready);
+    REQUIRE(device.rgba_uploads == 1);
+}
+
 TEST_CASE("async texture cache merges matching pending decodes", "[image][cache][async]") {
     TextureRecordingDevice device;
     auto decoder = std::make_shared<RecordingDecoder>();
@@ -617,9 +736,100 @@ TEST_CASE("destroyed texture cache drops background decode completion", "[image]
     cache.reset();
     background.drain();
 
-    REQUIRE(decoder->calls == 1);
+    // C5.5b：合作取消在解码前检查缓存存活，已销毁的缓存跳过解码、不上传、不回 UI。
+    REQUIRE(decoder->calls == 0);
     REQUIRE(ui.tasks.empty());
     REQUIRE(device.rgba_uploads == 0);
+}
+
+TEST_CASE("async texture cache respects the concurrent decode budget", "[image][cache][async][budget]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+            .max_concurrent_decodes = 1,
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    REQUIRE(cache.load_memory_async(
+        "first",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [](auto) {}
+    ));
+    REQUIRE(cache.load_memory_async(
+        "second",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [](auto) {}
+    ));
+
+    // 预算 1：只提交第一个，第二个排队。
+    REQUIRE(background.tasks.size() == 1);
+    background.drain();
+    REQUIRE(decoder->calls == 1);
+    REQUIRE(ui.tasks.size() == 1);
+
+    ui.drain();
+    // 第一个完成后第二个才被提交。
+    REQUIRE(background.tasks.size() == 1);
+    background.drain();
+    ui.drain();
+    REQUIRE(decoder->calls == 2);
+    REQUIRE(device.rgba_uploads == 2);
+}
+
+TEST_CASE("async decode retries a bounded number of times on failure", "[image][cache][async][retry]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<FlakyDecoder>(/*failures_before_success=*/1);
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+            .max_load_attempts = 2,
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    std::shared_ptr<render::CachedTexture> result;
+    REQUIRE(cache.load_memory_async(
+        "retry",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [&result](auto texture) { result = std::move(texture); }
+    ));
+
+    background.drain();
+    ui.drain();
+
+    REQUIRE(decoder->calls == 2);
+    REQUIRE(result != nullptr);
+    REQUIRE(device.rgba_uploads == 1);
 }
 
 TEST_CASE("texture cache keys include image preprocessing options", "[image][cache]") {
