@@ -117,8 +117,11 @@ motion as one host-injected snapshot with light/full fallback; it deliberately i
 Linux desktop observer. C5.3 window-scoped bounded font/image residency prevents Router replacement
 from repeatedly rebuilding unchanged GPU resources while leaving page-instance semantics unchanged.
 C5.4 moves packaged-image CPU decode/preprocessing to background workers, keeps GPU upload on the UI
-thread, displays fixed placeholders, and merges matching pending requests. C5.5–C5.6 retain package
-I/O cancellation/budgets and viewport-aware loading. The second-device manual record remains open.
+thread, displays fixed placeholders, and merges matching pending requests. C5.5 moves the res://
+resource read (`ResourceManager::require`) onto the same background worker with cooperative
+cancellation (C5.5a), then adds concurrent-decode and in-flight-encoded-byte budgets with lazy
+queuing plus bounded failure retry (C5.5b). C5.6 (viewport-aware + frame budgets) remains. The
+second-device manual record remains open.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -408,9 +411,15 @@ history follows:
   metadata replacement, executable suffixes, and explicit development links. Linux tests exercise
   Chinese SDK/config/cache/build paths; native Windows/macOS validation remains D4 rather than a
   premature support claim. Official release-key provisioning remains a C6 ceremony. C2.1 is closed.
-- Test suite 43/43 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.5 package-I/O budgets and C5.6
-  viewport-aware loading before the remaining Linux platform gate. New templates, i18n, keyframes/ColorSpace
-  sugar, component motion
+- C5.5 async image I/O/budgets/retry: `TextureCache::load_resource_async` runs `ResourceManager::require`
+  + CPU decode on the background worker (cooperative cancellation via the cache alive guard);
+  `Image::ensure_loaded` stops reading resources on the UI thread. C5.5b adds `max_concurrent_decodes`
+  + `max_inflight_encoded_bytes` budgets with lazy queuing/drain, and `max_load_attempts` bounded
+  retry. Tests prove the UI draw shows a placeholder with no read/decode, the background drain
+  performs one read + one decode and the UI drain one upload, plus budget queuing (only the first
+  decode runs until the slot frees) and retry (a flaky decoder is retried then succeeds); 44/44 green.
+- Test suite 44/44 green.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.6 viewport-aware loading before
+  the remaining Linux platform gate. New templates, i18n, keyframes/ColorSpace sugar, component motion
   slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.
