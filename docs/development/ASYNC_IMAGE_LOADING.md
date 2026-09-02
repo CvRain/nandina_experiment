@@ -51,11 +51,11 @@ C5.4 自动化必须证明：首帧只提交后台任务并绘制占位块、后
    在后台 `require` + 解码）移出 UI 线程，并配合作取消（任务开始/读取后/解码后检查 alive 守卫）。
    `C5.5b` 增加 `max_concurrent_decodes` 并发解码预算与 `max_inflight_encoded_bytes` 在途 encoded
    字节预算（超预算的 pending 请求惰性排队，完成后 drain），以及 `max_load_attempts` 有界失败重试。
-2. **C5.6 — 可见性与帧预算**：`C5.6a` 已落地每帧上传预算（`max_uploads_per_frame`，`begin_frame`
-   重置计数并按预算 `drain_uploads`，避免多个解码同帧完成造成单帧尖峰；NanWindow 每帧调用
-   `begin_frame` 并默认预算 4）。`C5.6b` 已落地视口门控：`Image::set_prefetch_distance(d)` 让图片
-   仅在其世界矩形与当前 clip 视口（外扩 d）相交时才触发加载，否则保持 idle 只画占位；Gallery
-   页对四张打包图片启用 120 的预取距离。剩余：加载优先级（可见 > 近 > 远）。
+2. **C5.6 — 可见性与帧预算（已完成）**：`C5.6a` 每帧上传预算（`max_uploads_per_frame` +
+   `begin_frame`/`drain_uploads`，NanWindow 默认 4）；`C5.6b` 视口门控 `Image::set_prefetch_distance(d)`
+   让图片仅在与当前 clip 视口（外扩 d）相交时才加载，并按世界矩形到视口的轴对齐间距计算加载
+   优先级（低值 = 更可见/更近）传给 `TextureCache`，`drain_pending` 按优先级排序提交；Gallery
+   对四张打包图片启用 120 预取。
 3. **1.1 性能工具**：加载耗时、缓存命中率、pending 数、临时内存和 GPU 驻留诊断面板。
 
 网络图片下载、渐进式 JPEG、磁盘缩略图缓存、跨窗口共享和热重载不属于 Linux 1.0 范围。

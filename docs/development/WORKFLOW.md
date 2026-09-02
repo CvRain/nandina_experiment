@@ -120,10 +120,10 @@ C5.4 moves packaged-image CPU decode/preprocessing to background workers, keeps 
 thread, displays fixed placeholders, and merges matching pending requests. C5.5 moves the res://
 resource read (`ResourceManager::require`) onto the same background worker with cooperative
 cancellation (C5.5a), then adds concurrent-decode and in-flight-encoded-byte budgets with lazy
-queuing plus bounded failure retry (C5.5b). C5.6a adds a per-frame upload budget (`begin_frame` +
-`drain_uploads`); C5.6b adds viewport-gated loading via `Image::set_prefetch_distance` (defer until
-the world rect meets the clip viewport + prefetch, exercised in the Gallery). Load priority remains.
-The second-device manual record remains open.
+queuing plus bounded failure retry (C5.5b). C5.6 adds a per-frame upload budget (`begin_frame` +
+`drain_uploads`), viewport-gated loading via `Image::set_prefetch_distance`, and priority-ordered
+decode submission (visible > near > far), all exercised in the Gallery. The second-device manual
+record remains open.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -430,9 +430,13 @@ history follows:
   enclosing ScrollView/overflow-clip rect in world space); otherwise the image stays `idle` and draws
   only its placeholder. The Gallery enables a 120 px prefetch so off-screen packaged images do not
   decode/upload until scrolled near. Tests cover an image outside its clip not loading and loading
-  once moved inside; 44/44 green. Load priority (visible > near > far) remains.
+  once moved inside; 44/44 green.
+- C5.6 load priority: the async load path accepts a `priority` (lower = more urgent); `Image` computes
+  it from the axis-aligned gap to the clip viewport (0 = visible) and `drain_pending` stable-sorts the
+  queue so visible/near images submit their decode first. Tests prove three queued loads drain in
+  priority order despite reverse insertion; 44/44 green.
 - Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.6 load priority and the remaining
-  Linux platform gate. New templates, i18n, keyframes/ColorSpace sugar, component motion slots, image
-  9-patch/atlas, and audio stay outside the closure line unless an acceptance gate explicitly requires
-  them.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate, then the remaining Linux platform gate and
+  C6 (D4 quality/distribution). New templates, i18n, keyframes/ColorSpace sugar, component motion slots,
+  image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate explicitly
+  requires them.
