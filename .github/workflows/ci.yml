@@ -24,8 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: gcc-16
-            image: gcc:16-bookworm
+          - name: gcc-15
+            image: gcc:15-bookworm
             cc: gcc
             cxx: g++
           - name: clang-21
@@ -41,10 +41,11 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            zlib1g-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Report toolchain
@@ -73,10 +74,11 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            zlib1g-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Configure
@@ -90,7 +92,7 @@ jobs:
     name: SQLite fallback
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: gcc:16-bookworm
+    container: gcc:15-bookworm
     env:
       CC: gcc
       CXX: g++
@@ -100,10 +102,11 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            zlib1g-dev \
             libssl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
             libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Configure
@@ -120,7 +123,7 @@ jobs:
     name: physics (Box2D enabled)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: gcc:16-bookworm
+    container: gcc:15-bookworm
     env:
       CC: gcc
       CXX: g++
@@ -130,10 +133,11 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            zlib1g-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
         with:
           submodules: recursive
       - name: Configure

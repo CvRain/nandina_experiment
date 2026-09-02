@@ -1095,7 +1095,7 @@ compiler, Python 3, pkg-config, Git, OpenSSL >= 3.0, and a real C++26 compile/li
 project path it also validates the resource manifest, CLI target metadata, Nandina source link or
 wrap, and recursively checked-out Nandina dependencies.
 
-The release compiler baseline is GCC 16+ or Clang 21+ with a matching standard library that passes
+The release compiler baseline is GCC 15+ or Clang 21+ with a matching standard library that passes
 the C++26 probe (`std::expected`, `std::move_only_function`, and `std::println`). `nandina-cli`
 executes `new -> build -> doctor -> run --no-build`, verifies incremental build-directory reuse,
 the generated resource package/lock/metadata, argument forwarding, and child exit-code propagation,
@@ -1104,7 +1104,7 @@ belongs to C6/C8.
 
 #### D4. Distribution And CI
 
-Status: C6a implemented locally, pending commit and remote validation. The workflow pins GCC 16 and
+Status: C6a implemented and undergoing remote validation. The workflow pins GCC 15 and
 Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optional physics. SDK
 source bundle/index publishing, release metadata, archive/offline consumers, and portable staging
 verification remain (C6b/C7).
@@ -1122,7 +1122,7 @@ after the official-repository promotion and re-verification defined by `1.0_PROM
 
 The CI contract (`.github/workflows/ci.yml`):
 
-- **build (GCC 16/Clang 21)**: recursive-submodule checkout → `meson setup --wrap-mode=nodownload` →
+- **build (GCC 15/Clang 21)**: recursive-submodule checkout → `meson setup --wrap-mode=nodownload` →
   compile → full `meson test`.
 - **sanitize**: Clang 21 + `-Db_sanitize=address,undefined` → compile → full headless suite.
 - **SQLite fallback**: force the pinned wrap fallback, then run the resource and external-consumer

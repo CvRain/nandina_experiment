@@ -440,7 +440,7 @@ history follows:
   `loading`; decoded RGBA waiting for the per-frame upload budget applies byte backpressure. Linux
   platform paths now expose validated XDG config/data/state/cache roots through
   `NanApplication::platform_paths()` while retaining executable-relative and XDG resource lookup.
-- C6a CI/sanitizer implementation: `.github/workflows/ci.yml` pins GCC 16/Clang 21 containers and
+- C6a CI/sanitizer implementation: `.github/workflows/ci.yml` pins GCC 15/Clang 21 containers and
   adds full build/test, Clang ASan+UBSan, forced SQLite fallback, and optional-physics jobs. This unit
   remains pending until committed and green on GitHub; local sanitizer completion is constrained by
   LeakSanitizer/ptrace in the current agent environment.
