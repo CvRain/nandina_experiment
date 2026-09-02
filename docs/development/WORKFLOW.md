@@ -120,8 +120,9 @@ C5.4 moves packaged-image CPU decode/preprocessing to background workers, keeps 
 thread, displays fixed placeholders, and merges matching pending requests. C5.5 moves the res://
 resource read (`ResourceManager::require`) onto the same background worker with cooperative
 cancellation (C5.5a), then adds concurrent-decode and in-flight-encoded-byte budgets with lazy
-queuing plus bounded failure retry (C5.5b). C5.6 (viewport-aware + frame budgets) remains. The
-second-device manual record remains open.
+queuing plus bounded failure retry (C5.5b). C5.6a adds a per-frame upload budget (`begin_frame` +
+`drain_uploads`); C5.6b viewport-aware requests and prefetch/priority remain. The second-device
+manual record remains open.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -418,8 +419,13 @@ history follows:
   retry. Tests prove the UI draw shows a placeholder with no read/decode, the background drain
   performs one read + one decode and the UI drain one upload, plus budget queuing (only the first
   decode runs until the slot frees) and retry (a flaky decoder is retried then succeeds); 44/44 green.
+- C5.6a per-frame upload budget: `TextureCache::begin_frame` resets the frame upload counter and
+  drains the ready uploads up to `max_uploads_per_frame` (0 = unlimited; NanWindow uses 4). Completed
+  decodes enqueue their RGBA and uploads are throttled across frames, so a batch of same-frame decode
+  completions no longer spikes the GPU upload phase. Tests prove only the first upload runs in one
+  frame and the deferred second upload runs after the next `begin_frame`; 44/44 green.
 - Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.6 viewport-aware loading before
-  the remaining Linux platform gate. New templates, i18n, keyframes/ColorSpace sugar, component motion
-  slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
-  explicitly requires them.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate, then C5.6b viewport-aware requests +
+  prefetch/priority before the remaining Linux platform gate. New templates, i18n, keyframes/ColorSpace
+  sugar, component motion slots, image 9-patch/atlas, and audio stay outside the closure line unless
+  an acceptance gate explicitly requires them.

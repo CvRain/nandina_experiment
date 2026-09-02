@@ -51,8 +51,10 @@ C5.4 自动化必须证明：首帧只提交后台任务并绘制占位块、后
    在后台 `require` + 解码）移出 UI 线程，并配合作取消（任务开始/读取后/解码后检查 alive 守卫）。
    `C5.5b` 增加 `max_concurrent_decodes` 并发解码预算与 `max_inflight_encoded_bytes` 在途 encoded
    字节预算（超预算的 pending 请求惰性排队，完成后 drain），以及 `max_load_attempts` 有界失败重试。
-2. **C5.6 — 可见性与帧预算**：ScrollView 可见区域附近才请求图片；支持预取距离和优先级；
-   按每帧纹理数量/字节预算分批上传，避免多个任务同时完成造成单帧尖峰。
+2. **C5.6 — 可见性与帧预算**：`C5.6a` 已落地每帧上传预算（`max_uploads_per_frame`，`begin_frame`
+   重置计数并按预算 `drain_uploads`，避免多个解码同帧完成造成单帧尖峰；NanWindow 每帧调用
+   `begin_frame` 并默认预算 4）。`C5.6b` 仍需 ScrollView 可见区域附近才请求图片、预取距离与
+   优先级。
 3. **1.1 性能工具**：加载耗时、缓存命中率、pending 数、临时内存和 GPU 驻留诊断面板。
 
 网络图片下载、渐进式 JPEG、磁盘缩略图缓存、跨窗口共享和热重载不属于 Linux 1.0 范围。
