@@ -140,12 +140,34 @@ namespace nandina::widget
         return placeholder_color_;
     }
 
+    void Image::set_prefetch_distance(const float distance) {
+        prefetch_distance_ = std::max(0.0F, distance);
+        mark_dirty(scene::DirtyFlags::paint);
+    }
+
+    auto Image::prefetch_distance() const noexcept -> float {
+        return prefetch_distance_;
+    }
+
     auto Image::on_draw(render::DrawContext& ctx) -> void {
+        const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
+        // C5.6b：视口门控——图片尚未加载且启用了预取时，只有世界矩形与当前 clip 视口
+        // （外扩预取距离）相交才触发加载，否则保持 idle 只画占位。
+        if (load_state_ == ImageLoadState::idle && prefetch_distance_ > 0.0F) {
+            const auto clip = ctx.clip().current();
+            if (clip.is_valid() && !clip.expanded(prefetch_distance_).intersects(world)) {
+                if (placeholder_color_) {
+                    ctx.device().draw_rect(
+                        world,
+                        placeholder_color_->with_alpha(placeholder_color_->alpha() * ctx.opacity())
+                    );
+                }
+                return;
+            }
+        }
         ensure_loaded(ctx.device());
         if (!texture_) {
             if (placeholder_color_) {
-                const auto world =
-                    render::world_bounds_from_local(ctx.world_transform(), local_rect());
                 ctx.device().draw_rect(
                     world,
                     placeholder_color_->with_alpha(placeholder_color_->alpha() * ctx.opacity())
@@ -153,7 +175,6 @@ namespace nandina::widget
             }
             return;
         }
-        const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
         const auto rects = compute_rects(world);
         const auto tint = tint_.with_alpha(tint_.alpha() * ctx.opacity());
         ctx.device().draw_texture_region(texture_->handle(), rects.source, rects.destination, tint);

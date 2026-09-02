@@ -939,3 +939,34 @@ TEST_CASE(
 
     REQUIRE(image->resource_manager() == &resources);
 }
+
+TEST_CASE("image defers loading outside its clip viewport", "[image][viewport]") {
+    TextureRecordingDevice device;
+    scene::NanSceneTree tree;
+
+    auto clip = std::make_shared<scene::NanControl>();
+    clip->set_overflow(scene::ControlOverflow::clip);
+    clip->set_size(foundation::NanSize(100.0F, 100.0F));
+
+    auto image = widget::Image::create("hero.png");
+    image->set_size(foundation::NanSize(20.0F, 20.0F));
+    image->set_position(foundation::NanPoint(1000.0F, 0.0F)); // 视口外
+    image->set_prefetch_distance(50.0F);
+    image->set_placeholder_color(foundation::NanColor::from_hex(0x808080));
+    clip->add_child(image);
+
+    tree.set_root(clip);
+    tree.draw(device);
+
+    // C5.6b：图片在 clip 视口（外扩预取）之外，不加载，只画占位。
+    REQUIRE(image->load_state() == widget::ImageLoadState::idle);
+    REQUIRE(device.loaded.empty());
+    REQUIRE(device.drawn_rects == 1);
+
+    // 移入视口后触发加载。
+    image->set_position(foundation::NanPoint(80.0F, 0.0F));
+    tree.draw(device);
+    REQUIRE(device.loaded.size() == 1);
+    REQUIRE(device.loaded.front() == "hero.png");
+    REQUIRE(image->load_state() == widget::ImageLoadState::ready);
+}

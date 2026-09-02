@@ -95,6 +95,11 @@ namespace nandina::widget
         void clear_placeholder_color();
         [[nodiscard]] auto placeholder_color() const -> const std::optional<foundation::NanColor>&;
 
+        /// C5.6b：视口预取距离（>0 时，仅在图片世界矩形与当前 clip 视口（外扩该距离）
+        /// 相交时才触发加载，否则保持 idle 只画占位）。
+        void set_prefetch_distance(float distance);
+        [[nodiscard]] auto prefetch_distance() const noexcept -> float;
+
         auto on_draw(render::DrawContext& ctx) -> void override;
         void apply_texture_cache(render::TextureCache& cache) override;
 
@@ -130,6 +135,7 @@ namespace nandina::widget
         ImageAlignment alignment_ = ImageAlignment::center;
         ImageLoadMode load_mode_ = ImageLoadMode::automatic;
         ImageLoadState load_state_ = ImageLoadState::idle;
+        float prefetch_distance_ = 0.0F;
         std::uint64_t load_generation_ = 0;
     };
 } // namespace nandina::widget

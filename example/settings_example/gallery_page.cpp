@@ -33,6 +33,8 @@ namespace nandina::examples::settings
                                      image.set_load_options(
                                          render::ImageLoadOptions {.resize = upload_size}
                                      );
+                                     // C5.6b：仅当图片进入 ScrollView 视口（外扩预取）才触发加载。
+                                     image.set_prefetch_distance(120.0F);
                                  })
                                  .build();
                 return ui.column()
