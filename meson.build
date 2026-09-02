@@ -20,6 +20,7 @@ cmake = import('cmake')
 # 配置 spdlog 的 CMake选项
 spdlog_options = cmake.subproject_options()
 spdlog_options.add_cmake_defines({})
+spdlog_options.set_install(false)
 
 # 配置 raylib 的CMake选项
 raylib_options = cmake.subproject_options()
@@ -27,6 +28,7 @@ raylib_options.add_cmake_defines({
     'CUSTOMIZE_BUILD': 'ON',
     'SUPPORT_FILEFORMAT_JPG': 'ON',
 })
+raylib_options.set_install(false)
 
 # 配置 utf8proc 的 CMake 选项
 utf8proc_options = cmake.subproject_options()
@@ -35,6 +37,7 @@ utf8proc_options.add_cmake_defines({
     'UTF8PROC_INSTALL': 'OFF',
     'UTF8PROC_ENABLE_TESTING': 'OFF',
 })
+utf8proc_options.set_install(false)
 
 # toml++ 是 header-only CMake 项目。固定为 Git submodule 后，Meson 和未来的
 # 顶层 CMake 构建都消费同一份官方源码，不依赖系统安装或 WrapDB 下载。
@@ -139,7 +142,6 @@ nanres = executable(
     'nanres',
     ['tools/nanres_main.cpp', 'tools/resource_manifest.cpp', 'tools/resource_packager.cpp'],
     dependencies: [nandina_dep, tomlplusplus_dep, openssl_dep],
-    install: true,
 )
 # D3：项目级工作流 CLI（脚手架/体检），只依赖 C++ 标准库，不链接框架运行时。
 # 放在 tools/ 子目录，构建产物为 buildDir/tools/nandina。

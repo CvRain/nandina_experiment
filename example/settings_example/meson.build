@@ -31,5 +31,4 @@ executable(
     'nandina_settings_example',
     files('settings_main.cpp'),
     dependencies: [settings_example_dep, raylib_dep],
-    install: true,
 )

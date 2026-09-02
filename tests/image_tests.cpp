@@ -205,12 +205,13 @@ namespace
         [[nodiscard]] auto name() const noexcept -> std::string_view override {
             return inner_->name();
         }
-        [[nodiscard]] auto find(const resource::ResourceKey& key) const -> resource::ResourceLookup
-            override {
+        [[nodiscard]] auto find(const resource::ResourceKey& key) const
+            -> resource::ResourceLookup override {
             ++key_finds;
             return inner_->find(key);
         }
-        [[nodiscard]] auto find(resource::ResourceId id) const -> resource::ResourceLookup override {
+        [[nodiscard]] auto find(resource::ResourceId id) const
+            -> resource::ResourceLookup override {
             return inner_->find(id);
         }
         [[nodiscard]] auto insert(
@@ -600,18 +601,19 @@ TEST_CASE(
     REQUIRE(device.draw_regions == 1);
 }
 
-TEST_CASE("async resource load reads and decodes on the background worker", "[image][cache][async]") {
+TEST_CASE(
+    "async resource load reads and decodes on the background worker",
+    "[image][cache][async]"
+) {
     auto backend = std::make_shared<RecordingBackend>("images");
-    REQUIRE(
-        backend
-            ->insert(
-                resource_id("10213243-5465-4768-899a-abbccddeeff0"),
-                resource::ResourceKey("hero.png"),
-                "image/png",
-                std::vector<std::uint8_t> {1, 2, 3}
-            )
-            .has_value()
-    );
+    REQUIRE(backend
+                ->insert(
+                    resource_id("10213243-5465-4768-899a-abbccddeeff0"),
+                    resource::ResourceKey("hero.png"),
+                    "image/png",
+                    std::vector<std::uint8_t> {1, 2, 3}
+                )
+                .has_value());
     resource::ResourceManager resources;
     (void)resources.mount(backend);
 
@@ -709,6 +711,45 @@ TEST_CASE("async texture cache merges matching pending decodes", "[image][cache]
     REQUIRE(second == first);
 }
 
+TEST_CASE(
+    "rejected async submission completes without leaving a stuck request",
+    "[image][cache][async]"
+) {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [](std::move_only_function<void()>) { return false; },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    bool completed = false;
+
+    REQUIRE(cache.load_memory_async(
+        "rejected",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [&completed](auto texture) {
+            REQUIRE(texture == nullptr);
+            completed = true;
+        }
+    ));
+
+    REQUIRE(completed);
+    REQUIRE(decoder->calls == 0);
+    cache.begin_frame();
+    REQUIRE(decoder->calls == 0);
+}
+
 TEST_CASE("destroyed texture cache drops background decode completion", "[image][cache][async]") {
     TextureRecordingDevice device;
     auto decoder = std::make_shared<RecordingDecoder>();
@@ -746,7 +787,10 @@ TEST_CASE("destroyed texture cache drops background decode completion", "[image]
     REQUIRE(device.rgba_uploads == 0);
 }
 
-TEST_CASE("async texture cache respects the concurrent decode budget", "[image][cache][async][budget]") {
+TEST_CASE(
+    "async texture cache respects the concurrent decode budget",
+    "[image][cache][async][budget]"
+) {
     TextureRecordingDevice device;
     auto decoder = std::make_shared<RecordingDecoder>();
     ManualTaskQueue background;
@@ -798,7 +842,10 @@ TEST_CASE("async texture cache respects the concurrent decode budget", "[image][
     REQUIRE(device.rgba_uploads == 2);
 }
 
-TEST_CASE("async decode retries a bounded number of times on failure", "[image][cache][async][retry]") {
+TEST_CASE(
+    "async decode retries a bounded number of times on failure",
+    "[image][cache][async][retry]"
+) {
     TextureRecordingDevice device;
     auto decoder = std::make_shared<FlakyDecoder>(/*failures_before_success=*/1);
     ManualTaskQueue background;
@@ -876,11 +923,67 @@ TEST_CASE("async uploads respect the per-frame budget", "[image][cache][async][b
 
     cache.begin_frame();
     background.drain(); // 两个解码同帧完成 → 两个 finish 进入 tasks 队列。
-    ui.drain();         // 预算 1：只上传第一个，第二个排队。
+    ui.drain(); // 预算 1：只上传第一个，第二个排队。
     REQUIRE(device.rgba_uploads == 1);
 
     cache.begin_frame(); // 下一帧补做第二个。
     REQUIRE(device.rgba_uploads == 2);
+}
+
+TEST_CASE(
+    "ready upload bytes apply backpressure to pending decodes",
+    "[image][cache][async][budget]"
+) {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+            .max_concurrent_decodes = 2,
+            .max_ready_upload_bytes = 8,
+            .max_uploads_per_frame = 1,
+        }
+    );
+    std::vector<std::shared_ptr<std::vector<std::uint8_t>>> owners;
+    for (std::uint8_t value = 1; value <= 4; ++value) {
+        auto bytes = std::make_shared<std::vector<std::uint8_t>>(
+            std::initializer_list<std::uint8_t> {value}
+        );
+        REQUIRE(cache.load_memory_async(
+            std::to_string(value),
+            std::shared_ptr<const void>(bytes),
+            *bytes,
+            "image/png",
+            {},
+            [](auto) {}
+        ));
+        owners.push_back(std::move(bytes));
+    }
+
+    cache.begin_frame();
+    REQUIRE(background.tasks.size() == 2);
+    background.drain();
+    ui.drain();
+    REQUIRE(background.tasks.size() == 1);
+
+    background.drain();
+    ui.drain();
+    REQUIRE(decoder->calls == 3);
+    REQUIRE(background.tasks.empty());
+
+    cache.begin_frame();
+    REQUIRE(background.tasks.empty());
+    cache.begin_frame();
+    REQUIRE(background.tasks.size() == 1);
 }
 
 TEST_CASE("texture cache keys include image preprocessing options", "[image][cache]") {
@@ -993,17 +1096,38 @@ TEST_CASE("async decode priority orders the pending queue", "[image][cache][asyn
             .max_concurrent_decodes = 1,
         }
     );
-    auto a = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
-    auto b = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {2, 3, 4});
-    auto c = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {3, 4, 5});
+    auto a =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    auto b =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {2, 3, 4});
+    auto c =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {3, 4, 5});
     REQUIRE(cache.load_memory_async(
-        "a", std::shared_ptr<const void>(a), *a, "image/png", {}, [](auto) {}, /*priority=*/50
+        "a",
+        std::shared_ptr<const void>(a),
+        *a,
+        "image/png",
+        {},
+        [](auto) {},
+        /*priority=*/50
     ));
     REQUIRE(cache.load_memory_async(
-        "b", std::shared_ptr<const void>(b), *b, "image/png", {}, [](auto) {}, /*priority=*/100
+        "b",
+        std::shared_ptr<const void>(b),
+        *b,
+        "image/png",
+        {},
+        [](auto) {},
+        /*priority=*/100
     ));
     REQUIRE(cache.load_memory_async(
-        "c", std::shared_ptr<const void>(c), *c, "image/png", {}, [](auto) {}, /*priority=*/0
+        "c",
+        std::shared_ptr<const void>(c),
+        *c,
+        "image/png",
+        {},
+        [](auto) {},
+        /*priority=*/0
     ));
 
     // 预算 1：先提交 a（首个），b/c 排队。a 完成后按优先级先提交 c（0）再提交 b（100）。

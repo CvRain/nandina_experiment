@@ -75,10 +75,11 @@ namespace nandina::app
         if (!locator) {
             throw std::invalid_argument("NanApplication: " + locator.error());
         }
+        platform_paths_ = std::move(*locator);
         int priority = 1000;
-        for (const auto& location: locator->resource_roots()) {
+        for (const auto& location: platform_paths_->resource_roots()) {
             // 开发期：优先消费 build-tree 元数据 resource-location.json，挂载其指向的
-            // 构建树包；release/install 无此文件时回落直查 `<root>/resources.db`。
+            // 构建树包；release/portable staging 无此文件时回落直查 `<root>/resources.db`。
             std::filesystem::path database = location.root / config.resource_package;
             std::filesystem::path external_root = location.root;
             const auto metadata_path = location.root / "resource-location.json";
@@ -89,11 +90,8 @@ namespace nandina::app
                     external_root = metadata->package_root;
                 }
                 else {
-                    log::get("app.application").warn(
-                        "NanApplication: {}: {}",
-                        metadata_path.string(),
-                        metadata.error()
-                    );
+                    log::get("app.application")
+                        .warn("NanApplication: {}: {}", metadata_path.string(), metadata.error());
                 }
             }
             std::error_code error;
@@ -122,13 +120,13 @@ namespace nandina::app
             --priority;
         }
         font_loader_ = std::make_unique<text::FontLoader>(resources_);
-        log::get("app.application").info(
-            "NanApplication: initialized {}",
-            application_id_
-        );
+        log::get("app.application").info("NanApplication: initialized {}", application_id_);
     }
 
-    NanApplication::~NanApplication() = default;
+    NanApplication::~NanApplication() {
+        background_executor_.shutdown();
+        dispatcher_.shutdown();
+    }
 
     auto NanApplication::graph() -> reactive::Graph& {
         return graph_;
@@ -178,6 +176,15 @@ namespace nandina::app
     }
     auto NanApplication::application_id() const noexcept -> std::string_view {
         return application_id_;
+    }
+
+    auto NanApplication::platform_paths() const -> const resource::PlatformResourceLocator& {
+        if (!platform_paths_) {
+            throw std::logic_error(
+                "NanApplication::platform_paths: application was not created with process paths"
+            );
+        }
+        return *platform_paths_;
     }
 
     auto NanApplication::dispatcher() -> UiDispatcher& {

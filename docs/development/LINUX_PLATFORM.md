@@ -16,7 +16,8 @@ X11 后端，因此在 Wayland 桌面中通过 XWayland 运行，并不是原生
 ## 2. 进程与资源路径
 
 `NanApplicationConfig::for_process()` 在 Linux 通过 `/proc/self/exe` 解析绝对可执行文件路径，
-并捕获 `HOME`、`XDG_DATA_HOME`、`XDG_DATA_DIRS`、`XDG_CACHE_HOME`。资源查找顺序是：
+并捕获 `HOME`、`XDG_CONFIG_HOME`、`XDG_DATA_HOME`、`XDG_DATA_DIRS`、
+`XDG_STATE_HOME`、`XDG_CACHE_HOME`。资源查找顺序是：
 
 1. `<executable-directory>/resources`；
 2. `$XDG_DATA_HOME/<application-id>`，未设置时为
@@ -24,9 +25,31 @@ X11 后端，因此在 Wayland 桌面中通过 XWayland 运行，并不是原生
 3. `$XDG_DATA_DIRS/<application-id>` 中的每个目录；
 4. 去重后的 `/usr/local/share/<application-id>` 与 `/usr/share/<application-id>`。
 
-用户数据根沿用第 2 项；缓存根为 `$XDG_CACHE_HOME/<application-id>`，未设置时为
-`$HOME/.cache/<application-id>`。当对应 XDG 变量未设置时，Linux 1.0 运行环境必须提供
-`HOME`。应用 ID 必须是单段规范 `ResourceKey`，可执行文件路径必须是绝对路径。
+`PlatformResourceLocator` 同时形成一份应用可复用的平台路径快照，并由
+`NanApplication::platform_paths()` 暴露：
+
+- config：`$XDG_CONFIG_HOME/<application-id>`，回退
+  `$HOME/.config/<application-id>`；
+- data：`$XDG_DATA_HOME/<application-id>`，回退
+  `$HOME/.local/share/<application-id>`；
+- state：`$XDG_STATE_HOME/<application-id>`，回退
+  `$HOME/.local/state/<application-id>`；
+- cache：`$XDG_CACHE_HOME/<application-id>`，回退
+  `$HOME/.cache/<application-id>`。
+
+配置、可变数据、状态、缓存与只读应用资源是不同语义；应用不应把 `settings.json` 交给
+`nanres`。用户级 portable 部署可将可执行文件放在 `~/.local/bin`，将 `resources.db` 与
+`external/` 一起放在 data 根，同时在 data 根下用应用自有子目录保存可变数据。资源逻辑 key
+不会因物理目录改变而变化。`resource-location.json` 只属于构建树，移动资源包时不得复制。
+
+所有 HOME/XDG 单目录值以及 `XDG_DATA_DIRS` 的每个条目都必须是绝对路径；无效配置在启动
+时产生明确错误。Linux 1.0 运行环境必须提供绝对 `HOME`。应用 ID 必须是单段规范
+`ResourceKey`，可执行文件路径必须是绝对路径。框架不检查当前用户是否为 root，也不替
+安装器选择 `/usr` 或 `~/.local`。
+
+Linux 1.0 只承诺构建树运行与 executable-relative/XDG data portable staging。系统 SDK
+安装和 deb/rpm/Flatpak/Snap/AppImage 不属于本契约；未来 macOS/Windows 实现应替换平台路径
+适配器，而不是让应用代码散布条件宏。
 
 ## 3. 窗口、DPI 与坐标空间
 
@@ -61,7 +84,8 @@ resize 不改变设计视口或用户界面缩放：响应式窗口使用新的 
 `on_teardown()`，清空 router，分离场景根，清除字体/纹理上下文，释放默认字体、字体 LRU、
 图片纹理 LRU，再释放渲染设备，清除 clipboard 服务，最后关闭原生窗口。这样所有 RAII
 纹理都能在设备有效期间调用 `destroy_texture()`。析构函数仅为异常路径提供已打开窗口的
-兜底关闭；详细资源所有权见 `RESOURCE_RESIDENCY.md`。
+兜底关闭。应用析构首先停止并 join 后台执行器，再销毁资源管理器与挂载后端，避免仍在读取
+`res://` 的任务观察到已销毁资源；详细资源所有权见 `RESOURCE_RESIDENCY.md`。
 
 ## 5. 系统外观与动效
 

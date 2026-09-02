@@ -80,10 +80,18 @@ Each release publishes at least:
 The first 1.0 implementation remains source-first. Prebuilt SDKs may be added later without
 changing the project manifest or lock model.
 
+NandinaUI 1.0 does not publish a system-installed framework SDK or native application packages.
+There is no supported installation of framework headers/libraries into `/usr`, `/usr/local`, or
+`~/.local`, and no deb/rpm/Flatpak/Snap/AppImage, macOS bundle, or Windows installer contract.
+Instead, the generated application produces a relocatable staging tree that downstream packagers
+may translate into their platform format. `resources.db` and its relative `external/` directory are
+copied together; build-only `resource-location.json` is excluded.
+
 ## 6. CLI Delivery And Platform Boundary
 
-NandinaCLI uses C++20 so installing the tool does not itself require the C++26 application
-toolchain. Release binaries are the primary user installation path; source builds remain supported.
+NandinaCLI uses C++20 so building the tool does not itself require the C++26 application toolchain.
+CLI binary packaging is independent from the NandinaUI 1.0 SDK/application distribution promise;
+source builds remain supported.
 The C++26 compiler/library capability remains a `nandina doctor` application-build check.
 
 Process execution, configuration/cache directories, locking, atomic publication, executable
@@ -97,7 +105,7 @@ Implementation status: `NandinaCLI` commits `3716bbd`, `a6722f9`, `742c02d`, `3f
 editable source configuration, size/SHA-256 verified cache, pinned project generation, locked
 `build`/`run`/`doctor` parity, Git fork resolution to exact commits, explicit path development mode,
 Ed25519 detached-index verification, and platform-selected process/config/cache/path backends.
-C2.1's code contract is complete. Native Windows/macOS support claims remain D4 CI/package gates;
+C2.1's code contract is complete. Native Windows/macOS support claims remain future platform work;
 provisioning the built-in official release key belongs to the C6 release-key ceremony.
 
 - The independent repository configures, builds, and tests without a NandinaUI checkout.

@@ -11,5 +11,4 @@ nandina = executable(
     'nandina',
     ['nandina_main.cpp'],
     include_directories: include_directories('.'),
-    install: true,
 )

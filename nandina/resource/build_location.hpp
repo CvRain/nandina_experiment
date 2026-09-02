@@ -17,7 +17,7 @@ namespace nandina::resource
 
     /// 读取 nanres build helper 生成的 resource-location.json（build-tree 开发元数据）。
     /// 返回包 id / 构建树包根 / 数据库文件名。文件缺失或格式非法时返回 unexpected。
-    /// 这是开发期查找构建树包的辅助；release/install 查找仍走资源根直查 resources.db。
+    /// 这是开发期查找构建树包的辅助；release/portable staging 仍直查 resources.db。
     [[nodiscard]] auto read_build_location_metadata(const std::filesystem::path& json_path)
         -> std::expected<BuildLocationMetadata, std::string>;
 } // namespace nandina::resource

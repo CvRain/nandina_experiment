@@ -19,6 +19,7 @@
 #define NANDINA_EXPERIMENT_APP_NAN_APPLICATION_HPP
 
 #include "../reactive/graph.hpp"
+#include "../resource/platform_resource_locator.hpp"
 #include "../resource/resource_manager.hpp"
 #include "../text/font_family.hpp"
 #include "../text/font_loader.hpp"
@@ -35,6 +36,7 @@
 #include <concepts>
 #include <functional>
 #include <memory>
+#include <optional>
 #include <stdexcept>
 #include <utility>
 
@@ -70,6 +72,7 @@ namespace nandina::app
         [[nodiscard]] auto font_loader() -> text::FontLoader&;
         [[nodiscard]] auto font_families() -> text::FontFamilyRegistry&;
         [[nodiscard]] auto application_id() const noexcept -> std::string_view;
+        [[nodiscard]] auto platform_paths() const -> const resource::PlatformResourceLocator&;
         [[nodiscard]] auto dispatcher() -> UiDispatcher&;
         [[nodiscard]] auto background_executor() -> BackgroundExecutor&;
 
@@ -143,6 +146,7 @@ namespace nandina::app
         reactive::Graph graph_;
         theme::ThemeManager theme_manager_;
         std::string application_id_;
+        std::optional<resource::PlatformResourceLocator> platform_paths_;
         resource::ResourceManager resources_;
         std::unique_ptr<text::FontLoader> font_loader_;
         text::FontFamilyRegistry font_families_;

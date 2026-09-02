@@ -33,7 +33,9 @@ namespace nandina::resource
             return application_id_;
         }
         [[nodiscard]] auto resource_roots() const -> std::vector<ResourceLocation>;
-        [[nodiscard]] auto user_data_root() const -> std::filesystem::path;
+        [[nodiscard]] auto config_root() const -> std::filesystem::path;
+        [[nodiscard]] auto data_root() const -> std::filesystem::path;
+        [[nodiscard]] auto state_root() const -> std::filesystem::path;
         [[nodiscard]] auto cache_root() const -> std::filesystem::path;
 
     private:

@@ -82,7 +82,7 @@ Layout, input, text, render device, platform window
 ```sh
 meson setup buildDir
 meson compile -C buildDir
-meson test -C buildDir --no-rebuild          # 42/42
+meson test -C buildDir --no-rebuild          # 44/44（physics2d enabled）
 ./buildDir/example/settings_example/nandina_settings_example
 ```
 
@@ -92,7 +92,7 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
 ## 当前状态与路线图
 
 - **1.0（收尾中）**：核心引擎（场景树/响应式/组件/主题/路由/文本/可访问性）全部落地；
-  `tests/` 42/42 绿。资源交付工具链 `nanres`（扫描/校验/锁/打包/安装）R0–R10 完成，
+  当前完整配置 `tests/` 44/44 绿。资源交付工具链 `nanres`（扫描/校验/锁/打包/portable staging）R0–R10 完成，
   D2（运行时 build-tree 包定位 + `[[resources]]` per-resource 覆盖）完成；D3 原型已具备
   `nandina new`/`build`/`run`/`doctor`。当前 C2.1 正将 CLI 拆分到平行的 `NandinaCLI`
   仓库；registry/archive 获取、分层软件源、镜像、SDK 锁、校验缓存、Meson wrap 以及

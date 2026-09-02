@@ -101,7 +101,10 @@ vcpkg_installed
 .wraplock
 .ai
 .kilo
-.github
+# .github 整体忽略，但追踪 CI 工作流。
+.github/*
+!.github/workflows/
+!.github/workflows/**
 .agents
 
 dev-docs-*

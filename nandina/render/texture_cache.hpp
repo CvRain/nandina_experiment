@@ -61,6 +61,7 @@ namespace nandina::render
         /// C5.5b 预算与重试：并发解码数上限、在途 encoded 字节预算、失败重试次数。
         std::size_t max_concurrent_decodes = 2;
         std::size_t max_inflight_encoded_bytes = 64U * 1024U * 1024U;
+        std::size_t max_ready_upload_bytes = 64U * 1024U * 1024U;
         std::size_t max_load_attempts = 2;
         /// C5.6 每帧上传预算：一帧最多上传的 RGBA 纹理数（0 = 不限）。
         std::size_t max_uploads_per_frame = 0;
@@ -127,6 +128,7 @@ namespace nandina::render
 
     private:
         enum class SourceKind { file, memory };
+        enum class PendingSubmitResult { submitted, blocked, rejected };
 
         struct Key {
             SourceKind kind = SourceKind::file;
@@ -149,7 +151,7 @@ namespace nandina::render
             Key key;
             std::vector<AsyncCompletion> completions;
             /// 后台读取 + 解码 + 重试，产出 RGBA（后台线程执行）。
-            std::move_only_function<DecodedImage()> load;
+            std::shared_ptr<std::move_only_function<DecodedImage()>> load;
             std::size_t encoded_bytes = 0;
             bool submitted = false;
             /// C5.6 加载优先级（低值先提交解码；0 = 可见）。
@@ -159,6 +161,7 @@ namespace nandina::render
         struct ReadyUpload {
             Key key;
             DecodedImage decoded;
+            std::size_t decoded_bytes = 0;
             std::uint64_t generation = 0;
             std::vector<AsyncCompletion> completions;
         };
@@ -169,7 +172,7 @@ namespace nandina::render
         void trim();
         void prune_expired();
         [[nodiscard]] auto find_pending(const Key& key) -> PendingEntry*;
-        [[nodiscard]] auto submit_pending(PendingEntry& entry) -> bool;
+        [[nodiscard]] auto submit_pending(PendingEntry& entry) -> PendingSubmitResult;
         void drain_pending();
         void drain_uploads();
         void finish_async(Key key, DecodedImage decoded, std::uint64_t generation);
@@ -185,6 +188,7 @@ namespace nandina::render
         std::size_t retained_bytes_ = 0;
         std::size_t inflight_decodes_ = 0;
         std::size_t inflight_encoded_bytes_ = 0;
+        std::size_t ready_upload_bytes_ = 0;
         std::size_t uploads_this_frame_ = 0;
         std::uint64_t generation_ = 0;
         std::shared_ptr<std::atomic_bool> alive_ = std::make_shared<std::atomic_bool>(true);

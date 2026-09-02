@@ -360,7 +360,7 @@ history follows:
   the widget clip assertion; 41/41 green.
 - D2 runtime metadata consumption: `NanApplication` now reads a `resource-location.json` at each
   scanned resource root and mounts the pointed build-tree package at that root's priority, falling
-  back to the direct `<root>/resources.db` when no metadata is present (release/install). This wires
+  back to the direct `<root>/resources.db` when no metadata is present (release/portable). This wires
   the dev flow "put assets → meson compile → application resolves the build-tree package" without a
   source-tree copy or manual sync. Infrastructure: nlohmann/json vendored as a git submodule with a
   thin `foundation::parse_json` wrapper, plus `resource::read_build_location_metadata`. Tests cover
@@ -435,8 +435,18 @@ history follows:
   it from the axis-aligned gap to the clip viewport (0 = visible) and `drain_pending` stable-sorts the
   queue so visible/near images submit their decode first. Tests prove three queued loads drain in
   priority order despite reverse insertion; 44/44 green.
+- C5.7 async/path hardening: application destruction stops and joins background work before mounted
+  resources are destroyed; rejected background submissions complete instead of leaving an Image in
+  `loading`; decoded RGBA waiting for the per-frame upload budget applies byte backpressure. Linux
+  platform paths now expose validated XDG config/data/state/cache roots through
+  `NanApplication::platform_paths()` while retaining executable-relative and XDG resource lookup.
+- C6a CI/sanitizer implementation: `.github/workflows/ci.yml` pins GCC 16/Clang 21 containers and
+  adds full build/test, Clang ASan+UBSan, forced SQLite fallback, and optional-physics jobs. This unit
+  remains pending until committed and green on GitHub; local sanitizer completion is constrained by
+  LeakSanitizer/ptrace in the current agent environment.
 - Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate, then the remaining Linux platform gate and
-  C6 (D4 quality/distribution). New templates, i18n, keyframes/ColorSpace sugar, component motion slots,
-  image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate explicitly
-  requires them.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate, then
+  C6b (SDK source publishing/release metadata/archive-offline and portable staging) before the
+  release candidate C7. System SDK installation and native application packaging stay outside 1.0. New
+  templates, i18n, keyframes/ColorSpace sugar, component motion slots, image 9-patch/atlas, and audio
+  stay outside the closure line unless an acceptance gate explicitly requires them.

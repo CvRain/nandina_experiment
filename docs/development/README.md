@@ -315,10 +315,10 @@ The text, clipping, editing, layout, interactive example, and R1-R10 resource-de
 | R4 `nanres` scan/validate | Complete in `9b0933d`. | Deterministic recursive scanner, ordered media detection, exclusions, unsafe-path diagnostics, and functional `init`/`scan`/`validate` CLI. |
 | R5 Policy/lock manifest | Complete in `9b0933d`. | toml++ policy parsing, SHA-256 inventory, stable UUID move/change rules, revisions, stale validation, and atomic generated lock updates. |
 | R6 SQLite package/sidecars | Complete in `9b0933d`. | Runtime-compatible SQLite packages, alias rows, policy/size-based BLOB selection, UUID-named external sidecars, atomic rebuilds, and fingerprint skips. |
-| R7 Meson build/install | Complete in `9b0933d`, simplified after it. | Policy-only automatic scan/validate/package target, build-tree executable-relative output, datadir install helper, and user/system prefix layout tests. |
+| R7 Meson build/staging | Complete in `9b0933d`, simplified after it. | Policy-only automatic scan/validate/package target, build-tree executable-relative output, and a datadir copy primitive. Native/system installation is not a 1.0 promise. |
 | R8 Application bootstrap | Complete in `9b0933d`. | Application-owned resource/font services, built-in bootstrap, locator-driven SQLite mounts, process config discovery, and PageContext service access. |
 | R9 Window text pipeline | Complete in `9b0933d`; bounded residency added by C5.3. | Render-device-scoped default FontPipelineCache, scene-context inheritance, LRU retention, explicit override preservation, and ordered scene/GPU teardown. |
-| R10 Cleanup/verification | Complete in `9b0933d`. | Removed temporary example resource/font setup and verified package, portable, prefix-install, and builtin-fallback modes. |
+| R10 Cleanup/verification | Complete in `9b0933d`. | Removed temporary example resource/font setup and verified package, portable, historical prefix-copy, and builtin-fallback modes. |
 | A4 Declarative regions | Complete. | Imperative `IfRegion` and keyed `ForEach`, stable child movement, item scopes, and a Todo acceptance migration without whole-list refresh. |
 
 Remaining M1-M6 follow-ups are deferred rather than blockers: UAX #14 line breaking, OpenType ligature-internal carets, native IME acquisition, scrollbar chrome, kinetic scrolling, Grid/Anchor, exact transformed polygon clipping, and accessibility bridges.
@@ -351,9 +351,9 @@ Add URI schemes without weakening stable logical keys:
 - `cache://` for disposable data.
 - `file://` for explicit filesystem access.
 
-`ResourceUri` strictly parses canonical logical keys for `res`, `builtin`, `user`, and `cache`, while `file` requires an explicit absolute POSIX path. `PlatformResourceLocator` validates the application ID and executable path, then deterministically yields executable-relative, XDG user, XDG system, `/usr/local/share`, and `/usr/share` locations with duplicate removal. It also provides XDG user-data and cache write roots. macOS and Windows location providers remain required before those platforms are claimed as supported.
+`ResourceUri` strictly parses canonical logical keys for `res`, `builtin`, `user`, and `cache`, while `file` requires an explicit absolute POSIX path. `PlatformResourceLocator` validates the application ID, executable path, HOME, and XDG paths, then deterministically yields executable-relative, XDG user, XDG system, `/usr/local/share`, and `/usr/share` locations with duplicate removal. It also provides distinct XDG config/data/state/cache roots through `NanApplication::platform_paths()`. macOS and Windows location providers remain future platform work.
 
-Runtime discovery uses the executable path, application ID, install prefix conventions, and platform locations rather than compiled absolute paths. Linux search order is executable-relative resources, `$XDG_DATA_HOME/<app-id>`, `~/.local/share/<app-id>` when unset, `$XDG_DATA_DIRS/<app-id>`, `/usr/local/share/<app-id>`, `/usr/share/<app-id>`, then builtins. Installation mode follows Meson's prefix; do not branch on whether the installer is root.
+Runtime discovery uses the executable path, application ID, and XDG platform locations rather than compiled absolute paths. Linux search order is executable-relative resources, `$XDG_DATA_HOME/<app-id>`, `~/.local/share/<app-id>` when unset, `$XDG_DATA_DIRS/<app-id>`, `/usr/local/share/<app-id>`, `/usr/share/<app-id>`, then builtins. Packagers choose a staging destination; runtime code does not branch on whether the current user is root.
 
 #### R3. Streamed Resources
 
@@ -420,13 +420,13 @@ the next usable face. Optional example or system fonts therefore degrade to the 
 family instead of throwing during dynamic page attachment. Exhausting the complete chain remains a
 configuration/resource error and is still reported.
 
-#### R10. Example Cleanup And Install Validation
+#### R10. Example Cleanup And Staging Validation
 
 Status: complete in `9b0933d`.
 
-The Todo example no longer contains `NANDINA_EXAMPLE_RESOURCE_DIR`, manual DirectoryBackend/resource/font services, `TodoPageParams::text_pipeline`, repetitive `set_text_pipeline()`, or manual resource teardown. The obsolete `bundled_fonts` Meson option, copy targets, and copy-specific font test are removed. R4 explicit scanning still covers loose development trees, while the application path uses the validated R7 SQLite package. Automated probes verify the generated package through `SQLiteBackend`, executable-relative portable layout, user/system datadir installation, and built-in font fallback when no optional/project package is present. Sarasa Gothic remains optional and is not downloaded or required for configure, build, startup, or tests.
+The Todo example no longer contains `NANDINA_EXAMPLE_RESOURCE_DIR`, manual DirectoryBackend/resource/font services, `TodoPageParams::text_pipeline`, repetitive `set_text_pipeline()`, or manual resource teardown. The obsolete `bundled_fonts` Meson option, copy targets, and copy-specific font test are removed. R4 explicit scanning still covers loose development trees, while the application path uses the validated R7 SQLite package. Automated probes verify the generated package through `SQLiteBackend`, executable-relative portable layout, datadir copy semantics, and built-in font fallback when no optional/project package is present. These copy probes are packaging primitives, not a supported system installer. Sarasa Gothic remains optional and is not downloaded or required for configure, build, startup, or tests.
 
-Note: the later example restructure removed the example's SQLite package and the packaged-application probes (`nanres-meson-package`, `nanres-chinese-font-package`, `r10-layout`, and the packaged-executable case in `application-resource`) together with the bundled CJK font; the `nanres` toolchain remains covered by the CLI, install, and build-workflow tests.
+Note: the later example restructure removed the example's SQLite package and the packaged-application probes (`nanres-meson-package`, `nanres-chinese-font-package`, `r10-layout`, and the packaged-executable case in `application-resource`) together with the bundled CJK font; the `nanres` toolchain remains covered by the CLI, staging-copy, and build-workflow tests.
 
 ### Simplified Chinese Example Fallback
 
@@ -1004,13 +1004,13 @@ template, and lifetime rules — lives in [`WORKFLOW.md`](WORKFLOW.md). Every ro
 
 ### Developer Experience Roadmap
 
-The application-facing resource workflow is a separate delivery line from the runtime architecture. The target experience is that an application can include Nandina as a Meson subproject, keep a small human-authored resource rule file, and get resource validation, stable locks, packaging, development lookup, and installation from a normal `meson compile`.
+The application-facing resource workflow is a separate delivery line from the runtime architecture. The target experience is that an application can include Nandina as a Meson subproject, keep a small human-authored resource rule file, and get resource validation, stable locks, packaging, development lookup, and a relocatable staging tree from a normal `meson compile`.
 
 #### D1. Meson Subproject Export
 
 Status: initial non-cross export implemented.
 
-Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina subproject: the `nanres` executable, build helper, install helper, and resource build template. A clean external fixture consumes these values through `subproject('nandina')`, creates a package and lock, and does not copy Nandina's internal `meson.build` files. The current export is validated for native builds. Splitting `nanres` and its dependencies into a build-machine executable for cross compilation remains a D4 requirement and must be completed before claiming cross-build support.
+Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina subproject: the `nanres` executable, build helper, legacy-named staging copy helper, and resource build template. A clean external fixture consumes these values through `subproject('nandina')`, creates a package and lock, and does not copy Nandina's internal `meson.build` files. The current export is validated for native builds. Splitting `nanres` and its dependencies into a build-machine executable for cross compilation remains future work; 1.0 does not claim cross-build support.
 
 #### D2. Convention-Driven Resources
 
@@ -1041,9 +1041,9 @@ put files under resources/assets/
 → the application resolves the build-tree package
 ```
 
-No source-tree copying or manual package synchronization is required. A build metadata file may point development runtime lookup at the package in the build tree; release lookup remains executable-relative and install-prefix based.
+No source-tree copying or manual package synchronization is required. A build metadata file may point development runtime lookup at the package in the build tree; release lookup remains executable-relative or XDG-data-root based.
 
-The resource build helper now writes a generated `resource-location.json` beside `resources.db`. It records the package ID, build-tree package root, and database filename. This file is development metadata only: it is generated, must not be hand-edited or committed, and its absolute build path must never be embedded into a release binary. Runtime metadata consumption is now wired in: `NanApplication` reads a `resource-location.json` at each scanned resource root (nlohmann/json is vendored as a git submodule and wrapped by `foundation/json.hpp`'s `parse_json`) and mounts the pointed build-tree package at that root's priority, falling back to the direct `<root>/resources.db` when no metadata file is present (release/install).
+The resource build helper now writes a generated `resource-location.json` beside `resources.db`. It records the package ID, build-tree package root, and database filename. This file is development metadata only: it is generated, must not be hand-edited or committed, and its absolute build path must never be embedded into a release binary. Runtime metadata consumption is now wired in: `NanApplication` reads a `resource-location.json` at each scanned resource root (nlohmann/json is vendored as a git submodule and wrapped by `foundation/json.hpp`'s `parse_json`) and mounts the pointed build-tree package at that root's priority, falling back to the direct `<root>/resources.db` when no metadata file is present (release/portable staging).
 
 Per-resource overrides are expressed as explicit `[[resources]]` entries keyed by logical key; they win over glob `[[rules]]` and over signature/extension media-type detection:
 
@@ -1104,14 +1104,30 @@ belongs to C6/C8.
 
 #### D4. Distribution And CI
 
-Status: planned after D3.
+Status: C6a implemented locally, pending commit and remote validation. The workflow pins GCC 16 and
+Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optional physics. SDK
+source bundle/index publishing, release metadata, archive/offline consumers, and portable staging
+verification remain (C6b/C7).
 
-Document recursive submodule checkout, test clean application builds, offline/default builds, native host-tool builds for cross compilation, executable-relative/package-prefix lookup, deterministic lock/package regeneration, and system/user installation trees. Nandina-as-Git-submodule is a supported development mode; a release archive/wrap remains a future distribution option, not a second resource model.
+Document recursive submodule checkout, clean application builds, offline/default builds,
+executable-relative/XDG resource lookup, deterministic lock/package regeneration, and relocatable
+portable staging trees. Nandina-as-Git-submodule is a supported development mode; a release
+archive/wrap is the default source distribution, not a second resource model.
 
-For 1.0, D4 owns the CI/sanitizer gates, release metadata, SDK bundle/index publishing, and
-source/install distribution verification. The source-resolution contract itself is frozen in C2.1
+For 1.0, D4 owns the CI/sanitizer gates, release metadata, SDK source bundle/index publishing, and
+archive/offline/portable distribution verification. System-installed SDKs and native application
+packages are explicit non-goals. The source-resolution contract itself is frozen in C2.1
 so later platform and release work consumes one stable model. The accepted tree is released only
 after the official-repository promotion and re-verification defined by `1.0_PROMOTION_PLAN.md`.
+
+The CI contract (`.github/workflows/ci.yml`):
+
+- **build (GCC 16/Clang 21)**: recursive-submodule checkout → `meson setup --wrap-mode=nodownload` →
+  compile → full `meson test`.
+- **sanitize**: Clang 21 + `-Db_sanitize=address,undefined` → compile → full headless suite.
+- **SQLite fallback**: force the pinned wrap fallback, then run the resource and external-consumer
+  workflows.
+- **physics**: `-Dphysics2d=enabled` → compile → `physics2d` test.
 
 Resource configuration decisions:
 
@@ -1164,4 +1180,4 @@ For resource/font changes, also run the focused targets:
 meson test -C buildDir resource font-resource --print-errorlogs
 ```
 
-SQLite dependency changes must validate both the normal system-dependency path and an isolated configure using `--force-fallback-for=sqlite3`. Once R4-R7 land, CI should additionally run `nanres validate`, verify deterministic lock/pack regeneration, launch from an executable-relative package layout, and test Linux user-prefix and system-prefix install trees.
+SQLite dependency changes must validate both the normal system-dependency path and an isolated configure using `--force-fallback-for=sqlite3`. CI should additionally run `nanres validate`, verify deterministic lock/pack regeneration, launch from an executable-relative package layout, and move `resources.db` plus `external/` into a clean portable/XDG staging tree without retaining build metadata.

@@ -1,7 +1,7 @@
 #include <catch2/catch_test_macros.hpp>
 
-#include "resource/backends/directory_backend.hpp"
 #include "resource/backends/builtin_backend.hpp"
+#include "resource/backends/directory_backend.hpp"
 #include "resource/backends/memory_backend.hpp"
 #include "resource/backends/sqlite_backend.hpp"
 #include "resource/platform_resource_locator.hpp"
@@ -26,14 +26,21 @@ namespace
     struct TempDirectory {
         std::filesystem::path path = std::filesystem::temp_directory_path()
             / ("nandina-resource-" + resource::ResourceId::random().to_string());
-        TempDirectory() { std::filesystem::create_directories(path); }
-        ~TempDirectory() { std::error_code error; std::filesystem::remove_all(path, error); }
+        TempDirectory() {
+            std::filesystem::create_directories(path);
+        }
+        ~TempDirectory() {
+            std::error_code error;
+            std::filesystem::remove_all(path, error);
+        }
     };
 
     void exec(sqlite3* db, const char* sql) {
         char* message = nullptr;
         const int result = sqlite3_exec(db, sql, nullptr, nullptr, &message);
-        if (message) { sqlite3_free(message); }
+        if (message) {
+            sqlite3_free(message);
+        }
         REQUIRE(result == SQLITE_OK);
     }
 
@@ -41,13 +48,15 @@ namespace
         sqlite3* db = nullptr;
         REQUIRE(sqlite3_open(path.string().c_str(), &db) == SQLITE_OK);
         exec(db, "PRAGMA application_id=1312902724; PRAGMA user_version=1;");
-        exec(db,
+        exec(
+            db,
             "CREATE TABLE resources("
             "id BLOB PRIMARY KEY, resource_key TEXT NOT NULL UNIQUE, media_type TEXT NOT NULL,"
             "storage INTEGER NOT NULL, data BLOB, external_path TEXT, size INTEGER NOT NULL);"
             "CREATE TABLE aliases(alias TEXT PRIMARY KEY, resource_id BLOB NOT NULL);"
         );
-        exec(db,
+        exec(
+            db,
             "INSERT INTO resources VALUES("
             "X'00112233445546778899aabbccddeeff','fonts/default','font/ttf',0,X'010203',NULL,3);"
             "INSERT INTO aliases VALUES('fonts/ui',X'00112233445546778899aabbccddeeff');"
@@ -56,7 +65,7 @@ namespace
         );
         REQUIRE(sqlite3_close(db) == SQLITE_OK);
     }
-}
+} // namespace
 
 TEST_CASE("resource identity and keys are canonical", "[resource]") {
     const auto value = id("00112233-4455-4677-8899-aabbccddeeff");
@@ -105,13 +114,17 @@ TEST_CASE("Linux locator follows executable and XDG resource order", "[resource]
         .executable_path = "/opt/nandina/bin/todo",
         .environment = {
             {"HOME", "/home/tester"},
+            {"XDG_CONFIG_HOME", "/config/user"},
             {"XDG_DATA_HOME", "/data/user"},
             {"XDG_DATA_DIRS", "/data/company:/usr/share"},
+            {"XDG_STATE_HOME", "/state/user"},
             {"XDG_CACHE_HOME", "/cache/user"},
         },
     });
     REQUIRE(locator.has_value());
-    REQUIRE(locator->user_data_root() == "/data/user/org.nandina.todo");
+    REQUIRE(locator->config_root() == "/config/user/org.nandina.todo");
+    REQUIRE(locator->data_root() == "/data/user/org.nandina.todo");
+    REQUIRE(locator->state_root() == "/state/user/org.nandina.todo");
     REQUIRE(locator->cache_root() == "/cache/user/org.nandina.todo");
     const auto roots = locator->resource_roots();
     REQUIRE(roots.size() == 5);
@@ -129,24 +142,41 @@ TEST_CASE("Linux locator uses HOME and default system data directories", "[resou
         .environment = {{"HOME", "/home/tester"}},
     });
     REQUIRE(locator.has_value());
-    REQUIRE(locator->user_data_root() == "/home/tester/.local/share/org.nandina.todo");
+    REQUIRE(locator->config_root() == "/home/tester/.config/org.nandina.todo");
+    REQUIRE(locator->data_root() == "/home/tester/.local/share/org.nandina.todo");
+    REQUIRE(locator->state_root() == "/home/tester/.local/state/org.nandina.todo");
     REQUIRE(locator->cache_root() == "/home/tester/.cache/org.nandina.todo");
     const auto roots = locator->resource_roots();
     REQUIRE(roots.size() == 4);
     REQUIRE(roots[2].root == "/usr/local/share/org.nandina.todo");
     REQUIRE(roots[3].root == "/usr/share/org.nandina.todo");
 
-    REQUIRE_FALSE(resource::PlatformResourceLocator::create({
-        .application_id = "../invalid",
-        .executable_path = "/bin/app",
-    }));
-    REQUIRE_FALSE(resource::PlatformResourceLocator::create({
-        .application_id = "valid.app",
-        .executable_path = "relative/app",
-    }));
+    REQUIRE_FALSE(
+        resource::PlatformResourceLocator::create({
+            .application_id = "../invalid",
+            .executable_path = "/bin/app",
+        })
+    );
+    REQUIRE_FALSE(
+        resource::PlatformResourceLocator::create({
+            .application_id = "valid.app",
+            .executable_path = "relative/app",
+            .environment = {{"HOME", "/home/tester"}},
+        })
+    );
+    REQUIRE_FALSE(
+        resource::PlatformResourceLocator::create({
+            .application_id = "valid.app",
+            .executable_path = "/bin/app",
+            .environment = {{"HOME", "/home/tester"}, {"XDG_CONFIG_HOME", "relative/config"}},
+        })
+    );
 }
 
-TEST_CASE("resource scanner is deterministic and follows media type precedence", "[resource][scan]") {
+TEST_CASE(
+    "resource scanner is deterministic and follows media type precedence",
+    "[resource][scan]"
+) {
     TempDirectory temp;
     std::filesystem::create_directories(temp.path / "assets/nested");
     {
@@ -154,9 +184,18 @@ TEST_CASE("resource scanner is deterministic and follows media type precedence",
         const std::array<unsigned char, 8> png {0x89, 'P', 'N', 'G', 0x0d, 0x0a, 0x1a, 0x0a};
         file.write(reinterpret_cast<const char*>(png.data()), png.size());
     }
-    { std::ofstream file(temp.path / "assets/nested/config.json"); file << "{}"; }
-    { std::ofstream file(temp.path / "assets/unknown.asset"); file << "binary"; }
-    { std::ofstream file(temp.path / "assets/forced.png"); file << "not-png"; }
+    {
+        std::ofstream file(temp.path / "assets/nested/config.json");
+        file << "{}";
+    }
+    {
+        std::ofstream file(temp.path / "assets/unknown.asset");
+        file << "binary";
+    }
+    {
+        std::ofstream file(temp.path / "assets/forced.png");
+        file << "not-png";
+    }
 
     const auto result = resource::scan_resources({
         .roots = {{.path = temp.path / "assets", .key_prefix = "app"}},
@@ -177,12 +216,30 @@ TEST_CASE("resource scanner rejects unsafe paths and normalized collisions", "[r
     std::filesystem::create_directories(temp.path / "assets/.hidden");
     std::filesystem::create_directories(temp.path / "assets/build-output");
     std::filesystem::create_directories(temp.path / "assets/package");
-    { std::ofstream file(temp.path / "assets/valid.txt"); file << "ok"; }
-    { std::ofstream file(temp.path / "assets/Upper.txt"); file << "a"; }
-    { std::ofstream file(temp.path / "assets/upper.txt"); file << "b"; }
-    { std::ofstream file(temp.path / "assets/.hidden/secret.txt"); file << "secret"; }
-    { std::ofstream file(temp.path / "assets/build-output/generated.bin"); file << "generated"; }
-    { std::ofstream file(temp.path / "assets/package/resources.db"); file << "output"; }
+    {
+        std::ofstream file(temp.path / "assets/valid.txt");
+        file << "ok";
+    }
+    {
+        std::ofstream file(temp.path / "assets/Upper.txt");
+        file << "a";
+    }
+    {
+        std::ofstream file(temp.path / "assets/upper.txt");
+        file << "b";
+    }
+    {
+        std::ofstream file(temp.path / "assets/.hidden/secret.txt");
+        file << "secret";
+    }
+    {
+        std::ofstream file(temp.path / "assets/build-output/generated.bin");
+        file << "generated";
+    }
+    {
+        std::ofstream file(temp.path / "assets/package/resources.db");
+        file << "output";
+    }
     std::error_code symlink_error;
     std::filesystem::create_symlink(
         temp.path / "assets/valid.txt",
@@ -216,10 +273,12 @@ TEST_CASE("memory resources survive replacement and manager overlays", "[resourc
     const auto resource_id = id("00112233-4455-4677-8899-aabbccddeeff");
     auto base = std::make_shared<resource::MemoryBackend>("base");
     auto override = std::make_shared<resource::MemoryBackend>("override");
-    auto old = base->insert(resource_id, resource::ResourceKey("fonts/default"), "font/ttf", {1, 2});
+    auto old =
+        base->insert(resource_id, resource::ResourceKey("fonts/default"), "font/ttf", {1, 2});
     REQUIRE(old.has_value());
     REQUIRE(base->add_alias(resource::ResourceKey("fonts/ui"), resource_id).has_value());
-    REQUIRE(override->insert(resource_id, resource::ResourceKey("fonts/default"), "font/ttf", {9}).has_value());
+    REQUIRE(override->insert(resource_id, resource::ResourceKey("fonts/default"), "font/ttf", {9})
+                .has_value());
 
     resource::ResourceManager manager;
     const auto base_mount = manager.mount(base, 0);
@@ -230,15 +289,22 @@ TEST_CASE("memory resources survive replacement and manager overlays", "[resourc
     REQUIRE(manager.require(resource::ResourceKey("fonts/default"))->get()->bytes()[0] == 1);
 
     REQUIRE(base->insert(
-        resource_id, resource::ResourceKey("fonts/default"), "font/ttf", {3},
-        resource::InsertMode::replace
-    ).has_value());
+                    resource_id,
+                    resource::ResourceKey("fonts/default"),
+                    "font/ttf",
+                    {3},
+                    resource::InsertMode::replace
+    )
+                .has_value());
     REQUIRE((*old)->bytes()[0] == 1);
     REQUIRE(manager.unmount(base_mount));
     REQUIRE((*old)->bytes()[1] == 2);
 }
 
-TEST_CASE("builtin resources provide an overridable default font and license", "[resource][builtin]") {
+TEST_CASE(
+    "builtin resources provide an overridable default font and license",
+    "[resource][builtin]"
+) {
     const auto builtin = resource::BuiltinBackend::create();
     REQUIRE(builtin->name() == "builtin");
 
@@ -250,9 +316,7 @@ TEST_CASE("builtin resources provide an overridable default font and license", "
     REQUIRE((**font)->storage() == resource::ResourceStorage::embedded_blob);
     REQUIRE((**font)->size() > 100'000);
 
-    const auto license = builtin->find(
-        resource::ResourceKey("licenses/fonts/caskaydia-cove")
-    );
+    const auto license = builtin->find(resource::ResourceKey("licenses/fonts/caskaydia-cove"));
     REQUIRE(license.has_value());
     REQUIRE(license->has_value());
     REQUIRE((**license)->media_type() == "text/plain");
@@ -262,19 +326,24 @@ TEST_CASE("builtin resources provide an overridable default font and license", "
     resource::ResourceManager manager;
     (void)manager.mount(builtin, -1000);
     auto override = std::make_shared<resource::MemoryBackend>("project");
-    REQUIRE(override->insert(
-        id("00112233-4455-4677-8899-aabbccddeeff"),
-        resource::ResourceKey("fonts/default"),
-        "font/ttf",
-        {1, 2, 3}
-    ).has_value());
+    REQUIRE(override
+                ->insert(
+                    id("00112233-4455-4677-8899-aabbccddeeff"),
+                    resource::ResourceKey("fonts/default"),
+                    "font/ttf",
+                    {1, 2, 3}
+                )
+                .has_value());
     (void)manager.mount(override, 0);
     REQUIRE(manager.require(resource::ResourceKey("fonts/default"))->get()->size() == 3);
 }
 
 TEST_CASE("directory backend loads manifest resources into owned handles", "[resource]") {
     TempDirectory temp;
-    { std::ofstream file(temp.path / "asset.bin", std::ios::binary); file.write("abc", 3); }
+    {
+        std::ofstream file(temp.path / "asset.bin", std::ios::binary);
+        file.write("abc", 3);
+    }
     const auto resource_id = id("00112233-4455-4677-8899-aabbccddeeff");
     auto backend = resource::DirectoryBackend::open({
         .root = temp.path,
@@ -298,7 +367,10 @@ TEST_CASE("directory backend loads manifest resources into owned handles", "[res
 
 TEST_CASE("directory streams are bounded and survive backend removal", "[resource][stream]") {
     TempDirectory temp;
-    { std::ofstream file(temp.path / "large.bin", std::ios::binary); file.write("abcdef", 6); }
+    {
+        std::ofstream file(temp.path / "large.bin", std::ios::binary);
+        file.write("abcdef", 6);
+    }
     const auto resource_id = id("20112233-4455-4677-8899-aabbccddeeff");
     auto backend = resource::DirectoryBackend::open({
         .root = temp.path,
@@ -346,7 +418,10 @@ TEST_CASE("SQLite backend resolves blobs aliases and external files", "[resource
     TempDirectory temp;
     const auto database = temp.path / "resources.db";
     create_database(database);
-    { std::ofstream file(temp.path / "basic.glsl", std::ios::binary); file.write("main", 4); }
+    {
+        std::ofstream file(temp.path / "basic.glsl", std::ios::binary);
+        file.write("main", 4);
+    }
     auto backend = resource::SQLiteBackend::open({.database = database});
     REQUIRE(backend.has_value());
 
@@ -369,9 +444,7 @@ TEST_CASE("SQLite backend resolves blobs aliases and external files", "[resource
     REQUIRE(bytes[0] == 1);
     REQUIRE(bytes[2] == 3);
 
-    auto external_stream = (*backend)->open_stream(
-        id("10112233-4455-4677-8899-aabbccddeeff")
-    );
+    auto external_stream = (*backend)->open_stream(id("10112233-4455-4677-8899-aabbccddeeff"));
     REQUIRE(external_stream.has_value());
     REQUIRE(external_stream->has_value());
     REQUIRE((**external_stream)->read(bytes) == 4);

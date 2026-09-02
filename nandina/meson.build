@@ -290,7 +290,6 @@ nandina_lib = static_library(
     [module_fundation, module_reactive, module_resource, module_scene, module_semantics, module_render, module_theme, module_text, module_widget, module_app, module_animation, module_physics2d, builtin_font_data, builtin_font_license_data],
     cpp_args : nandina_cpp_args,
     dependencies : nandina_dependencies,
-    install : true,
 )
 
 # 创建依赖对象，供 example 使用
