@@ -151,10 +151,10 @@ namespace nandina::widget
 
     auto Image::on_draw(render::DrawContext& ctx) -> void {
         const auto world = render::world_bounds_from_local(ctx.world_transform(), local_rect());
+        const auto clip = ctx.clip().current();
         // C5.6b：视口门控——图片尚未加载且启用了预取时，只有世界矩形与当前 clip 视口
         // （外扩预取距离）相交才触发加载，否则保持 idle 只画占位。
         if (load_state_ == ImageLoadState::idle && prefetch_distance_ > 0.0F) {
-            const auto clip = ctx.clip().current();
             if (clip.is_valid() && !clip.expanded(prefetch_distance_).intersects(world)) {
                 if (placeholder_color_) {
                     ctx.device().draw_rect(
@@ -165,7 +165,20 @@ namespace nandina::widget
                 return;
             }
         }
-        ensure_loaded(ctx.device());
+        // C5.6：加载优先级 = 世界矩形到 clip 视口的轴对齐间距（相交为 0 = 可见）。
+        int priority = 0;
+        if (clip.is_valid() && !clip.intersects(world)) {
+            const float dx = std::max(
+                0.0F,
+                std::max(world.get_left() - clip.get_right(), clip.get_left() - world.get_right())
+            );
+            const float dy = std::max(
+                0.0F,
+                std::max(world.get_top() - clip.get_bottom(), clip.get_top() - world.get_bottom())
+            );
+            priority = static_cast<int>(std::ceil(dx + dy));
+        }
+        ensure_loaded(ctx.device(), priority);
         if (!texture_) {
             if (placeholder_color_) {
                 ctx.device().draw_rect(
@@ -191,7 +204,7 @@ namespace nandina::widget
         return constraints.constrain(size());
     }
 
-    void Image::ensure_loaded(render::IRenderDevice& device) {
+    void Image::ensure_loaded(render::IRenderDevice& device, const int priority) {
         if (load_state_ != ImageLoadState::idle || source_.empty()) {
             return;
         }
@@ -232,7 +245,8 @@ namespace nandina::widget
                             if (const auto image = weak.lock()) {
                                 image->complete_async(generation, source, std::move(texture));
                             }
-                        }
+                        },
+                        priority
                     ))
                 {
                     return;

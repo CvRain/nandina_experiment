@@ -137,7 +137,8 @@ namespace nandina::render
         const std::span<const std::uint8_t> bytes,
         const std::string_view media_type,
         const ImageLoadOptions& options,
-        AsyncCompletion completion
+        AsyncCompletion completion,
+        const int priority
     ) -> bool {
         if (!supports_async_loading() || cache_key.empty() || !bytes_owner || bytes.empty()
             || media_type.empty() || !completion)
@@ -156,6 +157,7 @@ namespace nandina::render
             return true;
         }
         if (auto* pending = find_pending(key)) {
+            pending->priority = std::min(pending->priority, priority);
             pending->completions.push_back(std::move(completion));
             return true;
         }
@@ -179,6 +181,7 @@ namespace nandina::render
             },
             .encoded_bytes = bytes.size(),
             .submitted = false,
+            .priority = priority,
         };
         entry.completions.push_back(std::move(completion));
         pending_.push_back(std::move(entry));
@@ -194,7 +197,8 @@ namespace nandina::render
         resource::ResourceManager& resources,
         resource::ResourceKey key,
         const ImageLoadOptions& options,
-        AsyncCompletion completion
+        AsyncCompletion completion,
+        const int priority
     ) -> bool {
         if (!supports_async_loading() || !completion) {
             return false;
@@ -211,6 +215,7 @@ namespace nandina::render
             return true;
         }
         if (auto* pending = find_pending(cache_key)) {
+            pending->priority = std::min(pending->priority, priority);
             pending->completions.push_back(std::move(completion));
             return true;
         }
@@ -236,6 +241,7 @@ namespace nandina::render
             },
             .encoded_bytes = 0,
             .submitted = false,
+            .priority = priority,
         };
         entry.completions.push_back(std::move(completion));
         pending_.push_back(std::move(entry));
@@ -310,6 +316,8 @@ namespace nandina::render
     }
 
     void TextureCache::drain_pending() {
+        // C5.6：按优先级（低值 = 更可见/更近）排序，保证可见图片先提交解码。
+        std::ranges::stable_sort(pending_, std::less<>{}, &PendingEntry::priority);
         for (auto& entry: pending_) {
             (void)submit_pending(entry);
         }

@@ -102,7 +102,8 @@ namespace nandina::render
             std::span<const std::uint8_t> bytes,
             std::string_view media_type,
             const ImageLoadOptions& options,
-            AsyncCompletion completion
+            AsyncCompletion completion,
+            int priority = 0
         ) -> bool;
 
         /// 后台完成 res:// 资源读取 + CPU 解码，UI 线程只上传纹理（C5.5）。缓存键由
@@ -111,7 +112,8 @@ namespace nandina::render
             resource::ResourceManager& resources,
             resource::ResourceKey key,
             const ImageLoadOptions& options,
-            AsyncCompletion completion
+            AsyncCompletion completion,
+            int priority = 0
         ) -> bool;
 
         [[nodiscard]] auto supports_async_loading() const noexcept -> bool;
@@ -150,6 +152,8 @@ namespace nandina::render
             std::move_only_function<DecodedImage()> load;
             std::size_t encoded_bytes = 0;
             bool submitted = false;
+            /// C5.6 加载优先级（低值先提交解码；0 = 可见）。
+            int priority = 0;
         };
 
         struct ReadyUpload {

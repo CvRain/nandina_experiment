@@ -132,13 +132,17 @@ namespace
     class RecordingDecoder final: public render::IImageDecoder {
     public:
         int calls = 0;
+        std::vector<std::uint8_t> decoded_bytes;
 
         [[nodiscard]] auto decode_memory(
-            std::span<const std::uint8_t>,
+            std::span<const std::uint8_t> bytes,
             std::string_view,
             const render::ImageLoadOptions&
         ) -> render::DecodedImage override {
             ++calls;
+            if (!bytes.empty()) {
+                decoded_bytes.push_back(bytes[0]);
+            }
             return render::DecodedImage {
                 .width = 2,
                 .height = 1,
@@ -969,4 +973,47 @@ TEST_CASE("image defers loading outside its clip viewport", "[image][viewport]")
     REQUIRE(device.loaded.size() == 1);
     REQUIRE(device.loaded.front() == "hero.png");
     REQUIRE(image->load_state() == widget::ImageLoadState::ready);
+}
+
+TEST_CASE("async decode priority orders the pending queue", "[image][cache][async][priority]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+            .max_concurrent_decodes = 1,
+        }
+    );
+    auto a = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    auto b = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {2, 3, 4});
+    auto c = std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {3, 4, 5});
+    REQUIRE(cache.load_memory_async(
+        "a", std::shared_ptr<const void>(a), *a, "image/png", {}, [](auto) {}, /*priority=*/50
+    ));
+    REQUIRE(cache.load_memory_async(
+        "b", std::shared_ptr<const void>(b), *b, "image/png", {}, [](auto) {}, /*priority=*/100
+    ));
+    REQUIRE(cache.load_memory_async(
+        "c", std::shared_ptr<const void>(c), *c, "image/png", {}, [](auto) {}, /*priority=*/0
+    ));
+
+    // 预算 1：先提交 a（首个），b/c 排队。a 完成后按优先级先提交 c（0）再提交 b（100）。
+    background.drain();
+    ui.drain();
+    background.drain();
+    ui.drain();
+    background.drain();
+    ui.drain();
+
+    REQUIRE(decoder->calls == 3);
+    REQUIRE(decoder->decoded_bytes == std::vector<std::uint8_t> {1, 3, 2});
 }

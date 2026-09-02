@@ -113,7 +113,7 @@ namespace nandina::widget
             foundation::NanRect destination;
         };
 
-        void ensure_loaded(render::IRenderDevice& device);
+        void ensure_loaded(render::IRenderDevice& device, int priority);
         void reset_load();
         void complete_async(
             std::uint64_t generation,
