@@ -318,8 +318,10 @@ namespace nandina::render
     void TextureCache::clear() {
         ++generation_;
         pending_.clear();
+        ready_uploads_.clear();
         inflight_decodes_ = 0;
         inflight_encoded_bytes_ = 0;
+        uploads_this_frame_ = 0;
         index_.clear();
         retained_.clear();
         retained_bytes_ = 0;
@@ -373,6 +375,48 @@ namespace nandina::render
         std::erase_if(index_, [](const IndexedEntry& entry) { return entry.texture.expired(); });
     }
 
+    void TextureCache::begin_frame() {
+        uploads_this_frame_ = 0;
+        drain_uploads();
+    }
+
+    void TextureCache::drain_uploads() {
+        const auto budget = async_.max_uploads_per_frame;
+        while (!ready_uploads_.empty()
+               && (budget == 0 || uploads_this_frame_ < budget))
+        {
+            auto ready = std::move(ready_uploads_.front());
+            ready_uploads_.pop_front();
+            if (ready.generation != generation_) {
+                continue;
+            }
+            ++uploads_this_frame_;
+            std::shared_ptr<CachedTexture> texture;
+            if (ready.decoded.valid()) {
+                const auto handle = device_->create_rgba_texture(
+                    ready.decoded.width,
+                    ready.decoded.height,
+                    ready.decoded.rgba
+                );
+                if (handle) {
+                    texture = std::make_shared<CachedTexture>(
+                        *device_,
+                        handle,
+                        NanSize(
+                            static_cast<float>(ready.decoded.width),
+                            static_cast<float>(ready.decoded.height)
+                        )
+                    );
+                    index(ready.key, texture);
+                    retain(ready.key, texture);
+                }
+            }
+            for (auto& completion: ready.completions) {
+                completion(texture);
+            }
+        }
+    }
+
     void TextureCache::finish_async(Key key, DecodedImage decoded, const std::uint64_t generation) {
         if (generation != generation_)
             return;
@@ -385,26 +429,17 @@ namespace nandina::render
             --inflight_decodes_;
             inflight_encoded_bytes_ -= pending->encoded_bytes;
         }
-        auto completions = std::move(pending->completions);
+        ready_uploads_.push_back(
+            ReadyUpload {
+                .key = key,
+                .decoded = std::move(decoded),
+                .generation = generation,
+                .completions = std::move(pending->completions),
+            }
+        );
         pending_.erase(pending);
 
-        std::shared_ptr<CachedTexture> texture;
-        if (decoded.valid()) {
-            const auto handle =
-                device_->create_rgba_texture(decoded.width, decoded.height, decoded.rgba);
-            if (handle) {
-                texture = std::make_shared<CachedTexture>(
-                    *device_,
-                    handle,
-                    NanSize(static_cast<float>(decoded.width), static_cast<float>(decoded.height))
-                );
-                index(key, texture);
-                retain(key, texture);
-            }
-        }
-        for (auto& completion: completions)
-            completion(texture);
-
+        drain_uploads();
         drain_pending();
     }
 

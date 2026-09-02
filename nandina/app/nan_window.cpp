@@ -178,6 +178,7 @@ namespace nandina::app
                 .post_ui = [this](
                                std::move_only_function<void()> task
                            ) { return app_.dispatcher().post(std::move(task)); },
+                .max_uploads_per_frame = 4,
             }
         );
         tree_.set_texture_cache(*texture_cache_);
@@ -309,6 +310,9 @@ namespace nandina::app
         );
         update_viewport_mapping(metrics.screen_size);
         auto deferred_effects = app_.graph().defer_effects();
+        if (texture_cache_) {
+            texture_cache_->begin_frame();
+        }
 
         {
             auto phase = tree_.enter_phase(scene::FramePhase::input);

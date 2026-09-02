@@ -13,6 +13,7 @@
 #include <atomic>
 #include <cstddef>
 #include <cstdint>
+#include <deque>
 #include <functional>
 #include <list>
 #include <memory>
@@ -61,6 +62,8 @@ namespace nandina::render
         std::size_t max_concurrent_decodes = 2;
         std::size_t max_inflight_encoded_bytes = 64U * 1024U * 1024U;
         std::size_t max_load_attempts = 2;
+        /// C5.6 每帧上传预算：一帧最多上传的 RGBA 纹理数（0 = 不限）。
+        std::size_t max_uploads_per_frame = 0;
 
         [[nodiscard]] explicit operator bool() const noexcept {
             return decoder != nullptr && submit_background && post_ui;
@@ -113,6 +116,9 @@ namespace nandina::render
 
         [[nodiscard]] auto supports_async_loading() const noexcept -> bool;
 
+        /// 帧起点：重置本帧上传计数并补做上一帧排队的上传（C5.6）。
+        void begin_frame();
+
         void clear();
         [[nodiscard]] auto retained_entries() const noexcept -> std::size_t;
         [[nodiscard]] auto retained_bytes() const noexcept -> std::size_t;
@@ -146,6 +152,13 @@ namespace nandina::render
             bool submitted = false;
         };
 
+        struct ReadyUpload {
+            Key key;
+            DecodedImage decoded;
+            std::uint64_t generation = 0;
+            std::vector<AsyncCompletion> completions;
+        };
+
         [[nodiscard]] auto find(const Key& key) -> std::shared_ptr<CachedTexture>;
         void index(Key key, const std::shared_ptr<CachedTexture>& texture);
         void retain(const Key& key, std::shared_ptr<CachedTexture> texture);
@@ -154,6 +167,7 @@ namespace nandina::render
         [[nodiscard]] auto find_pending(const Key& key) -> PendingEntry*;
         [[nodiscard]] auto submit_pending(PendingEntry& entry) -> bool;
         void drain_pending();
+        void drain_uploads();
         void finish_async(Key key, DecodedImage decoded, std::uint64_t generation);
         [[nodiscard]] static auto same_key(const Key& lhs, const Key& rhs) -> bool;
 
@@ -163,9 +177,11 @@ namespace nandina::render
         std::vector<IndexedEntry> index_;
         std::list<RetainedEntry> retained_;
         std::vector<PendingEntry> pending_;
+        std::deque<ReadyUpload> ready_uploads_;
         std::size_t retained_bytes_ = 0;
         std::size_t inflight_decodes_ = 0;
         std::size_t inflight_encoded_bytes_ = 0;
+        std::size_t uploads_this_frame_ = 0;
         std::uint64_t generation_ = 0;
         std::shared_ptr<std::atomic_bool> alive_ = std::make_shared<std::atomic_bool>(true);
     };

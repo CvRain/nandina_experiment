@@ -832,6 +832,53 @@ TEST_CASE("async decode retries a bounded number of times on failure", "[image][
     REQUIRE(device.rgba_uploads == 1);
 }
 
+TEST_CASE("async uploads respect the per-frame budget", "[image][cache][async][budget]") {
+    TextureRecordingDevice device;
+    auto decoder = std::make_shared<RecordingDecoder>();
+    ManualTaskQueue background;
+    ManualTaskQueue ui;
+    render::TextureCache cache(
+        device,
+        {},
+        render::TextureCacheAsyncServices {
+            .decoder = decoder,
+            .submit_background = [&background](
+                                     std::move_only_function<void()> task
+                                 ) { return background.submit(std::move(task)); },
+            .post_ui =
+                [&ui](std::move_only_function<void()> task) { return ui.submit(std::move(task)); },
+            .max_concurrent_decodes = 2,
+            .max_uploads_per_frame = 1,
+        }
+    );
+    auto bytes =
+        std::make_shared<std::vector<std::uint8_t>>(std::initializer_list<std::uint8_t> {1, 2, 3});
+    REQUIRE(cache.load_memory_async(
+        "one",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [](auto) {}
+    ));
+    REQUIRE(cache.load_memory_async(
+        "two",
+        std::shared_ptr<const void>(bytes),
+        *bytes,
+        "image/png",
+        {},
+        [](auto) {}
+    ));
+
+    cache.begin_frame();
+    background.drain(); // 两个解码同帧完成 → 两个 finish 进入 tasks 队列。
+    ui.drain();         // 预算 1：只上传第一个，第二个排队。
+    REQUIRE(device.rgba_uploads == 1);
+
+    cache.begin_frame(); // 下一帧补做第二个。
+    REQUIRE(device.rgba_uploads == 2);
+}
+
 TEST_CASE("texture cache keys include image preprocessing options", "[image][cache]") {
     TextureRecordingDevice dev;
     render::TextureCache cache(dev);
