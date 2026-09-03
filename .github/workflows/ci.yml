@@ -24,8 +24,8 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - name: gcc-15
-            image: gcc:15-bookworm
+          - name: gcc-16
+            image: gcc:16
             cc: gcc
             cxx: g++
             toolchain_args: ''
@@ -34,8 +34,8 @@ jobs:
             image: silkeh/clang:21-bookworm
             cc: clang
             cxx: clang++
-            toolchain_args: -Dcpp_args=-stdlib=libc++ -Dcpp_link_args=-stdlib=libc++
-            extra_packages: libc++-21-dev libc++abi-21-dev
+            toolchain_args: ''
+            extra_packages: ''
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
@@ -52,6 +52,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
       - name: Report toolchain
         run: |
           "$CXX" --version
@@ -79,18 +81,16 @@ jobs:
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
             zlib1g-dev \
-            libc++-21-dev libc++abi-21-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
       - name: Configure
-        run: |
-          meson setup buildDir-asan -Db_sanitize=address,undefined \
-            -Dcpp_args=-stdlib=libc++ -Dcpp_link_args=-stdlib=libc++ \
-            --wrap-mode=nodownload
+        run: meson setup buildDir-asan -Db_sanitize=address,undefined --wrap-mode=nodownload
       - name: Build
         run: meson compile -C buildDir-asan
       - name: Test
@@ -100,7 +100,7 @@ jobs:
     name: SQLite fallback
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: gcc:15-bookworm
+    container: gcc:16
     env:
       CC: gcc
       CXX: g++
@@ -117,6 +117,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
       - name: Configure
         run: meson setup buildDir-fallback --force-fallback-for=sqlite3
       - name: Build
@@ -131,7 +133,7 @@ jobs:
     name: physics (Box2D enabled)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: gcc:15-bookworm
+    container: gcc:16
     env:
       CC: gcc
       CXX: g++
@@ -148,6 +150,8 @@ jobs:
       - uses: actions/checkout@v5
         with:
           submodules: recursive
+      - name: Configure git
+        run: git config --global --add safe.directory '*'
       - name: Configure
         run: meson setup buildDir-physics -Dphysics2d=enabled --wrap-mode=nodownload
       - name: Build
