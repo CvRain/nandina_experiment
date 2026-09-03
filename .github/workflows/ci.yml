@@ -31,11 +31,11 @@ jobs:
             toolchain_args: ''
             extra_packages: ''
           - name: clang-21
-            image: silkeh/clang:21-bookworm
+            image: silkeh/clang:21-trixie
             cc: clang
             cxx: clang++
             toolchain_args: ''
-            extra_packages: ''
+            extra_packages: g++
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
@@ -70,7 +70,7 @@ jobs:
     name: sanitize (Clang 21, ASan + UBSan)
     runs-on: ubuntu-latest
     timeout-minutes: 30
-    container: silkeh/clang:21-bookworm
+    container: silkeh/clang:21-trixie
     env:
       CC: clang
       CXX: clang++
@@ -80,7 +80,7 @@ jobs:
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
             ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
-            zlib1g-dev \
+            zlib1g-dev g++ \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
