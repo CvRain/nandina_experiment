@@ -28,10 +28,14 @@ jobs:
             image: gcc:15-bookworm
             cc: gcc
             cxx: g++
+            toolchain_args: ''
+            extra_packages: ''
           - name: clang-21
             image: silkeh/clang:21-bookworm
             cc: clang
             cxx: clang++
+            toolchain_args: -Dcpp_args=-stdlib=libc++ -Dcpp_link_args=-stdlib=libc++
+            extra_packages: libc++-21-dev libc++abi-21-dev
     env:
       CC: ${{ matrix.cc }}
       CXX: ${{ matrix.cxx }}
@@ -40,8 +44,8 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
-            zlib1g-dev \
+            ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
+            zlib1g-dev ${{ matrix.extra_packages }} \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
@@ -54,7 +58,7 @@ jobs:
           meson --version
           ninja --version
       - name: Configure
-        run: meson setup buildDir --wrap-mode=nodownload
+        run: meson setup buildDir --wrap-mode=nodownload ${{ matrix.toolchain_args }}
       - name: Build
         run: meson compile -C buildDir
       - name: Test
@@ -73,8 +77,9 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
             zlib1g-dev \
+            libc++-21-dev libc++abi-21-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev
           python3 -m pip install --break-system-packages --no-cache-dir "meson==${MESON_VERSION}"
@@ -82,7 +87,10 @@ jobs:
         with:
           submodules: recursive
       - name: Configure
-        run: meson setup buildDir-asan -Db_sanitize=address,undefined --wrap-mode=nodownload
+        run: |
+          meson setup buildDir-asan -Db_sanitize=address,undefined \
+            -Dcpp_args=-stdlib=libc++ -Dcpp_link_args=-stdlib=libc++ \
+            --wrap-mode=nodownload
       - name: Build
         run: meson compile -C buildDir-asan
       - name: Test
@@ -101,7 +109,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
             zlib1g-dev \
             libssl-dev libx11-dev libxrandr-dev libxinerama-dev libxcursor-dev \
             libxi-dev libgl1-mesa-dev libglu1-mesa-dev
@@ -116,7 +124,7 @@ jobs:
       - name: Test resource workflow
         run: |
           meson test -C buildDir-fallback --print-errorlogs \
-            resource nanres-cli nanres-install nanres-build-workflow \
+            resource nanres-cli portable-stage nanres-build-workflow \
             nandina-subproject-fixture font-resource application-resource
 
   physics:
@@ -132,7 +140,7 @@ jobs:
         run: |
           apt-get update
           DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-            ca-certificates git python3 python3-pip ninja-build pkg-config cmake \
+            ca-certificates git python3 python3-pip ninja-build pkg-config cmake zstd \
             zlib1g-dev \
             libsqlite3-dev libssl-dev libx11-dev libxrandr-dev libxinerama-dev \
             libxcursor-dev libxi-dev libgl1-mesa-dev libglu1-mesa-dev

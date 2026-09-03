@@ -398,7 +398,7 @@ Status: complete in `9b0933d`.
 
 Status: complete in `9b0933d`; Meson authoring simplified in the current change.
 
-The example previously built a SQLite resource package with an always-stale Meson custom target around `nanres_build_helper.py`. During the example restructure, resource packaging was removed while the application layout stabilized. C3 restores a minimal package for the Settings brand image, making the example a real `res://` consumer without restoring the former bundled CJK font pack. The `nanres` toolchain remains exported through `nandina_resource_toolchain` and is also exercised by the `nanres-cli`, `nanres-install`, `nanres-build-workflow`, and `nandina-subproject-fixture` tests.
+The example previously built a SQLite resource package with an always-stale Meson custom target around `nanres_build_helper.py`. During the example restructure, resource packaging was removed while the application layout stabilized. C3 restores a minimal package for the Settings brand image, making the example a real `res://` consumer without restoring the former bundled CJK font pack. The `nanres` toolchain remains exported through `nandina_resource_toolchain` and is also exercised by the `nanres-cli`, `portable-stage`, `nanres-build-workflow`, and `nandina-subproject-fixture` tests.
 
 Fully offline builds use compatible system dependencies or pre-populated Meson `subprojects/packagecache` archives for the pinned wraps. Configure/build never downloads Sarasa Gothic or other optional resource packs implicitly. Generated SQLite fallback source trees, build outputs, resource databases, package fingerprints, and lock-update temporaries remain outside source control; generated `resources.lock.toml` is the intentional exception and is committed as application inventory.
 
@@ -1010,7 +1010,12 @@ The application-facing resource workflow is a separate delivery line from the ru
 
 Status: initial non-cross export implemented.
 
-Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina subproject: the `nanres` executable, build helper, legacy-named staging copy helper, and resource build template. A clean external fixture consumes these values through `subproject('nandina')`, creates a package and lock, and does not copy Nandina's internal `meson.build` files. The current export is validated for native builds. Splitting `nanres` and its dependencies into a build-machine executable for cross compilation remains future work; 1.0 does not claim cross-build support.
+Export a stable `nandina_resource_toolchain` Meson dictionary from the Nandina subproject: the
+`nanres` executable, build helper, explicit portable-stage helper, and resource build template. A
+clean external fixture consumes these values through `subproject('nandina')`, creates a package and
+lock, and does not copy Nandina's internal `meson.build` files. The current export is validated for
+native builds. Splitting `nanres` and its dependencies into a build-machine executable for cross
+compilation remains future work; 1.0 does not claim cross-build support.
 
 #### D2. Convention-Driven Resources
 
@@ -1104,10 +1109,14 @@ belongs to C6/C8.
 
 #### D4. Distribution And CI
 
-Status: C6a implemented and undergoing remote validation. The workflow pins GCC 15 and
-Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optional physics. SDK
-source bundle/index publishing, release metadata, archive/offline consumers, and portable staging
-verification remain (C6b/C7).
+Status: C6a/C6b implemented and undergoing remote validation. The workflow pins GCC 15 and
+Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optional physics. The
+`sdk_bundle.py` helper emits reproducible `.tar.xz`/`.tar.zst`/`.zip` source bundles,
+`sdk-manifest.json`, and a CLI-compatible `index.toml`; Linux 1.0 indexes the `.tar.xz` artifact so
+Meson remains compatible with Python 3.11. The archive consumer fixture populates Meson's package cache and
+configures with `--wrap-mode=nodownload`. `portable_stage.py` atomically publishes a relocatable
+executable plus `resources.db`/`external/` tree and excludes build-only metadata. One remote CI pass
+is still required before C7.
 
 Document recursive submodule checkout, clean application builds, offline/default builds,
 executable-relative/XDG resource lookup, deterministic lock/package regeneration, and relocatable

@@ -72,7 +72,8 @@ licenses, and an SDK manifest.
 
 Each release publishes at least:
 
-- a `.tar.zst` source bundle for Unix-like hosts;
+- a Meson/Python 3.11-compatible `.tar.xz` registry artifact for Linux 1.0;
+- a `.tar.zst` source bundle for newer Unix-like tooling;
 - a `.zip` source bundle for Windows;
 - hashes/signatures and a machine-readable SDK manifest;
 - the source-index entry consumed by NandinaCLI.

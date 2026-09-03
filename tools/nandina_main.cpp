@@ -243,7 +243,6 @@ namespace
               "    '" + std::string(name) + "',\n"
               "    files('src/main.cpp'),\n"
               "    dependencies: [nandina_dep],\n"
-              "    install: true,\n"
               ")\n";
     }
 

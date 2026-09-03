@@ -9,10 +9,3 @@ nanres_package = custom_target(
     build_by_default: true,
     build_always_stale: true,
 )
-
-meson.add_install_script(
-    nanres_install_helper,
-    nanres_package,
-    nanres_policy,
-    get_option('datadir'),
-)

@@ -440,13 +440,14 @@ history follows:
   `loading`; decoded RGBA waiting for the per-frame upload budget applies byte backpressure. Linux
   platform paths now expose validated XDG config/data/state/cache roots through
   `NanApplication::platform_paths()` while retaining executable-relative and XDG resource lookup.
-- C6a CI/sanitizer implementation: `.github/workflows/ci.yml` pins GCC 15/Clang 21 containers and
+- C6a/C6b CI/source-distribution implementation: `.github/workflows/ci.yml` pins GCC 15/Clang 21 containers and
   adds full build/test, Clang ASan+UBSan, forced SQLite fallback, and optional-physics jobs. This unit
-  remains pending until committed and green on GitHub; local sanitizer completion is constrained by
-  LeakSanitizer/ptrace in the current agent environment.
+  is committed and awaits a green GitHub run; `sdk_bundle.py`/`portable_stage.py` and archive/offline
+  consumer coverage are green locally. Local sanitizer completion is constrained by LeakSanitizer/ptrace
+  in the current agent environment.
 - Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate, then
-  C6b (SDK source publishing/release metadata/archive-offline and portable staging) before the
-  release candidate C7. System SDK installation and native application packaging stay outside 1.0. New
+- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate,
+  obtain a green remote C6 CI run, then align final release metadata/signing before release candidate
+  C7. System SDK installation and native application packaging stay outside 1.0. New
   templates, i18n, keyframes/ColorSpace sugar, component motion slots, image 9-patch/atlas, and audio
   stay outside the closure line unless an acceptance gate explicitly requires them.

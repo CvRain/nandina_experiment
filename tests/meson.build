@@ -290,13 +290,17 @@ test(
     'nandina-cli',
     nandina_cli_test,
     args: [nandina, meson.project_source_root()],
-    timeout: 300,
+    timeout: 600,
 )
-nanres_install_test = find_program('nanres_install_test.py')
+portable_stage_test = find_program('portable_stage_test.py')
 test(
-    'nanres-install',
-    nanres_install_test,
-    args: [meson.project_source_root() / 'tools' / 'nanres_install.py'],
+    'portable-stage',
+    portable_stage_test,
+    args: [
+        meson.project_source_root() / 'tools' / 'portable_stage.py',
+        nanres,
+        nanres_package_probe,
+    ],
 )
 nanres_build_workflow_test = find_program('nanres_build_workflow_test.py')
 test(
@@ -311,8 +315,11 @@ nandina_subproject_fixture_test = find_program('nandina_subproject_fixture_test.
 test(
     'nandina-subproject-fixture',
     nandina_subproject_fixture_test,
-    args: [meson.project_source_root()],
-    timeout: 300,
+    args: [
+        meson.project_source_root(),
+        meson.project_source_root() / 'tools' / 'sdk_bundle.py',
+    ],
+    timeout: 600,
 )
 font_resource_tests = executable(
     'font_resource_tests',

@@ -147,11 +147,11 @@ nanres = executable(
 # 放在 tools/ 子目录，构建产物为 buildDir/tools/nandina。
 subdir('tools')
 nanres_build_helper = [python, files('tools/nanres_build_helper.py')]
-nanres_install_helper = [python, files('tools/nanres_install.py')]
+nandina_portable_stage_helper = [python, files('tools/portable_stage.py')]
 nandina_resource_toolchain = {
     'nanres': nanres,
     'build_helper': nanres_build_helper,
-    'install_helper': nanres_install_helper,
+    'stage_helper': nandina_portable_stage_helper,
     'template': files('meson/nandina_resources.build'),
 }
 if not meson.is_subproject()

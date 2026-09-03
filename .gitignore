@@ -114,3 +114,4 @@ dev-docs-*
 /subprojects/libpng-*/
 /subprojects/libpng.wrap
 /subprojects/tomlplusplus-*/
+/dist/
