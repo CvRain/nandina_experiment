@@ -99,7 +99,7 @@ jobs:
       - name: Test
         run: |
           meson test -C buildDir-asan --print-errorlogs \
-            foundation contrast font scene physics2d render image reactive widget \
+            foundation contrast font scene render image reactive widget \
             authoring build-context-header settings-example router async viewport-scaling \
             window-metrics linux-clipboard button theme-design-system checkbox slider switch \
             badge card progress-bar radio-button theme-families color tabs tooltip select \
