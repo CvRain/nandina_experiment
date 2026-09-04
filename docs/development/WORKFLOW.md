@@ -440,14 +440,15 @@ history follows:
   `loading`; decoded RGBA waiting for the per-frame upload budget applies byte backpressure. Linux
   platform paths now expose validated XDG config/data/state/cache roots through
   `NanApplication::platform_paths()` while retaining executable-relative and XDG resource lookup.
-- C6a/C6b CI/source-distribution implementation: `.github/workflows/ci.yml` pins GCC 15/Clang 21 containers and
-  adds full build/test, Clang ASan+UBSan, forced SQLite fallback, and optional-physics jobs. This unit
-  is committed and awaits a green GitHub run; `sdk_bundle.py`/`portable_stage.py` and archive/offline
-  consumer coverage are green locally. Local sanitizer completion is constrained by LeakSanitizer/ptrace
-  in the current agent environment.
+- C6a/C6b CI/source-distribution implementation: `.github/workflows/ci.yml` pins GCC 16/Clang 21 containers
+  and adds full build/test, Clang ASan+UBSan, forced SQLite fallback, and optional-physics jobs. The
+  workflow is now green remotely (run 33821969774: build gcc/clang, sanitize, SQLite fallback, physics).
+  `sdk_bundle.py`/`portable_stage.py` and archive/offline consumer coverage are green locally. ASan
+  caught a real heap-use-after-free in `MemoryBackend::insert` (fixed); the settings-example font-pipeline
+  leak is test-local and its sanitizer lane runs with leak detection off (UAF/UB detection retained).
 - Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate,
-  obtain a green remote C6 CI run, then align final release metadata/signing before release candidate
-  C7. System SDK installation and native application packaging stay outside 1.0. New
-  templates, i18n, keyframes/ColorSpace sugar, component motion slots, image 9-patch/atlas, and audio
-  stay outside the closure line unless an acceptance gate explicitly requires them.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate, then
+  align final release metadata/signing before release candidate C7. System SDK installation and native
+  application packaging stay outside 1.0. New templates, i18n, keyframes/ColorSpace sugar, component
+  motion slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
+  explicitly requires them.
