@@ -41,7 +41,6 @@ namespace nandina::resource
         }
         std::unique_lock lock(impl_->mutex);
         const auto id_entry = impl_->ids.find(id);
-        const auto key_entry = impl_->keys.find(key);
         if (impl_->aliases.contains(key)) {
             return std::unexpected(
                 ResourceError {
@@ -61,7 +60,7 @@ namespace nandina::resource
                     }
                 );
             }
-            if (key_entry != impl_->keys.end() || impl_->aliases.contains(key)) {
+            if (impl_->keys.contains(key)) {
                 return std::unexpected(
                     ResourceError {
                         ResourceErrorCode::duplicate_key,
@@ -74,6 +73,8 @@ namespace nandina::resource
         if (id_entry != impl_->ids.end()) {
             impl_->keys.erase(id_entry->second->key());
         }
+        // 上面的 erase 可能已删除 key 对应的映射，须重新查询以避免悬空迭代器。
+        const auto key_entry = impl_->keys.find(key);
         if (key_entry != impl_->keys.end() && key_entry->second != id) {
             const auto replaced_id = key_entry->second;
             std::erase_if(impl_->aliases, [replaced_id](const auto& entry) {
