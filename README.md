@@ -82,7 +82,7 @@ Layout, input, text, render device, platform window
 ```sh
 meson setup buildDir
 meson compile -C buildDir
-meson test -C buildDir --no-rebuild          # 44/44（physics2d enabled）
+meson test -C buildDir --no-rebuild          # 45/45（physics2d enabled）
 ./buildDir/example/settings_example/nandina_settings_example
 ```
 
@@ -92,14 +92,14 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
 ## 当前状态与路线图
 
 - **1.0（收尾中）**：核心引擎（场景树/响应式/组件/主题/路由/文本/可访问性）全部落地；
-  当前完整配置 `tests/` 44/44 绿。资源交付工具链 `nanres`（扫描/校验/锁/打包/portable staging）R0–R10 完成，
+  当前完整配置 `tests/` 45/45 绿。资源交付工具链 `nanres`（扫描/校验/锁/打包/portable staging）R0–R10 完成，
   D2（运行时 build-tree 包定位 + `[[resources]]` per-resource 覆盖）完成；D3 原型已具备
   `nandina new`/`build`/`run`/`doctor`。当前 C2.1 正将 CLI 拆分到平行的 `NandinaCLI`
   仓库；registry/archive 获取、分层软件源、镜像、SDK 锁、校验缓存、Meson wrap 以及
   `build`/`run`/`doctor` 已在独立仓库落地；Git fork 固定提交、显式 path 开发模式和
   source 增删启停、Ed25519 签名索引、离线重验及 POSIX/Windows 平台后端也已完成，
-  C2.1 代码合同闭合。Windows/macOS 原生支持声明继续由 D4 CI 决定。D4
-  （交叉编译/CI 分发）待做。1.0 的最低承诺是 Linux + C++26 + Meson/Ninja + Git submodule；完整验收门禁见
+  C2.1 代码合同闭合。Windows/macOS 原生支持声明继续由 D4 CI 决定。C6 的 CI、源码归档和
+  portable/offline 验证已完成，C6.1 发布元数据对齐已完成；1.0 的最低承诺是 Linux + C++26 + Meson/Ninja + Git submodule；完整验收门禁见
   `docs/development/1.0_ACCEPTANCE.md`，正式仓库晋升流程见
   `docs/development/1.0_PROMOTION_PLAN.md`。
 - **1.1（进行中）**：声明式可定制动画系统（per-node opacity、组合器、spring/keyframes、
@@ -113,6 +113,7 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
 - `docs/development/WORKFLOW.md` —— 当前进度快照与后续项。
 - `docs/development/1.0_ACCEPTANCE.md` —— Linux 1.0 支持边界、门禁与收尾顺序。
 - `docs/development/1.0_PROMOTION_PLAN.md` —— 晋升正式仓库、归档 1.x 与 2.0 分工。
+- `docs/development/RELEASE_METADATA.md` —— 版本、CLI 兼容性、支持边界与发布元数据契约。
 - `docs/development/NANDINA_CLI_DISTRIBUTION.md` —— 独立 CLI、软件源、SDK 锁与制品合同。
 - `docs/development/THEME_FAMILIES.md` —— 主题族设计。
 - `docs/development/SOFT_SHADOWS.md` —— 软阴影设计。

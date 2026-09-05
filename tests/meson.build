@@ -321,6 +321,12 @@ test(
     ],
     timeout: 600,
 )
+release_metadata_test = find_program('release_metadata_test.py')
+test(
+    'release-metadata',
+    release_metadata_test,
+    args: [meson.project_source_root()],
+)
 font_resource_tests = executable(
     'font_resource_tests',
     files('font_resource_tests.cpp'),

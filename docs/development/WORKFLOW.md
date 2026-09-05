@@ -105,7 +105,7 @@ Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
 **Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
-accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 43/43 green.
+accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 45/45 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
 commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
@@ -446,9 +446,13 @@ history follows:
   `sdk_bundle.py`/`portable_stage.py` and archive/offline consumer coverage are green locally. ASan
   caught a real heap-use-after-free in `MemoryBackend::insert` (fixed); the settings-example font-pipeline
   leak is test-local and its sanitizer lane runs with leak detection off (UAF/UB detection retained).
-- Test suite 44/44 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate, then
-  align final release metadata/signing before release candidate C7. System SDK installation and native
+- C6.1 release metadata alignment is complete: a root `release-metadata.toml` is the reviewable
+  identity for the pre-1.0 SDK, while `meson.build`, source-bundle defaults, the changelog, and the
+  Linux support contract are checked for drift. The revision stays `unreleased` until an RC freeze,
+  and license selection remains an explicit C7 decision.
+- Test suite 45/45 green.
+- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate,
+  then review C6.1 metadata before release candidate C7. System SDK installation and native
   application packaging stay outside 1.0. New templates, i18n, keyframes/ColorSpace sugar, component
   motion slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.

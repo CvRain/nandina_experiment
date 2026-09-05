@@ -1109,14 +1109,16 @@ belongs to C6/C8.
 
 #### D4. Distribution And CI
 
-Status: C6a/C6b implemented and undergoing remote validation. The workflow pins GCC 15 and
+Status: C6a/C6b implemented and remotely green (run 33821969774). The workflow pins GCC 16 and
 Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optional physics. The
 `sdk_bundle.py` helper emits reproducible `.tar.xz`/`.tar.zst`/`.zip` source bundles,
 `sdk-manifest.json`, and a CLI-compatible `index.toml`; Linux 1.0 indexes the `.tar.xz` artifact so
 Meson remains compatible with Python 3.11. The archive consumer fixture populates Meson's package cache and
 configures with `--wrap-mode=nodownload`. `portable_stage.py` atomically publishes a relocatable
-executable plus `resources.db`/`external/` tree and excludes build-only metadata. One remote CI pass
-is still required before C7.
+executable plus `resources.db`/`external/` tree and excludes build-only metadata. C6.1 now tracks
+release identity in the root `release-metadata.toml`; the metadata test prevents Meson, bundle,
+changelog, and support-profile drift before C7. One second-device manual pass and the C7 release
+ceremony remain before promotion.
 
 Document recursive submodule checkout, clean application builds, offline/default builds,
 executable-relative/XDG resource lookup, deterministic lock/package regeneration, and relocatable

@@ -14,6 +14,7 @@ import stat
 import subprocess
 import tarfile
 import tempfile
+import tomllib
 import zipfile
 
 
@@ -215,21 +216,33 @@ def write_atomic(path: pathlib.Path, content: str) -> None:
     os.replace(temporary, path)
 
 
+def release_metadata(source: pathlib.Path) -> dict[str, object]:
+    path = source / "release-metadata.toml"
+    if not path.is_file():
+        return {}
+    with path.open("rb") as stream:
+        return tomllib.load(stream)
+
+
 def main() -> int:
     parser = argparse.ArgumentParser(description="Build reproducible NandinaUI source SDK bundles")
     parser.add_argument("--source", type=pathlib.Path, default=pathlib.Path.cwd())
     parser.add_argument("--output", type=pathlib.Path, required=True)
-    parser.add_argument("--version", required=True)
-    parser.add_argument("--minimum-cli", default="0.2.0")
+    parser.add_argument("--version")
+    parser.add_argument("--minimum-cli")
     parser.add_argument("--repository", default="official")
-    parser.add_argument("--channel", default="stable")
+    parser.add_argument("--channel")
     parser.add_argument("--allow-dirty", action="store_true")
     options = parser.parse_args()
+    metadata = release_metadata(options.source.resolve())
+    version = options.version or str(metadata.get("sdk_version", ""))
+    minimum_cli = options.minimum_cli or str(metadata.get("minimum_cli", ""))
+    channel = options.channel or str(metadata.get("release_channel", "stable"))
     for name, value in {
-        "version": options.version,
-        "minimum CLI version": options.minimum_cli,
+        "version": version,
+        "minimum CLI version": minimum_cli,
         "repository": options.repository,
-        "channel": options.channel,
+        "channel": channel,
     }.items():
         if not IDENTIFIER.fullmatch(value):
             raise SystemExit(f"invalid {name}: {value}")
@@ -244,7 +257,7 @@ def main() -> int:
     )
     paths = git_paths(source, options.allow_dirty)
     output.mkdir(parents=True, exist_ok=True)
-    root_name = f"nandina-sdk-{options.version}"
+    root_name = f"nandina-sdk-{version}"
     license_path = next(
         (name for name in ("LICENSE", "LICENSE.txt", "COPYING") if (source / name).is_file()),
         None,
@@ -252,13 +265,16 @@ def main() -> int:
     internal = {
         "schema": 1,
         "name": "NandinaUI",
-        "version": options.version,
-        "minimum_cli": options.minimum_cli,
+        "version": version,
+        "minimum_cli": minimum_cli,
         "revision": revision,
         "dirty": dirty,
         "license": license_path,
         "submodules": submodule_manifest(source),
     }
+    for key in ("release_channel", "support_profile", "license_status", "known_limitations"):
+        if key in metadata:
+            internal[key] = metadata[key]
     internal_bytes = (json.dumps(internal, indent=2, sort_keys=True) + "\n").encode("utf-8")
 
     xz_path = output / f"{root_name}-source.tar.xz"
@@ -283,13 +299,13 @@ def main() -> int:
         f'repository = "{options.repository}"\n\n'
         "[[packages]]\n"
         'name = "NandinaUI"\n'
-        f'version = "{options.version}"\n'
-        f'channel = "{options.channel}"\n'
+        f'version = "{version}"\n'
+        f'channel = "{channel}"\n'
         f'artifact = "{primary["filename"]}"\n'
         f'size = {primary["size"]}\n'
         f'sha256 = "{primary["sha256"]}"\n'
         f'directory = "{root_name}"\n'
-        f'minimum_cli = "{options.minimum_cli}"\n'
+        f'minimum_cli = "{minimum_cli}"\n'
     )
     write_atomic(output / "index.toml", index)
     return 0
