@@ -99,7 +99,7 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
   `build`/`run`/`doctor` 已在独立仓库落地；Git fork 固定提交、显式 path 开发模式和
   source 增删启停、Ed25519 签名索引、离线重验及 POSIX/Windows 平台后端也已完成，
   C2.1 代码合同闭合。Windows/macOS 原生支持声明继续由 D4 CI 决定。C6 的 CI、源码归档和
-  portable/offline 验证已完成，C6.1 发布元数据对齐已完成；1.0 的最低承诺是 Linux + C++26 + Meson/Ninja + Git submodule；完整验收门禁见
+  portable/offline 验证已完成，当前发布标识为 `0.1.0-alpha.1`；这是 Linux + C++26 的预 1.0 源码消费版本，完整验收门禁见
   `docs/development/1.0_ACCEPTANCE.md`，正式仓库晋升流程见
   `docs/development/1.0_PROMOTION_PLAN.md`。
 - **1.1（进行中）**：声明式可定制动画系统（per-node opacity、组合器、spring/keyframes、
@@ -114,6 +114,7 @@ sqlite3、tomlplusplus、nlohmann/json、box2d（可选）、Catch2。C++26（cl
 - `docs/development/1.0_ACCEPTANCE.md` —— Linux 1.0 支持边界、门禁与收尾顺序。
 - `docs/development/1.0_PROMOTION_PLAN.md` —— 晋升正式仓库、归档 1.x 与 2.0 分工。
 - `docs/development/RELEASE_METADATA.md` —— 版本、CLI 兼容性、支持边界与发布元数据契约。
+- `docs/development/LICENSING.md` —— 商业使用、署名与修改回馈的许可证建议。
 - `docs/development/NANDINA_CLI_DISTRIBUTION.md` —— 独立 CLI、软件源、SDK 锁与制品合同。
 - `docs/development/THEME_FAMILIES.md` —— 主题族设计。
 - `docs/development/SOFT_SHADOWS.md` —— 软阴影设计。

@@ -1,7 +1,7 @@
 project(
     'nandina_experiment',
     'cpp',
-    version: '0.1.0',
+    version: '0.1.0-alpha.1',
     default_options: ['default_library=static', 'cpp_std=c++26'],
 )
 

@@ -104,7 +104,7 @@ silently reordered during implementation.
 Snapshot of the active milestone and step, refreshed each round so history stays
 readable:
 
-**Current state (1.x line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
+**Current state (pre-1.0 alpha line)**: the 1.0 core (scene/reactive/widgets/theme/router/text/
 accessibility) and the 1.1 authoring/animation/image/font work are landed; `tests/` is 45/45 green.
 The resource-delivery line R0–R10, the experiment-local D1–D3 prototype, and the independent
 NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's automated desktop edit
@@ -447,9 +447,9 @@ history follows:
   caught a real heap-use-after-free in `MemoryBackend::insert` (fixed); the settings-example font-pipeline
   leak is test-local and its sanitizer lane runs with leak detection off (UAF/UB detection retained).
 - C6.1 release metadata alignment is complete: a root `release-metadata.toml` is the reviewable
-  identity for the pre-1.0 SDK, while `meson.build`, source-bundle defaults, the changelog, and the
+  identity for the `0.1.0-alpha.1` SDK, while `meson.build`, source-bundle defaults, the changelog, and the
   Linux support contract are checked for drift. The revision stays `unreleased` until an RC freeze,
-  and license selection remains an explicit C7 decision.
+  and the selected MIT license is present at the repository root and covered by the metadata test.
 - Test suite 45/45 green.
 - Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate,
   then review C6.1 metadata before release candidate C7. System SDK installation and native

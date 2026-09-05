@@ -21,10 +21,11 @@ def main() -> int:
     assert metadata["name"] == "NandinaUI"
     assert SEMVER.fullmatch(metadata["sdk_version"])
     assert SEMVER.fullmatch(metadata["minimum_cli"])
-    assert metadata["release_channel"] == "pre-1.0"
+    assert metadata["release_channel"] == "alpha"
     assert metadata["support_profile"] == "linux-desktop-source"
     assert metadata["revision"] == "unreleased"
-    assert metadata["license_status"] == "pending"
+    assert metadata["license"] == "MIT"
+    assert metadata["license_status"] == "confirmed"
     assert metadata["known_limitations"]
 
     project_version = re.search(r"version:\s*'([^']+)'", meson)
@@ -33,12 +34,14 @@ def main() -> int:
     assert 'metadata.get("minimum_cli"' in bundle
     assert 'metadata.get("sdk_version"' in bundle
 
-    assert changelog.startswith("# Changelog\n\n## Unreleased (pre-1.0)")
+    assert changelog.startswith("# Changelog\n\n## 0.1.0-alpha.1 (unreleased)")
     assert "installation into system" in changelog
     assert "Windows/macOS" in changelog
     assert "C6.1" in acceptance
     assert "license status" in acceptance
-    assert not any((root / name).is_file() for name in ("LICENSE", "LICENSE.txt", "COPYING"))
+    license_text = (root / "LICENSE").read_text(encoding="utf-8")
+    assert license_text.startswith("MIT License\n")
+    assert "Copyright (c) 2026 ClaudeRainer" in license_text
     return 0
 
 

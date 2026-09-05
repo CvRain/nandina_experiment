@@ -1,6 +1,6 @@
 # Changelog
 
-## Unreleased (pre-1.0)
+## 0.1.0-alpha.1 (unreleased)
 
 The C++26 experiment line currently targets a Linux desktop source-consumption release. The C6
 quality and source-distribution work is complete: GCC/Clang CI, sanitizer coverage, SQLite fallback,
