@@ -1115,10 +1115,11 @@ Clang 21 containers, runs the full suite, ASan+UBSan, SQLite fallback, and optio
 `sdk-manifest.json`, and a CLI-compatible `index.toml`; Linux 1.0 indexes the `.tar.xz` artifact so
 Meson remains compatible with Python 3.11. The archive consumer fixture populates Meson's package cache and
 configures with `--wrap-mode=nodownload`. `portable_stage.py` atomically publishes a relocatable
-executable plus `resources.db`/`external/` tree and excludes build-only metadata. C6.1 now tracks
+executable plus `resources.db`/`external/` tree and excludes build-only metadata. C5's second-device
+manual gate now passes on CachyOS under Hyprland and Plasma. C6.1 now tracks
 release identity in the root `release-metadata.toml`; the metadata test prevents Meson, bundle,
-changelog, and support-profile drift before C7. One second-device manual pass and the C7 release
-ceremony remain before promotion.
+changelog, and support-profile drift before C7. Only the C7 release ceremony remains before
+promotion.
 
 Document recursive submodule checkout, clean application builds, offline/default builds,
 executable-relative/XDG resource lookup, deterministic lock/package regeneration, and relocatable

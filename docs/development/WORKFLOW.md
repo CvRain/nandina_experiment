@@ -111,7 +111,7 @@ NandinaCLI C2.1 workflow and the C3 packaged-image path are complete. C4's autom
 commands are complete through the platform-neutral contract in `TEXT_EDITING.md`. GNOME Wayland +
 fcitx5 committed CJK input and desktop commands are manually recorded. Hyprland end-to-end and
 owner clipboard acceptance pass after fixing the embedded-editor clipboard ownership boundary.
-C4 is closed; C5 is active and its platform facts/manual gate are tracked in `LINUX_PLATFORM.md`.
+C4 is closed; C5 is complete and its platform facts/manual record are tracked in `LINUX_PLATFORM.md`.
 The first-device C5.1 DPI/resize baseline is committed. C5.2 now defines `system` appearance and
 motion as one host-injected snapshot with light/full fallback; it deliberately installs no implicit
 Linux desktop observer. C5.3 window-scoped bounded font/image residency prevents Router replacement
@@ -122,8 +122,8 @@ resource read (`ResourceManager::require`) onto the same background worker with 
 cancellation (C5.5a), then adds concurrent-decode and in-flight-encoded-byte budgets with lazy
 queuing plus bounded failure retry (C5.5b). C5.6 adds a per-frame upload budget (`begin_frame` +
 `drain_uploads`), viewport-gated loading via `Image::set_prefetch_distance`, and priority-ordered
-decode submission (visible > near > far), all exercised in the Gallery. The second-device manual
-record remains open.
+  decode submission (visible > near > far), all exercised in the Gallery. The second-device record
+  covers CachyOS under Hyprland and Plasma, including touchpad interaction; C5 is closed.
 The active sequence remains the C0-C8 Linux 1.0 closure contract in `1.0_ACCEPTANCE.md`: make the
 Linux platform promise truthful, finish D4, freeze an RC, and promote
 it to the official repository through `1.0_PROMOTION_PLAN.md`. i18n is deferred past 1.0. Detailed
@@ -451,8 +451,7 @@ history follows:
   Linux support contract are checked for drift. The revision stays `unreleased` until an RC freeze,
   and the selected MIT license is present at the repository root and covered by the metadata test.
 - Test suite 45/45 green.
-- Next (1.0 closure): complete the C5.4 Gallery manual gate and the remaining Linux platform gate,
-  then review C6.1 metadata before release candidate C7. System SDK installation and native
+- Next (1.0 closure): freeze the C7 release candidate. C5 and C6.1 are complete; system SDK installation and native
   application packaging stay outside 1.0. New templates, i18n, keyframes/ColorSpace sugar, component
   motion slots, image 9-patch/atlas, and audio stay outside the closure line unless an acceptance gate
   explicitly requires them.
